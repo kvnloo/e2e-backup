@@ -259,6 +259,18 @@ await device.openLink('myapp://orders/42');
 await expect(screen.getByText('Order #42')).toBeVisible();
 ```
 
+To start the app from a link, declare
+[`app.linkBase`](/reference/config#linkbase) on the target and pass
+`relaunch`. If the app is running, it's stopped first, so the link launches
+it:
+
+```ts
+await app.open('/orders/42', { relaunch: true });
+```
+
+You can share this test with a web target. There, the page is recreated
+before the path opens.
+
 `device.setNetwork('offline')` and `device.setAirplaneMode(true)` work on
 Android only. An iOS simulator shares the Mac's network, and simctl can only
 change its status bar, so on iOS both fail with `UNSUPPORTED_CAPABILITY`.

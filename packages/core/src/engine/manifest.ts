@@ -28,6 +28,7 @@ const KNOWN_KEYS = [
   'performAt',
   'pointerActions',
   'tapModifiers',
+  'linkRelaunch',
   'selectsDevice',
   'launchArgumentValues',
   'keyboard',
@@ -279,6 +280,12 @@ export function defineEngine<Fixtures extends object = {}>(declared: EngineSpec<
       throw invalid(name, 'declares tapModifiers without perform: modifiers ride the tap actions perform receives');
     }
   }
+  if (spec.linkRelaunch !== undefined) {
+    if (typeof spec.linkRelaunch !== 'boolean') throw invalid(name, 'linkRelaunch must be a boolean');
+    if (spec.linkRelaunch && spec.session?.openLink === undefined) {
+      throw invalid(name, 'declares linkRelaunch without session.openLink: relaunch is passed to openLink');
+    }
+  }
   if (spec.selectsDevice !== undefined) {
     if (typeof spec.selectsDevice !== 'boolean') throw invalid(name, 'selectsDevice must be a boolean');
     if (spec.selectsDevice && spec.prepare === undefined) throw invalid(name, 'declares selectsDevice without prepare: prepare binds the device --device names');
@@ -304,6 +311,7 @@ export function defineEngine<Fixtures extends object = {}>(declared: EngineSpec<
   }
   if (spec.actions !== undefined) handle['actions'] = declaredKinds(name, 'actions', spec.actions, KNOWN_LOCATOR_ACTION_KINDS);
   if (spec.tapModifiers === true) handle['tapModifiers'] = true;
+  if (spec.linkRelaunch === true) handle['linkRelaunch'] = true;
   if (spec.selectsDevice === true) handle['selectsDevice'] = true;
   if (spec.launchArgumentValues === true) handle['launchArgumentValues'] = true;
   if (spec.isolation === 'worker') handle['isolation'] = 'worker';

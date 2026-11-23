@@ -15,6 +15,7 @@ import type { DebugTrace } from '../internal/debug.ts';
 import { ConfigurationError, errorMessage, InfrastructureError, TestError } from '../internal/errors.ts';
 import { Deadline } from '../internal/time.ts';
 import { didYouMean } from '../internal/suggest.ts';
+import { rejectUnknownOptions } from '../internal/options.ts';
 import { createScreenshotContext, type ScreenshotContext, type WrittenScreenshots } from './screenshots.ts';
 import { sessionRecordings } from './recordings.ts';
 import { resolveSecretValue, sessionLedger } from './secrecy.ts';
@@ -31,7 +32,7 @@ import {
 } from '../locator/screen.ts';
 import { engineAppInfo, joinLink, refusesLink } from '../config/app.ts';
 import type { ResolvedAgentConfig, ResolvedConfig, ResolvedTarget } from '../config/resolve.ts';
-import type { App, CommandConfig, Expectable, FixtureScope, RecordingOptions, SetupSession, TestFixtures } from '../types.ts';
+import type { App, AppOpenOptions, CommandConfig, Expectable, FixtureScope, RecordingOptions, SetupSession, TestFixtures } from '../types.ts';
 import type { StepRecord, StepRecorder } from './steps.ts';
 
 export interface ArtifactSink {
@@ -619,12 +620,18 @@ export function createApp(
     }
   };
 
-  /** One recorded navigation: resolved against the base URL, on the test budget. */
-  const navigate = (api: string, label: string, url: string | undefined): Promise<void> =>
+  /**
+   * One recorded navigation: resolved against the base URL, on the test
+   * budget. With relaunch, the context is recreated first, as in
+   * `app.restart()`, within the same budget.
+   */
+  const navigate = (api: string, label: string, url: string | undefined, relaunch: boolean): Promise<void> =>
     steps.run('app', api, label, async () => {
       requireAppUrl(target);
       const resolved = url === undefined ? target.app.base.href : resolveNavigationUrl(url, target.app.base).url;
-      await openAt(resolved, lifecycleMs());
+      const deadline = new Deadline(lifecycleMs());
+      if (relaunch) await engine.session.app.restart(engine.operation(deadline.remaining()));
+      await openAt(resolved, deadline.remaining());
     });
 
   /**
@@ -649,15 +656,23 @@ export function createApp(
    * what a test calls before it looks at the screen. A path has nowhere to
    * go there; a link goes through `device.openLink`. An engine without a
    * relaunch hook is refused here; one with a hook reports its own reason it
-   * cannot launch, such as a build not installed yet.
+   * cannot launch, such as a build not installed yet. A link with relaunch
+   * needs an engine that declares `linkRelaunch`. Otherwise an older engine
+   * would open the link in the running app.
    */
-  const launchPinnedApp = (openPath: string | undefined): Promise<void> =>
+  const launchPinnedApp = (openPath: string | undefined, relaunch: boolean): Promise<void> =>
     steps.run('app', 'app.open', openPath ?? '', async () => {
       const { linkBase } = target.app;
       if (openPath !== undefined && linkBase !== undefined) {
         const link = joinLink(linkBase, openPath);
         if (refusesLink(link)) throw new ConfigurationError('POLICY_DENIED', `app.open() refuses the link's scheme on target "${target.name}"`);
-        await engine.session.app.openLink(link, engine.operation(lifecycleMs()));
+        if (relaunch && target.engine?.linkRelaunch !== true) {
+          throw new ConfigurationError(
+            'UNSUPPORTED_CAPABILITY',
+            `app.open(path, { relaunch: true }) cannot start the app from a link on target "${target.name}": engine ${target.engine?.name ?? 'none'} does not declare linkRelaunch`,
+          );
+        }
+        await engine.session.app.openLink(link, engine.operation(lifecycleMs()), relaunch ? { relaunch: true } : undefined);
         return;
       }
       if (openPath !== undefined) {
@@ -677,10 +692,22 @@ export function createApp(
 
   return {
     baseUrl: target.app.base === undefined ? undefined : baseUrlOf(target.app.base),
-    open: (openPath?: string) =>
-      target.app.base === undefined && !engine.session.verbs.has('navigate')
-        ? launchPinnedApp(openPath)
-        : navigate('app.open', openPath ?? '/', openPath),
+    async open(openPath?: string, options?: AppOpenOptions): Promise<void> {
+      if (openPath !== undefined && typeof openPath !== 'string') {
+        throw new TestError('INVALID_ARGUMENT', 'app.open takes a path string first, then options: app.open(path, { relaunch: true })');
+      }
+      rejectUnknownOptions('app.open', options, ['relaunch']);
+      if (options?.relaunch !== undefined && typeof options.relaunch !== 'boolean') {
+        throw new TestError('INVALID_ARGUMENT', 'app.open relaunch must be a boolean');
+      }
+      const relaunch = options?.relaunch === true;
+      if (target.app.base === undefined && !engine.session.verbs.has('navigate')) {
+        await launchPinnedApp(openPath, relaunch);
+        return;
+      }
+
+      await navigate('app.open', openPath ?? '/', openPath, relaunch);
+    },
     restart: () => steer('app.restart', (operation) => engine.session.app.restart(operation)),
     clearState: () => steer('app.clearState', (operation) => engine.session.app.reset(operation)),
     async back(): Promise<void> {

@@ -240,6 +240,7 @@ class EngineClient {
         actions: manifest.actions,
         pointerActions: manifest.pointerActions,
         tapModifiers: manifest.tapModifiers,
+        linkRelaunch: manifest.linkRelaunch,
         selectsDevice: manifest.selectsDevice,
         launchArgumentValues: manifest.launchArgumentValues,
         isolation: manifest.isolation,

@@ -176,6 +176,14 @@ void (async () => {
   void video.path;
 })();
 
+void (async () => {
+  await appFixture.open('/orders/42', { relaunch: true });
+  // @ts-expect-error relaunch is a boolean
+  await appFixture.open('/orders/42', { relaunch: 'yes' });
+  // @ts-expect-error app.open takes relaunch and nothing else
+  await appFixture.open('/orders/42', { timeout: 1_000 });
+})();
+
 void (screen.tree() satisfies Promise<string>);
 void (screen.debug({ timeout: 1000 }) satisfies Promise<void>);
 // @ts-expect-error tree reads the whole screen; a locator does not scope it

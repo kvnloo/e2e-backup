@@ -71,6 +71,14 @@ describe('defineEngine', () => {
     );
   });
 
+  it('carries linkRelaunch onto the handle only with session.openLink, and only as a boolean', () => {
+    const session = { openLink: async () => undefined };
+    expect(defineEngine(observingEngine({ session, linkRelaunch: true })).linkRelaunch).toBe(true);
+    expect(defineEngine(observingEngine({ session, linkRelaunch: false })).linkRelaunch).toBeUndefined();
+    expect(() => defineEngine(observingEngine({ linkRelaunch: true }))).toThrow(/linkRelaunch without session.openLink/);
+    expect(() => defineEngine(observingEngine({ session, linkRelaunch: 'yes' as never }))).toThrow(/linkRelaunch must be a boolean/);
+  });
+
   it('keeps the SPI v1 list stable and accepts an explicitly declared upload action', () => {
     const perform = async () => undefined;
     const legacy = defineEngine(observingEngine({ actions: LOCATOR_ACTION_KINDS, perform }));

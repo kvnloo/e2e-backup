@@ -412,10 +412,12 @@ describe('e2e/core', { timeout: 60_000 }, () => {
     const session = await opened.newSession();
     await session.app.open('/products/A-1001');
     await session.app.open('https://shop.example.com/orders/42');
+    await session.app.open('/orders/43', { relaunch: true });
     await expect(session.app.open('javascript:alert(1)')).rejects.toMatchObject({ code: 'POLICY_DENIED' });
-    expect(fake.callsOf(fake.attempts[0]!.attemptId, 'session').filter((call) => call.method === 'openLink').map((call) => call.url)).toEqual([
-      'shopapp://products/A-1001',
-      'https://shop.example.com/orders/42',
+    expect(fake.callsOf(fake.attempts[0]!.attemptId, 'session').filter((call) => call.method === 'openLink').map(({ url, relaunch }) => ({ url, relaunch }))).toEqual([
+      { url: 'shopapp://products/A-1001', relaunch: undefined },
+      { url: 'https://shop.example.com/orders/42', relaunch: undefined },
+      { url: 'shopapp://orders/43', relaunch: true },
     ]);
     await session.close();
     await expect(host(createFakeEngine({ device: true }).engine, { app: { bundleId: 'com.example.shop', linkBase: 'shopapp://' } }))

@@ -815,6 +815,41 @@ describe('app steering hooks', () => {
     expect(runtime(empty()).fixtures.app.baseUrl).toBeUndefined();
   });
 
+  it('app.open(path, { relaunch: true }) recreates the context, then opens the path, as one app.open step', async () => {
+    const { engine, calls, app } = steerable({ url: 'http://127.0.0.1:4599' });
+    const { fixtures, steps } = runtime(engine, {}, app);
+    await fixtures.app.open('/orders/42', { relaunch: true });
+    await fixtures.app.open('/orders/43', { relaunch: false });
+    expect(calls).toEqual(['restart', 'open http://127.0.0.1:4599/orders/42', 'open http://127.0.0.1:4599/orders/43']);
+    expect(steps.all().map((step) => [step.api, step.label, step.status])).toEqual([
+      ['app.open', '/orders/42', 'passed'],
+      ['app.open', '/orders/43', 'passed'],
+    ]);
+  });
+
+  it('app.open refuses options it does not take before the engine sees anything', async () => {
+    const { engine, calls, app } = steerable({ url: 'http://127.0.0.1:4599' });
+    const { fixtures, steps } = runtime(engine, {}, app);
+    await expect(fixtures.app.open('/', { relanch: true } as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: 'app.open options has no key "relanch"; it takes relaunch',
+    });
+    await expect(fixtures.app.open('/', { relaunch: 'yes' } as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: 'app.open relaunch must be a boolean',
+    });
+    await expect(fixtures.app.open('/', true as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: 'app.open options must be a plain object',
+    });
+    await expect(fixtures.app.open({ relaunch: true } as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: expect.stringContaining('app.open takes a path string first'),
+    });
+    expect(calls).toEqual([]);
+    expect(steps.all()).toEqual([]);
+  });
+
   it('reopen nothing on a surface without an address', async () => {
     const { engine, calls, app } = steerable({});
     const { fixtures } = runtime(engine, {}, app);
@@ -859,6 +894,50 @@ describe('app steering hooks', () => {
       code: 'UNSUPPORTED_CAPABILITY',
       message: expect.stringContaining('does not relaunch a pinned app'),
     });
+  });
+
+  /** A device that opens links in its pinned app, and declares `linkRelaunch` unless told not to. */
+  function linking(linkRelaunch = true) {
+    const calls: string[] = [];
+    const engine = defineEngine({
+      name: 'fake', version: '1', spiVersion: 1,
+      observe: async () => snapshot([]),
+      session: {
+        restart: async () => { calls.push('restart'); },
+        openLink: async (url, _operation, options) => { calls.push(`openLink ${url} ${JSON.stringify(options)}`); },
+      },
+      ...(linkRelaunch ? { linkRelaunch: true } : {}),
+    });
+    return { engine, calls, app: { bundleId: 'com.example.shop', linkBase: 'shopapp://' } };
+  }
+
+  it('app.open(path, { relaunch: true }) on a device asks the engine to relaunch the app from the link', async () => {
+    const { engine, calls, app } = linking();
+    const { fixtures, steps } = runtime(engine, {}, app);
+    await fixtures.app.open('/orders/42', { relaunch: true });
+    await fixtures.app.open('/orders/43');
+    expect(calls).toEqual(['openLink shopapp://orders/42 {"relaunch":true}', 'openLink shopapp://orders/43 undefined']);
+    expect(steps.all().map((step) => [step.api, step.label, step.status])).toEqual([
+      ['app.open', '/orders/42', 'passed'],
+      ['app.open', '/orders/43', 'passed'],
+    ]);
+  });
+
+  it('app.open(path, { relaunch: true }) on an engine without linkRelaunch is UNSUPPORTED_CAPABILITY, never a warm open', async () => {
+    const { engine, calls, app } = linking(false);
+    const { fixtures } = runtime(engine, {}, app);
+    await expect(fixtures.app.open('/orders/42', { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('does not declare linkRelaunch'),
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('app.open({ relaunch: true }) with no path on a device launches the pinned app fresh, as app.open() does', async () => {
+    const { engine, calls, app } = linking();
+    const { fixtures } = runtime(engine, {}, app);
+    await fixtures.app.open(undefined, { relaunch: true });
+    expect(calls).toEqual(['restart']);
   });
 
   it("app.open() keeps the engine's own reason it cannot launch", async () => {

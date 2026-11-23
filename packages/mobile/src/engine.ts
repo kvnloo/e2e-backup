@@ -37,6 +37,7 @@ export function buildEngine(surface: AgentDeviceSurface): MobileEngine {
     // `e2e run --device` names the device `prepare` binds; see DevicePool.prepare.
     ...(surface.pool.selectsDevice ? { selectsDevice: true } : {}),
     launchArgumentValues: true,
+    linkRelaunch: true,
     prepare: (info) => surface.pool.prepare(info),
     finish: (info) => surface.pool.finish(info),
     doctor: (info) => surface.doctor(info),
@@ -66,8 +67,8 @@ export function buildEngine(surface: AgentDeviceSurface): MobileEngine {
       restart: (operation) => surface.restart(operation),
       reset: (operation) => surface.reset(operation),
       // `app.open(path)` on a target with `app.linkBase`: the link opens in the pinned app, as `device.openLink` would.
-      openLink: async (url, operation) =>
-        await surface.openLink(linkTarget(url), undefined, operation.signal, surface.inputBudget('open link', operation)),
+      openLink: async (url, operation, options) =>
+        await surface.openLink(linkTarget(url), undefined, operation.signal, surface.inputBudget('open link', operation), options?.relaunch === true),
     },
     artifacts: {
       screenshot: (label, operation) => surface.screenshot(label, operation, surface.inputBudget('screenshot', operation)),

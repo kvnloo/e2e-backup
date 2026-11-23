@@ -360,6 +360,12 @@ export interface VideoLink {
   readonly startedAt: string;
 }
 
+/** How `EngineSession.openLink` opens a link. */
+export interface OpenLinkOptions {
+  /** Set to launch the pinned app from the link. The app is stopped first if it's running. */
+  readonly relaunch?: boolean;
+}
+
 /**
  * Steering hooks behind the universal `app` fixture and the agent's
  * `navigate` verb. The app itself is the target's `app`, handed over as data;
@@ -383,9 +389,10 @@ export interface EngineSession {
    * Opens a link in the app under test, as a deep link or a universal link
    * would: `app.open(path)` on a target that declares `app.linkBase` lands
    * here with the link joined and its scheme checked. A device engine's hook;
-   * a target whose engine lacks it cannot declare `linkBase`.
+   * a target whose engine lacks it cannot declare `linkBase`. `options` is
+   * `{ relaunch: true }` only for an engine that declares `linkRelaunch`.
    */
-  openLink?(url: string, context: OperationContext): Promise<void>;
+  openLink?(url: string, context: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once in the surface's history. */
   back?(context: OperationContext): Promise<void>;
   /** Sets the viewport to `size` in CSS pixels, for this page and every page the attempt opens after it. */
@@ -805,6 +812,14 @@ export interface Engine {
    * that predates the field never drops one silently.
    */
   readonly tapModifiers?: boolean;
+  /**
+   * `session.openLink` honors `{ relaunch: true }`: it stops the pinned app
+   * if it's running, then opens the link, so the link launches the app. Without
+   * it the harness fails `app.open(path, { relaunch: true })` with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine, so an engine that
+   * predates the field never opens the link in the running app instead.
+   */
+  readonly linkRelaunch?: boolean;
   /**
    * `prepare` binds the target to the device `EnginePrepareInfo.device`
    * names, for `e2e run --device`, over the device the engine was configured

@@ -13,6 +13,7 @@
     "keyboard/press",
     "keyboard/dismiss",
     "artifacts/screenshot",
+    "session/openLink",
     "session/back",
     "session/switchTab",
     "session/closeTab",
@@ -26,6 +27,7 @@
   ],
   "actions": ["tap", "doubleTap", "longPress", "fill", "clear", "press", "check", "uncheck", "focus", "scrollIntoView", "dragTo", "swipe"],
   "pointerActions": ["tap", "doubleTap", "longPress", "dragTo", "swipe", "swipeTo"],
+  "linkRelaunch": true,
   "selectsDevice": true,
   "launchArgumentValues": true,
   "isolation": "worker"

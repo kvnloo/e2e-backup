@@ -118,6 +118,10 @@
     "tapModifiers": {
       "type": "boolean"
     },
+    "linkRelaunch": {
+      "description": "session/openLink honors { relaunch: true }: it stops the pinned app first, so the link launches it.",
+      "type": "boolean"
+    },
     "selectsDevice": {
       "description": "prepare binds the device e2e run --device names.",
       "type": "boolean"
@@ -400,6 +404,27 @@
           "methods": {
             "contains": {
               "const": "artifacts/screenshot"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "linkRelaunch": {
+            "const": true
+          }
+        },
+        "required": [
+          "linkRelaunch"
+        ]
+      },
+      "then": {
+        "properties": {
+          "methods": {
+            "contains": {
+              "const": "session/openLink"
             }
           }
         }

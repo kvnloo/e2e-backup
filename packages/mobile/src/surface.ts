@@ -968,9 +968,12 @@ export class AgentDeviceSurface {
    * device anyway. An unbound open reports the URL as its app name, which is
    * no identity, and the package that took the link as its bundle id when
    * the OS told it; the next snapshot names the foreground app either way.
+   * With `relaunch`, the app is stopped first if it's running, so the link
+   * launches it.
    */
-  async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget): Promise<void> {
+  async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget, relaunch = false): Promise<void> {
     const target = app ?? this.pinnedApp;
+    if (relaunch && target === undefined) throw unsupported(`relaunching the app from a link needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
     if (target === undefined && this.options.platform === 'ios') {
       throw new TestError(
         'INVALID_ARGUMENT',
@@ -983,6 +986,7 @@ export class AgentDeviceSurface {
         const open = () => client.apps.open({
           ...this.selection(),
           ...(target === undefined ? { app: url.href } : { app: target, url: url.href }),
+          ...(relaunch ? { relaunch: true } : {}),
         });
         // An `app.open(path)` is an input like a tap: past its budget the link may have opened, so it is never repeated.
         return input === undefined ? open() : input.send(open);

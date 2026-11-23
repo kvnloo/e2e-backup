@@ -23,7 +23,7 @@ import type {
   ViewportPoint,
   ViewportSize,
 } from './contract.ts';
-import type { AppLogEntry, EngineObserveOptions, EngineSnapshot, EngineState, EngineTabs, VideoSegment } from './index.ts';
+import type { AppLogEntry, EngineObserveOptions, EngineSnapshot, EngineState, EngineTabs, OpenLinkOptions, VideoSegment } from './index.ts';
 import type { ComputedStyleProperty, ComputedStyleValues } from './computed-style.ts';
 
 export type * from './contract.ts';
@@ -125,7 +125,7 @@ export interface SessionApp {
   /** Opens the app at one resolved URL. */
   open(url: string, operation: OperationContext): Promise<void>;
   /** Opens one checked link in the app under test. */
-  openLink(url: string, operation: OperationContext): Promise<void>;
+  openLink(url: string, operation: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once. */
   back(operation: OperationContext): Promise<void>;
   /** Sets the viewport size in CSS pixels. */
