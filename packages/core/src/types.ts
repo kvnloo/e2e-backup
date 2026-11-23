@@ -497,6 +497,12 @@ export interface TapOptions extends ClickOptions {
    * a box, which needs the engine's `tap` pointer action.
    */
   position?: Point;
+  /**
+   * The mouse button that clicks, `left` unless told otherwise. `middle` and
+   * `right` need an engine that declares `tapButtons`, `UNSUPPORTED_CAPABILITY`
+   * otherwise, and do not combine with `position` yet.
+   */
+  button?: 'left' | 'middle' | 'right';
 }
 
 /** `longPress` options: the hold time in milliseconds, 100 through 10000, default the engine's own. */

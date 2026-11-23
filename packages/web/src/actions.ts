@@ -167,7 +167,7 @@ function controlPoint(label: HTMLLabelElement): { x: number; y: number } | null 
 async function clickControl(
   target: ActionTarget,
   verb: 'tap' | 'check' | 'uncheck',
-  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[] },
+  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; button?: 'middle' | 'right' },
 ): Promise<void> {
   const { signal, ...click } = options;
   const deadline = new Deadline(options.timeout);
@@ -290,7 +290,12 @@ export async function dispatchLocatorAction(
   const locator = asActionable(target);
   switch (action.kind) {
     case 'tap':
-      await clickControl(target, 'tap', { timeout, signal: operation.signal, ...heldKeys(action) });
+      await clickControl(target, 'tap', {
+        timeout,
+        signal: operation.signal,
+        ...heldKeys(action),
+        ...(action.button === undefined ? {} : { button: action.button }),
+      });
       return;
     case 'doubleTap':
       await locator.dblclick({ timeout, ...heldKeys(action) });

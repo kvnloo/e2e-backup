@@ -484,9 +484,9 @@ export default {
   `writing-tests`, Sign-in sessions).
 - A deterministic check naming a platform label runs there only:
   `test('...', { platforms: ['ios'] }, ...)`.
-- `selectOption`, `setInputFiles`, `scrollIntoView`, `secondaryTap`, and
-  `modifiers` on `tap` or `doubleTap` are `UNSUPPORTED_CAPABILITY` on a
-  device.
+- `selectOption`, `setInputFiles`, `scrollIntoView`, `secondaryTap`,
+  `modifiers` on `tap` or `doubleTap`, and a `middle` or `right` `button` on
+  `tap` are `UNSUPPORTED_CAPABILITY` on a device.
 - `device.clipboard()` and `device.setClipboard()` are
   `UNSUPPORTED_CAPABILITY` on an Android build with no clipboard shell
   command (the Android 16 emulator is one); check a copy by pasting into a

@@ -210,6 +210,7 @@ export interface EngineManifest {
   /** Required with `engine/performAt`. */
   readonly pointerActions?: readonly PointerActionKind[];
   readonly tapModifiers?: boolean;
+  readonly tapButtons?: boolean;
   /** Requires `lifecycle/prepare`: `prepare` binds the device `e2e run --device` names. */
   readonly selectsDevice?: boolean;
   /** The engine reads the object form of `app.launchArguments` from `EngineAppInfo.launchArgumentValues`. */

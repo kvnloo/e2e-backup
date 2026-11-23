@@ -313,7 +313,8 @@ substring; a `RegExp` matches as written.
 Each action resolves one node, waits up to `config.actionTimeout` (30 s, or
 `{ timeout }`) for it to be actionable, and does one thing: `tap()` (alias
 `click()`), `doubleTap()` (alias `dblclick()`), `secondaryTap()` (each takes
-`{ modifiers: ['Shift'] }`), `longPress({ duration? })`
+`{ modifiers: ['Shift'] }`; `tap()` also takes `{ button: 'middle' }`, `left`
+by default), `longPress({ duration? })`
 (100 to 10000 ms; default 500 on the web, 1000 on a device),
 `fill(value | Secret)`, `pressSequentially(text, { delay? })`, `clear()`,
 `press(key)`, `check()`, `uncheck()`,
@@ -322,7 +323,7 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 (paths relative to the project root, or `{ name, mimeType, buffer: Buffer }` payloads, singly or as an array; `[]` clears; a missing path, or one under a directory the runner cannot search, is `INVALID_ARGUMENT`), `dragTo(locator)`, `scrollIntoView()`,
 `swipe({ direction, momentum? })`. Web only, `UNSUPPORTED_CAPABILITY` on a
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
-and `modifiers`.
+`modifiers`, and a `middle` or `right` `button`.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the
@@ -330,8 +331,8 @@ field and types one character per `delay`, plain string only (a `Secret` is
 `INVALID_ARGUMENT` and goes through `fill`).
 
 Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
-{ x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` it is
-`INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
+{ x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` or a
+`middle` or `right` `button` it is `INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
 `screen.swipe({ from, to, duration? })` swipes along a path,
 `screen.swipe({ direction, momentum? })` swipes the viewport. Viewport

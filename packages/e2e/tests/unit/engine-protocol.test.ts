@@ -561,6 +561,7 @@ describe('engine protocol', () => {
       toy({
         actions: ['tap', 'blur'],
         perform: async () => {},
+        tapButtons: true,
         pointerActions: ['tap'],
         performAt: async () => {},
         keyboard: { type: async () => {}, press: async () => {} },
@@ -574,6 +575,7 @@ describe('engine protocol', () => {
       { ...base, methods: ['engine/readStyle'] },
       { ...base, methods: ['engine/observe'], actions: ['tap'] },
       { ...base, methods: ['engine/observe'], tapModifiers: true },
+      { ...base, methods: ['engine/observe'], tapButtons: true },
       { ...base, methods: ['engine/observe'], selectsDevice: true },
       // The client serves prepare for finish alone, which would drop the device it never forwards.
       { ...base, methods: ['lifecycle/finish'], selectsDevice: true },

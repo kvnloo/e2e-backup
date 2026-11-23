@@ -136,6 +136,7 @@ export function web(options: WebOptions = {}): WebEngine {
     actions: [...LOCATOR_ACTION_KINDS, 'blur', 'setInputFilePayloads'],
     // Playwright holds each modifier for the click.
     tapModifiers: true,
+    tapButtons: true,
     // A page takes every pointer action of the contract at a bare point too.
     performAt: (point, action, operation) => surface.performAt(point, action, operation),
     pointerActions: POINTER_ACTION_KINDS,

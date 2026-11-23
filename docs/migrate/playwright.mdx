@@ -120,7 +120,7 @@ run only in a browser, so a test that uses it declares
 | --- | --- |
 | `click()`, `dblclick()` | `tap()`, `doubleTap()`; `click()` and `dblclick()` are aliases |
 | `click({ button: 'right' })`, `click({ delay })` | `secondaryTap()`, `longPress({ duration })` |
-| `click({ position })`, `click({ modifiers })` | `tap({ position })`, `tap({ modifiers })` |
+| `click({ position })`, `click({ modifiers })`, `click({ button: 'middle' })` | `tap({ position })`, `tap({ modifiers })`, `tap({ button: 'middle' })` |
 | `fill()`, `pressSequentially()`, `clear()`, `focus()`, `blur()`, `hover()`, `check()`, `uncheck()`, `dragTo()`, `setInputFiles(path)`, `selectOption({ label })` or `{ value }` | the same, without `force`, `trial`, or `position` |
 | `setInputFiles({ name, mimeType, buffer })` | Web only. Pass a plain object with only `name`, `mimeType`, and `buffer`. |
 | `press(key)` | the same for one character or a [named key](/reference/engine#keys); `browser.keyboard.press` after `focus()` for a key code |

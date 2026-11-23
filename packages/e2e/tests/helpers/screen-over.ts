@@ -40,6 +40,8 @@ export interface ScreenOverOptions {
   readonly keyboard?: EngineKeyboard;
   /** Whether the engine declares `tapModifiers`; default not. */
   readonly tapModifiers?: boolean;
+  /** Whether the engine declares `tapButtons`; default not. */
+  readonly tapButtons?: boolean;
   /** Action and assertion timeout in milliseconds. */
   readonly timeoutMs: number;
 }
@@ -63,6 +65,7 @@ export function screenOver(options: ScreenOverOptions): { screen: Screen; steps:
         }),
     ...(options.keyboard === undefined ? {} : { keyboard: options.keyboard }),
     ...(options.tapModifiers === undefined ? {} : { tapModifiers: options.tapModifiers }),
+    ...(options.tapButtons === undefined ? {} : { tapButtons: options.tapButtons }),
   });
   const steps = new StepRecorder('attempt');
   const signal = new AbortController().signal;

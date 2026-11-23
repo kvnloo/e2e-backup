@@ -161,6 +161,77 @@ describe('locator action options', () => {
     });
   });
 
+  describe('button', () => {
+    /** A screen over the box whose engine declares `tapButtons` and `tapModifiers` or neither, keeping every action it receives. */
+    function buttonScreen(declared: boolean) {
+      const received: LocatorAction[] = [];
+      const { screen, steps } = screenOver({
+        locate: (expression) => resolveExpression(expression, NODES),
+        observe: () => snapshot(NODES),
+        perform: (_ref, action) => {
+          received.push(action);
+        },
+        tapButtons: declared,
+        tapModifiers: declared,
+        timeoutMs: 1_000,
+      });
+      return { screen, steps, received };
+    }
+
+    it.each([
+      ['tap', 'middle', (locator: Locator) => locator.tap({ button: 'middle' })],
+      ['click', 'right', (locator: Locator) => locator.click({ button: 'right' })],
+    ] as const)('%s hands the %s button to an engine that declares tapButtons', async (verb, button, call) => {
+      const { screen, steps, received } = buttonScreen(true);
+      await call(screen.getByLabel('Agree'));
+      expect(received).toEqual([{ kind: 'tap', button }]);
+      expect(steps.all()).toEqual([
+        expect.objectContaining({ api: `locator.${verb}`, label: `getByLabel("Agree") with the ${button} button`, status: 'passed' }),
+      ]);
+    });
+
+    it('holds the modifiers for a click with another button', async () => {
+      const { screen, steps, received } = buttonScreen(true);
+      await screen.getByLabel('Agree').click({ button: 'middle', modifiers: ['ControlOrMeta', 'Shift'] });
+      expect(received).toEqual([{ kind: 'tap', modifiers: ['ControlOrMeta', 'Shift'], button: 'middle' }]);
+      expect(steps.all()).toEqual([
+        expect.objectContaining({ label: 'getByLabel("Agree") with the middle button and ControlOrMeta+Shift' }),
+      ]);
+    });
+
+    it('leaves the field off a left click, so an engine without tapButtons takes it', async () => {
+      const { screen, received } = buttonScreen(false);
+      await screen.getByLabel('Agree').tap({ button: 'left' });
+      expect(received).toEqual([{ kind: 'tap' }]);
+    });
+
+    it('refuses another button on an engine that does not declare tapButtons, before resolving', async () => {
+      const { screen, received } = buttonScreen(false);
+      const started = Date.now();
+      await expect(screen.getByLabel('Missing').tap({ button: 'middle' })).rejects.toMatchObject({
+        code: 'UNSUPPORTED_CAPABILITY',
+        message: expect.stringContaining('the middle button on the "tap" action'),
+      });
+      expect(Date.now() - started).toBeLessThan(500);
+      expect(received).toEqual([]);
+    });
+
+    it('rejects a button that is not left, middle, or right before any lookup', async () => {
+      const { screen, received } = buttonScreen(true);
+      await expect(
+        Promise.resolve().then(() => screen.getByLabel('Agree').tap({ button: invalid<'left'>('back') })),
+      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', message: 'tap() button "back" is not one of left, middle, right' });
+      expect(received).toEqual([]);
+    });
+
+    it('refuses another button with a position, which the pointer path cannot press yet', async () => {
+      const { screen } = buttonScreen(true);
+      await expect(
+        Promise.resolve().then(() => screen.getByLabel('Agree').tap({ button: 'right', position: { x: 1, y: 1 } })),
+      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', message: expect.stringContaining('the right button with a position') });
+    });
+  });
+
   it('longPress sends a duration from 100 through 10000 and none when unset, so the engine default holds', async () => {
     const { screen, actions } = boxScreen();
     const box = screen.getByLabel('Agree');

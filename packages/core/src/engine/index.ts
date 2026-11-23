@@ -806,6 +806,13 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
+   * The surface honors `button` on the `tap` action `perform` receives,
+   * clicking with the middle or right mouse button. Without it the harness
+   * fails a tap that names a button other than the primary one with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine.
+   */
+  readonly tapButtons?: boolean;
+  /**
    * `prepare` binds the target to the device `EnginePrepareInfo.device`
    * names, for `e2e run --device`, over the device the engine was configured
    * with. Without it the runner refuses the flag for the target before

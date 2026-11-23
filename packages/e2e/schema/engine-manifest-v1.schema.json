@@ -118,6 +118,9 @@
     "tapModifiers": {
       "type": "boolean"
     },
+    "tapButtons": {
+      "type": "boolean"
+    },
     "selectsDevice": {
       "description": "prepare binds the device e2e run --device names.",
       "type": "boolean"
@@ -173,6 +176,27 @@
         },
         "required": [
           "tapModifiers"
+        ]
+      },
+      "then": {
+        "properties": {
+          "methods": {
+            "contains": {
+              "const": "engine/perform"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tapButtons": {
+            "const": true
+          }
+        },
+        "required": [
+          "tapButtons"
         ]
       },
       "then": {

@@ -412,14 +412,28 @@ class LocatorImpl extends ScreenImpl implements Locator {
 
   /**
    * One tap of the node: the platform's own, or, with a position, the pointer
-   * dispatched at that offset of the node's box.
+   * dispatched at that offset of the node's box. The primary button is the
+   * default, so it never reaches the engine as a `button`.
    */
   private tapWith(api: 'tap' | 'click', options: TapOptions | undefined): Promise<void> {
-    rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers']);
+    rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'button']);
     const modifiers = requireModifiers(options?.modifiers, api);
-    if (options?.position === undefined) return this.dispatchTap(api, 'tap', modifiers, options?.timeout);
+    const button = options?.button;
+    if (button !== undefined && button !== 'left' && button !== 'middle' && button !== 'right') {
+      throw new TestError('INVALID_ARGUMENT', `${api}() button ${describeValue(button)} is not one of left, middle, right`);
+    }
+    if (options?.position === undefined) {
+      return this.dispatchTap(
+        api,
+        { kind: 'tap', ...modifiers, ...(button === undefined || button === 'left' ? {} : { button }) },
+        options?.timeout,
+      );
+    }
     if (modifiers.modifiers !== undefined) {
       throw new TestError('INVALID_ARGUMENT', `${api}() does not take modifiers with a position yet; drop one of them`);
+    }
+    if (button === 'middle' || button === 'right') {
+      throw new TestError('INVALID_ARGUMENT', `${api}() does not take the ${button} button with a position yet; drop one of them`);
     }
     const position = requirePoint(options.position, `${api} position`);
     return this.context.steps.run(
@@ -449,19 +463,22 @@ class LocatorImpl extends ScreenImpl implements Locator {
     options: ClickOptions | undefined,
   ): Promise<void> {
     rejectUnknownOptions(api, options, ['timeout', 'modifiers']);
-    return this.dispatchTap(api, kind, requireModifiers(options?.modifiers, api), options?.timeout);
+    return this.dispatchTap(api, { kind, ...requireModifiers(options?.modifiers, api) }, options?.timeout);
   }
 
-  /** One tap kind with the keys it holds, named after the node in the step label. */
+  /** One tap with the keys it holds and the button it clicks with, both named in the step label. */
   private dispatchTap(
     api: string,
-    kind: 'tap' | 'doubleTap' | 'secondaryTap',
-    held: { modifiers?: readonly KeyModifier[] },
+    action: Extract<LocatorAction, { kind: 'tap' | 'doubleTap' | 'secondaryTap' }>,
     timeout: number | undefined,
   ): Promise<void> {
-    const label = held.modifiers === undefined ? this.label : `${this.label} with ${held.modifiers.join('+')}`;
+    const held = [
+      ...('button' in action && action.button !== undefined ? [`the ${action.button} button`] : []),
+      ...(action.modifiers === undefined ? [] : [action.modifiers.join('+')]),
+    ];
+    const label = held.length === 0 ? this.label : `${this.label} with ${held.join(' and ')}`;
     return this.context.steps.run('locator', `locator.${api}`, label, () =>
-      this.context.engine.perform(this.expression, { kind, ...held }, timeout),
+      this.context.engine.perform(this.expression, action, timeout),
     );
   }
 
