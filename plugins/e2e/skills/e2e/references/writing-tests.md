@@ -323,6 +323,10 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
 and `modifiers`.
 
+A swipe's `momentum` is how far it travels, as a share of the node (or the
+viewport, for `screen.swipe`): `slow` 0.25, `none` 0.5 (the default), and
+`fast` 0.8. The shares are the same on web and mobile.
+
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the
 field and types one character per `delay`, plain string only (a `Secret` is
@@ -333,9 +337,7 @@ Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 `INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
 `screen.swipe({ from, to, duration? })` swipes along a path,
-`screen.swipe({ direction, momentum? })` swipes the viewport. A swipe with a
-direction travels a share of the viewport, or of the node on a locator:
-`slow` 0.25, `none` 0.5 (the default), `fast` 0.8, on web and mobile alike. Viewport
+`screen.swipe({ direction, momentum? })` swipes the viewport. Viewport
 points also take percentages from `'0%'` through `'100%'`, rounded to the
 nearest pixel: `{ x: '50%', y: '50%' }`. Prefer a locator; a point moves with
 the layout.

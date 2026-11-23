@@ -60,11 +60,13 @@ const ASSERTION_ACTIONS = new Set<string>(Object.values(READ_ONLY_GRAMMAR).flat(
 const MAX_STALE_RELOCATIONS = 2;
 
 /**
- * How far one grammar scroll moves: `fast`, 0.8 of the scrolled box
- * (`SWIPE_SHARE`), to cover a long feed in few actions. On the web the wheel
- * moves exactly that, so every row is on screen at least once. A device
- * flings further than the finger travels, so there a short row can pass
- * between two looks.
+ * The momentum of one grammar scroll. With `fast`, each scroll moves 0.8 of
+ * the scrolled box (`SWIPE_SHARE`), so a long feed takes few actions.
+ *
+ * On the web, the wheel moves exactly that far, so every row shorter than a
+ * fifth of the box shows in at least one look. On a device, the content can
+ * fling further than the finger travels, so a short row can pass between
+ * two looks.
  */
 const SCROLL_MOMENTUM: Momentum = 'fast';
 

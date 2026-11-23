@@ -1519,12 +1519,12 @@ export class AgentDeviceSurface {
     const deterministic = operation.origin === 'test';
     const settle = deterministic ? {} : this.settleOptions;
     // The observation root is the screen: a swipe on it scrolls the whole
-    // viewport, which is the one action a screen takes, by the momentum's
-    // `SWIPE_SHARE` of it. agent-device centres the gesture on the viewport,
-    // so a scroll down starts the finger at `0.5 + amount / 2` of the
-    // height, and it keeps a tenth of the height clear at each edge, so a
-    // `fast` scroll down starts at 0.9. Bottom chrome there (a sticky footer,
-    // a tab bar) swallows the drag: a live iOS run once lost every scroll of
+    // viewport, which is the one action a screen takes. The swipe travels
+    // the momentum's `SWIPE_SHARE` of the viewport. The gesture is centred
+    // on the viewport, with a tenth of the height kept clear at each edge,
+    // so a scroll down starts the finger at `0.5 + amount / 2` of the height
+    // (0.9 with `fast`). Bottom chrome there, such as a sticky footer or a
+    // tab bar, can swallow the drag. A live iOS run once lost every scroll of
     // the mobile benchmark's sticky chrome flow that way.
     if (ref.id === ROOT_ID) {
       if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);

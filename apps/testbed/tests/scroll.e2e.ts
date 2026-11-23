@@ -28,7 +28,7 @@ test.describe('scrolling', { requires: ['browser'], tags: ['scroll'] }, () => {
     await expect(screen.getByRole('status', 'Picked row')).toHaveText('picked Item 40');
   });
 
-  test('scrollUntilVisible reaches every row of a long list in turn, skipping none', async ({ screen }) => {
+  test('scrollUntilVisible reaches every row of a long list in turn', async ({ screen }) => {
     const pane = screen.getByRole('list', 'Pane');
     for (let index = 1; index <= 40; index += 1) {
       await pane.scrollUntilVisible(screen.getByRole('button', { name: `Item ${index}`, exact: true }));

@@ -154,9 +154,9 @@ export function readPngSize(data: Uint8Array): { width: number; height: number }
 
 /**
  * The finger gesture that scrolls one rect's content in `direction`. Scrolling
- * down reveals what is below, so the finger travels up; the travel is the
+ * down reveals what is below, so the finger travels up. It travels the
  * momentum's `SWIPE_SHARE` of the rect's extent, centred on the rect, so it
- * never leaves it.
+ * never leaves the rect.
  */
 export function swipeWithin(
   rect: Rect,

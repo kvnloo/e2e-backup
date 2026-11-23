@@ -477,12 +477,14 @@ await screen.swipe({ from: { x: '50%', y: '80%' }, to: { x: '50%', y: '20%' } })
 
 - `direction` is the way the content scrolls, not the finger: `'down'`
   reveals what is below.
-- `momentum` is how far the gesture travels, `'none'` by default, as a
-  share of the surface along the swipe: `'slow'` a quarter, `'none'` half,
-  `'fast'` 0.8. The surface is the viewport, or the node on a locator. The
-  web and mobile engines use the same shares, so `'fast'` moves a paging
-  scroll view past half a page on both. A device may fling the content
-  further than the finger travels.
+- `momentum` is how far the gesture travels, as a share of the viewport
+  (or of the node, on a locator) along the swipe. It's `'none'` by default.
+  The shares are the same on the web and on a device:
+  - `'slow'`: a quarter.
+  - `'none'`: half.
+  - `'fast'`: 0.8, so a paging scroll view moves past half a page.
+
+  On a device, the content can fling further than the finger travels.
 
 `{ from, to, duration? }` is a swipe along a path between two viewport
 points: a touch swipe on a device, a pointer drag on a document platform.
@@ -530,8 +532,8 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 
 - `momentum` is as [`screen.swipe`](#screen-swipe) defines it. A longer step
   is faster, but it must not carry the target past the surface unseen, as a
-  virtualized list does. For a long list whose rows are shorter than a fifth
-  of the surface, pass `'fast'`.
+  virtualized list does. On a long list, `'fast'` takes fewer steps. On the
+  web, it doesn't skip any row shorter than a fifth of the surface.
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
   whole scroll, each swipe included.
 - On a locator each step swipes that node. So a feed or a table that is its
@@ -1406,7 +1408,7 @@ export interface PressSequentiallyOptions extends ActionOptions {
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the swipe travels, a share of the swiped box; default `none`. The three values are defined under screen.swipe. */
+  /** How far the swipe travels, as a share of the swiped box. Default `none`. The three values are defined under screen.swipe. */
   momentum?: Momentum;
   from?: never;
   to?: never;
@@ -1478,7 +1480,7 @@ export type SelectOption =
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
-/** How far a swipe travels; defined under screen.swipe. */
+/** How far a swipe travels. The values are defined under screen.swipe. */
 export type Momentum = 'none' | 'slow' | 'fast';
 ```
 
