@@ -515,7 +515,7 @@ export interface PressSequentiallyOptions extends ActionOptions {
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** Fling strength; default `none`. */
+  /** How far the swipe travels, a share of the swiped box; default `none`. */
   momentum?: Momentum;
   from?: never;
   to?: never;

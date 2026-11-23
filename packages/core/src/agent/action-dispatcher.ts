@@ -60,18 +60,17 @@ const ASSERTION_ACTIONS = new Set<string>(Object.values(READ_ONLY_GRAMMAR).flat(
 const MAX_STALE_RELOCATIONS = 2;
 
 /**
- * How far one grammar scroll moves. A swipe with no momentum moves half the
- * scrolled box; `fast` moves 0.8 of it (`SWIPE_SHARE`), which keeps every
- * row on screen at least once while covering a long feed in fewer actions.
+ * How far one grammar scroll moves: `fast`, 0.8 of the scrolled box
+ * (`SWIPE_SHARE`), to cover a long feed in few actions. On the web the wheel
+ * moves exactly that, so every row is on screen at least once. A device
+ * flings further than the finger travels, so there a short row can pass
+ * between two looks.
  */
 const SCROLL_MOMENTUM: Momentum = 'fast';
 
 /**
  * How many pages a scroll to a text may turn. Each page moves as a grammar
- * scroll does (`SCROLL_MOMENTUM`): 0.8 of the list, so every row is on
- * screen in at least one look and none is skipped between pages, and a drag
- * that starts inside the list, not in the chrome under it, which a longer
- * flick on a full-screen list lands in and loses. A windowed table of five
+ * scroll does (`SCROLL_MOMENTUM`): 0.8 of the list. A windowed table of five
  * thousand short rows is about four hundred pages on a browser; the cap
  * bounds a text that never shows, the step's own clock bounds the time, and a
  * screen that stops moving ends the paging before either.

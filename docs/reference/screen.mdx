@@ -530,7 +530,8 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 
 - `momentum` is as [`screen.swipe`](#screen-swipe) defines it. A longer step
   is faster, but it must not carry the target past the surface unseen, as a
-  virtualized list does.
+  virtualized list does. For a long list whose rows are shorter than a fifth
+  of the surface, pass `'fast'`.
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
   whole scroll, each swipe included.
 - On a locator each step swipes that node. So a feed or a table that is its
@@ -1405,7 +1406,7 @@ export interface PressSequentiallyOptions extends ActionOptions {
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** Fling strength; default `none`. The three values are defined under screen.swipe. */
+  /** How far the swipe travels, a share of the swiped box; default `none`. The three values are defined under screen.swipe. */
   momentum?: Momentum;
   from?: never;
   to?: never;
@@ -1477,7 +1478,7 @@ export type SelectOption =
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
-/** Fling strength of a swipe; defined under screen.swipe. */
+/** How far a swipe travels; defined under screen.swipe. */
 export type Momentum = 'none' | 'slow' | 'fast';
 ```
 

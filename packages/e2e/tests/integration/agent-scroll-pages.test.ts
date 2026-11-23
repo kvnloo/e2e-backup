@@ -25,6 +25,8 @@ interface Paged {
   /** Engine observations between each swipe and the next one, the last one up to the end of the scroll. */
   readonly capturesPerPage: number[];
   readonly swipes: number;
+  /** The momentum of every swipe the paging sent. */
+  readonly momenta: (string | undefined)[];
   readonly error: string | undefined;
   readonly found: string | undefined;
 }
@@ -57,6 +59,7 @@ async function scrollTo(text: string, turning: Turning, withClock = false, textO
   let observations = 0;
   let page = 0;
   const atSwipe: number[] = [];
+  const momenta: (string | undefined)[] = [];
   const list: ScriptedNode = { id: 'list', role: 'list', name: 'Ledger', children: rowsOf(0, PER_PAGE, textOf) };
   const clock: ScriptedNode = { id: 'clock', role: 'status', name: 'Clock', text: clockText(0), rect: { x: 0, y: 0, width: 100, height: 20 } };
   const counter: ScriptedNode = { id: 'counter', role: 'status', name: 'Inbox', text: '0 unread', rect: { x: 0, y: 0, width: 100, height: 20 } };
@@ -74,6 +77,7 @@ async function scrollTo(text: string, turning: Turning, withClock = false, textO
     perform: (_ref, action) => {
       if (action.kind !== 'swipe') return;
       atSwipe.push(observations);
+      momenta.push(action.momentum);
       const next = turning === 'never' ? page : page + 1;
       if (turning === 'now') turn(next);
       if (turning === 'late') setTimeout(() => turn(page + 1), 40);
@@ -114,7 +118,7 @@ async function scrollTo(text: string, turning: Turning, withClock = false, textO
   } finally {
     project.cleanup();
   }
-  return { capturesPerPage, swipes: atSwipe.length, error, found };
+  return { capturesPerPage, swipes: atSwipe.length, momenta, error, found };
 }
 
 describe('scroll_to a text, reads per page', () => {
@@ -124,6 +128,11 @@ describe('scroll_to a text, reads per page', () => {
     expect(result.found).toContain('Row 13');
     expect(result.swipes).toBe(4);
     expect(result.capturesPerPage).toEqual([1, 1, 1, 1]);
+  });
+
+  it('pages with fast swipes, 0.8 of the list each', async () => {
+    const result = await scrollTo('Row 13', 'now');
+    expect(result.momenta).toEqual(['fast', 'fast', 'fast', 'fast']);
   });
 
   it('keeps reading a page that turns after the stability poll, instead of ending the list', async () => {

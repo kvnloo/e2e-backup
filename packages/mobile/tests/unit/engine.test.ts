@@ -1531,7 +1531,7 @@ describe('perform', () => {
       ['interactions.press', { ref: '@e7', settle: true, settleQuietMs: 150 }],
       ['interactions.type', { text: ' ' }],
       ['interactions.swipe', { from: { x: 195, y: 620 }, to: { x: 195, y: 420 } }],
-      // The root swipe is the viewport swipe: agent-device's whole-screen scroll at its default amount, settled like a tap.
+      // The root swipe is the viewport swipe: agent-device's whole-screen scroll by the momentum's share, settled like a tap.
       ['interactions.scroll', { direction: 'up', amount: 0.8, settle: true, settleQuietMs: 150 }],
       ['interactions.drag', { source: '@e4', destination: '@e3' }],
     ]);

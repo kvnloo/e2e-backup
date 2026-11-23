@@ -39,7 +39,7 @@ test.describe('scrolling', { requires: ['browser'], tags: ['scroll'] }, () => {
     }
   });
 
-  test('a viewport swipe and a wheel gesture both move the page',async ({ screen, browser }) => {
+  test('a viewport swipe and a wheel gesture both move the page', async ({ screen, browser }) => {
     const position = screen.getByRole('status', 'Scroll position');
     await expect(position).toHaveText('0');
 

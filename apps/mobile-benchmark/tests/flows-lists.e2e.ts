@@ -9,7 +9,7 @@ import { expect, openScenario, test } from './fixtures.ts';
 test('infinite scroll reaches the target item', async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Infinite Scroll List');
   const target = screen.getByTestId('item-137');
-  await screen.scrollUntilVisible(target, { direction: 'down', timeout: 120_000 });
+  await screen.scrollUntilVisible(target, { direction: 'down', momentum: 'none', timeout: 120_000 });
   await target.tap();
   await expect(screen.getByTestId('success-message')).toHaveText('Found item 137');
 });
@@ -96,7 +96,7 @@ test('async states: load, pull to refresh, claim through the toast', async ({ ap
   await expect(claimed).toHaveText('Reward claimed');
 });
 
-// Row 512 is about 40 screens down and scrollUntilVisible pages one screen
+// Row 512 is about 40 screens down and scrollUntilVisible pages half a screen
 // per swipe, so the test needs more than the default budget. Only the rows on
 // screen enter the tree, so the count is a screenful, never the 600 loaded.
 test('huge virtualized list reaches row 512', { timeout: 300_000 }, async ({ app, device, screen }) => {
@@ -107,7 +107,7 @@ test('huge virtualized list reaches row 512', { timeout: 300_000 }, async ({ app
   expect(onScreen).toBeGreaterThan(0);
   expect(onScreen).toBeLessThan(600);
   const target = screen.getByTestId('row-512');
-  await screen.scrollUntilVisible(target, { direction: 'down', timeout: 240_000 });
+  await screen.scrollUntilVisible(target, { direction: 'down', momentum: 'none', timeout: 240_000 });
   await target.tap();
   await expect(screen.getByTestId('success-message')).toHaveText('Found Row 0512');
 });
