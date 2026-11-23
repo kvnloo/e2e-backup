@@ -477,9 +477,12 @@ await screen.swipe({ from: { x: '50%', y: '80%' }, to: { x: '50%', y: '20%' } })
 
 - `direction` is the way the content scrolls, not the finger: `'down'`
   reveals what is below.
-- `momentum` is its fling strength, `'none'` by default. `'none'` is a
-  plain drag of half the surface, `'slow'` a short fling, `'fast'` a long
-  one. The engine decides how far each carries.
+- `momentum` is how far the gesture travels, `'none'` by default, as a
+  share of the surface along the swipe: `'slow'` a quarter, `'none'` half,
+  `'fast'` 0.8. The surface is the viewport, or the node on a locator. The
+  web and mobile engines use the same shares, so `'fast'` moves a paging
+  scroll view past half a page on both. A device may fling the content
+  further than the finger travels.
 
 `{ from, to, duration? }` is a swipe along a path between two viewport
 points: a touch swipe on a device, a pointer drag on a document platform.

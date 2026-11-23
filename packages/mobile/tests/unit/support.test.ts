@@ -100,6 +100,15 @@ describe('support helpers', () => {
     expect(swipeWithin(rect, 'left', undefined)).toEqual({ from: { x: 50, y: 300 }, to: { x: 150, y: 300 } });
   });
 
+  it.each([
+    ['slow', 75],
+    ['none', 150],
+    ['fast', 240],
+  ] as const)('swipes a node with %s momentum by the share of its box every engine moves', (momentum, distance) => {
+    const { from, to } = swipeWithin({ x: 0, y: 0, width: 400, height: 300 }, 'down', momentum);
+    expect(from.y - to.y).toBe(distance);
+  });
+
   it('constrains labels to safe filenames', () => {
     expect(sanitizeFilename('after checkout/1')).toBe('after_checkout_1');
     expect(sanitizeFilename('')).toBe('artifact');

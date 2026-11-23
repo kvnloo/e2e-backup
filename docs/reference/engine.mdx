@@ -1196,6 +1196,11 @@ honors in `actions` and `pointerActions`.
 
 The grammar is closed. Anything beyond it is an agent-side `defineTool`.
 
+A `swipe` travels `SWIPE_SHARE[momentum ?? 'none']` of the node along the
+swipe's axis, or of the viewport on the root: `slow` 0.25, `none` 0.5,
+`fast` 0.8. Read the table from `e2e/engine` so every engine moves the same
+share.
+
 #### Locator actions
 
 ```ts
@@ -2414,7 +2419,7 @@ return context.fixture('printer', printer, { print: { kind: 'resource' } });
 `KEY_NAMES`, `parseKey`, `ENGINE_ERROR_CODES`, `RETRYABLE_ENGINE_ERROR_CODES`,
 `Secret`, `isSecret`, `TextMatch`, `JsonValue`, `JsonValueRules`,
 `ResolveExpressionOptions`, `PollConditionOptions`, `WithoutUndefined`,
-`FixtureOperation`, `EngineIsolation`, `OBSERVED_NAME_LIMIT`, and `OBSERVED_TEXT_LIMIT` are
+`FixtureOperation`, `EngineIsolation`, `OBSERVED_NAME_LIMIT`, `OBSERVED_TEXT_LIMIT`, and `SWIPE_SHARE` are
 exported from `e2e/engine`. So are the [engine protocol](/reference/engine-protocol)'s
 `connectEngine`, `serveEngine`, `describeEngine`, `spawnTransport`,
 `socketTransport`, `loopbackTransport`, `ENGINE_METHODS`,

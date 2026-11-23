@@ -591,13 +591,13 @@ describe('lifecycle', () => {
     expect(none.fake.lastArgs('command.back')).toEqual({});
     const screen = await screenRootOf(none);
     await none.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, operation());
-    expect(none.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down' });
+    expect(none.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', amount: 0.5 });
 
     // A test's own step never settles: its `expect` polls for the outcome.
     const step: OperationContext = { ...operation(), origin: 'test' };
     const slowScreen = await screenRootOf(slow);
     await slow.engine.perform!(slowScreen.ref, { kind: 'swipe', direction: 'up', momentum: 'slow' }, step);
-    expect(slow.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'up', postGestureStabilization: false });
+    expect(slow.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'up', amount: 0.25, postGestureStabilization: false });
 
     expect(() => harness({ settle: -1 })).toThrow(/non-negative integer/);
     expect(() => harness({ settle: 1.5 })).toThrow(/non-negative integer/);
@@ -1532,7 +1532,7 @@ describe('perform', () => {
       ['interactions.type', { text: ' ' }],
       ['interactions.swipe', { from: { x: 195, y: 620 }, to: { x: 195, y: 420 } }],
       // The root swipe is the viewport swipe: agent-device's whole-screen scroll at its default amount, settled like a tap.
-      ['interactions.scroll', { direction: 'up', settle: true, settleQuietMs: 150 }],
+      ['interactions.scroll', { direction: 'up', amount: 0.8, settle: true, settleQuietMs: 150 }],
       ['interactions.drag', { source: '@e4', destination: '@e3' }],
     ]);
     const presses = h.fake.calls.filter((call) => call.method === 'interactions.press');
@@ -2561,7 +2561,7 @@ describe('device fixture', () => {
     await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...operation(), origin: 'test' });
 
     expect(Date.now() - dismissedAt).toBe(120);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', postGestureStabilization: false });
+    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', amount: 0.5, postGestureStabilization: false });
   });
 
   it('counts a back, home, alert, keyboard, rotation, or fold as an action, so a control that arrives with it waits out the transition budget', async () => {
@@ -3752,7 +3752,7 @@ describe('deterministic actions', () => {
     await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, operation());
 
     expect(Date.now()).toBe(startedAt);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', settle: true, settleQuietMs: 150 });
+    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', amount: 0.5, settle: true, settleQuietMs: 150 });
   });
 
   it('counts captures between consecutive screen swipes toward the transition budget', async () => {
@@ -4112,7 +4112,7 @@ describe('deterministic actions', () => {
     const agent: OperationContext = { ...operation(), origin: 'agent' };
 
     await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, step);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', postGestureStabilization: false });
+    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', amount: 0.5, postGestureStabilization: false });
     await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, step);
     expect(h.fake.lastArgs('interactions.swipe')).toEqual({
       from: expect.any(Object),
@@ -4121,7 +4121,7 @@ describe('deterministic actions', () => {
     });
 
     await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, agent);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down' });
+    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', amount: 0.5 });
     await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, agent);
     expect(h.fake.lastArgs('interactions.swipe')).toEqual({ from: expect.any(Object), to: expect.any(Object) });
   });

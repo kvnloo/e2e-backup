@@ -325,7 +325,17 @@ describe('dispatchLocatorAction', () => {
     expect(frame.mock.invocationCallOrder[0]).toBeGreaterThan(wheel.mock.invocationCallOrder[0]!);
 
     await dispatchLocatorAction(target, { kind: 'swipe', direction: 'left', momentum: 'fast' }, OPERATION, lookup);
-    expect(wheel).toHaveBeenLastCalledWith(-600, 0);
+    expect(wheel).toHaveBeenLastCalledWith(-320, 0);
+  });
+
+  it.each([
+    ['slow', 75],
+    ['none', 150],
+    ['fast', 240],
+  ] as const)('scrolls a node with %s momentum by the share of its box every engine moves', async (momentum, distance) => {
+    const { target, wheel } = stubLocator({ x: 0, y: 0, width: 400, height: 300 });
+    await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', momentum }, OPERATION, lookup);
+    expect(wheel).toHaveBeenCalledWith(0, distance);
   });
 
   it('wheels a node hit at its centre there, at the box the hit test read, without hovering it first', async () => {
@@ -471,6 +481,16 @@ describe('dispatchPointerAction', () => {
     const { page, calls } = stubPage();
     await dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipe', direction: 'down' });
     expect(calls).toEqual(['move 10,20', 'wheel 0,300', 'frame']);
+  });
+
+  it.each([
+    ['slow', 200],
+    ['none', 400],
+    ['fast', 640],
+  ] as const)('swipes the viewport with %s momentum by the share every engine moves', async (momentum, distance) => {
+    const { page, calls } = stubPage();
+    await dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipe', direction: 'right', momentum });
+    expect(calls).toEqual(['move 10,20', `wheel ${distance},0`, 'frame']);
   });
 
   it('resolves a swipe only once the frame after the wheel rendered', async () => {

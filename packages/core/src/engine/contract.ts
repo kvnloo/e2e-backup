@@ -14,6 +14,16 @@
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 /** Fling strength of a swipe. */
 export type Momentum = 'none' | 'slow' | 'fast';
+/**
+ * How far a swipe in a direction moves, as a share of the swiped box along
+ * the swipe's axis: the node, or the viewport on the screen. Every engine
+ * reads this table, so one momentum moves the same share on each. `slow` is
+ * a quarter of the box, shorter than any row, so a test stepping through a
+ * list sees every row fully on screen at some stop; at three quarters the
+ * mobile benchmark's scenario list dragged rows past. `fast` moves a paging
+ * scroll view past half its width.
+ */
+export const SWIPE_SHARE: Readonly<Record<Momentum, number>> = { slow: 0.25, none: 0.5, fast: 0.8 };
 /** One option of a select: its label (a bare string too), its `value` attribute, or its zero-based index. */
 export type SelectOption =
   | string

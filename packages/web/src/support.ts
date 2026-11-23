@@ -3,7 +3,7 @@
 import { statSync, type Stats } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 import type { ElementHandle, FrameLocator, Locator as PwLocator, Mouse, Page } from 'playwright-core';
-import { EngineError, withinCleanupBudget, type EngineCleanupContext, type Momentum, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
+import { EngineError, SWIPE_SHARE, withinCleanupBudget, type EngineCleanupContext, type Momentum, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
 import { ConfigurationError, InfrastructureError, TestError } from '@e2e-dev/core/engine';
 
 export const DEFAULT_VIEWPORT = { width: 1280, height: 720 } as const;
@@ -580,8 +580,7 @@ function wheelAim(element: Element): WheelAim {
 }
 
 function swipeDistance(extent: number, momentum: Momentum): number {
-  const ratio = momentum === 'fast' ? 1.5 : momentum === 'slow' ? 0.75 : 0.5;
-  return Math.round(extent * ratio);
+  return Math.round(extent * SWIPE_SHARE[momentum]);
 }
 
 function wheelDelta(direction: ScrollDirection, distance: number): [number, number] {

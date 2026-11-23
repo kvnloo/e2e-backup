@@ -28,7 +28,18 @@ test.describe('scrolling', { requires: ['browser'], tags: ['scroll'] }, () => {
     await expect(screen.getByRole('status', 'Picked row')).toHaveText('picked Item 40');
   });
 
-  test('a viewport swipe and a wheel gesture both move the page', async ({ screen, browser }) => {
+  test('scrollUntilVisible reaches every row of a long list in turn, skipping none', async ({ screen }) => {
+    const pane = screen.getByRole('list', 'Pane');
+    for (let index = 1; index <= 40; index += 1) {
+      await pane.scrollUntilVisible(screen.getByRole('button', { name: `Item ${index}`, exact: true }));
+    }
+
+    for (let index = 1; index <= 120; index += 1) {
+      await screen.scrollUntilVisible(screen.getByRole('button', { name: `Row ${index}`, exact: true }));
+    }
+  });
+
+  test('a viewport swipe and a wheel gesture both move the page',async ({ screen, browser }) => {
     const position = screen.getByRole('status', 'Scroll position');
     await expect(position).toHaveText('0');
 

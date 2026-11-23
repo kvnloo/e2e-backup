@@ -83,6 +83,7 @@ export {
   OBSERVED_TEXT_LIMIT,
   POINTER_ACTION_KINDS,
   RETRYABLE_ENGINE_ERROR_CODES,
+  SWIPE_SHARE,
   parseKey,
 } from './contract.ts';
 export type { AppPermissionState, Expectable, JsonValue, Locator, Screen, Secret } from '../types.ts';

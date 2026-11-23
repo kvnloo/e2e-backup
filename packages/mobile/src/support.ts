@@ -1,7 +1,7 @@
 /** Shared helpers for the agent-device engine: error constructors, filenames, PNG headers, gestures, the screen location and size. */
 
 import type { CaptureScreenshotResult, PressOptions } from 'agent-device';
-import { EngineError, withTimeout, type Momentum, type ScrollDirection, type ViewportSize } from '@e2e-dev/core/engine';
+import { EngineError, SWIPE_SHARE, withTimeout, type Momentum, type ScrollDirection, type ViewportSize } from '@e2e-dev/core/engine';
 import type { AgentDeviceClient } from './options.ts';
 
 export interface Point {
@@ -154,20 +154,16 @@ export function readPngSize(data: Uint8Array): { width: number; height: number }
 
 /**
  * The finger gesture that scrolls one rect's content in `direction`. Scrolling
- * down reveals what is below, so the finger travels up; the travel is a share
- * of the rect's extent scaled by momentum, and never leaves the rect. The
- * root scroll sends no share (agent-device's default, see `perform`); these
- * are for a gesture inside one control, and deterministic tests step through
- * a list with `slow`, a quarter of the box, shorter than any row, so every
- * row lands fully on screen at some stop. At three quarters the mobile
- * benchmark's scenario list dragged rows past.
+ * down reveals what is below, so the finger travels up; the travel is the
+ * momentum's `SWIPE_SHARE` of the rect's extent, centred on the rect, so it
+ * never leaves it.
  */
 export function swipeWithin(
   rect: Rect,
   direction: ScrollDirection,
   momentum: Momentum | undefined,
 ): { from: Point; to: Point } {
-  const ratio = momentum === 'fast' ? 0.8 : momentum === 'slow' ? 0.25 : 0.5;
+  const ratio = SWIPE_SHARE[momentum ?? 'none'];
   const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   const dx = (rect.width * ratio) / 2;
   const dy = (rect.height * ratio) / 2;
