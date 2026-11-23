@@ -283,7 +283,7 @@ export function defineEngine<Fixtures extends object = {}>(declared: EngineSpec<
   if (spec.tapButtons !== undefined) {
     if (typeof spec.tapButtons !== 'boolean') throw invalid(name, 'tapButtons must be a boolean');
     if (spec.tapButtons && !capabilities.has('actions')) {
-      throw invalid(name, 'declares tapButtons without perform: the button rides the tap action perform receives');
+      throw invalid(name, 'declares tapButtons without perform: the button is sent with the tap action that perform receives');
     }
   }
   if (spec.selectsDevice !== undefined) {

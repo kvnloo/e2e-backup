@@ -162,7 +162,10 @@ describe('locator action options', () => {
   });
 
   describe('button', () => {
-    /** A screen over the box whose engine declares `tapButtons` and `tapModifiers` or neither, keeping every action it receives. */
+    /**
+     * Creates a screen over the box that records every action its engine receives.
+     * Set `declared` to declare both `tapButtons` and `tapModifiers` on the engine.
+     */
     function buttonScreen(declared: boolean) {
       const received: LocatorAction[] = [];
       const { screen, steps } = screenOver({
@@ -181,7 +184,7 @@ describe('locator action options', () => {
     it.each([
       ['tap', 'middle', (locator: Locator) => locator.tap({ button: 'middle' })],
       ['click', 'right', (locator: Locator) => locator.click({ button: 'right' })],
-    ] as const)('%s hands the %s button to an engine that declares tapButtons', async (verb, button, call) => {
+    ] as const)('%s with the %s button is sent to an engine with tapButtons', async (verb, button, call) => {
       const { screen, steps, received } = buttonScreen(true);
       await call(screen.getByLabel('Agree'));
       expect(received).toEqual([{ kind: 'tap', button }]);
@@ -190,7 +193,7 @@ describe('locator action options', () => {
       ]);
     });
 
-    it('holds the modifiers for a click with another button', async () => {
+    it('holds the modifiers for a middle click', async () => {
       const { screen, steps, received } = buttonScreen(true);
       await screen.getByLabel('Agree').click({ button: 'middle', modifiers: ['ControlOrMeta', 'Shift'] });
       expect(received).toEqual([{ kind: 'tap', modifiers: ['ControlOrMeta', 'Shift'], button: 'middle' }]);
@@ -199,13 +202,13 @@ describe('locator action options', () => {
       ]);
     });
 
-    it('leaves the field off a left click, so an engine without tapButtons takes it', async () => {
+    it('sends a left click without the button field, so it works on an engine without tapButtons', async () => {
       const { screen, received } = buttonScreen(false);
       await screen.getByLabel('Agree').tap({ button: 'left' });
       expect(received).toEqual([{ kind: 'tap' }]);
     });
 
-    it('refuses another button on an engine that does not declare tapButtons, before resolving', async () => {
+    it('refuses a middle button on an engine without tapButtons before resolving the node', async () => {
       const { screen, received } = buttonScreen(false);
       const started = Date.now();
       await expect(screen.getByLabel('Missing').tap({ button: 'middle' })).rejects.toMatchObject({
@@ -224,7 +227,7 @@ describe('locator action options', () => {
       expect(received).toEqual([]);
     });
 
-    it('refuses another button with a position, which the pointer path cannot press yet', async () => {
+    it('refuses a right button with a position', async () => {
       const { screen } = buttonScreen(true);
       await expect(
         Promise.resolve().then(() => screen.getByLabel('Agree').tap({ button: 'right', position: { x: 1, y: 1 } })),

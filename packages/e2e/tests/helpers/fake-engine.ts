@@ -135,7 +135,7 @@ export interface FakeEngineBehavior {
   keyboard?: boolean;
   /** Declares `tapModifiers`, so modifiers on the tap actions reach `perform`. */
   tapModifiers?: boolean;
-  /** Declares `tapButtons`, so a middle or right button on the tap action reaches `perform`. */
+  /** Set to declare `tapButtons`, so a middle or right button on the tap action is passed to `perform`. */
   tapButtons?: boolean;
   /** Declares `session.back`, `restart`, and `reset` beside `open`; with a scene, the last two close the app. */
   navigation?: boolean;

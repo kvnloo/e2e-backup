@@ -1074,7 +1074,7 @@ test('shift-clicks', async ({ app, screen }) => {
   );
 
   it(
-    'hands a middle button only to an engine that declares tapButtons, and refuses it before perform otherwise',
+    'sends a middle button to perform only when the engine declares tapButtons',
     async () => {
       const file = `import { test } from 'e2e';
 

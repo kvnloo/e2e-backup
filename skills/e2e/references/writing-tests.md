@@ -312,9 +312,9 @@ substring; a `RegExp` matches as written.
 
 Each action resolves one node, waits up to `config.actionTimeout` (30 s, or
 `{ timeout }`) for it to be actionable, and does one thing: `tap()` (alias
-`click()`), `doubleTap()` (alias `dblclick()`), `secondaryTap()` (each takes
-`{ modifiers: ['Shift'] }`, and `tap()` takes `{ button: 'middle' }` or
-`'right'`), `longPress({ duration? })`
+`click()`, takes `{ button: 'middle' }` or `'right'`), `doubleTap()` (alias
+`dblclick()`), `secondaryTap()` (each takes `{ modifiers: ['Shift'] }`),
+`longPress({ duration? })`
 (100 to 10000 ms; default 500 on the web, 1000 on a device),
 `fill(value | Secret)`, `pressSequentially(text, { delay? })`, `clear()`,
 `press(key)`, `check()`, `uncheck()`,

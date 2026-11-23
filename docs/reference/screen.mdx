@@ -698,8 +698,8 @@ await screen.getByRole('link', 'Docs').click({ button: 'middle' });
 
 The options are [`TapOptions`](#types):
 
-- `button`: `left` (default), `middle`, or `right`. The browser engine
-  clicks with it. For the tab a middle click on a link opens, see
+- `button`: the mouse button for the click, `left` (default), `middle`, or
+  `right`. For the tab that opens when a link is middle-clicked, see
   [Tabs](/reference/web#tabs).
 - `modifiers`: the browser engine holds them.
 - `position`: an offset from the node's top-left corner, inside its border,
@@ -713,7 +713,7 @@ The options are [`TapOptions`](#types):
 | `INVALID_ARGUMENT` | An unknown or repeated modifier, or `modifiers` beside `position`. |
 | `INVALID_ARGUMENT` | A `button` other than `left`, `middle`, or `right`, or a middle or right `button` beside `position`. |
 | `UNSUPPORTED_CAPABILITY` | `modifiers` on an engine that does not declare `tapModifiers`, the mobile engine among them; thrown before it acts. |
-| `UNSUPPORTED_CAPABILITY` | A middle or right `button` on an engine that does not declare `tapButtons`, the mobile engine among them; thrown before it acts. |
+| `UNSUPPORTED_CAPABILITY` | A middle or right `button` on an engine without `tapButtons` (such as the mobile engine). Thrown before any action. |
 | `UNSUPPORTED_CAPABILITY` | `position` on an engine without the `tap` pointer action. |
 | `ACTION_FAILED` | `position` on a node the browser engine cannot bring into view; its scroll waits for visibility. Other engines fail as they report it. |
 | `LOCATOR_NOT_FOUND` | `position` on a node that resolves but never shows a visible box within the timeout. |
@@ -1470,8 +1470,8 @@ export interface TapOptions extends ClickOptions {
   position?: Point;
   /**
    * The mouse button to click with: `left` (default), `middle`, or `right`.
-   * `middle` and `right` need an engine that declares `tapButtons`,
-   * `UNSUPPORTED_CAPABILITY` otherwise. They don't work with `position` yet.
+   * `middle` and `right` fail with `UNSUPPORTED_CAPABILITY` on an engine
+   * without `tapButtons`. They can't be combined with `position` yet.
    */
   button?: 'left' | 'middle' | 'right';
 }

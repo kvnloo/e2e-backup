@@ -197,7 +197,7 @@ export interface TargetSession {
   readonly pointerActions: ReadonlySet<PointerActionKind>;
   /** Whether the engine declared `tapModifiers`, so the tap actions may carry `modifiers`. */
   readonly tapModifiers: boolean;
-  /** Whether the engine declared `tapButtons`, so the tap action may carry `button`. */
+  /** `true` when the engine declared `tapButtons`, so `button` is allowed on the tap action. */
   readonly tapButtons: boolean;
   /** Captures one atomic agent observation; the harness redacts it downstream. */
   observe(operation: OperationContext, options?: EngineObserveOptions): Promise<Observation>;

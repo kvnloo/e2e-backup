@@ -1,8 +1,8 @@
 /**
- * `tap` with a mouse button against a real page, through both kinds of target
- * the engine acts on: a deterministic locator and an element handle from an
- * agent observation. The page reads the button and the held keys off the
- * events the click fires.
+ * Tests `tap` with a mouse button on a real page, for both kinds of
+ * `ActionTarget`: a locator from a test, and an element handle from an agent
+ * observation. The button and held keys of each click event are written into
+ * the page's text.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -37,7 +37,7 @@ beforeEach(async () => {
 </script>`);
 });
 
-/** The link as the engine would hold it: a locator, or the element handle an observed ref resolves to. */
+/** Returns the link as an action target: a locator, or the element handle an observed ref resolves to. */
 async function linkAs(kind: 'locator' | 'element'): Promise<ActionTarget> {
   const locator = page.locator('a');
   if (kind === 'locator') return { kind, locator };
@@ -57,11 +57,11 @@ describe.each(['locator', 'element'] as const)('a tap on %s', (kind) => {
     expect(await tap(await linkAs(kind), { kind: 'tap', button: 'middle' })).toBe('auxclick 1');
   });
 
-  it('with the middle button holds the modifiers it names', async () => {
+  it('with the middle button and Shift fires auxclick with shiftKey', async () => {
     expect(await tap(await linkAs(kind), { kind: 'tap', button: 'middle', modifiers: ['Shift'] })).toBe('auxclick 1 shift');
   });
 
-  it('with no button clicks with the primary one', async () => {
+  it('with no button fires click with button 0', async () => {
     expect(await tap(await linkAs(kind), { kind: 'tap' })).toBe('click 0');
   });
 });

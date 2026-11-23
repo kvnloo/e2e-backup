@@ -412,8 +412,8 @@ class LocatorImpl extends ScreenImpl implements Locator {
 
   /**
    * One tap of the node: the platform's own, or, with a position, the pointer
-   * dispatched at that offset of the node's box. A left click reaches the
-   * engine without `button`, so an engine without `tapButtons` still takes it.
+   * dispatched at that offset of the node's box. A left click is sent
+   * without `button`, so it works on an engine without `tapButtons`.
    */
   private tapWith(api: 'tap' | 'click', options: TapOptions | undefined): Promise<void> {
     rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'button']);
@@ -433,7 +433,7 @@ class LocatorImpl extends ScreenImpl implements Locator {
       throw new TestError('INVALID_ARGUMENT', `${api}() does not take modifiers with a position yet; drop one of them`);
     }
     if (button === 'middle' || button === 'right') {
-      throw new TestError('INVALID_ARGUMENT', `${api}() does not take the ${button} button with a position yet; drop one of them`);
+      throw new TestError('INVALID_ARGUMENT', `${api}() does not take the ${button} button with a position yet (drop one of them)`);
     }
     const position = requirePoint(options.position, `${api} position`);
     return this.context.steps.run(
@@ -466,7 +466,7 @@ class LocatorImpl extends ScreenImpl implements Locator {
     return this.dispatchTap(api, { kind, ...requireModifiers(options?.modifiers, api) }, options?.timeout);
   }
 
-  /** One tap with the keys it holds and the button it clicks with, both named in the step label. */
+  /** Runs one tap as a step labeled with its held keys and mouse button. */
   private dispatchTap(
     api: string,
     action: Extract<LocatorAction, { kind: 'tap' | 'doubleTap' | 'secondaryTap' }>,

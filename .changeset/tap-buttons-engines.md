@@ -3,4 +3,4 @@
 '@e2e-dev/desktop': patch
 ---
 
-The engine doesn't declare `tapButtons`, so a middle or right `button` on `tap` fails with `UNSUPPORTED_CAPABILITY` before it reaches the app.
+`tapButtons` isn't declared, so `tap` with a middle or right `button` fails with `UNSUPPORTED_CAPABILITY` before anything reaches the app.

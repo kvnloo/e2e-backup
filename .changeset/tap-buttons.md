@@ -3,4 +3,8 @@
 'e2e': patch
 ---
 
-`tap` and `click` take `{ button: 'middle' }` or `{ button: 'right' }`, as Playwright's `click({ button })` does, so a test of a middle click on a link no longer dispatches `auxclick` in the page. The default stays `left`. An engine opts in with `tapButtons: true`. On one that doesn't (the mobile engine), a middle or right tap fails with `UNSUPPORTED_CAPABILITY` before the node resolves, instead of clicking with the primary button. Any other button, or a middle or right button beside `position`, is `INVALID_ARGUMENT`.
+`tap` and `click` accept `{ button: 'middle' }` and `{ button: 'right' }`, like Playwright's `click({ button })`. A test of a middle click on a link doesn't need to dispatch `auxclick` in the page anymore. The default is still `left`.
+
+Engine support is declared with `tapButtons: true`. A middle or right tap fails with `UNSUPPORTED_CAPABILITY` when `tapButtons` isn't declared (as on the mobile engine). It fails before the node resolves, instead of clicking with the primary button.
+
+`INVALID_ARGUMENT` is thrown for any other button, and for a middle or right button with `position`.
