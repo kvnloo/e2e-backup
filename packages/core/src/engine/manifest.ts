@@ -283,7 +283,7 @@ export function defineEngine<Fixtures extends object = {}>(declared: EngineSpec<
   if (spec.linkRelaunch !== undefined) {
     if (typeof spec.linkRelaunch !== 'boolean') throw invalid(name, 'linkRelaunch must be a boolean');
     if (spec.linkRelaunch && spec.session?.openLink === undefined) {
-      throw invalid(name, 'declares linkRelaunch without session.openLink: relaunch is passed to openLink');
+      throw invalid(name, 'declares linkRelaunch without session.openLink (relaunch is passed to openLink)');
     }
   }
   if (spec.selectsDevice !== undefined) {

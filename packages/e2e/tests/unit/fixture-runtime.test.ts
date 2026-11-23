@@ -827,7 +827,7 @@ describe('app steering hooks', () => {
     ]);
   });
 
-  it('app.open refuses options it does not take before the engine sees anything', async () => {
+  it('app.open with an invalid path or options fails before any engine call', async () => {
     const { engine, calls, app } = steerable({ url: 'http://127.0.0.1:4599' });
     const { fixtures, steps } = runtime(engine, {}, app);
     await expect(fixtures.app.open('/', { relanch: true } as never)).rejects.toMatchObject({
@@ -896,7 +896,7 @@ describe('app steering hooks', () => {
     });
   });
 
-  /** A device that opens links in its pinned app, and declares `linkRelaunch` unless told not to. */
+  /** Creates a device engine with `session.openLink`. Pass `false` to leave out `linkRelaunch`. */
   function linking(linkRelaunch = true) {
     const calls: string[] = [];
     const engine = defineEngine({
@@ -923,7 +923,7 @@ describe('app steering hooks', () => {
     ]);
   });
 
-  it('app.open(path, { relaunch: true }) on an engine without linkRelaunch is UNSUPPORTED_CAPABILITY, never a warm open', async () => {
+  it('app.open(path, { relaunch: true }) on an engine without linkRelaunch fails with UNSUPPORTED_CAPABILITY instead of opening the link in the running app', async () => {
     const { engine, calls, app } = linking(false);
     const { fixtures } = runtime(engine, {}, app);
     await expect(fixtures.app.open('/orders/42', { relaunch: true })).rejects.toMatchObject({
@@ -933,7 +933,7 @@ describe('app steering hooks', () => {
     expect(calls).toEqual([]);
   });
 
-  it('app.open({ relaunch: true }) with no path on a device launches the pinned app fresh, as app.open() does', async () => {
+  it('app.open(undefined, { relaunch: true }) on a device launches the pinned app fresh, as app.open() does', async () => {
     const { engine, calls, app } = linking();
     const { fixtures } = runtime(engine, {}, app);
     await fixtures.app.open(undefined, { relaunch: true });

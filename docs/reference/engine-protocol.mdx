@@ -210,7 +210,7 @@ export interface EngineManifest {
   /** Required with `engine/performAt`. */
   readonly pointerActions?: readonly PointerActionKind[];
   readonly tapModifiers?: boolean;
-  /** Requires `session/openLink`: `openLink` honors `{ relaunch: true }`. */
+  /** Requires `session/openLink`. Set when `{ relaunch: true }` is handled in `openLink`. */
   readonly linkRelaunch?: boolean;
   /** Requires `lifecycle/prepare`: `prepare` binds the device `e2e run --device` names. */
   readonly selectsDevice?: boolean;

@@ -119,7 +119,7 @@
       "type": "boolean"
     },
     "linkRelaunch": {
-      "description": "session/openLink honors { relaunch: true }: it stops the pinned app first, so the link launches it.",
+      "description": "Set when { relaunch: true } is handled in session/openLink. The pinned app is stopped first, then launched from the link.",
       "type": "boolean"
     },
     "selectsDevice": {

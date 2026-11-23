@@ -968,8 +968,8 @@ export class AgentDeviceSurface {
    * device anyway. An unbound open reports the URL as its app name, which is
    * no identity, and the package that took the link as its bundle id when
    * the OS told it; the next snapshot names the foreground app either way.
-   * With `relaunch`, the app is stopped first if it's running, so the link
-   * launches it.
+   * With `relaunch`, the app is stopped first if it's running, then launched
+   * from the link.
    */
   async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget, relaunch = false): Promise<void> {
     const target = app ?? this.pinnedApp;

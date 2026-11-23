@@ -144,7 +144,7 @@ export interface FakeEngineBehavior {
    * the app, opening the scene at the fake's location. Overrides `navigation`.
    */
   device?: boolean;
-  /** With `device`, declares `session.openLink` and `linkRelaunch`: every call is a `session` record, and the app opens at the link. */
+  /** Set with `device` to declare `session.openLink` and `linkRelaunch`. Each call is recorded as a `session` call, then the app is opened at the link. */
   links?: boolean;
   /** Declares the state capability. */
   state?: boolean;

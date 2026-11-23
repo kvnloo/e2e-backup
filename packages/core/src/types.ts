@@ -681,9 +681,9 @@ export interface App {
   readonly baseUrl: string | undefined;
   /**
    * Opens the app: the declared URL, a path relative to it, or any absolute
-   * http(s) URL. On a device target, which has no URL, it launches the pinned
-   * app fresh; a path opens as a link in it when the target declares
-   * `app.linkBase`.
+   * http(s) URL. On a device target, which has no URL, the pinned app is
+   * launched fresh. A path is opened as a link in it when `app.linkBase` is
+   * declared on the target.
    */
   open(path?: string, options?: AppOpenOptions): Promise<void>;
   /**
@@ -713,15 +713,15 @@ export interface App {
   stopRecording(): Promise<readonly [RecordedVideo, ...RecordedVideo[]]>;
 }
 
-/** How `app.open` opens the app. */
+/** Options for `app.open`. */
 export interface AppOpenOptions {
   /**
-   * Set to start the app fresh before the path opens.
+   * Set to start the app fresh before the path is opened.
    *
-   * On a device target with `app.linkBase`, the pinned app is stopped if it's
-   * running, so the link launches it. On a target with a URL, the context is
-   * recreated as in `app.restart()`, and the path opens instead of the base
-   * URL.
+   * - On a device target with `app.linkBase`, the pinned app is stopped if
+   *   it's running, then launched from the link.
+   * - On a target with a URL, the context is recreated as in `app.restart()`,
+   *   then the path is opened instead of the base URL.
    */
   readonly relaunch?: boolean;
 }

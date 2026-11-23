@@ -3311,7 +3311,7 @@ describe('device fixture', () => {
     await expect(h.engine.session!.openLink!('javascript:alert(1)', operation())).rejects.toMatchObject({ code: 'POLICY_DENIED' });
   });
 
-  it.each(['ios', 'android'] as const)('on %s, stops the pinned app before app.open(path, { relaunch: true }) opens the link, in one open', async (platform) => {
+  it.each(['ios', 'android'] as const)('on %s, relaunches the pinned app from the link for app.open(path, { relaunch: true }) in one agent-device open', async (platform) => {
     const h = harness({ platform, bundleId: 'dev.e2e.benchmark' });
     expect(h.engine.linkRelaunch).toBe(true);
     await openAttempt(h);

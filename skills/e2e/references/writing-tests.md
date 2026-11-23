@@ -226,9 +226,12 @@ label. `browser` (`Browser`): browser targets, import `test` from `@e2e-dev/web`
 - `open(path?)`: opens the target's `app.url`, a relative path, or an absolute
   http(s) URL. On a device it relaunches the pinned app, and a path opens as
   a link in it only when the target declares `app.linkBase`.
-  `open(path, { relaunch: true })` starts fresh first. On a device the app is
-  stopped, so the link launches it. In a browser the page is recreated as in
-  `restart()`, and the path opens instead of the base URL.
+  With `{ relaunch: true }`, the app is started fresh before the path is
+  opened:
+  - On a device, the app is stopped if it's running, then launched from the
+    link.
+  - In a browser, the page is recreated as in `restart()`, then the path is
+    opened instead of the base URL.
 - `back()`: one history step back.
 - `restart()`: recreates the context keeping persisted state (a restored
   session included), then reopens the base URL.

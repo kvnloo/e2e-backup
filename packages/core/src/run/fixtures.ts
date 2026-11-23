@@ -621,7 +621,7 @@ export function createApp(
   };
 
   /**
-   * One recorded navigation: resolved against the base URL, on the test
+   * Runs one recorded navigation, resolved against the base URL, on the test
    * budget. With relaunch, the context is recreated first, as in
    * `app.restart()`, within the same budget.
    */
@@ -657,8 +657,8 @@ export function createApp(
    * go there; a link goes through `device.openLink`. An engine without a
    * relaunch hook is refused here; one with a hook reports its own reason it
    * cannot launch, such as a build not installed yet. A link with relaunch
-   * needs an engine that declares `linkRelaunch`. Otherwise an older engine
-   * would open the link in the running app.
+   * is refused unless `linkRelaunch` is declared on the engine. Otherwise the
+   * link would be opened in the running app by an older engine.
    */
   const launchPinnedApp = (openPath: string | undefined, relaunch: boolean): Promise<void> =>
     steps.run('app', 'app.open', openPath ?? '', async () => {
@@ -669,7 +669,7 @@ export function createApp(
         if (relaunch && target.engine?.linkRelaunch !== true) {
           throw new ConfigurationError(
             'UNSUPPORTED_CAPABILITY',
-            `app.open(path, { relaunch: true }) cannot start the app from a link on target "${target.name}": engine ${target.engine?.name ?? 'none'} does not declare linkRelaunch`,
+            `app.open(path, { relaunch: true }) can't start the app from a link on target "${target.name}" because engine ${target.engine?.name ?? 'none'} does not declare linkRelaunch`,
           );
         }
         await engine.session.app.openLink(link, engine.operation(lifecycleMs()), relaunch ? { relaunch: true } : undefined);
