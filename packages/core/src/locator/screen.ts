@@ -412,8 +412,8 @@ class LocatorImpl extends ScreenImpl implements Locator {
 
   /**
    * One tap of the node: the platform's own, or, with a position, the pointer
-   * dispatched at that offset of the node's box. The primary button is the
-   * default, so it never reaches the engine as a `button`.
+   * dispatched at that offset of the node's box. A left click reaches the
+   * engine without `button`, so an engine without `tapButtons` still takes it.
    */
   private tapWith(api: 'tap' | 'click', options: TapOptions | undefined): Promise<void> {
     rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'button']);

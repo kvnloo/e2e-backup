@@ -808,8 +808,9 @@ export interface Engine {
   /**
    * The surface honors `button` on the `tap` action `perform` receives,
    * clicking with the middle or right mouse button. Without it the harness
-   * fails a tap that names a button other than the primary one with
-   * `UNSUPPORTED_CAPABILITY` before it reaches the engine.
+   * fails a tap that carries a button with `UNSUPPORTED_CAPABILITY` before
+   * it reaches the engine, so an engine that predates the field never
+   * clicks with the primary button instead.
    */
   readonly tapButtons?: boolean;
   /**

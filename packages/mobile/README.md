@@ -95,7 +95,7 @@ spread.
   the tree exposes the checked state, as switches do on both platforms),
   focus on editable fields, `Enter`, single-character keys, swipe within a node, drag.
   `selectOption`, `setInputFiles`, `scrollIntoView`, `secondaryTap`,
-  `modifiers` on `tap` or `doubleTap`, a `middle` or `right` `button` on `tap`,
+  `modifiers` on `tap` or `doubleTap`, a middle or right `button` on `tap`,
   focus on a control, and other keys fail with `UNSUPPORTED_CAPABILITY`.
 - **Location**: every `screen` query, plus agent-device selectors through
   `device.locator('role=navigation-bar id=General')`.
