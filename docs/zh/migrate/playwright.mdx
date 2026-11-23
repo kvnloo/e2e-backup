@@ -153,6 +153,7 @@ test('checkout', async ({ app, agent, screen }) => {
 | `page.waitForEvent('popup')` | `browser.waitForPopup(() => trigger)`，会激活新标签页，参阅[标签页](/reference/web#tabs) |
 | `context.pages()`, `context.newPage()`, `page.bringToFront()` | `browser.tabs()`、`browser.newTab()`、`tab.activate()`；没有 `context.on('page')` 事件 |
 | `page.evaluate(fn, arg)` | `browser.evaluate(fn, arg)`，输入和输出均为 JSON |
+| `page.webmcp.tools()`、`page.webmcp.callTool(name, input)` | 在 `browser.webmcp` 上用法相同，用 `web({ webmcp: true })` 代替启动参数或首选项；仅覆盖主框架，见 [WebMCP](/reference/web#webmcp) |
 | `page.addInitScript()`, `page.emulateMedia({ colorScheme, reducedMotion })` | `browser.addInitScript()` 或 `web({ initScripts })`；`browser.emulateMedia()` |
 | `context.addCookies()`, `cookies()`, `clearCookies()` | `browser.setCookies()`、`browser.cookies()`、`browser.clearCookies()` |
 

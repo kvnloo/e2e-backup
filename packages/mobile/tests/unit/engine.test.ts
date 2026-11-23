@@ -19,6 +19,7 @@ import { buildEngine, mobile } from '../../src/engine.ts';
 import { ORIGIN_UNKNOWN_BOUNDS, ORIGIN_WARNING } from '../../src/errors.ts';
 import { AgentDeviceSurface } from '../../src/surface.ts';
 import { swipeWithin } from '../../src/support.ts';
+import { tvTools } from '../../src/tools.ts';
 import { ANDROID_APP_PACKAGE, ANDROID_ID_SNAPSHOT, createFakeClient, SETTINGS_NODES, SETTINGS_SNAPSHOT, type FakeClient } from '../helpers/fake-client.ts';
 import { boot, harness, poolVariableIn, PROJECT_ROOT, type Harness } from '../helpers/harness.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
@@ -57,6 +58,12 @@ async function openAttempt(h: Harness, attemptId = 'a1'): Promise<void> {
   await h.engine.startAttempt!({ attemptId, artifactsDir, signal: new AbortController().signal, resolveSecret: noSecrets, ...ignoreTrace });
   const { app } = h;
   if (app.bundleId !== undefined || app.appPath !== undefined) await h.engine.session!.restart!(operation());
+}
+
+/** One `tv_remote` call, as the agent makes it. */
+function remoteTool(h: Harness, key: string): Promise<unknown> {
+  const execute = tvTools(h.engine).tv_remote!.tool.execute as (input: unknown, options: object) => Promise<unknown>;
+  return execute({ key }, { toolCallId: 'c1', messages: [] });
 }
 
 /** The observed node with this name, from a fresh observation. */
@@ -2224,6 +2231,49 @@ describe('device fixture', () => {
     return h.engine.fixtures!['device']!(context) as Device;
   }
 
+  it.each([
+    ['up', 'up'],
+    ['down', 'down'],
+    ['left', 'left'],
+    ['right', 'right'],
+    ['select', 'select'],
+    ['back', 'back'],
+    ['menu', 'menu'],
+    ['home', 'home'],
+    ['play', 'media-play'],
+    ['pause', 'media-pause'],
+    ['play-pause', 'media-play-pause'],
+    ['stop', 'media-stop'],
+    ['rewind', 'media-rewind'],
+    ['fast-forward', 'media-fast-forward'],
+    ['next', 'media-next'],
+    ['previous', 'media-previous'],
+  ] as const)('device.pressRemote(%j) presses the agent-device tv-remote button %s', async (key, button) => {
+    const h = harness();
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await fixture(h).pressRemote(key);
+    expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([['command.tvRemote', { platform: 'ios', button }]]);
+  });
+
+  it.each(['Menu', 'Home', 'toString', '', 3])('device.pressRemote refuses %j, a name outside the list, before any device call', async (key) => {
+    const h = harness();
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await expect(fixture(h).pressRemote(key as never)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', message: expect.stringContaining('not a remote key; press one of up, down, left, right, select, back, menu, home, play') });
+    expect(h.fake.calls).toHaveLength(before);
+  });
+
+  it('fails a remote key the device has no button for with UNSUPPORTED_CAPABILITY', async () => {
+    const h = harness();
+    await openAttempt(h);
+    h.fake.respond('command.tvRemote', () => {
+      throw new AppError('UNSUPPORTED_OPERATION', 'tv-remote is not supported on this device');
+    });
+    await expect(fixture(h).pressRemote('menu')).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    expect(h.fake.methods()).toContain('command.tvRemote');
+  });
+
   describe('viewport', () => {
     it.each(['ios', 'android'] as const)('reads the %s viewport as a recorded resource without capturing pixels', async (platform) => {
       const h = harness({ platform });
@@ -2965,7 +3015,7 @@ describe('device fixture', () => {
     expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', postGestureStabilization: false });
   });
 
-  it('counts a back, home, alert, keyboard, rotation, or fold as an action, so a control that arrives with it waits out the transition budget', async () => {
+  it('counts a back, home, remote press, shake, alert, keyboard, rotation, or fold as an action, so a control that arrives with it waits out the transition budget', async () => {
     autoAdvanceTimers();
     const h = harness({ transition: 120 });
     await openAttempt(h);
@@ -2974,6 +3024,9 @@ describe('device fixture', () => {
     for (const change of [
       () => device.back(),
       () => device.home(),
+      () => device.pressRemote('menu'),
+      () => remoteTool(h, 'select'),
+      () => device.shake(),
       () => device.alert('accept'),
       () => device.dismissKeyboard(),
       () => device.setOrientation('landscape-left'),
@@ -3102,6 +3155,7 @@ describe('device fixture', () => {
     expect(await device.foregroundApp()).toEqual({ name: 'Settings', bundleId: 'com.apple.Preferences' });
     await device.home();
     await device.back();
+    await device.shake();
     await device.alert('accept');
     await device.dismissKeyboard();
     expect(await device.clipboard()).toBe('pasted');
@@ -3122,6 +3176,7 @@ describe('device fixture', () => {
       ['command.appState', {}],
       ['command.home', { platform: 'ios' }],
       ['command.back', { settle: true, settleQuietMs: 150 }],
+      ['command.shake', { platform: 'ios' }],
       ['command.alert', { platform: 'ios', action: 'accept' }],
       ['command.keyboard', { action: 'dismiss' }],
       ['command.clipboard', { platform: 'ios', action: 'read' }],
@@ -3309,6 +3364,9 @@ describe('device fixture', () => {
       () => selected.clipboard(),
       () => selected.setClipboard('x'),
       () => selected.setPermission('camera', 'grant'),
+      // A remote reaches the launcher, so a test presses it with no app open.
+      () => selected.pressRemote('home'),
+      () => remoteTool(h, 'home'),
       // iOS refuses going offline before any command, so the radios are Android's.
       ...(platform === 'ios' ? [
         () => selected.enrollBiometrics('touchid', true),
@@ -3479,6 +3537,25 @@ describe('device fixture', () => {
     const count = android.fake.calls.length;
     await expect(fixture(android).clearKeychain()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
     expect(android.fake.calls.length).toBe(count);
+  });
+
+  it('shakes the selected simulator or emulator, and maps agent-device\'s refusal of a physical device to UNSUPPORTED_CAPABILITY with its hint', async () => {
+    const android = harness({ platform: 'android', device: 'emulator-5554', bundleId: 'com.example.app' });
+    await openAttempt(android);
+    await expect(fixture(android).shake()).resolves.toBeUndefined();
+    expect(android.fake.lastArgs('command.shake')).toEqual({ platform: 'android', serial: 'emulator-5554' });
+
+    const phone = harness({ platform: 'android', device: 'R58M123ABC', bundleId: 'com.example.app' });
+    await openAttempt(phone);
+    // agent-device 0.21.42's own refusal: the message names no reason, the details do.
+    const hint = 'shake overrides the accelerometer through the Android emulator console; a physical device has no console, so shake it by hand.';
+    phone.fake.respond('command.shake', () => {
+      throw new AppError('UNSUPPORTED_OPERATION', 'Runtime operation shake is unavailable', { reason: 'unsupported-device-kind', hint });
+    });
+    await expect(fixture(phone).shake()).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining(hint),
+    });
   });
 
   it('folds an iOS simulator or an Android emulator through the one device command, and maps a hingeless device to UNSUPPORTED_CAPABILITY', async () => {

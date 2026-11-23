@@ -249,6 +249,7 @@ start a script that brings them up and serves the app.
 | `testIdAttribute` | What `getByTestId` reads; default `data-testid`. |
 | `chromiumSandbox` | Whether a locally launched Chromium runs with its OS sandbox on; default `true` on macOS and Windows, `false` on Linux, where root and most containers cannot start it. |
 | `screencast` | `{ size?, quality? }` for the engine's own video: frame size (default the viewport's), JPEG quality 0 to 100. |
+| `webmcp` | `true` launches Chromium or Firefox with [WebMCP](https://github.com/webmachinelearning/webmcp) on, so `browser.webmcp.tools()` and `callTool()` reach the tools a page registers; default `false`. WebKit has none (`INVALID_CONFIG`); a browser attached with `connect` must be started with it. |
 
 - `basicAuth` via `secrets.get()` masks text, not screenshots or model pixels
   showing the password. An undeclared name is `INVALID_CONFIG` at load, as is

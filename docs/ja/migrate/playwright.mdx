@@ -153,6 +153,7 @@ test('checkout', async ({ app, agent, screen }) => {
 | `page.waitForEvent('popup')` | 新しいタブをアクティブにする `browser.waitForPopup(() => trigger)`。[タブ](/reference/web#tabs)を参照 |
 | `context.pages()`, `context.newPage()`, `page.bringToFront()` | `browser.tabs()`、`browser.newTab()`、`tab.activate()`。`context.on('page')` イベントはなし |
 | `page.evaluate(fn, arg)` | `browser.evaluate(fn, arg)`。入出力は JSON |
+| `page.webmcp.tools()`、`page.webmcp.callTool(name, input)` | `browser.webmcp` で同じように使えます。起動引数や設定の代わりに `web({ webmcp: true })` を指定します。メインフレームのみが対象です。[WebMCP](/reference/web#webmcp) を参照 |
 | `page.addInitScript()`, `page.emulateMedia({ colorScheme, reducedMotion })` | `browser.addInitScript()` または `web({ initScripts })`。`browser.emulateMedia()` |
 | `context.addCookies()`, `cookies()`, `clearCookies()` | `browser.setCookies()`、`browser.cookies()`、`browser.clearCookies()` |
 
