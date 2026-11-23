@@ -332,7 +332,7 @@ describe('dispatchLocatorAction', () => {
     ['slow', 75],
     ['none', 150],
     ['fast', 240],
-  ] as const)('scrolls a node with %s momentum by the share of its box every engine moves', async (momentum, distance) => {
+  ] as const)('scrolls a node with %s momentum by the same share of its box on every engine', async (momentum, distance) => {
     const { target, wheel } = stubLocator({ x: 0, y: 0, width: 400, height: 300 });
     await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', momentum }, OPERATION, lookup);
     expect(wheel).toHaveBeenCalledWith(0, distance);
@@ -487,7 +487,7 @@ describe('dispatchPointerAction', () => {
     ['slow', 200],
     ['none', 400],
     ['fast', 640],
-  ] as const)('swipes the viewport with %s momentum by the share every engine moves', async (momentum, distance) => {
+  ] as const)('swipes the viewport with %s momentum by the same share on every engine', async (momentum, distance) => {
     const { page, calls } = stubPage();
     await dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipe', direction: 'right', momentum });
     expect(calls).toEqual(['move 10,20', `wheel ${distance},0`, 'frame']);

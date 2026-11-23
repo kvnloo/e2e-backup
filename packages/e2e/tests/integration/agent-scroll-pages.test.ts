@@ -25,7 +25,7 @@ interface Paged {
   /** Engine observations between each swipe and the next one, the last one up to the end of the scroll. */
   readonly capturesPerPage: number[];
   readonly swipes: number;
-  /** The momentum of every swipe the paging sent. */
+  /** The momentum of each swipe sent while paging. */
   readonly momenta: (string | undefined)[];
   readonly error: string | undefined;
   readonly found: string | undefined;

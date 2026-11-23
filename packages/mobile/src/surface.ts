@@ -1521,11 +1521,11 @@ export class AgentDeviceSurface {
     // The observation root is the screen: a swipe on it scrolls the whole
     // viewport, which is the one action a screen takes. The swipe travels
     // the momentum's `SWIPE_SHARE` of the viewport. The gesture is centred
-    // on the viewport, with a tenth of the height kept clear at each edge,
-    // so a scroll down starts the finger at `0.5 + amount / 2` of the height
-    // (0.9 with `fast`). Bottom chrome there, such as a sticky footer or a
-    // tab bar, can swallow the drag. A live iOS run once lost every scroll of
-    // the mobile benchmark's sticky chrome flow that way.
+    // on the viewport, so a scroll down starts the finger at
+    // `0.5 + amount / 2` of the height. With `fast`, that's 0.9, a tenth of
+    // the height above the bottom edge. A drag that starts on bottom chrome
+    // (a sticky footer or a tab bar) can be lost. Every scroll of the mobile
+    // benchmark's sticky chrome flow was lost that way in one live iOS run.
     if (ref.id === ROOT_ID) {
       if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);
       if (deterministic) await this.waitOutTransition(operation, input);

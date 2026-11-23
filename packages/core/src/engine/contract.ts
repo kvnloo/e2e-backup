@@ -15,17 +15,17 @@ export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 /** How far a swipe travels, as a share of the swiped box (`SWIPE_SHARE`). */
 export type Momentum = 'none' | 'slow' | 'fast';
 /**
- * The share of the swiped box a swipe in a direction travels, by momentum,
- * measured along the swipe. The box is the node, or the viewport on the
- * screen. The table is shared by the web and mobile engines, so a momentum
- * moves the same share on each.
+ * The distance a swipe with a direction travels for each momentum, as a
+ * share of the swiped box along the swipe. The box is the node (or the
+ * viewport, on the screen). The web and mobile engines both use this table,
+ * so a momentum travels the same share on each.
  *
  * `slow` is a quarter, so each stop overlaps the one before by three
- * quarters. A test stepping through a list then sees every row fully on
- * screen at some stop. At three quarters, the mobile benchmark's scenario
- * list dragged rows past.
+ * quarters. When a test steps through a list, every row is fully on screen
+ * at some stop. With three quarters, rows of the mobile benchmark's scenario
+ * list were dragged past.
  *
- * `fast` moves a paging scroll view past half a page.
+ * `fast` is 0.8, so a paging scroll view moves past half a page.
  */
 export const SWIPE_SHARE: Readonly<Record<Momentum, number>> = { slow: 0.25, none: 0.5, fast: 0.8 };
 /** One option of a select: its label (a bare string too), its `value` attribute, or its zero-based index. */

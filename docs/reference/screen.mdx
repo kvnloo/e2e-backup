@@ -477,12 +477,12 @@ await screen.swipe({ from: { x: '50%', y: '80%' }, to: { x: '50%', y: '20%' } })
 
 - `direction` is the way the content scrolls, not the finger: `'down'`
   reveals what is below.
-- `momentum` is how far the gesture travels, as a share of the viewport
-  (or of the node, on a locator) along the swipe. It's `'none'` by default.
-  The shares are the same on the web and on a device:
-  - `'slow'`: a quarter.
-  - `'none'`: half.
-  - `'fast'`: 0.8, so a paging scroll view moves past half a page.
+- `momentum` is how far the gesture travels, measured along the swipe as a
+  share of the viewport (or of the node, on a locator). It's `'none'` by
+  default. The shares are the same on the web and on a device:
+  - `'slow'`: 0.25
+  - `'none'`: 0.5
+  - `'fast'`: 0.8 (so a paging scroll view moves past half a page)
 
   On a device, the content can fling further than the finger travels.
 
@@ -532,8 +532,9 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 
 - `momentum` is as [`screen.swipe`](#screen-swipe) defines it. A longer step
   is faster, but it must not carry the target past the surface unseen, as a
-  virtualized list does. On a long list, `'fast'` takes fewer steps. On the
-  web, it doesn't skip any row shorter than a fifth of the surface.
+  virtualized list does. With `'fast'`, fewer steps are needed on a long
+  list. On the web, every row shorter than a fifth of the surface is still
+  fully on screen at some step.
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
   whole scroll, each swipe included.
 - On a locator each step swipes that node. So a feed or a table that is its

@@ -323,9 +323,12 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
 and `modifiers`.
 
-A swipe's `momentum` is how far it travels, as a share of the node (or the
-viewport, for `screen.swipe`): `slow` 0.25, `none` 0.5 (the default), and
-`fast` 0.8. The shares are the same on web and mobile.
+A swipe's `momentum` is how far it travels, as a share of the node (or of
+the viewport, for `screen.swipe`). The shares are the same on web and mobile:
+
+- `slow`: 0.25
+- `none`: 0.5 (the default)
+- `fast`: 0.8
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the

@@ -1196,8 +1196,8 @@ honors in `actions` and `pointerActions`.
 
 The grammar is closed. Anything beyond it is an agent-side `defineTool`.
 
-A `swipe` travels a share of the node along the swipe, or of the viewport on
-the root. Take the share from `SWIPE_SHARE[momentum ?? 'none']` in
+A `swipe` travels a share of the node (or of the viewport, on the root),
+measured along the swipe. Take the share from `SWIPE_SHARE[momentum ?? 'none']` in
 `e2e/engine` (`slow` 0.25, `none` 0.5, `fast` 0.8), so a test's swipes move
 the same distance on every engine.
 

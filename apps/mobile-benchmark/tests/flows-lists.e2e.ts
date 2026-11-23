@@ -96,8 +96,8 @@ test('async states: load, pull to refresh, claim through the toast', async ({ ap
   await expect(claimed).toHaveText('Reward claimed');
 });
 
-// Row 512 is about 40 screens down and scrollUntilVisible pages half a screen
-// per swipe, so the test needs more than the default budget. Only the rows on
+// Row 512 is about 40 screens down, at half a screen per scrollUntilVisible
+// swipe, so the test needs more than the default budget. Only the rows on
 // screen enter the tree, so the count is a screenful, never the 600 loaded.
 test('huge virtualized list reaches row 512', { timeout: 300_000 }, async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Huge Virtualized List');

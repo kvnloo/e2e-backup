@@ -104,7 +104,7 @@ describe('support helpers', () => {
     ['slow', 75],
     ['none', 150],
     ['fast', 240],
-  ] as const)('swipes a node with %s momentum by the share of its box every engine moves', (momentum, distance) => {
+  ] as const)('swipes a node with %s momentum by the same share of its box on every engine', (momentum, distance) => {
     const { from, to } = swipeWithin({ x: 0, y: 0, width: 400, height: 300 }, 'down', momentum);
     expect(from.y - to.y).toBe(distance);
   });

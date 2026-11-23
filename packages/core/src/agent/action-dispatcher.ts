@@ -61,7 +61,7 @@ const MAX_STALE_RELOCATIONS = 2;
 
 /**
  * The momentum of one grammar scroll. With `fast`, each scroll moves 0.8 of
- * the scrolled box (`SWIPE_SHARE`), so a long feed takes few actions.
+ * the scrolled box (`SWIPE_SHARE`), so a long feed needs only a few actions.
  *
  * On the web, the wheel moves exactly that far, so every row shorter than a
  * fifth of the box shows in at least one look. On a device, the content can
@@ -71,9 +71,9 @@ const MAX_STALE_RELOCATIONS = 2;
 const SCROLL_MOMENTUM: Momentum = 'fast';
 
 /**
- * How many pages a scroll to a text may turn. Each page moves as a grammar
- * scroll does (`SCROLL_MOMENTUM`): 0.8 of the list. A windowed table of five
- * thousand short rows is about four hundred pages on a browser; the cap
+ * How many pages a scroll to a text may turn. Each page turn is one grammar
+ * scroll (`SCROLL_MOMENTUM`), 0.8 of the list. A windowed table of five
+ * thousand short rows is about four hundred pages on a browser. The cap
  * bounds a text that never shows, the step's own clock bounds the time, and a
  * screen that stops moving ends the paging before either.
  */
