@@ -588,11 +588,17 @@ function wheelAim(element: Element): WheelAim {
  * Page-side: the client size, along the swipe's axis, of the container a
  * wheel scrolls from `element`, or from the element at `at` when given: the
  * nearest one, itself included, whose content overflows along that axis and
- * whose style lets it scroll. The walk crosses out of a shadow root to its
- * host. With none, it is the viewport.
+ * whose style lets it scroll. The element at a point is found inside open
+ * shadow roots, and the walk up crosses out of a shadow root to its host.
+ * With none, it is the viewport, as it is for a pane inside an iframe.
  */
 function scrollExtent(element: Element, { vertical, at }: { vertical: boolean; at?: ViewportPoint }): number {
   let node = at === undefined ? element : document.elementFromPoint(at.x, at.y);
+  while (at !== undefined && node?.shadowRoot) {
+    const inner = node.shadowRoot.elementFromPoint(at.x, at.y);
+    if (inner === null || inner === node) break;
+    node = inner;
+  }
   while (node !== null) {
     const overflow = getComputedStyle(node)[vertical ? 'overflowY' : 'overflowX'];
     const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;

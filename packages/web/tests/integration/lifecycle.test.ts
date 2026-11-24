@@ -786,6 +786,17 @@ describe('web engine lifecycle', () => {
         const [row] = await engine.locate!(byRole('button'), operation('sc1'));
         await engine.perform!(row!.ref, swipe, operation('sc1'));
         await expect.poll(offsets).toEqual([300, 0]);
+
+        // The same pane inside an open shadow root is found and measured too.
+        await page.setContent(`<body style="margin: 0; height: 3000px"><div id="host"></div></body>`);
+        await page.evaluate(() => {
+          const root = document.querySelector('#host')?.attachShadow({ mode: 'open' });
+          if (root !== undefined) root.innerHTML = '<div id="pane" style="position: fixed; top: 200px; left: 0; right: 0; height: 300px; overflow: auto"><div style="height: 3000px"></div></div>';
+        });
+        const shadowOffsets = () => page.evaluate(() => [document.querySelector('#host')?.shadowRoot?.querySelector('#pane')?.scrollTop ?? -1, window.scrollY]);
+        const again = await engine.observe!(operation('sc1'));
+        await engine.perform!(again.root.ref, swipe, operation('sc1'));
+        await expect.poll(shadowOffsets).toEqual([150, 0]);
       });
     });
 

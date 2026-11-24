@@ -1452,9 +1452,15 @@ export class AgentDeviceSurface {
   }
 
   /** Records that a test's gesture skipped the stabilization wait, so the next action on a control checks it stopped moving. */
-  /** Sends `drags` one after another, each taking `durationMs`. */
+  /**
+   * Sends `drags` one after another, each taking `durationMs`. The first one
+   * goes out only when the budget holds every drag, so a swipe is never cut
+   * off between two of its drags.
+   */
   private async pan(client: AgentDeviceClient, drags: readonly Drag[], durationMs: number, input: InputBudget): Promise<void> {
-    for (const drag of drags) await input.send(() => client.interactions.pan({ ...drag, durationMs }), durationMs);
+    for (const [index, drag] of drags.entries()) {
+      await input.send((signal) => client.interactions.pan({ ...drag, durationMs, signal }), index === 0 ? drags.length * durationMs : durationMs);
+    }
   }
 
   private noteGesture(operation: OperationContext): void {
@@ -1541,7 +1547,10 @@ export class AgentDeviceSurface {
       const viewport = this.knownViewport;
       if (viewport === undefined) throw notActionable('the screen size is not known yet, so a swipe has nothing to measure its distance by; observe the screen first');
       if (deterministic) await this.waitOutTransition(operation, input);
-      const before = this.latestScreen;
+      // The last action may have replaced the screen, so a capture from before
+      // it gives the wrong containers: read the screen again.
+      const latest = this.latestScreen;
+      const before = latest === undefined || latest === this.screenBeforeAction ? this.project(await this.capture(operation.signal, false, input)) : latest;
       const centre = { x: viewport.width / 2, y: viewport.height / 2 };
       // A capture that could not place its window on the screen gives boxes in
       // another frame, so its containers are not trusted.

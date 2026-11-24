@@ -1535,7 +1535,10 @@ describe('perform', () => {
       ['interactions.type', { text: ' ' }],
       // A node swipe drags from a quarter in from the edge the content comes from.
       ['interactions.pan', { x: 195, y: 620, dx: 0, dy: -200, durationMs: 400 }],
-      // The root swipe is the viewport swipe. 0.8 of the screen is longer than one drag, so it is two.
+      // The root swipe is the viewport swipe. The node swipe may have changed
+      // the screen, so it reads the screen again for its containers. 0.8 of
+      // the screen is longer than one drag, so it is two.
+      ['capture.snapshot', { interactiveOnly: false }],
       ['interactions.pan', { x: 195, y: 211, dx: 0, dy: 337.6, durationMs: 150 }],
       ['interactions.pan', { x: 195, y: 211, dx: 0, dy: 337.6, durationMs: 150 }],
       ['interactions.drag', { source: '@e4', destination: '@e3' }],
@@ -4319,6 +4322,29 @@ describe('deterministic actions', () => {
       await h.engine.perform!((await observed(h, 'Row 5')).ref, swipe, operation());
       await h.engine.perform!((await observed(h, 'Continue')).ref, swipe, operation());
       expect(pans(h)).toEqual([LIST_DOWN, { x: 195, y: 805, dx: 0, dy: -30, durationMs: 400 }]);
+    });
+
+    it('reads the screen again for its containers when an action came after the last read', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'Continue')).ref, { kind: 'tap' }, operation());
+      // The tap opened a sheet with a shorter list, from y 400 to 800.
+      h.fake.respond('capture.snapshot', () => ({
+        ...LIST_SNAPSHOT,
+        nodes: LIST_SNAPSHOT.nodes.map((node) => (node.ref === '@e2' ? { ...node, rect: { x: 0, y: 400, width: 390, height: 400 } } : node)),
+      }));
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(pans(h)).toEqual([{ x: 195, y: 700, dx: 0, dy: -200, durationMs: 400 }]);
+    });
+
+    it('sends no drag of a split swipe when its budget cannot hold every drag', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      // A distance of 1 is two drags of 400 ms, so 600 ms holds only one.
+      await expect(
+        h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 600 }),
+      ).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+      expect(pans(h)).toEqual([]);
     });
 
     it('drags a node near its container edge to the middle over a scroll step, and leaves the rest where they are', async () => {

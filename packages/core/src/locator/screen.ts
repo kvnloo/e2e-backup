@@ -299,15 +299,16 @@ class ScreenImpl implements Screen {
           if (engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView' }, deadline);
           return;
         }
-        if (deadline.expired()) throw notVisible();
         try {
           await swipeStep(deadline);
         } catch (cause) {
           // A swipe cut by the scroll's deadline is the scroll timing out. The
           // engine's timer can wake a millisecond before this clock reads the
           // deadline, so a swipe that ran out of its budget within a poll
-          // interval of the deadline is the deadline too, whichever timer fired first.
-          if (deadline.expired() || (isOperationTimeout(cause) && deadline.remaining() < POLL_INTERVAL_MS)) {
+          // interval of the deadline is the deadline too, whichever timer fired
+          // first. So is a step an engine refused because its drag no longer
+          // fit the time left.
+          if (deadline.expired() || deadline.remaining() < step.durationMs || (isOperationTimeout(cause) && deadline.remaining() < POLL_INTERVAL_MS)) {
             throw notVisible(cause);
           }
           throw cause;

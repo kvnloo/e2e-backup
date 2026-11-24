@@ -11,7 +11,11 @@
 - `distance` is how far the content scrolls, as a share of the scroll container along the swipe, above 0 and at most 1. The default is 0.5.
 - `speed` is `'slow'`, `'normal'`, or `'fast'`. Each drag takes 1500, 400, or 150 ms, and the default is `'normal'`. The web wheel ignores it.
 
-Replace `momentum: 'slow'` with `distance: 0.25`, `'none'` with the default, and `'fast'` with `distance: 0.8`.
+To keep a test's old stride, set `distance` to what its `momentum` moved:
+
+- On the web, `'slow'` moved 0.75 of the box and `'fast'` 1.5. Use `distance: 0.75`, and `distance: 1` for `'fast'`, since a swipe now moves one container at most.
+- On a device, a node swipe moved 0.25 for `'slow'` and 0.8 for `'fast'`. A screen swipe moved about 0.6 with any momentum.
+- `'none'` moved 0.5 everywhere, the new default.
 
 The swipe scrolls the scroll container under the screen's center, or the node's nearest scroll container on a locator. Before, it was the whole screen or the node's own box.
 
