@@ -143,10 +143,16 @@ Registers an unfinished test without a body:
 test.todo('add checkout coverage');
 ```
 
-It is reported as `skipped` with `skip.cause` and `skip.reason` set to `todo`.
-It does not run and has no attempts. A TODO-only selection fails with
-`NO_TESTS`, like a selection containing only other skipped tests. A TODO
-registration inside a serial group is a `COLLECTION_ERROR`.
+- The test never runs and has no attempts. It is reported `skipped`, with
+  `skip.cause` and `skip.reason` both `todo`.
+- A selection of only TODO tests fails with `NO_TESTS`, like any selection
+  with nothing to run, unless `--pass-with-no-tests` is set.
+- It takes no test options and returns a `TestCase`.
+
+| Throws | When |
+| --- | --- |
+| `COLLECTION_ERROR` | Called with a body or any argument after the title. Use [`test.skip`](#test-skip) or [`test.fixme`](#test-fixme) for a test with a body. |
+| `COLLECTION_ERROR` | Called inside a serial group. Set [`skip`](#skip) on the serial `describe` instead. |
 
 #### `test.fixme`
 

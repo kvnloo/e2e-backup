@@ -476,7 +476,7 @@ describe('registration', () => {
       collectModule(async () => {
         Reflect.apply(test.todo, test, ['has a body', noop]);
       }),
-    ).rejects.toThrow('test.todo() accepts a title only');
+    ).rejects.toThrow('test.todo() takes a title only; register a test with a body through test.skip(title, fn) or test.fixme(title, fn)');
     expect(() => test.todo('outside')).toThrow(/^test\.todo\(\) can only be called while a test module is being collected/);
   });
 

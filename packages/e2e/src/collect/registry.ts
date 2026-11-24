@@ -776,20 +776,16 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
           'set skip on the serial describe instead',
       );
     }
-    const options = skip === 'fixme'
-      ? { ...given, skip: fixmeReason() }
-      : skip === 'todo'
-        ? { ...given, skip: 'todo' }
-        : skip === true
-          ? { ...given, skip: typeof given.skip === 'string' ? given.skip : true }
-          : given;
+    const options = typeof skip === 'string'
+      ? { ...given, skip: skip === 'fixme' ? fixmeReason() : 'todo' }
+      : skip === true
+        ? { ...given, skip: typeof given.skip === 'string' ? given.skip : true }
+        : given;
     const mode: TestMode = options.only === true
       ? 'only'
-      : skip === 'fixme'
-        ? 'fixme'
-        : skip === 'todo'
-          ? 'todo'
-          : options.skip !== undefined && options.skip !== false ? 'skip' : 'normal';
+      : typeof skip === 'string'
+        ? skip
+        : options.skip !== undefined && options.skip !== false ? 'skip' : 'normal';
     return collector.registerTest('test', mode, title, options, [], fn, chain, namedBy);
   };
   /** The `test()` call forms. */
@@ -866,7 +862,9 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     },
     todo(title: string, ...args: unknown[]): TestCase {
       requireCollector('test.todo()');
-      if (args.length > 0) throw new CollectionError('test.todo() accepts a title only; it does not take a body');
+      if (args.length > 0) {
+        throw new CollectionError('test.todo() takes a title only; register a test with a body through test.skip(title, fn) or test.fixme(title, fn)');
+      }
       return registrar('test.todo()', 'todo')(title, () => {});
     },
     fixme(first?: string | boolean, second?: TestBody | string): TestCase | undefined {
