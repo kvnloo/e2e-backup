@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { discoverConfig } from '../../src/config/load.ts';
 import { isCiMode, type CliOverrides } from '@e2e-dev/core/lib/config/resolve';
 import { resolveConfig } from '../../src/config/resolve-run.ts';
@@ -9,8 +9,8 @@ import { ConfigurationError, defineEngine } from '@e2e-dev/core/lib/engine/index
 import { protocolEngine } from '@e2e-dev/core/lib/engine/protocol/client';
 import { secrets } from '@e2e-dev/core/lib/secrets';
 import type { CommandConfig, Target, TargetApp } from '@e2e-dev/core/lib/types';
-import { dot, junit, list } from '../../src/reporters.ts';
-import type { BuiltinReporter, E2EConfig, Reporter, TestFilter } from '../../src/run-types.ts';
+import { dot, junit, line, list } from '../../src/reporters.ts';
+import type { BuiltinReporter, E2EConfig, FinishedRun, Reporter, TestFilter } from '../../src/run-types.ts';
 import { snapshot } from '../helpers/snapshot.ts';
 import { invalid } from '../helpers/invalid.ts';
 
@@ -19,13 +19,24 @@ const BASE_ENV = {} as NodeJS.ProcessEnv;
 const WEB = { name: 'web', platform: 'web' } as const;
 const TARGETS = [WEB];
 
+/** The terminal stream a `list`, `dot`, or `line` reporter prints its summary rows to. */
+function streamOf(reporter: Reporter): 'stdout' | 'stderr' | undefined {
+  const spies = (['stdout', 'stderr'] as const).map((stream) => [stream, vi.spyOn(process[stream], 'write').mockImplementation(() => true)] as const);
+  try {
+    reporter.onSummary?.([{ label: 'Report', text: 'report.json' }], {} as FinishedRun);
+    return spies.find(([, spy]) => spy.mock.calls.length > 0)?.[0];
+  } finally {
+    for (const [, spy] of spies) spy.mockRestore();
+  }
+}
+
 function resolve(raw: Partial<E2EConfig>, env: NodeJS.ProcessEnv = BASE_ENV) {
   return resolveConfig({ targets: TARGETS, ...raw }, { projectRoot: ROOT, env });
 }
 
 /** A minimal observing engine, the way web() or mobile() would drive a target. */
 function fakeEngine() {
-  return defineEngine({ name: 'fake', version: '1.0.0', spiVersion: 1, observe: async () => snapshot([]) });
+  return defineEngine({ name: 'fake', version: '1.0.0', spiVersion: 1, launchArgumentValues: true, observe: async () => snapshot([]) });
 }
 
 /** One web target on the fake engine declaring `app`. */
@@ -541,7 +552,9 @@ describe('resolveConfig', () => {
     expect(() => resolveApp({ url: 5 } as never)).toThrow('target "web" app.url must be a non-empty string');
     expect(() => resolveApp({ bundleId: '' })).toThrow('app.bundleId must be a non-empty string');
     expect(() => resolveApp({ appPath: ' ' })).toThrow('app.appPath must be a non-empty string');
-    expect(() => resolveApp({ launchArguments: ['-a', 1] } as never)).toThrow('app.launchArguments must be an array of strings');
+    expect(() => resolveApp({ launchArguments: ['-a', 1] } as never)).toThrow(
+      'app.launchArguments must be an array of strings or an object of argument name to string, number, boolean, or array of strings; item 1 is a number',
+    );
     expect(() => resolveApp({ permissions: { camera: 'allow' } } as never)).toThrow(
       'app.permissions.camera must be grant, deny, or reset, got "allow"',
     );
@@ -556,6 +569,51 @@ describe('resolveConfig', () => {
       launchArguments: ['-e2e'],
       permissions: { camera: 'grant' },
     });
+  });
+
+  it('takes launch arguments as an object of name to string, number, boolean, or list of strings, and leaves out an undefined value', () => {
+    const launchArguments = { AppleLanguages: ['fr'], AppleLocale: 'fr_FR', e2e: true, retries: 3, skipOnboarding: undefined };
+    expect(resolveApp({ bundleId: 'dev.shop.app', launchArguments }).launchArguments).toEqual({
+      AppleLanguages: ['fr'],
+      AppleLocale: 'fr_FR',
+      e2e: true,
+      retries: 3,
+    });
+    expect(resolveApp({ bundleId: 'dev.shop.app', launchArguments: {} }).launchArguments).toEqual({});
+    expect(resolveApp({ bundleId: 'dev.shop.app', launchArguments: Object.assign(Object.create(null), { e2e: true }) }).launchArguments).toEqual({ e2e: true });
+
+    const shape = 'target "web" app.launchArguments must be an array of strings or an object of argument name to string, number, boolean, or array of strings';
+    expect(() => resolveApp({ launchArguments: 'fr_FR' } as never)).toThrow(`${shape}, got a string`);
+    expect(() => resolveApp({ launchArguments: null } as never)).toThrow(`${shape}, got null`);
+    expect(() => resolveApp({ launchArguments: new Map([['AppleLocale', 'fr_FR']]) } as never)).toThrow(`${shape}, got a Map`);
+    expect(() => resolveApp({ launchArguments: { '': 'x' } })).toThrow('target "web" app.launchArguments has an empty argument name');
+    expect(() => resolveApp({ launchArguments: { 'Apple Locale': 'fr_FR' } })).toThrow(
+      'target "web" app.launchArguments argument name "Apple Locale" must have no whitespace or control characters',
+    );
+    expect(() => resolveApp({ launchArguments: { '-AppleLocale': 'fr_FR' } })).toThrow(
+      'target "web" app.launchArguments argument name "-AppleLocale" starts with a dash; remove the dash, the engine adds it',
+    );
+    expect(() => resolveApp({ launchArguments: { 'a\u0000b': 'x' } })).toThrow('argument name "a\\u0000b" must have no whitespace or control characters');
+    expect(() => resolveApp({ launchArguments: { env: 'a\u0000' } })).toThrow('target "web" app.launchArguments.env holds a NUL character');
+    expect(() => resolveApp({ launchArguments: { tags: ['a', 'b\u0000'] } })).toThrow('target "web" app.launchArguments.tags holds a NUL character');
+    expect(() => resolveApp({ launchArguments: ['-a', 'b\u0000'] })).toThrow('target "web" app.launchArguments item 1 holds a NUL character');
+
+    const value = (name: string) => `target "web" app.launchArguments.${name} must be a string, number, boolean, or array of strings, got`;
+    expect(() => resolveApp({ launchArguments: { locale: { language: 'fr' } } } as never)).toThrow(`${value('locale')} an object`);
+    expect(() => resolveApp({ launchArguments: { languages: ['fr', 1] } } as never)).toThrow(
+      'target "web" app.launchArguments.languages must be a string, number, boolean, or array of strings; item 1 is a number',
+    );
+    const sparse = ['fr'];
+    sparse[2] = 'de';
+    expect(() => resolveApp({ launchArguments: { languages: sparse } })).toThrow(
+      'target "web" app.launchArguments.languages must be a string, number, boolean, or array of strings; item 1 is undefined',
+    );
+    expect(() => resolveApp({ launchArguments: { retries: Number.NaN } })).toThrow(`${value('retries')} NaN`);
+    expect(() => resolveApp({ launchArguments: { retries: 2 ** 53 } })).toThrow(`${value('retries')} a number beyond 2^53 - 1`);
+    expect(() => resolveApp({ launchArguments: { ratio: -1e300 } })).toThrow(`${value('ratio')} a number beyond 2^53 - 1`);
+    expect(resolveApp({ bundleId: 'dev.shop.app', launchArguments: { retries: 2 ** 53 - 1, ratio: -1.5 } }).launchArguments).toEqual({ retries: 2 ** 53 - 1, ratio: -1.5 });
+    expect(() => resolveApp({ launchArguments: { retries: null } } as never)).toThrow(`${value('retries')} null`);
+    expect(() => resolveApp({ launchArguments: { when: new Date(0) } } as never)).toThrow(`${value('when')} a Date`);
   });
 
   it("hands the declaration to the engine's validateApp, which names the target", () => {
@@ -591,36 +649,51 @@ describe('resolveConfig', () => {
     expect(reporterNames(['list', 'junit'])).toEqual(['list', 'junit']);
     expect(reporterNames(['json', 'markdown'])).toEqual(['json', 'markdown']);
     const [printer] = resolve({ reporters: ['list'] }).reporters;
-    expect(printer?.printsTo).toBe('stdout');
+    expect(printer?.interactive).toBe(true);
+    expect(streamOf(printer!)).toBe('stdout');
     expect(() => resolve({ reporters: ['xunit'] as never })).toThrow(/unknown reporter "xunit"/);
   });
 
-  it('moves the list or dot id beside json to stderr', () => {
-    for (const id of ['list', 'dot'] as const) {
-      const streams = resolve({ reporters: [id, 'json'] }).reporters.map((reporter) => [reporter.name, reporter.printsTo]);
-      expect(streams).toEqual([[id, 'stderr'], ['json', 'stdout']]);
+  it('moves the list, dot, or line id beside json to stderr', () => {
+    for (const id of ['list', 'dot', 'line'] as const) {
+      const [view, document] = resolve({ reporters: [id, 'json'] }).reporters;
+      expect([view!.name, streamOf(view!), document!.name]).toEqual([id, 'stderr', 'json']);
+      // Only the view shows the run; the document is not interactive.
+      expect([view!.interactive, document!.interactive]).toEqual([true, undefined]);
     }
     const cli = resolveConfig({ targets: TARGETS, reporters: ['dot'] }, { projectRoot: ROOT, env: BASE_ENV, cli: { reporters: ['dot', 'json'] } });
-    expect(cli.reporters.map((reporter) => reporter.printsTo)).toEqual(['stderr', 'stdout']);
+    expect(streamOf(cli.reporters[0]!)).toBe('stderr');
     // A factory called without a stream is its id; one given a stream keeps it.
-    expect(resolve({ reporters: [list(), 'json'] }).reporters.map((reporter) => reporter.printsTo)).toEqual(['stderr', 'stdout']);
+    expect(streamOf(resolve({ reporters: [list(), 'json'] }).reporters[0]!)).toBe('stderr');
+    expect(streamOf(resolve({ reporters: [line(), 'json'] }).reporters[0]!)).toBe('stderr');
+    expect(streamOf(resolve({ reporters: [line({ stream: 'stderr' })] }).reporters[0]!)).toBe('stderr');
+    expect(() => resolve({ reporters: [line({ stream: 'stdout' }), 'json'] })).toThrow(/reporters "line" and "json" both print to stdout/);
     const flagged = resolveConfig({ targets: TARGETS, reporters: [dot(), 'junit'] }, { projectRoot: ROOT, env: BASE_ENV, cli: { reporters: ['dot', 'json'] } });
-    expect(flagged.reporters.map((reporter) => reporter.printsTo)).toEqual(['stderr', 'stdout']);
+    expect(streamOf(flagged.reporters[0]!)).toBe('stderr');
     expect(() => resolve({ reporters: [list({ stream: 'stdout' }), 'json'] })).toThrow(/reporters "list" and "json" both print to stdout/);
+    expect(streamOf(resolve({ reporters: [list({ stream: 'stdout' }), 'junit'] }).reporters[0]!)).toBe('stdout');
   });
 
-  it.each([['list', 'dot'], ['dot', 'list']] as const)('rejects %s combined with %s reporters', (first, second) => {
-    expect(() => resolve({ reporters: [first, second] })).toThrow(/list.*dot|dot.*list/u);
+  it.each([['list', 'dot'], ['dot', 'list'], ['line', 'list'], ['dot', 'line']] as const)('rejects %s combined with %s reporters', (first, second) => {
+    expect(() => resolve({ reporters: [first, second] })).toThrow(`reporters "${first}" and "${second}" are all interactive`);
   });
 
-  it('refuses two reporters printing to one stream, a built-in or not, and takes any number of live ones', () => {
-    const dots: Reporter = { name: 'dots', printsTo: 'stdout', onEvent: () => undefined };
-    expect(() => resolve({ reporters: [list(), dots] })).toThrow(/reporters "list" and "dots" both print to stdout/);
-    expect(() => resolve({ reporters: [list({ stream: 'stderr' }), dot({ stream: 'stderr' })] })).toThrow(/both print to stderr/);
-    expect(reporterNames([list({ stream: 'stderr' }), dots])).toEqual(['list', 'dots']);
+  it('refuses a second interactive reporter, a built-in or not, whatever their streams, and takes any number of others', () => {
+    expect(() => resolve({ reporters: [list({ stream: 'stdout' }), dot({ stream: 'stderr' })] })).toThrow(/reporters "list" and "dot" are all interactive/);
+    expect(() => resolve({ reporters: [list(), list({ stream: 'stderr' })] })).toThrow(/reporters "list" and "list" are all interactive/);
+    const dots: Reporter = { name: 'dots', interactive: true, onEvent: () => undefined };
+    expect(() => resolve({ reporters: [list(), dots] })).toThrow(/reporters "list" and "dots" are all interactive/);
+    expect(() => resolve({ reporters: [dots, { ...dots, name: 'bars' }, { ...dots, name: 'pies' }] })).toThrow(/reporters "dots", "bars" and "pies" are all interactive/);
+    // --reporter replaces the built-in view, never a reporter object.
     expect(reporterNames([dots, 'junit'])).toEqual(['junit', 'dots']);
-    const live = (name: string): Reporter => ({ name, onOutput: () => undefined, onStepPrompt: () => undefined, onSummary: () => undefined });
+    expect(reporterNames([{ ...dots, interactive: false }, 'list'])).toEqual(['list', 'dots']);
+    const live = (name: string): Reporter => ({ name, onEvent: () => undefined, onSummary: () => undefined });
     expect(reporterNames(['list', live('socket'), live('overlay')])).toEqual(['list', 'socket', 'overlay']);
+  });
+
+  it('rejects a reporter whose interactive is not a flag, and hooks the contract dropped', () => {
+    expect(() => resolve({ reporters: [{ name: 'logs', interactive: 'stdout', onEvent: () => undefined } as never] })).toThrow(/an optional interactive flag/);
+    expect(() => resolve({ reporters: [{ name: 'logs', onOutput: () => undefined } as never] })).toThrow(/at least one of onEvent, reportFiles, onRunFinished, and onSummary/);
   });
 
   it('keeps reporter objects under --reporter and reuses the options of the built-ins it names', () => {
@@ -651,7 +724,7 @@ describe('resolveConfig', () => {
     expect(() => resolve({ reporters: [{ name: '', onRunFinished: handler }] as never })).toThrow(/must be a built-in id/);
     expect(() => resolve({ reporters: [{ name: 'x' }] as never })).toThrow(/must be a built-in id/);
     expect(() => resolve({ reporters: [{ name: 'x', onEvent: 'no' }] as never })).toThrow(/must be a built-in id/);
-    expect(() => resolve({ reporters: [{ name: 'x', printsTo: 'console', onEvent: handler }] as never })).toThrow(/must be a built-in id/);
+    expect(() => resolve({ reporters: [{ name: 'x', interactive: 'console', onEvent: handler }] as never })).toThrow(/must be a built-in id/);
     expect(() => resolve({ reporters: ['list', junit] as never })).toThrow(/reporters\[1\] is the function junit; call it/);
     // A reporter of your own may share a built-in's name; `--reporter` never replaces it.
     expect(reporterNames([{ name: 'json', onRunFinished: handler }], ['list'])).toEqual(['list', 'json']);

@@ -53,7 +53,8 @@ target, so a test can `requires: ['browser']`. Browser options:
 such as `de-DE` and `Europe/Berlin`), `colorScheme` and `reducedMotion` (the
 `prefers-color-scheme` and `prefers-reduced-motion` every page reports, from
 first paint; `browser.emulateMedia` changes them in a test), `initScripts` (scripts every document
-runs before the page's own), and
+runs before the page's own), `webmcp` (`true` launches Chromium or Firefox with
+WebMCP on, for `browser.webmcp`), and
 `connect` — attach to a remote browser over CDP instead of launching a local
 one.
 
@@ -83,7 +84,7 @@ engine verifies the default context ID and active page target ID, clears stale
 references, and never repeats a dispatched operation. A missing target fails
 the attempt. The host owns deleting the remote browser after cleanup.
 
-This mode does not support `headers`, `basicAuth`, `userAgent`, `locale`, `timezoneId`, context reset, or session
+This mode does not support `headers`, `basicAuth`, `userAgent`, `locale`, `timezoneId`, `deviceScaleFactor`, context reset, or session
 state capture and restore. Recording resumes after reconnect, but a segment
 lost during the disconnect remains unavailable. See the
 [Playwright reference](../../docs/reference/web.mdx#recovering-a-cdp-transport)

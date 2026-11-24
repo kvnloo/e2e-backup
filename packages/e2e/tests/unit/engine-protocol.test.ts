@@ -26,6 +26,7 @@ import {
   type SemanticNode,
 } from '@e2e-dev/core/lib/engine/index';
 import { resolveConfig } from '../../src/config/resolve-run.ts';
+import { engineAppInfo } from '@e2e-dev/core/lib/config/app';
 import { ConfigurationError, TestTimeoutError } from '@e2e-dev/core/lib/internal/errors';
 import { encodeLocatorAction, decodeLocatorAction } from '@e2e-dev/core/lib/engine/protocol/protocol';
 import { protocolEngine } from '@e2e-dev/core/lib/engine/protocol/client';
@@ -587,6 +588,82 @@ describe('engine protocol', () => {
     }
   });
 
+  describe('launch arguments', () => {
+    const resolveTarget = (engine: EngineHandle, launchArguments: unknown) =>
+      resolveConfig(
+        { targets: [{ name: 'phone', platform: 'toy', engine, app: { bundleId: 'dev.shop.app', launchArguments: launchArguments as never } }] },
+        { projectRoot: process.cwd(), env: {} as NodeJS.ProcessEnv },
+      ).targets[0]!;
+
+    const prepare = (target: ReturnType<typeof resolveTarget>) =>
+      target.engine!.prepare!({ runId: 'run', targetName: target.name, projectRoot: process.cwd(), app: engineAppInfo(target.app), slots: 1, env: {}, headed: false, signal: new AbortController().signal, log: () => {} });
+
+    it('hands an engine that predates the object form a list it can spread, and refuses an object at config load', async () => {
+      const spread: string[][] = [];
+      const legacy = defineEngine(
+        toy({
+          validateApp(app) {
+            spread.push([...(app.launchArguments ?? [])]);
+          },
+          async prepare(info) {
+            spread.push([...(info.app.launchArguments ?? [])]);
+          },
+        }),
+      );
+      await prepare(resolveTarget(legacy, ['-AppleLocale', 'fr_FR']));
+      expect(spread).toEqual([
+        ['-AppleLocale', 'fr_FR'],
+        ['-AppleLocale', 'fr_FR'],
+      ]);
+
+      expect(() => resolveTarget(legacy, { AppleLocale: 'fr_FR', AppleLanguages: ['fr'] })).toThrowError(
+        expect.objectContaining({
+          code: 'INVALID_CONFIG',
+          message:
+            'target "phone" app.launchArguments is an object, and engine "toy" takes only a list of strings: write the arguments as a list, or use an engine version that supports the object syntax',
+        }),
+      );
+      expect(spread).toHaveLength(2);
+    });
+
+    it('carries the object form to an engine that declares launchArgumentValues', async () => {
+      const seen: unknown[] = [];
+      const { local, remote } = overLoopback(
+        toy({
+          launchArgumentValues: true,
+          async prepare(info) {
+            seen.push(info.app);
+          },
+        }),
+        {
+          validateApp(app) {
+            seen.push(app);
+          },
+        },
+      );
+      expect(describeEngine(local).launchArgumentValues).toBe(true);
+      expect(remote.launchArgumentValues).toBe(true);
+
+      const launchArgumentValues = { AppleLocale: 'fr_FR', AppleLanguages: ['fr'], e2e: true, retries: 3 };
+      await prepare(resolveTarget(remote, { ...launchArgumentValues, token: undefined }));
+      expect(seen).toEqual([
+        { bundleId: 'dev.shop.app', launchArgumentValues },
+        { bundleId: 'dev.shop.app', launchArgumentValues },
+      ]);
+
+      seen.length = 0;
+      await prepare(resolveTarget(remote, ['-e2e', 'YES']));
+      expect(seen).toEqual([
+        { bundleId: 'dev.shop.app', launchArguments: ['-e2e', 'YES'] },
+        { bundleId: 'dev.shop.app', launchArguments: ['-e2e', 'YES'] },
+      ]);
+    });
+
+    it('refuses a launchArgumentValues flag that is not a boolean', () => {
+      expect(() => defineEngine(toy({ launchArgumentValues: 'yes' as never }))).toThrow(/launchArgumentValues must be a boolean/);
+    });
+  });
+
   it('serves every in-process target through one protocol client and leaves a connected engine as declared', () => {
     const engine = defineEngine(toy());
     const { remote } = overLoopback(toy());
@@ -782,6 +859,21 @@ describe('engine protocol against a server written from the messages alone', () 
     const body = JSON.stringify({ jsonrpc: '2.0', id: 1, error: null });
     input.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
     await expect(pending).rejects.toMatchObject({ code: -32603, message: expect.stringContaining('malformed error') });
+  });
+
+  it('reads a message that arrives a byte at a time, and two that arrive in one chunk', async () => {
+    const input = new PassThrough();
+    const seen: unknown[] = [];
+    const connection = new Connection({ input, output: new PassThrough() }, { notifications: { note: (params) => void seen.push(params) } });
+    const frame = (params: unknown): Buffer => {
+      const body = JSON.stringify({ jsonrpc: '2.0', method: 'note', params });
+      return Buffer.from(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+    };
+    for (const byte of frame('één')) input.write(Buffer.from([byte]));
+    input.write(Buffer.concat([frame(2), frame(3)]));
+    input.write(frame(4));
+    await vi.waitFor(() => expect(seen).toEqual(['één', 2, 3, 4]));
+    expect(connection.closed).toBeUndefined();
   });
 
   it('reports a malformed notification instead of crashing', async () => {

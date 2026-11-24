@@ -274,14 +274,15 @@ reporters: ['list', 'junit'], // default: ['list']
 | Value | Does |
 | --- | --- |
 | `'list'`, `list()` | Terminal progress, failures, and a run summary. |
-| `'dot'`, `dot()` | Compact terminal progress, failures, and a run summary. Excludes `list`: the two together are `INVALID_CONFIG`. |
+| `'dot'`, `dot()` | Compact terminal progress, failures, and a run summary. |
+| `'line'`, `line()` | One row of terminal progress, each failure as it happens, and a run summary. |
 | `'junit'`, `junit()` | Writes `<output>/junit.xml`, or `outputFile`. |
 | `'markdown'`, `markdown()` | Writes `<output>/summary.md`, or `outputFile`. |
-| `'json'`, `json()` | Prints the report on stdout. Beside it, `list` or `dot` prints to stderr unless given a `stream`. |
+| `'json'`, `json()` | Prints the report on stdout. Beside it, `list`, `dot`, or `line` prints to stderr unless given a `stream`. |
 | another `Reporter` object | Runs beside the built-in ones. `--reporter` never removes it. |
 
 An id is its factory called with no options. An unknown id is
-`INVALID_CONFIG`. See [Reporters](/reference/reporters).
+`INVALID_CONFIG`, and so are two of `list`, `dot`, and `line` together. See [Reporters](/reference/reporters).
 
 ### targets
 
@@ -385,7 +386,7 @@ targets: [
 | [`linkBase`](#linkbase) | `string` | - |
 | [`identity`](#identity) | `string` | derived from the app |
 | [`environment`](#environment) | `'test' \| 'staging' \| 'production'` | `'test'` or `'production'` |
-| [`launchArguments`](#launcharguments) | `string[]` | - |
+| [`launchArguments`](#launcharguments) | `string[] \| Record<string, LaunchArgumentValue>` | - |
 | [`permissions`](#permissions) | `Record<string, AppPermissionState>` | - |
 | [`command`](#command) | `CommandConfig` | - |
 | [`readyUrl`](#readyurl) | `string` | `url` |
@@ -511,14 +512,39 @@ environment: 'staging', // default: 'test' for a local host or no URL, else 'pro
 #### `launchArguments`
 
 Arguments every fresh launch passes the app: `app.open()`, `app.restart()`,
-and `app.clearState()`.
+and `app.clearState()`. Give a list of strings, the arguments themselves, or
+an object of argument name to value. On iOS and macOS an entry becomes
+`-name value`.
+On Android it becomes an `am start` extra of the value's type: `--es` for a
+string, `--ez` for a boolean, `--ei` for a whole number (`--el` beyond Java's
+`int`), `--ef` for a fraction, `--esa` for a list.
 
 ```ts
 launchArguments: ['-e2e', 'YES'],
 ```
 
-Arguments that select a build mode change what the app is: give each mode its
-own `identity`.
+```ts
+launchArguments: { AppleLanguages: ['fr'], AppleLocale: 'fr_FR', e2e: true },
+```
+
+```ts
+type LaunchArgumentValue = string | number | boolean | readonly string[];
+type LaunchArguments = readonly string[] | Readonly<Record<string, LaunchArgumentValue | undefined>>;
+```
+
+- An object value is a string, a finite number below 2^53 in magnitude, a
+  boolean, or a list of strings. A name has no leading dash, whitespace, or
+  control characters, and nothing holds a NUL character. A value read from the
+  environment may be `undefined`: that entry is left out.
+- The table under
+  [Launch arguments and permissions](/reference/mobile#launch-arguments-and-permissions)
+  shows each value type on iOS and Android.
+- Arguments that select a build mode change what the app is. Give each mode
+  its own `identity`.
+
+| Throws | When |
+| --- | --- |
+| `INVALID_CONFIG` | A list item that is not a string. An object with an empty name, a name with whitespace or a control character, a value of another kind, a number beyond 2^53 - 1 in magnitude, or a NUL character anywhere. The engine adds its own rules: see [the mobile reference](/reference/mobile#launch-arguments-and-permissions). |
 
 #### `permissions`
 
@@ -698,7 +724,8 @@ overrides it for one run.
 | `junit.xml`, `summary.md` | The `junit` and `markdown` reporters' files |
 | `ai-trace.json` | `--ai-trace` |
 | `timings.json` | How long each file took, smoothed over recent runs. A run with more than one worker starts the longest files first by it; see [Cache the timings history](/ci#cache-the-timings-history) |
-| `results/` | One directory per test: its [trace page](/debugging#traces), `trace.md`, when the [`trace`](#trace) mode keeps one, and its screenshots, videos, downloads, and logs, one `attempt-<n>/` per attempt. Cleared once a run's tests start, so it holds the latest run's evidence and nothing its report no longer names. A `--last-failed` rerun keeps the files the report it reruns names and writes its own attempts under each test's `rerun-<n>/` |
+| `report-with-reruns.json` | Written by a `--last-failed` rerun: the first run and every rerun since as one report, with the same run id as `report.json`. A run without `--last-failed` removes it |
+| `results/` | One directory per test: its [trace page](/debugging#traces), `trace.md`, when the [`trace`](#trace) mode keeps one, and its screenshots, videos, downloads, and logs, one `attempt-<n>/` per attempt. Cleared once a run's tests start, so it holds the latest run's evidence and nothing its report no longer names. A `--last-failed` rerun keeps the files the runs before it name and writes its own attempts under each test's `rerun-<n>/` |
 | `sessions/` | The run's encrypted `test.setup` sessions, deleted when it ends |
 | `videos/<session>/` | [`e2e mcp`](/reference/mcp#recording) session recordings |
 

@@ -19,6 +19,7 @@ import { FileCacheStore, MAX_CACHE_WIRE_BYTES } from '@e2e-dev/core/lib/cache/st
 import { discoverConfig, loadConfigModule, missingConfigError } from '../config/load.ts';
 import { resolveConfig } from '../config/resolve-run.ts';
 import { errorMessage } from '@e2e-dev/core/lib/internal/errors';
+import { redactError } from '@e2e-dev/core/lib/run/secrecy';
 import { visibleWidth } from '../report/format.ts';
 import { formatBytes } from './format-bytes.ts';
 import { docsLine, examples } from './help.ts';
@@ -76,7 +77,7 @@ async function cache(command: CacheCommand, options: CacheOptions = {}): Promise
   try {
     directory = await resolveCacheDirectory(options);
   } catch (cause) {
-    process.stderr.write(`${errorMessage(cause)}\n`);
+    process.stderr.write(`${redactError(errorMessage(cause))}\n`);
     return 2;
   }
 

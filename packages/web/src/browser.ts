@@ -37,6 +37,7 @@ import {
   type OperationContext,
 } from '@e2e-dev/core/engine';
 import { classifyInputError } from './actions.ts';
+import { validateCookies } from './cookies.ts';
 import type { AttemptTab } from './attempt-session.ts';
 import type { DialogHandler } from './dialogs.ts';
 import { saveDownloadsTo, saveFromBrowser, saveLocally } from './downloads.ts';
@@ -55,6 +56,7 @@ import {
   type NormalizedRoutePattern,
 } from './route-pattern.ts';
 import type { PlaywrightSurface } from './surface.ts';
+import { createWebMcp, type WebMcp } from './webmcp.ts';
 
 /**
  * One of `json`, `body`, or `path`, or none for an empty body. `path` names a
@@ -390,6 +392,17 @@ export interface Browser extends Expectable<BrowserExpectation> {
     /** Releases the primary pointer button. */
     up(): Promise<void>;
   };
+  /**
+   * The tools the active tab's page registers through WebMCP
+   * (`document.modelContext`, `navigator.modelContext` on Firefox), read and
+   * called from test code with no model involved. It covers the page's main
+   * frame. Needs a browser with WebMCP: `web({ webmcp: true })`, or
+   * `--enable-features=WebMCP` on a browser the engine attaches to, and a
+   * page in a secure context; on a page without WebMCP both calls reject with
+   * `UNSUPPORTED_CAPABILITY`. Names, descriptions, schemas, and results come
+   * from the page, so treat them as untrusted input.
+   */
+  readonly webmcp: WebMcp;
 }
 
 interface StoredRoute {
@@ -845,6 +858,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         );
       }),
     setCookies(cookies) {
+      validateCookies(cookies);
       const scheme = new URL(baseHref()).protocol === 'https:' ? 'https' : 'http';
       // The harness's URL rule decides which cookie targets are admitted; a
       // domain cookie is checked as the origin it would be sent to. The rule
@@ -945,6 +959,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       down: () => surface.guard(context.operation(), 'mouse.down', () => surface.requirePage().mouse.down(), classifyInputError),
       up: () => surface.guard(context.operation(), 'mouse.up', () => surface.requirePage().mouse.up(), classifyInputError),
     },
+    webmcp: createWebMcp(surface, context),
   };
 
   const action: FixtureOperation = { kind: 'resource' };
@@ -981,6 +996,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     waitForDownloads: { ...action, timeout: false },
     keyboard: { down: { ...action, label: (key) => key }, up: { ...action, label: (key) => key }, press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },
     mouse: { move: action, wheel: action, down: action, up: action },
+    webmcp: { tools: action, callTool: { ...action, label: (name) => String(name) } },
   });
 }
 

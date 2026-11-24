@@ -233,7 +233,7 @@ mobile({ platform: 'ios', transition: 800 }); // default: 500
 
 待機中にコントロールが変わった場合、アクションは自身のタイムアウト内で対象を探し直してから操作します。
 
-[`device`](#device) の `back`、`home`、`alert`、`dismissKeyboard`、`setOrientation`、`fold` は画面を変えるため、タップと同じくこの待機時間の対象となるアクションとして数えます。それらが表示した画面とともに現れるコントロールには、この時間が過ぎてから次のアクションを行います。
+[`device`](#device) の `back`、`home`、`shake`、`alert`、`dismissKeyboard`、`setOrientation`、`fold` は画面を変えるため、タップと同じくこの待機時間の対象となるアクションとして数えます。それらが表示した画面とともに現れるコントロールには、この時間が過ぎてから次のアクションを行います。
 
 `fill` と `clear` は、入力前にフィールドを読み直します。フィールドがない、機密状態が変わった、取得が不完全な場合は、変更を加える前に `NODE_STALE` を返し、新しい観測を得てから再試行します。入力欄ではない対象は `UNSUPPORTED_CAPABILITY` です。iOS の `other` は、プラットフォームが分類できなかった要素の型です。値またはテキストだけを持つ場合は入力対象になります。Compose Multiplatform や Flutter の独自描画フィールドが、そのように報告されることがあるためです。
 
@@ -297,6 +297,21 @@ export default {
 ```
 
 - iOS は引数をアプリのプロセス（`ProcessInfo.processInfo.arguments`）に渡します。Android は `am start` に追加するため、`['--ez', 'e2e', 'true']` は真偽値の Intent extra になります。
+
+    ```ts title="e2e.config.ts"
+    export default {
+      targets: [
+        {
+          name: 'iphone',
+          engine: mobile({ platform: 'ios' }),
+          app: {
+            bundleId: 'com.example.app',
+            launchArguments: ['-flag', 'false', '-title', 'a b'],
+          },
+        },
+      ],
+    } satisfies E2EConfig;
+    ```
 - 各権限の状態は `grant`、`deny`、`reset` です。iOS の `deny` は拒否を記録し、確認画面を出さずにアプリへ拒否を返します。Android では権限を取り消し、次にアプリが要求すると OS が再度確認します。
 - アプリを先に開かず、起動前にアプリ名を指定して権限を設定します。iOS は権限が変更された実行中のアプリを終了し、Android は権限を取り消されたアプリを終了するためです。
 - ウォームアップでは起動引数を渡さず、権限にも触れません。
@@ -392,13 +407,14 @@ test('offline banner', { platforms: ['android'] }, async ({ app, device, screen 
 | [`foregroundApp`](#foregroundapp) | `Promise<ForegroundApp>` |
 | [`home`](#home) | `Promise<void>` |
 | [`back`](#back) | `Promise<void>` |
+| [`shake`](#shake) | `Promise<void>` |
 | [`alert`](#alert) | `Promise<void>` |
 | [`dismissKeyboard`](#dismisskeyboard) | `Promise<void>` |
 | [`isKeyboardShown`](#iskeyboardshown) | `Promise<boolean>` |
 | [`clipboard`](#clipboard) | `Promise<string>` |
 | [`setClipboard`](#setclipboard) | `Promise<void>` |
 
-すべての非同期メソッドは `device.<method>` ステップとして記録し、`config.actionTimeout` で制限します。`back`、`home`、`alert`、`dismissKeyboard`、`setOrientation`、`fold` は、[`transition`](#transition) の待機時間の対象となるアクションとして数えます。以下の各項目にメンバーの宣言、[型](#device-fixture)にそこで使う型を載せています。
+すべての非同期メソッドは `device.<method>` ステップとして記録し、`config.actionTimeout` で制限します。`back`、`home`、`shake`、`alert`、`dismissKeyboard`、`setOrientation`、`fold` は、[`transition`](#transition) の待機時間の対象となるアクションとして数えます。以下の各項目にメンバーの宣言、[型](#device-fixture)にそこで使う型を載せています。
 
 | エラー | 発生条件 |
 | --- | --- |
@@ -729,6 +745,7 @@ openApp(app: string, options?: OpenAppOptions): Promise<void>;
 ```ts
 await device.openApp('Settings');
 await device.openApp('com.example.app', { relaunch: true, permissions: { camera: 'grant' } });
+await device.openApp('com.example.app', { relaunch: true, launchArguments: { AppleLocale: 'fr_FR' } });
 ```
 
 - agent-device は `scheme:rest` 形式をすべて URL として開くため、リンクはデバイスへ渡す前に拒否します。
@@ -853,6 +870,31 @@ back(): Promise<void>;
 ```ts
 await device.back();
 ```
+
+#### `shake`
+
+```ts
+/**
+ * Shakes the device once: the simulator's shake gesture on an iPhone or
+ * iPad simulator, a swing of the accelerometer on an Android phone or
+ * tablet emulator. `UNSUPPORTED_CAPABILITY` on a physical device and on a
+ * device a provider drives through its own backend. It resolves once the
+ * shake is sent, so assert on what the app shows next.
+ */
+shake(): Promise<void>;
+```
+
+```ts
+await device.shake();
+await expect(screen.getByText('Report a problem')).toBeVisible();
+```
+
+アプリは実機でのシェイクと同じようにこのシェイクを受け取ります。React Native の開発ビルドは開発メニューを開き、シェイクのハンドラーを持つアプリはそれを実行します。
+
+| エラー | 発生条件 |
+| --- | --- |
+| `UNSUPPORTED_CAPABILITY` | agent-device がシェイクできないデバイスの場合。実機、TV やウォッチのターゲット、プロバイダーが独自のバックエンド（WebDriver セッションやプロバイダー所有の iOS シミュレーターなど）で操作するデバイスが該当します。 |
+| `ENGINE_FAILURE` | Android エミュレーターのコンソールがシェイクを拒否した場合。加速度センサーのないイメージがこれに該当します。 |
 
 #### `alert`
 
@@ -1123,11 +1165,12 @@ export interface OpenAppOptions {
   /** Terminate the app first, so it starts fresh; without it a running app is brought forward as it is. */
   readonly relaunch?: boolean;
   /**
-   * Arguments this launch hands the app: its process arguments on iOS,
-   * `am start` arguments on Android. Replaces the target's `app.launchArguments`
-   * for a relaunch of the pinned app.
+   * Arguments this launch hands the app, a list or an object like
+   * `app.launchArguments`: its process arguments on iOS, `am start`
+   * arguments on Android. Replaces the target's `app.launchArguments` for a
+   * relaunch of the pinned app.
    */
-  readonly launchArguments?: readonly string[];
+  readonly launchArguments?: LaunchArguments;
   /**
    * Permissions the app holds before this launch, each granted, denied, or
    * reset. Replaces the target's `app.permissions` for a relaunch of the

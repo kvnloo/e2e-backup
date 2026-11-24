@@ -104,11 +104,13 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `launchApp` | `app.open()`, a fresh launch of the target's app; nothing launches on its own |
 | `clearState`, `launchApp: { clearState: true }` | `app.clearState()` |
 | `launchApp: { stopApp: false }` | `device.openApp(id)` without `relaunch` |
-| `launchApp: { arguments }` | `app.launchArguments` on the target, a list of strings, not a map; `device.openApp(app, { relaunch: true, launchArguments })` for one launch |
+| `launchApp: { arguments }` | `app.launchArguments` on the target, with the same keys, or a list of strings for an iOS app that reads `ProcessInfo.processInfo.arguments` (an object is spelled for `UserDefaults`: `NO` for `false`, quotes around `a b` or `-1`); `device.openApp(app, { relaunch: true, launchArguments })` for one launch |
 | `launchApp: { permissions }`, `setPermissions` | `app.permissions` on the target, or `device.openApp(app, { relaunch: true, permissions })` for one launch; `grant`, `deny`, `reset` for `allow`, `deny`, `unset`. `device.setPermission(name, state)` before `app.open()` |
 | `stopApp`, `killApp` | `device.closeApp()`, a force stop; `app.restart()` to stop the app and launch it again |
 | `clearKeychain`, `openLink`, `setLocation`, `setAirplaneMode`, `setOrientation`, `setClipboard` | the same on `device`, such as `device.openLink(url)`. `clearKeychain` is iOS simulator only, `setAirplaneMode(true)` Android 11 or newer. For `travel`, loop `device.setLocation` |
 | `back`, `pressKey: Home`, `hideKeyboard`, `setDarkMode` | `app.back()`, `device.home()`, `device.dismissKeyboard()`, `device.setAppearance('dark')` |
+| `pressKey: Remote Dpad Up`, `Down`, `Left`, `Right`, `Remote Dpad Center` | `device.pressRemote('up')`, `'down'`, `'left'`, `'right'`, `'select'` |
+| `pressKey: Remote Media Play Pause`, `Remote Media Stop`, `Remote Media Next`, `Remote Media Previous`, `Remote Media Rewind`, `Remote Media Fast Forward`, `Remote Menu` | `device.pressRemote('play-pause')`, `'stop'`, `'next'`, `'previous'`, `'rewind'`, `'fast-forward'`, `'menu'`; the [remote keys](/reference/engine#keys) list the rest |
 
 </Accordion>
 <Accordion title="Taps, input, and swipes">
@@ -174,7 +176,7 @@ on purpose.
 | `scrollUntilVisible: { centerElement, visibilityPercentage, speed }` | On a device, a node more than a fifth of its list from the middle is dragged to the middle after at least one step, as with `centerElement: true`. In Maestro, that happens only when you set `centerElement`. `visibilityPercentage` doesn't have a match, since the scroll stops at the first match the platform shows. For `speed`, use `speed: 'slow'`, `'normal'`, or `'fast'` |
 | Device logs and crash reports beside a failure | `adb logcat` or `xcrun simctl spawn <udid> log stream`, collected in a fixture |
 | `maestro hierarchy` as a terminal command | A one-line test that calls `screen.debug()` |
-| `--device-locale` | `app.launchArguments: ['-AppleLanguages', '(de)', '-AppleLocale', 'de_DE']` on iOS, see [Run the app in another language](/mobile#run-the-app-in-another-language); on Android, set the device language before the run |
+| `--device-locale` | `app.launchArguments: { AppleLanguages: ['de'], AppleLocale: 'de_DE' }` on iOS, see [Run the app in another language](/mobile#run-the-app-in-another-language); on Android, set the device language before the run |
 | Maestro Cloud | Your [CI](/ci) with a [hosted device provider](/mobile#hosted-devices) |
 | `pressKey: lock`, `power`, `volume up`, `volume down` | `client.command.hardwareButton` on [`unstable_raw`](/reference/mobile#unstable_raw): power and volume on Android, volume on a physical iPhone |
 | JUnit `properties`, a JUnit path with `--output` | Ids in tags or the title; copy `.e2e/junit.xml` after the run |
@@ -188,7 +190,7 @@ on purpose.
 | `retry: { maxRetries, commands }` | A `for` loop with try/catch; `expect.poll` for a value, `{ retries }` for the whole test |
 | Android process death with `killApp` | `device.home()`, then `adb shell am kill <package>`, then `device.openApp(id)` |
 | `assertDarkMode`, `assertLightMode` | Assert on a themed control, or `toHaveScreenshot` |
-| TV remote keys | `-` |
+| `Remote System Navigation Up`, `Down`, `Remote Button A`, `B` | `-` |
 
 ### Not planned
 

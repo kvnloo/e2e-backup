@@ -582,9 +582,10 @@ describe('createEngineSession pixels-only observation', () => {
     // Sent without proof, or withheld by the engine: either way the session keeps no image.
     expect(await look(snapshot([pin, label], { pixels }))).toEqual({ pixels: undefined, withheld: 'MASKING_UNPROVEN' });
     expect(await look(snapshot([pin, label], { maskedRegionCount: 0 }))).toEqual({ pixels: undefined, withheld: 'MASKING_UNPROVEN' });
-    // No screenshot taken, or one withheld on a screen with nothing to mask, withholds nothing.
+    // No screenshot taken withholds nothing.
     expect(await look(snapshot([pin, label]))).toEqual({ pixels: undefined, withheld: undefined });
-    expect(await look(snapshot([label], { maskedRegionCount: 0 }))).toEqual({ pixels: undefined, withheld: undefined });
+    // One the engine withheld is withheld even where the tree shows nothing to mask: a tree read in part can leave a secure field out.
+    expect(await look(snapshot([label], { maskedRegionCount: 0, truncated: true }))).toEqual({ pixels: undefined, withheld: 'MASKING_UNPROVEN' });
     // A count no pixels request asked for withholds nothing either.
     raw = snapshot([pin, label], { maskedRegionCount: 0 });
     const unasked = await session.observe(OP);

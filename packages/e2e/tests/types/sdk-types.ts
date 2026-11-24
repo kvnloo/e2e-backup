@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { json, junit, list as listReporter, markdown } from '../../src/reporters.ts';
+import { json, junit, line, list as listReporter, markdown } from '../../src/reporters.ts';
 import {
   credentials,
   expect,
@@ -60,8 +60,9 @@ import {
   beforeAll,
   beforeEach,
   describe,
+  foldLastRun,
 } from '../../src/index.ts';
-import type { Engine, EngineAttemptContext, EngineCleanupContext, EngineDisposeContext, EngineFixtureContext, EngineHandle, EngineObserveOptions, EngineSnapshot } from '../../src/engine/index.ts';
+import type { Engine, EngineAppInfo, EngineAttemptContext, EngineCleanupContext, EngineDisposeContext, EngineFixtureContext, EngineHandle, EngineObserveOptions, EngineSnapshot } from '../../src/engine/index.ts';
 import {
   BASE_RULES,
   createGrammarTools,
@@ -70,6 +71,10 @@ import {
   defineTool,
   getToolContext,
   isRuntimeHardStop,
+  redactSecrets,
+  redactStepText,
+  registerProviderKey,
+  registerProviderKeys,
   VERDICT_RULES,
   type ScreenOutput,
 } from '../../src/agent/public.ts';
@@ -242,6 +247,20 @@ customExecutorObservation.keyboardVisible satisfies boolean | undefined;
 ({ targets: [{ engine, app: { bundleId: 'dev.shop.app', permissions: { camera: 'allow' } } }] }) satisfies E2EConfig;
 // @ts-expect-error launch arguments are the strings the launch command takes
 ({ targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: [1] } }] }) satisfies E2EConfig;
+// An object value is a string, number, boolean, or list of strings, or undefined straight from the environment.
+declare const tokenFromEnv: string | undefined;
+({
+  targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: { AppleLanguages: ['fr'], AppleLocale: 'fr_FR', e2e: true, retries: 3, token: tokenFromEnv } } }],
+}) satisfies E2EConfig;
+// @ts-expect-error an object value is flat: no nested object
+({ targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: { locale: { language: 'fr' } } } }] }) satisfies E2EConfig;
+// @ts-expect-error a list value holds strings only
+({ targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: { languages: [1] } } }] }) satisfies E2EConfig;
+// An engine that predates the object form spreads `launchArguments`; the object arrives in `launchArgumentValues` only.
+declare const engineApp: EngineAppInfo;
+[...(engineApp.launchArguments ?? [])] satisfies string[];
+engineApp.launchArgumentValues?.['AppleLanguages'] satisfies string | number | boolean | readonly string[] | undefined;
+
 // @ts-expect-error the app URL is the target's app.url, not a key of the target itself
 ({ targets: [{ engine, url: 'http://localhost:3000' }] }) satisfies E2EConfig;
 // @ts-expect-error an engine only drives the app: the target declares it
@@ -351,6 +370,8 @@ unique(7);
 declare const reporter: Reporter;
 ({ targets, reporters: ['list', reporter] }) satisfies E2EConfig;
 ({ targets, reporters: ['dot'] }) satisfies E2EConfig;
+({ targets, reporters: ['line'] }) satisfies E2EConfig;
+({ targets, reporters: [line({ stream: 'stderr' })] }) satisfies E2EConfig;
 ({ targets, reporters: [reporter] }) satisfies E2EConfig;
 ({
   name: 'upload',
@@ -380,22 +401,45 @@ if (runEvent.type === 'step') {
 junit({ output: 'reports' });
 ({
   name: 'dots',
-  printsTo: 'stdout',
-  onOutput: ({ stream, text, target, pair }) => void process[stream].write(`${target ?? 'runner'} ${pair?.testId ?? ''} ${text}`),
-  onStepPrompt: (prompt) => {
-    prompt?.steps[0].step.label satisfies string | undefined;
-    prompt?.steps[0].step.attachId satisfies string | undefined;
-    // @ts-expect-error reporters receive prompt data without the runner's attach hook
-    prompt?.attach;
+  interactive: true,
+  onEvent: (event) => {
+    if (event.type === 'output') {
+      void process[event.stream].write(`${event.target ?? 'runner'} ${event.pair?.testId ?? ''} ${event.text}`);
+      // The runner's own output names no test.
+      if (event.target === undefined) event.pair satisfies undefined;
+    }
+    if (event.type === 'collected') {
+      event.repeatEach satisfies number;
+      event.tests[0]?.titlePath satisfies readonly string[] | undefined;
+      event.tests[0]?.source?.line satisfies number | undefined;
+      event.tests[0]?.disposition satisfies 'run' | 'skip' | 'filtered' | undefined;
+      event.tests[0]?.kind satisfies 'test' | 'setup' | undefined;
+    }
+    if (event.type === 'step' && event.progress.phase === 'start') {
+      event.progress.source?.file satisfies string | undefined;
+    }
+    if (event.type === 'paused') {
+      event.reason satisfies 'step' | 'pause';
+      event.steps[0].label satisfies string;
+      event.steps[0].source?.line satisfies number | undefined;
+      event.attachId satisfies string;
+      event.titlePath satisfies readonly string[];
+      event.keys[0]?.does satisfies string | undefined;
+      // @ts-expect-error reporters only observe a pause: the event has no way to answer it
+      event.attach;
+    }
+    if (event.type === 'resumed') event.testId satisfies string;
   },
-  onSummary: (rows) => void rows.map((row) => row.label),
+  onSummary: (rows, finished) => void process.stdout.write(`${rows.length} ${finished.report.run.status}\n`),
 }) satisfies Reporter;
+// @ts-expect-error output is an event, not a hook of its own
+({ name: 'logs', onOutput: () => undefined }) satisfies Reporter;
 ({
   name: 'pages',
   reportFiles: async (finished) => [{ path: 'reports/run.txt', content: finished.report.run.status, label: 'Run' }],
 }) satisfies Reporter;
-// @ts-expect-error printsTo names a terminal stream
-({ name: 'logs', printsTo: 'console', onEvent: () => undefined }) satisfies Reporter;
+// @ts-expect-error interactive is a flag
+({ name: 'logs', interactive: 'stdout', onEvent: () => undefined }) satisfies Reporter;
 // @ts-expect-error a report file holds text
 ({ name: 'pages', reportFiles: () => [{ path: 'run.bin', content: new Uint8Array() }] }) satisfies Reporter;
 
@@ -448,6 +492,11 @@ declare const finishedRun: FinishedRun;
 finishedRun.status satisfies RunStatus;
 finishedRun.exitCode satisfies RunExitCode;
 finishedRun.lastRun satisfies FinishedRun['report'] | undefined;
+// A reporter folds a --last-failed rerun into the runs before it the way the runner does.
+foldLastRun(finishedRun.report, finishedRun.lastRun ?? finishedRun.report) satisfies Report;
+finishedRun.report.run.shard?.index satisfies number | undefined;
+// @ts-expect-error the shard marker is set or absent, never false
+({ cause: 'filtered', reason: 'outside the shard', otherShard: false }) satisfies NonNullable<Report['run']['results'][number]['skip']>;
 // @ts-expect-error the run status is a closed union
 'skipped' satisfies RunStatus;
 // @ts-expect-error the exit codes are the closed set a run ends with
@@ -716,6 +765,14 @@ test.fail('known gap');
 test.setTimeout(60_000);
 // @ts-expect-error the timeout is a number of milliseconds
 test.setTimeout('60s');
+// slow takes the runtime shapes of skip and fail, and no registration form.
+void (test.slow() satisfies void);
+test.slow(true, 'imports a large file');
+test.slow('imports a large file');
+// @ts-expect-error there is no test.slow(title, fn); call test.slow() in the body
+test.slow('slow', async () => {});
+// @ts-expect-error the condition is a boolean
+test.slow(1);
 test.fail('gap', async () => {}) satisfies ReturnType<typeof test>;
 void (test.fail(false) satisfies void);
 test('gap', { fail: 'known gap' }, async () => {});
@@ -1076,6 +1133,19 @@ VERDICT_RULES satisfies string;
 // A runtime hard stop narrows to the AgentError the step rethrows untouched.
 declare const thrown: unknown;
 if (isRuntimeHardStop(thrown)) thrown.code satisfies string;
+// An executor registers a key by name and value, or an environment's, and redacts text it cuts itself.
+registerProviderKey('agent.key', 'value') satisfies void;
+registerProviderKeys({ OPENAI_API_KEY: 'value', UNSET: undefined }) satisfies void;
+registerProviderKeys(process.env) satisfies void;
+redactSecrets('text') satisfies string;
+declare const stepContext: StepExecutorContext;
+redactStepText(stepContext, 'text') satisfies string;
+// @ts-expect-error a key is registered under a name: the marker shows it
+registerProviderKey('value');
+// @ts-expect-error only text is redacted: an object's strings are the caller's to walk
+redactSecrets({ text: 'text' });
+// @ts-expect-error text is redacted for a step: the step's context comes first
+redactStepText('text');
 // A grammar tool's result is a rendered screen: text, or text with its screenshot.
 declare const rendered: ScreenOutput;
 if (typeof rendered !== 'string') rendered.pixels.mediaType satisfies string;

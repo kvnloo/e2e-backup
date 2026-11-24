@@ -24,7 +24,7 @@
   "bugs": {
     "url": "https://github.com/e2e-inc/e2e/issues"
   },
-  "homepage": "https://github.com/e2e-inc/e2e/tree/main/packages/core#readme",
+  "homepage": "https://e2e.com/docs/core",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public",
@@ -75,7 +75,7 @@
   },
   "devDependencies": {
     "@types/node": "26.6.6",
-    "ai": "7.0.179",
+    "ai": "7.0.181",
     "typescript": "7.0.2",
     "vitest": "5.1.1"
   },

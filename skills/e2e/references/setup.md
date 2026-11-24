@@ -40,7 +40,7 @@ pnpm dlx e2e init  # pnpm
 With `e2e` installed, run the installed version: `npx e2e init` or `pnpm exec
 e2e init`; `npx e2e init my-app` scaffolds into a new directory.
 
-The wizard picks the engines (web, mobile, or both) and a model provider (None for tests without AI)
+The wizard picks the engines (web, mobile, or both) and a model provider (**Skip for now** for tests without AI)
 and offers to install this skill, register the MCP server for your coding
 agent, and install dependencies. `--yes` picks the web engine (Playwright) and Vercel AI
 Gateway, installs the skill in `.agents/skills/` (`.claude/skills/e2e`
@@ -64,8 +64,12 @@ install needs a separate entry (topic `mcp`).
 
 Init adds dependencies and a `test:e2e` script to `package.json`, writes
 `e2e.config.ts` and `tests/example.e2e.ts`, updates `.gitignore`, leaves
-existing configs and tests alone. Re-run after upgrading to refresh skill and
-MCP entries.
+existing configs and tests alone. Re-running is safe: beside an existing
+config it writes no example test and adds the engine and model packages the
+config imports that `package.json` lacks. It adds none when `package.json`
+declares another `e2e` than the one running init (an older pin under
+`npx e2e@latest init`): it names them, so run the project's own `e2e init`
+after installing. Re-run after upgrading to refresh skill and MCP entries.
 
 Without the wizard (`ai`, Vercel AI SDK v7, only for `agent.*` steps):
 
@@ -164,7 +168,7 @@ or `E2E_USER_ADMIN_PASSWORD` first, or defer to fill time with
 | `cleanupTimeout` | `30000` | Each `afterEach` hook, fixture teardown, engine cleanup, ms. |
 | `retries` | `0`, `1` in CI | 0 to 10. |
 | `workers` | half the cores, `1` in CI | Parallel test files, capped by the `workers` the engine declares per target. |
-| `reporters` | `['list']` | `list`, `dot`, `json`, `junit`, `markdown` ids, the same as factories from `e2e/reporters` (`junit({ outputFile })`), or `{ name, printsTo?, onEvent?, onOutput?, onStepPrompt?, reportFiles?, onRunFinished?, onSummary? }` objects; one reporter at most prints to each of stdout and stderr (`dot` excludes `list`; beside `json`, the `list` and `dot` ids print to stderr), `--reporter` keeps the other objects. |
+| `reporters` | `['list']` | `list`, `dot`, `line`, `json`, `junit`, `markdown` ids, the same as factories from `e2e/reporters` (`junit({ outputFile })`), or `{ name, interactive?, onEvent?, reportFiles?, onRunFinished?, onSummary? }` objects; two of `list`, `dot`, and `line` together are `INVALID_CONFIG`, and beside `json` their ids print to stderr; without one of them or another `interactive` reporter, what the code prints goes to stderr; `--reporter` keeps the other objects. |
 | `cache` | `'read-write'` | `'read-write'`, `'read-only'`, `'off'`, or `{ mode, store, dir, strict }`; CI demotes only a defaulted mode to `'read-only'`. `strict` (`--strict-cache`) fails a step whose recording no longer replays (`REPLAY_STALE`) instead of handing it to the agent; retries replay too, and the run never writes the cache. |
 | `agents` | `{ default: built-in }` | Tests run with `default`, `e2e run --agent <name>` picks another, entries never inherit from `default`. Options: topic `agent`. |
 | `filters` | `[]` | Test filters `{ name, filter(tests, context) }`, unique names, applied in order with `--changed-since <ref>`. Use `filters: [decisionFilter({ model: gateway.decisionModel('typesafe-ai/jev') })]`, with `decisionFilter` from `@e2e-dev/decision` and `gateway` from `ai` (install `@e2e-dev/decision ai`), to run only the tests a pull request can affect. `filter` gets candidates `{ id, file, titlePath, tags, setupFile? }` and a context `{ projectRoot, changes: { base, root, files }, configFile, signal, log, redact }` with repository-relative `files`, and returns `{ exclude: { [id]: reason }, relevance?: { [id]: 0 to 1 }, note? }`; every test it does not name runs, and `relevance` (how likely each test is to fail) makes each target start the likeliest files first. Read files, the environment, or the network inside `filter`, never at config load: workers load the config too. When filters run: topic `running`. |
@@ -194,7 +198,7 @@ target's `app`:
 | `url` | Base URL for `app.open()` and relative navigation; required on a `web()` target, not supported on a mobile target yet. Missing scheme: `https://`, `http://` for loopback; port `0` on `127.0.0.1` or `[::1]` takes a free port. |
 | `bundleId` | Device targets: the bundle id, package name, or display name (`Settings`) `app.open()` launches. |
 | `appPath` | Device targets: the `.app` or `.apk` under test. A device target needs `bundleId` or `appPath`. |
-| `launchArguments` | Device targets: arguments every fresh launch gets. |
+| `launchArguments` | Device targets: arguments every fresh launch gets, a list of strings, or an object of argument name to string, number, boolean, or list of strings (`-name value` on iOS; on Android an `am start` extra of the value's type: `--es`, `--ez`, `--ei` or `--el` or `--ef`, `--esa`). |
 | `permissions` | Device targets: states (`grant`, `deny`, `reset`) every fresh launch gets. Web targets: `grant` only, held by every page (`{ 'clipboard-write': 'grant' }` lets headless Chromium write the clipboard). |
 | `command` | The process serving `url`: `{ executable, args, cwd, env, inheritEnv, startupTimeout, shutdownTimeout, log, reuseExisting }`; `{port}` in `args` and `env` expands to `url`'s port. Targets declaring the same command share one process. |
 | `readyUrl` | Readiness probe when it differs from `url`; `{port}` expands too. |
@@ -239,6 +243,7 @@ start a script that brings them up and serves the app.
 | --- | --- |
 | `browser` | `'chromium'` (default), `'firefox'`, `'webkit'`, or a `BrowserProvider` leasing hosted browsers over CDP ([`browserRun()`](https://e2e.com/docs/integrations/browser-run) from `@e2e-dev/browser-run`, `kernel()` from `@e2e-dev/kernel`, `notte()` from `@e2e-dev/notte`, `smol()` from `@e2e-dev/smol`, `lightpanda()` from `@e2e-dev/lightpanda`, `moli()` from `@e2e-dev/moli`, `testmuBrowsers()` from `@e2e-dev/testmu/web`, `e2bBrowsers()` from `@e2e-dev/e2b/web`, or your own), which implies chromium and excludes `connect`; any other name is `INVALID_CONFIG` at load. Scope `'worker'` (default): one browser per worker slot from `prepare` to `finish`; `'attempt'`: one per attempt, with `reconnectEndpoint`'s limits (`lightpanda()`, `moli()`, and `testmuBrowsers()` are worker scope only; `notte()` is attempt scope only). |
 | `viewport` | `{ width, height }` in whole pixels, default 1280x720, else `INVALID_CONFIG` at load; `null` follows the browser window (hosted live view, headed run). On a headed hosted browser (Kernel) use `null` and size the service's screen; a fixed size gives a smaller, unmaximized window. |
+| `deviceScaleFactor` | Device pixels per CSS pixel (`window.devicePixelRatio`), default 1. At 2, saved screenshots (`app.screenshot()`, a failure's, an `agent.assert`'s) are twice the viewport's size on each side; the factor does not change the image the model reads or the one `toHaveScreenshot` compares. Not with `viewport: null`. |
 | `connect` | `{ cdpEndpoint }` attaches to a remote Chromium over CDP; `cdpEndpoint` is required, and both it and `reconnectEndpoint` are resolvers `(signal) => url` or `(signal) => ({ endpoint, headers })` for authenticated CDP connections, not strings, else `INVALID_CONFIG` at load. With `reconnectEndpoint` it rides one persistent default context, needs a fresh browser from `cdpEndpoint` every attempt, and reconnects only to the original browser and page. |
 | `headers` | Sent to the app's origin only (scheme, host, and port of `app.url`; Vercel's `x-vercel-protection-bypass`, ngrok's `ngrok-skip-browser-warning`), `agent.act` included; `credentialOrigins: ['https://api.example.com']` adds exact origins for `headers` and `basicAuth`. A request keeps them through its redirects, to any origin. Disables the browser HTTP cache and service workers. |
 | `basicAuth` | `{ username, password }` for a `401` challenge from the app's origin, or one `credentialOrigins` lists (a redirect to `www` or `https:` is another origin; WebKit answers any origin when one is on a default port or an IPv6 host); `password` may be `secrets.get('name')`, resolved per attempt and redacted like any secret, the base64 `Authorization` credential too. |
@@ -249,13 +254,14 @@ start a script that brings them up and serves the app.
 | `testIdAttribute` | What `getByTestId` reads; default `data-testid`. |
 | `chromiumSandbox` | Whether a locally launched Chromium runs with its OS sandbox on; default `true` on macOS and Windows, `false` on Linux, where root and most containers cannot start it. |
 | `screencast` | `{ size?, quality? }` for the engine's own video: frame size (default the viewport's), JPEG quality 0 to 100. |
+| `webmcp` | `true` launches Chromium or Firefox with [WebMCP](https://github.com/webmachinelearning/webmcp) on, so `browser.webmcp.tools()` and `callTool()` reach the tools a page registers; default `false`. WebKit has none (`INVALID_CONFIG`); a browser attached with `connect` must be started with it. |
 
 - `basicAuth` via `secrets.get()` masks text, not screenshots or model pixels
   showing the password. An undeclared name is `INVALID_CONFIG` at load, as is
   the handle (a reference, not the value) in `app.command.env`, a template
   literal, or `context`; read those from `process.env`.
 - `reconnectEndpoint` or an attempt-scoped provider rides one persistent
-  context without `headers`, `basicAuth`, `userAgent`, `locale`, `timezoneId`, `app.clearState()`, or
+  context without `headers`, `basicAuth`, `userAgent`, `locale`, `timezoneId`, `deviceScaleFactor`, `app.clearState()`, or
   session state. Recovery never repeats a dispatched operation; exhausting
   the budget is `OPERATION_TIMEOUT`. Without `reconnectEndpoint` a dropped
   connection is reacquired at the next attempt.
@@ -384,14 +390,14 @@ export default {
   'NO']` loads that dev server on every fresh launch, dev menu off;
   `app.command` (`npx expo start --port 8081`) with `readyUrl:
   'http://localhost:8081/status'` starts it.
-- Another language on iOS: `app.launchArguments: ['-AppleLanguages', '(fr)',
-  '-AppleLocale', 'fr_FR']`, one target per language; the app must ship
-  it. Android has no such argument: on a hosted device set `language` and
-  `locale` on `browserstack()` or `testmu()`, on a local one set the device's
-  language.
+- Another language on iOS: `app.launchArguments: { AppleLanguages: ['fr'],
+  AppleLocale: 'fr_FR' }`, one target per language; the app must ship it.
+  Android has no such argument, and these names in an object fail at config load there:
+  on a hosted device set `language` and `locale` on `browserstack()` or
+  `testmu()`, on a local one set the device's language.
 - One worker per device. No `device`: every booted simulator or emulator of
   the platform, and every reachable paired iPhone or iPad or connected Android phone, is the pool, up to `workers`,
-  minus devices another agent-device session holds (none booted: agent-device boots
+  minus devices another agent-device session holds (one another session takes while `prepare` boots it, starts the runner, or opens the app is swapped for the next free one, or its worker dropped when none is free, unless a short-lived agent-device command only had it busy; none booted: agent-device boots
   a shut-down one, on iOS an iPhone over an iPad over an Apple TV, on Android a phone or tablet over a TV, then the newest OS, then name order; all held: `prepare` fails); one `device`: one worker whatever `workers` says; a list (`device:
   ['iPhone 17', 'iPhone 17 Pro']`): an explicit pool. Devices boot in
   `prepare`, before the run's clock. Two sessions on one device fight over

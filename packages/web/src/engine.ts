@@ -101,7 +101,9 @@ export function web(options: WebOptions = {}): WebEngine {
   validateMedia(options);
   if (options.initScripts !== undefined) validateInitScripts(options.initScripts);
   if (options.viewport !== undefined && options.viewport !== null) validatePixelSize('web({ viewport })', options.viewport);
+  if (options.deviceScaleFactor !== undefined) validateDeviceScaleFactor(options);
   if (options.screencast !== undefined) validateScreencast(options.screencast);
+  if (options.webmcp !== undefined) validateWebmcp(options, provider);
   const reconnecting = options.connect?.reconnectEndpoint !== undefined;
   // A per-attempt lease rides the same persistent context as `reconnectEndpoint`, with the same limits.
   const recoverable = reconnecting || provider?.scope === 'attempt';
@@ -180,6 +182,7 @@ const WEB_OPTION_KEYS: readonly string[] = Object.keys({
   browser: true,
   chromiumSandbox: true,
   viewport: true,
+  deviceScaleFactor: true,
   screencast: true,
   connect: true,
   headers: true,
@@ -192,10 +195,11 @@ const WEB_OPTION_KEYS: readonly string[] = Object.keys({
   colorScheme: true,
   reducedMotion: true,
   initScripts: true,
+  webmcp: true,
 } satisfies Record<keyof WebOptions, true>);
 
 /** The options applied when the engine creates a browser context, which a persistent context never is. */
-const CREATION_OPTION_KEYS = ['headers', 'basicAuth', 'userAgent', 'locale', 'timezoneId'] as const satisfies readonly (keyof WebOptions)[];
+const CREATION_OPTION_KEYS = ['headers', 'basicAuth', 'userAgent', 'locale', 'timezoneId', 'deviceScaleFactor'] as const satisfies readonly (keyof WebOptions)[];
 
 /**
  * What a persistent context rules out, named with its cause: `what` replaces
@@ -362,6 +366,27 @@ function validateTimezoneId(timezoneId: unknown): void {
 }
 
 /**
+ * `webmcp` changes how the browser is launched, so it needs a browser the
+ * engine launches, and one that has WebMCP: WebKit does not.
+ */
+function validateWebmcp(options: WebOptions, provider: BrowserProvider | undefined): void {
+  if (typeof options.webmcp !== 'boolean') {
+    throw new ConfigurationError('INVALID_CONFIG', `web({ webmcp }) must be true or false, got ${JSON.stringify(options.webmcp)}`);
+  }
+  if (!options.webmcp) return;
+  const elsewhere = provider !== undefined ? `browser provider "${provider.name}"` : options.connect !== undefined ? 'connect' : undefined;
+  if (elsewhere !== undefined) {
+    throw new ConfigurationError(
+      'INVALID_CONFIG',
+      `web({ webmcp }) is a launch setting, and with ${elsewhere} the engine does not launch the browser; start that browser with --enable-features=WebMCP and remove webmcp`,
+    );
+  }
+  if (options.browser === 'webkit') {
+    throw new ConfigurationError('INVALID_CONFIG', 'web({ webmcp }) requires the chromium or firefox browser; WebKit does not implement WebMCP');
+  }
+}
+
+/**
  * Refuses a media feature value the browser does not emulate, at config load
  * rather than at the first page. A persistent context takes these too: they
  * are set on each page, not only on a context the engine creates.
@@ -416,6 +441,17 @@ function validatePixelSize(option: string, size: unknown): void {
   }
   if (!Number.isInteger(width) || !Number.isInteger(height) || (width as number) < 1 || (height as number) < 1) {
     throw new ConfigurationError('INVALID_CONFIG', `${option} must be { width, height } in whole pixels, each at least 1`);
+  }
+}
+
+/** `web({ deviceScaleFactor })`: a number above 0, beside a viewport size the browser can scale. */
+function validateDeviceScaleFactor(options: WebOptions): void {
+  const factor: unknown = options.deviceScaleFactor;
+  if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0) {
+    throw new ConfigurationError('INVALID_CONFIG', 'web({ deviceScaleFactor }) must be a number above 0');
+  }
+  if (options.viewport === null) {
+    throw new ConfigurationError('INVALID_CONFIG', 'web({ deviceScaleFactor }) needs a viewport size; viewport: null leaves the window at its own scale');
   }
 }
 

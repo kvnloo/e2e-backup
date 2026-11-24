@@ -747,8 +747,7 @@ describe('web platform integration', () => {
     expect(tapStep?.artifacts ?? []).toHaveLength(0);
     const download = attempt.artifacts.find((artifact) => artifact.kind === 'download');
     expect(download?.path).toContain('downloads/');
-    // Bytes the app served, not rewritten by the runner: the record says so.
-    expect(download).toMatchObject({ redaction: 'incomplete', mediaType: 'text/csv' });
+    expect(download).toMatchObject({ mediaType: 'text/csv', redaction: 'incomplete' });
   });
 
   it('keeps a class assertion polling while the node is missing and passes once it arrives', () => {

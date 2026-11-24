@@ -6,13 +6,14 @@ export { credentials, secrets } from '@e2e-dev/core/lib/secrets';
 export { unique } from '@e2e-dev/core/lib/params';
 export { AgentError, isAgentError } from '@e2e-dev/core/lib/agent/error';
 // The markdown page the `markdown` reporter writes, for a reporter that posts
-// it elsewhere: @e2e-dev/github renders the pull request comment from it.
+// it elsewhere: @e2e-dev/github renders the pull request comment from it,
+// folding a --last-failed rerun into the runs before it first.
 export { renderMarkdownReport } from './report/markdown.ts';
+export { foldLastRun } from './report/fold.ts';
 export type { MarkdownReportOptions } from './report/markdown.ts';
 
 export type * from '@e2e-dev/core/lib/types';
 export type * from './run-types.ts';
-export type { HeldStep, NumberedStep, StepPrompt } from './run/step-hold.ts';
 export type {
   ExecutorActions,
   ExecutorAttempt,
@@ -38,5 +39,5 @@ export type {
   StepVerdictStatus,
 } from '@e2e-dev/core/lib/agent/executor';
 export type { StepTurn, VisionDegradation } from '@e2e-dev/core/lib/run/steps';
-export type { RunEvent, RunEventOf, RunExitCode, RunStatus } from './run/events.ts';
+export type { CollectedTestInfo, PausedKey, PausedStep, RunEvent, RunEventOf, RunExitCode, RunStatus } from './run/events.ts';
 export type { EngineAppDeclaration } from '@e2e-dev/core/lib/engine/index';

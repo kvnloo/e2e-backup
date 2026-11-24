@@ -37,6 +37,7 @@ export type { EngineFinishInfo, EnginePrepareInfo, EnginePrepareResult } from '.
 // config options get.
 export { ConfigurationError, InfrastructureError, TestError } from '../internal/errors.ts';
 export { rejectUnknownKeys, rejectUnknownOptions } from '../internal/options.ts';
+export { appleUserDefaults, checkLaunchArguments } from '../internal/launch-arguments.ts';
 export { validateJsonValue, type JsonValueRules } from '../internal/json-value.ts';
 export { describePattern, matchesText, toTextPattern } from '../internal/text.ts';
 export { resolveExpression, type ResolveExpressionOptions } from './resolve.ts';
@@ -53,7 +54,7 @@ export type {
 export { Deadline, pollCondition, stepTimeout, withTimeout, withinCleanupBudget, type PollConditionOptions } from '../internal/time.ts';
 export { isRefusedLinkScheme, sameSite, siteOf, urlMatches } from '../internal/urls.ts';
 export { obj, type WithoutUndefined } from '../internal/objects.ts';
-import type { AppPermissionState, Expectable, Locator, Screen, Secret } from '../types.ts';
+import type { AppPermissionState, Expectable, LaunchArgumentValues, Locator, Screen, Secret } from '../types.ts';
 import type {
   EngineHostIdentity,
   EngineSpiVersion,
@@ -86,7 +87,7 @@ export {
   SCROLL_STEP,
   parseKey,
 } from './contract.ts';
-export type { AppPermissionState, Expectable, JsonValue, Locator, Screen, Secret } from '../types.ts';
+export type { AppPermissionState, Expectable, JsonValue, LaunchArgumentValue, LaunchArgumentValues, LaunchArguments, Locator, ResolvedLaunchArguments, Screen, Secret } from '../types.ts';
 export { isSecret } from '../secrets.ts';
 
 /**
@@ -172,8 +173,16 @@ export interface EngineAppInfo {
   readonly bundleId?: string;
   /** The build to install, as the target declared it; relative to `projectRoot`. */
   readonly appPath?: string;
-  /** Arguments every fresh launch passes the app. */
+  /** Arguments every fresh launch passes the app, when the target declared them as a list of strings. */
   readonly launchArguments?: readonly string[];
+  /**
+   * Arguments every fresh launch passes the app, when the target declared
+   * them as an object of argument name to value; the engine spells them for
+   * its launch command. Only an engine that declares `launchArgumentValues`
+   * receives one: for any other engine the object is `INVALID_CONFIG` at
+   * config load.
+   */
+  readonly launchArgumentValues?: LaunchArgumentValues;
   /** Permissions the app holds, by name; what each state means is the engine's (a device sets them before every fresh launch). */
   readonly permissions?: Readonly<Record<string, AppPermissionState>>;
 }
@@ -680,9 +689,10 @@ export interface EngineSnapshot {
    * Regions masked in the screenshot; the harness checks it covers every secure
    * node. An engine asked for pixels (`pixels: true`) that cannot mask every
    * secure node on screen omits `pixels` and still reports the regions it
-   * could mask, fewer than the secure nodes, so `toHaveScreenshot` fails with
-   * `POLICY_DENIED` and the agent reads `MASKING_UNPROVEN`, not a missing
-   * screenshot.
+   * could mask. A count with no `pixels` always reads as withheld, even when
+   * the tree holds no secure node, since a tree read only in part can leave
+   * one out: `toHaveScreenshot` fails with `POLICY_DENIED` and the agent reads
+   * `MASKING_UNPROVEN`, not a missing screenshot.
    */
   readonly maskedRegionCount?: number;
 }
@@ -803,6 +813,13 @@ export interface Engine {
    * anything is prepared.
    */
   readonly selectsDevice?: boolean;
+  /**
+   * The engine reads the object form of `app.launchArguments` from
+   * `EngineAppInfo.launchArgumentValues`. Without it the harness refuses an
+   * object at config load, so an engine that predates the object form only
+   * ever receives a list in `EngineAppInfo.launchArguments`.
+   */
+  readonly launchArgumentValues?: boolean;
   /** capability: keyboard - requires observation. Input to whatever holds focus; see `EngineKeyboard`. */
   readonly keyboard?: EngineKeyboard;
   /**
@@ -836,7 +853,7 @@ export interface Engine {
    * machine here (a first-run browser download, a toolchain fetch), so it
    * happens once instead of per worker and its progress reaches the reporter
    * through `info.log`. It runs after collection and before the run's clock
-   * starts: `plan` is emitted, the report's `startedAt` taken, and the app
+   * starts: `collected` is emitted, the report's `startedAt` taken, and the app
    * started only once every target is prepared, so a download is never part
    * of a run's duration. A run with nothing to run (the test filters left
    * nothing, or `--pass-with-no-tests` on an empty selection) prepares no

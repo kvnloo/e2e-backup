@@ -353,14 +353,19 @@ function rejectWatchIn(command: Command, reporters: readonly Reporter[] | undefi
 /**
  * Where `--step` cannot work: it waits at every step, so not in CI; its
  * prompt is one at a time, so one worker; and it cannot share the keyboard
- * with `--watch` or stdout with the json reporter.
+ * with `--watch`. Beside the json reporter it needs a terminal, on stderr
+ * too, where the prompt is: commands that step the run would print the
+ * report among the steps. The runner
+ * refuses the same for a json reporter the config sets.
  */
 function rejectStepIn(command: Command, options: { watch?: boolean; workers?: number; reporter?: readonly Reporter[] }): void {
   const refuse = (why: string): never => command.error(`error: --step ${why}`, { exitCode: 2 });
   if (isCiMode(process.env)) refuse('waits at every step, so it is refused in CI (CI is set)');
   if (options.watch === true) refuse('cannot be combined with --watch: both read the keyboard');
   if (options.workers !== undefined && options.workers > 1) refuse('runs one test at a time, so it cannot be combined with --workers above 1');
-  if (options.reporter?.includes('json') === true) refuse('cannot be combined with --reporter json: the prompt would land in its stdout document');
+  if (options.reporter?.includes('json') === true && !(hasTerminal() && process.stderr.isTTY === true)) {
+    refuse('cannot be combined with --reporter json without a terminal on stdin, stdout, and stderr: the prompt is on stderr, and the commands that step the run would print the report among the steps');
+  }
 }
 
 /** Whether `--step` can read keys: stdin and stdout are both a terminal. Without one, the run steps from later commands (`step-control.ts`). */
@@ -523,7 +528,7 @@ function createProgram(version: string, telemetry: Telemetry, updateCheck: Updat
     .command('init')
     .summary('scaffold an ESM package, e2e.config.ts, an example test, .gitignore entries, and the agent skill')
     .description(
-      'Scaffold a project: an ESM package.json, e2e.config.ts, an example test per engine, .gitignore entries, and the e2e skill for coding agents. An existing config and test files stay as they are; an existing package.json gets only the missing dependencies and scripts, and .gitignore only the missing entries. Prompts for the engines, for AI support, and for the skill directories, then offers to install the dependencies; --yes takes the defaults, with the skill in .agents/skills and .claude/skills linked to it.',
+      'Scaffold a project: an ESM package.json, e2e.config.ts, an example test per engine, .gitignore entries, and the e2e skill for coding agents. An existing config and test files stay as they are, and no example test is written beside an existing config; an existing package.json gets only the missing dependencies, those of the packages the config imports included, and scripts, and .gitignore only the missing entries. Prompts for the engines, for AI support, and for the skill directories, then offers to install the dependencies; --yes takes the defaults, with the skill in .agents/skills and .claude/skills linked to it.',
     )
     .argument('[directory]', 'project directory, created when missing (default: the current directory)')
     .option('-y, --yes', 'skip the prompts; each answer not given as a flag takes its default: web, vercel, every skill and MCP location, no installation');
@@ -536,6 +541,7 @@ function createProgram(version: string, telemetry: Telemetry, updateCheck: Updat
           'e2e init',
           'e2e init my-app',
           'e2e init my-app --example with-expo',
+          'e2e init my-app --example',
           'e2e init --yes',
           'e2e init --yes --gateway openrouter --skills .agents/skills --mcp none --install',
           'e2e init --yes --ci github-actions',
@@ -1017,7 +1023,7 @@ function createProgram(version: string, telemetry: Telemetry, updateCheck: Updat
         rejectForwardedFlags(command, files);
         // The config and its test filters run in this process and may print a secret, as under `run`.
         const output = claimRunnerOutput();
-        if (options.reporter === 'json') output.keepStdoutForReport();
+        if (options.reporter === 'json') output.leaveStdout();
         let pairs: readonly ListedPair[];
         try {
           ({ pairs } = await listSelection(
@@ -1062,7 +1068,7 @@ function createProgram(version: string, telemetry: Telemetry, updateCheck: Updat
     .action(async (options: { config?: string; target?: string[]; headed?: boolean; checkModel?: boolean; json?: boolean }) => {
       const { doctor, formatDoctorReport } = await import('./doctor.ts');
       const output = claimRunnerOutput();
-      if (options.json === true) output.keepStdoutForReport();
+      if (options.json === true) output.leaveStdout();
       // Ctrl-C stops the checks, which then report: an engine server is
       // shut down before the process exits instead of left running.
       const signals = new SignalLadder();
