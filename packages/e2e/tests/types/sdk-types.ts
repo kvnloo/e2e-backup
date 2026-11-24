@@ -714,6 +714,9 @@ void test.runIf(Promise.resolve(true));
 void test.runIf(isFeatureOn() as Promise<boolean> | boolean);
 // fixme takes exactly skip's shapes: a registration returns a TestCase, a call inside a body returns nothing.
 test.fixme('not yet', async () => {}) satisfies ReturnType<typeof test>;
+test.todo('not yet') satisfies ReturnType<typeof test>;
+// @ts-expect-error todo takes a title only, with no body
+test.todo('not yet', async () => {});
 void (test.fixme(true, 'flaky on webkit') satisfies void);
 void (test.fixme('flaky on webkit') satisfies void);
 void (test.fixme() satisfies void);
