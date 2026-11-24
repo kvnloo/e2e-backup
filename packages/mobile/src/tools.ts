@@ -22,6 +22,12 @@ import type { AgentDeviceSurface } from './surface.ts';
  * is an optional peer dependency, and this module loads with the project's
  * config, so it must not need the package at run time.
  */
+/**
+ * The budget for reading the screen's pixel scale before the agent's swipe,
+ * the bound of a targeted agent action (`actionTimeout` caps it lower).
+ */
+const TARGETED_ACTION_MS = 15_000;
+
 function deviceTool<INPUT>(definition: Tool<INPUT, string>): Tool<INPUT, string> {
   return definition;
 }
@@ -143,7 +149,9 @@ export function mobileTools(
         }),
         execute: async ({ from, to }, options) => {
           const surface = active();
-          await surface.command('swipe', (client) => client.interactions.swipe({ from: surface.toDevicePoint(from), to: surface.toDevicePoint(to) }), abort(options));
+          const signal = abort(options) ?? new AbortController().signal;
+          await surface.readPixelScale(signal, surface.inputBudget('swipe', { timeoutMs: TARGETED_ACTION_MS, signal }));
+          await surface.command('swipe', (client) => client.interactions.swipe({ from: surface.toDevicePoint(from), to: surface.toDevicePoint(to) }), signal);
           return `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y}).`;
         },
       }),

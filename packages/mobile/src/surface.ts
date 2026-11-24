@@ -328,6 +328,9 @@ interface LeaseRecorder {
  */
 const SPARSE_RETRY_BACKOFF_MS = [0, 1_200, 3_000] as const;
 
+/** How long to wait before capturing again when a capture couldn't give the pixel scale a point action needs. */
+const SCALE_READ_RETRY_MS = 250;
+
 /**
  * Waits between captures while the keyboard reads as moving
  * ({@link KeyboardUnknown.settling}): an iPhone keyboard slides in or out in
@@ -559,11 +562,13 @@ export class AgentDeviceSurface {
    */
   private knownViewport: ViewportSize | undefined;
   /**
-   * Device pixels per viewport unit on each axis, from the latest capture
-   * (see `inDp`). It's 1 on iOS and close to the display density on Android.
-   * It's undefined before the session's first capture.
+   * Device pixels per viewport unit on each axis on Android, from the latest
+   * capture with screen geometry (see `inDp`). It's undefined before that
+   * capture and after a rotation.
    */
   private pixelScale: Point | undefined;
+  /** The display density the latest Android capture reported, to tell a density change from a new screen size. */
+  private pixelDensity: number | undefined;
 
   constructor(
     readonly options: MobileOptions,
@@ -873,6 +878,7 @@ export class AgentDeviceSurface {
     this.installedApp = undefined;
     this.knownViewport = undefined;
     this.pixelScale = undefined;
+    this.pixelDensity = undefined;
     let closing: Promise<void> | undefined;
     const close = (): void => {
       if (client === undefined) return;
@@ -1156,10 +1162,10 @@ export class AgentDeviceSurface {
   }
 
   /**
-   * Converts a capture to density-independent pixels (dp). Every rect and
-   * point the harness reads is in dp, like iOS points. On Android, geometry
-   * from agent-device is in physical pixels, with the display density
-   * beside it.
+   * Converts an Android capture to density-independent pixels (dp). Every
+   * rect and point the harness reads is in dp, like iOS points. On Android,
+   * geometry from agent-device is in physical pixels, with the display
+   * density beside it.
    *
    * The viewport is stored in whole units in the report and the replay
    * cache. So the screen is rounded to whole dp, and each axis gets a
@@ -1167,20 +1173,24 @@ export class AgentDeviceSurface {
    * pixels). That way, rects, points, and screenshot masks are converted
    * both ways without a rounding gap.
    *
-   * A capture without a density (iOS, or an older Android helper) is
-   * returned unchanged. When the scale changes, the learned viewport is
-   * dropped, since it's in the old scale.
+   * A capture without screen geometry is returned unchanged and sets no
+   * scale. A capture without a density (an older Android helper) stays in
+   * physical pixels. When the density changes, the learned viewport is
+   * dropped, since it's in the old unit.
    */
   private inDp(raw: RawSnapshot): RawSnapshot {
-    const density = raw.androidSnapshot?.pixelDensity;
+    if (this.options.platform !== 'android') return raw;
     const screen = raw.viewport ?? viewportOf(raw.nodes ?? []);
-    if (density === undefined || screen === undefined) {
-      this.pixelScale = density === undefined ? { x: 1, y: 1 } : (this.pixelScale ?? { x: density, y: density });
+    if (screen === undefined) return raw;
+    const density = raw.androidSnapshot?.pixelDensity;
+    if (density === undefined) {
+      this.pixelScale = { x: 1, y: 1 };
       return raw;
     }
+    if (this.pixelDensity !== undefined && this.pixelDensity !== density) this.knownViewport = undefined;
+    this.pixelDensity = density;
     const viewport = { width: Math.round(screen.width / density), height: Math.round(screen.height / density) };
     const scale = { x: screen.width / viewport.width, y: screen.height / viewport.height };
-    if (this.pixelScale !== undefined && (this.pixelScale.x !== scale.x || this.pixelScale.y !== scale.y)) this.knownViewport = undefined;
     this.pixelScale = scale;
     const toDp = (rect: Rect): Rect => ({ x: rect.x / scale.x, y: rect.y / scale.y, width: rect.width / scale.x, height: rect.height / scale.y });
     const { nodes, keyboard } = raw;
@@ -1192,10 +1202,41 @@ export class AgentDeviceSurface {
     };
   }
 
-  /** Converts a point in viewport units to the device's pixels (see `inDp`). */
+  /** Converts a point in viewport units to the device's pixels with the latest scale (see `inDp`). */
   toDevicePoint(point: Point): Point {
     const scale = this.pixelScale ?? { x: 1, y: 1 };
     return { x: point.x * scale.x, y: point.y * scale.y };
+  }
+
+  /**
+   * Reads the pixel scale before a point action when no capture has set it
+   * (see `inDp`). A test or the agent can name a point before the screen is
+   * captured, and on Android the scale comes from a capture, so one is taken
+   * first. A screen that can't be read yet (a splash screen, an app still
+   * launching) or a capture without screen geometry is captured again until
+   * the budget runs out. Then the action fails with `OPERATION_TIMEOUT`, and
+   * no input is sent.
+   */
+  async readPixelScale(signal: AbortSignal, input: InputBudget): Promise<void> {
+    while (this.pixelScale === undefined && this.options.platform === 'android') {
+      try {
+        await this.capture(signal, true, input);
+      } catch (cause) {
+        if (signal.aborted || !(isUnreadableCapture(cause) || (this.launching && isAppNotRunning(cause)))) throw cause;
+      }
+      if (this.pixelScale !== undefined) break;
+      if (input.remainingMs() <= SCALE_READ_RETRY_MS) {
+        throw new EngineError('OPERATION_TIMEOUT', 'the screen could not be read to convert the point to device pixels before the action timed out; nothing was sent', {
+          retryable: false,
+        });
+      }
+      await sleep(SCALE_READ_RETRY_MS, signal);
+    }
+  }
+
+  /** Drops the pixel scale after a rotation swaps the screen's axes, so the next point action reads it again. */
+  forgetPixelScale(): void {
+    this.pixelScale = undefined;
   }
 
   /**
@@ -1740,9 +1781,7 @@ export class AgentDeviceSurface {
    */
   async performAt(point: ViewportPoint, action: PointerAction, operation: OperationContext, input: InputBudget): Promise<void> {
     const settle = operation.origin === 'test' ? {} : this.settleOptions;
-    // A test can name a point before the screen is captured. On Android,
-    // the density comes from a capture, so one is taken first.
-    if (this.pixelScale === undefined && this.options.platform === 'android') await this.capture(operation.signal, true, input);
+    await this.readPixelScale(operation.signal, input);
     const at = this.toDevicePoint(point);
     const sent = action.kind === 'swipeTo' ? { ...action, target: this.toDevicePoint(action.target) } : action;
     const before = this.latestScreen;
@@ -1920,7 +1959,7 @@ export class AgentDeviceSurface {
     const tipTop = tip.rect.y;
     const button = nodes.find((node) => node.label === 'Continue' && node.rect !== undefined && node.rect.y > tipTop);
     if (button?.rect === undefined) return false;
-    await this.command('keyboard.dismiss', (client) => input.press(client, this.toDevicePoint(centreOf(button.rect!))), signal);
+    await this.command('keyboard.dismiss', (client) => input.press(client, centreOf(button.rect!)), signal);
     return true;
   }
 
@@ -2072,12 +2111,25 @@ export class AgentDeviceSurface {
     if (redacted === undefined) return undefined;
     const size = readPngSize(redacted.data);
     if (size === undefined) return undefined;
-    const scale = viewport.width > 0 ? size.width / viewport.width : 1;
+    const scale = imageScale(size, viewport);
     return {
       pixels: { data: redacted.data, mediaType: 'image/png', width: size.width, height: size.height, scale },
       masked: redacted.masked,
     };
   }
+}
+
+/**
+ * Returns the image pixels per viewport unit that `ObservationPixels.scale`
+ * reports. On Android the viewport is whole dp, so the two axes scale by
+ * slightly different factors (see `inDp`). Their harmonic mean keeps the
+ * image size divided by the scale rounding to the viewport on both axes.
+ */
+function imageScale(size: { readonly width: number; readonly height: number }, viewport: ViewportSize): number {
+  if (viewport.width <= 0 || viewport.height <= 0) return 1;
+  const x = size.width / viewport.width;
+  const y = size.height / viewport.height;
+  return x === y ? x : (2 * x * y) / (x + y);
 }
 
 /**
@@ -2099,8 +2151,8 @@ function secureBounds(projected: ProjectedSnapshot): readonly Rect[] | undefined
  * Returns the masked bytes and how many regions were covered, or undefined
  * when the image cannot be read or edited: the caller then withholds the
  * image rather than ship one it could not prove redacted. Bounds are in
- * logical points; the image may be at device scale, so they are scaled by
- * the image-to-viewport ratio.
+ * logical points. The image may be at device scale, so each axis is scaled
+ * by the image-to-viewport ratio on that axis.
  */
 function redactSecure(
   data: Uint8Array,
@@ -2110,8 +2162,9 @@ function redactSecure(
   if (secure.length === 0) return { data, masked: 0 };
   const size = readPngSize(data);
   if (size === undefined) return undefined;
-  const scale = viewport !== undefined && viewport.width > 0 ? size.width / viewport.width : 1;
-  const rects = secure.map((rect) => ({ x: rect.x * scale, y: rect.y * scale, width: rect.width * scale, height: rect.height * scale }));
+  const x = viewport !== undefined && viewport.width > 0 ? size.width / viewport.width : 1;
+  const y = viewport !== undefined && viewport.height > 0 ? size.height / viewport.height : 1;
+  const rects = secure.map((rect) => ({ x: rect.x * x, y: rect.y * y, width: rect.width * x, height: rect.height * y }));
   try {
     return { data: maskPng(data, rects), masked: rects.length };
   } catch {
