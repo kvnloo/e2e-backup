@@ -5,9 +5,10 @@ import { expect } from 'e2e';
  * The Golden Row is row index 4321 at 36 px a row, 155 556 px down a 480 px
  * viewport. A scroll step on the table moves 0.65 of its height, 312 px, so
  * about 499 strides reach it, and no row passes unseen because a stride is
- * shorter than the viewport; measured at about 160 ms a stride, 80 s in all.
- * Nearly twice that, so a slower CI box fails the scroll and not the attempt;
- * the attempt gets the default budget on top for opening and claiming.
+ * shorter than the viewport. That took 17 s on an M-series Mac, about 34 ms a
+ * stride. The timeout leaves room for a CI box several times slower, so it
+ * fails the scroll and not the attempt; the attempt gets the default budget
+ * on top for opening and claiming.
  */
 const SCROLL_TIMEOUT_MS = 140_000;
 

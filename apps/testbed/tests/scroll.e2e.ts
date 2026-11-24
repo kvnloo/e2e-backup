@@ -39,20 +39,18 @@ test.describe('scrolling', { requires: ['browser'], tags: ['scroll'] }, () => {
     }
   });
 
-  test('a viewport swipe and a wheel gesture both move the page', async ({ screen, browser }) => {
-    const position = screen.getByRole('status', 'Scroll position');
-    await expect(position).toHaveText('0');
-
+  test('a screen swipe scrolls the container under the screen centre, as a wheel there does', async ({ screen, browser }) => {
+    const pane = screen.getByRole('status', 'Pane position');
+    // The pane is under the screen's centre, so it scrolls half its 200 px, and the page stays.
     await screen.swipe({ direction: 'down' });
-    await expect(position).not.toHaveText('0');
-    const afterSwipe = Number(await position.textContent());
-    expect(afterSwipe).toBeGreaterThan(0);
+    await expect(pane).toHaveText('100');
+    await expect(screen.getByRole('status', 'Scroll position')).toHaveText('0');
 
     await browser.mouse.wheel(0, 600);
-    await expect(position).toHaveText(String(afterSwipe + 600));
+    await expect(pane).toHaveText('700');
 
     await screen.swipe({ direction: 'up' });
-    await expect.poll(async () => Number(await position.textContent())).toBeLessThan(afterSwipe + 600);
+    await expect(pane).toHaveText('600');
   });
 
   test('a node swipe scrolls only inside a scrollable node', async ({ screen }) => {
