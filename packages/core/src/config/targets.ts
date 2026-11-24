@@ -8,7 +8,7 @@ import { isEngineHandle } from '../engine/index.ts';
 import { protocolEngine, type EngineClientHandle } from '../engine/protocol/client.ts';
 import { ConfigurationError } from '../internal/errors.ts';
 import type { ResolvedRecording } from '../internal/recording-modes.ts';
-import type { Target } from '../types.ts';
+import type { LocatorsConfig, Target } from '../types.ts';
 import { checkTargetApp, digestTargetApp, resolveTargetApp, TARGET_KEYS, unknownTargetKey, type ResolvedApp, type TargetAppDeclaration } from './app.ts';
 import { isRecord } from './command.ts';
 import { describeValue } from './validate.ts';
@@ -34,21 +34,23 @@ export interface ResolvedTarget {
   readonly trace: ResolvedRecording;
   /** Which attempts on the target record a video: `--video`, else the target's `video`, else the config's, else `off`. A test's own `video` wins over it. */
   readonly video: ResolvedRecording;
+  /** Defaults for the target's screen queries. They come from the target's `locators`, else the config's, else `visible: false`. */
+  readonly locators: Readonly<Required<LocatorsConfig>>;
 }
 
 /** A safe artifact path segment: the filename alphabet, and never `.` or `..`, which would name a directory's self or parent. */
 export const TARGET_NAME_PATTERN = /^(?!\.+$)[A-Za-z0-9_.-]+$/;
 
 /**
- * Resolves `targets`: each target's name, platform, engine, recordings, and
- * app, without the run's ports. An engine in this process is served over
- * the engine protocol, so each call crosses the wire format a remote engine
- * would receive.
+ * Resolves `targets`: each target's name, platform, engine, recordings,
+ * locator defaults, and app, without the run's ports. An engine in this
+ * process is served over the engine protocol, so each call crosses the wire
+ * format a remote engine would receive.
  */
 export function resolveTargets(
   declared: unknown,
   projectRoot: string,
-  recordings: (target: Target, where: string) => Pick<ResolvedTarget, 'trace' | 'video'>,
+  inherited: (target: Target, where: string) => Pick<ResolvedTarget, 'trace' | 'video' | 'locators'>,
 ): readonly ResolvedTarget[] {
   if (declared === undefined) {
     throw new ConfigurationError(
@@ -103,7 +105,7 @@ export function resolveTargets(
       engine,
       app: resolveTargetApp(name, declaredApp, projectRoot),
       declaredApp,
-      ...recordings(target, where),
+      ...inherited(target, where),
     };
   });
 }
@@ -134,13 +136,16 @@ export function launchesPinnedApp(target: ResolvedTarget): boolean {
  * contract version, the platform it drives (a named target inherits it, so
  * two workers whose engines declare different platforms must not agree on
  * the digest), and capability set. The app enters as declared, env values
- * reduced to their names and the run's port never.
+ * reduced to their names and the run's port never. The locator defaults are
+ * digested only when `visible` is true, so the digest of a config that
+ * doesn't set them doesn't change.
  */
 export function digestTargets(targets: readonly ResolvedTarget[]) {
-  return targets.map(({ name, platform, engine, declaredApp }) => ({
+  return targets.map(({ name, platform, engine, declaredApp, locators }) => ({
     name,
     platform,
     app: digestTargetApp(declaredApp),
+    ...(locators.visible ? { locators } : {}),
     ...(engine === undefined
       ? {}
       : {

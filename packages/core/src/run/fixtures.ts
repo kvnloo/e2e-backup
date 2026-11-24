@@ -110,6 +110,8 @@ interface ScreenWiring {
   readonly redaction: NodeRedaction;
   /** The app URL's origin, so the tree shows a link on it by its path. */
   readonly appOrigin: string | undefined;
+  /** The target's query defaults. */
+  readonly locators: ScreenContext['locators'];
   /** Where `toHaveScreenshot` keeps screenshots; only a test has them. */
   readonly screenshots?: ScreenshotContext | undefined;
 }
@@ -144,6 +146,7 @@ export function createScreenContext(wiring: ScreenWiring): ScreenContext {
         maxBytes: config.limits.maxObservationBytes,
         appOrigin: wiring.appOrigin,
       }).text,
+    locators: wiring.locators,
     ...(wiring.screenshots === undefined ? {} : { screenshots: wiring.screenshots }),
   };
 }
@@ -164,6 +167,7 @@ export function createFixtures(environment: AttemptEnvironment): AttemptFixtures
     secrets,
     redaction: ledger,
     appOrigin: environment.target.app.base?.origin,
+    locators: environment.target.locators,
     ...(environment.test === undefined
       ? {}
       : {

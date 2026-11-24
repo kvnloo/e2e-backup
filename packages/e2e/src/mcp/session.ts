@@ -485,6 +485,7 @@ export class SessionHost {
         onActionFailed: (cause) => usage.failed(classifyError(cause).code),
         onRunCodeFailed: (code) => usage.failed(code),
         runCode: { attempt: () => attempt, engineFixtures: Object.keys(target.engine?.fixtures ?? {}) },
+        locators: target.locators,
       });
       const live: LiveSession = {
         kind: 'standalone',

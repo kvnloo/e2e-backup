@@ -1306,6 +1306,55 @@ describe('resolveConfig', () => {
     });
   });
 
+  describe('locators', () => {
+    const visibleOf = (raw: Partial<E2EConfig>) => resolve(raw).targets.map((target) => target.locators.visible);
+
+    it('keeps hidden matches unless visible is true in the config or on a target', () => {
+      expect(visibleOf({})).toEqual([false]);
+      expect(visibleOf({ locators: {} })).toEqual([false]);
+      expect(visibleOf({ locators: { visible: true } })).toEqual([true]);
+      expect(visibleOf({ targets: [{ ...WEB, locators: { visible: true } }] })).toEqual([true]);
+    });
+
+    it("uses a target's visible over the config's", () => {
+      const targets = [
+        { name: 'inherits', platform: 'web' },
+        { name: 'own', platform: 'web', locators: { visible: false } },
+        { name: 'empty', platform: 'web', locators: {} },
+      ];
+      expect(visibleOf({ targets, locators: { visible: true } })).toEqual([true, false, true]);
+    });
+
+    it('changes the digest only when visible is true, wherever it is set', () => {
+      const plain = resolve({}).configDigest;
+      expect(resolve({ locators: {} }).configDigest).toBe(plain);
+      expect(resolve({ locators: { visible: false } }).configDigest).toBe(plain);
+      expect(resolve({ targets: [{ ...WEB, locators: { visible: false } }] }).configDigest).toBe(plain);
+      const visible = resolve({ locators: { visible: true } }).configDigest;
+      expect(visible).not.toBe(plain);
+      expect(resolve({ targets: [{ ...WEB, locators: { visible: true } }] }).configDigest).toBe(visible);
+    });
+
+    it("refuses a value that isn't an object with a boolean visible, wherever it is set", () => {
+      const failure = (raw: unknown): unknown => {
+        try {
+          resolve(invalid(raw));
+        } catch (error) {
+          return error;
+        }
+        throw new Error('resolved');
+      };
+      expect(failure({ locators: true })).toMatchObject({ code: 'INVALID_CONFIG', message: 'locators must be an object, got true' });
+      expect(failure({ locators: { visible: 'yes' } })).toMatchObject({ code: 'INVALID_CONFIG', message: 'locators.visible must be a boolean, got "yes"' });
+      expect(failure({ locators: { visble: true } })).toMatchObject({ code: 'INVALID_CONFIG', message: expect.stringContaining('locators has unknown key "visble"') });
+      expect(failure({ targets: [{ ...WEB, locators: { visible: 1 } }] })).toMatchObject({
+        code: 'INVALID_CONFIG',
+        message: 'target "web" locators.visible must be a boolean, got 1',
+      });
+      expect(failure({ targets: [{ ...WEB, locators: [] }] })).toMatchObject({ code: 'INVALID_CONFIG', message: 'target "web" locators must be an object, got an array' });
+    });
+  });
+
   describe('output', () => {
     /** The message `resolve` throws for `raw` and `cli`. */
     const refusal = (raw: Partial<E2EConfig>, cli: { output?: string } = {}): string => {

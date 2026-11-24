@@ -227,7 +227,8 @@ Then each test, one at a time:
   selectors list the edits most ports need: e2e matches whole strings and
   fails on several matches where the old runner took the first. When a
   query also matches a hidden copy (another layout's), add
-  `{ visible: true }`. When two visible nodes match, such as a second
+  `{ visible: true }`, or set `locators: { visible: true }` in the config
+  when most queries need it. When two visible nodes match, such as a second
   toast over the first, pick the one the step means.
 - A sleep or fixed wait becomes `agent.waitFor` on the state it waited
   for (`agent.waitFor('the upload finished')`), or an assertion with a

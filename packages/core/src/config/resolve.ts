@@ -160,6 +160,7 @@ const TOP_LEVEL_KEYS = new Set([
   'output',
   'trace',
   'video',
+  'locators',
   'reporters',
   'agents',
   'filters',
@@ -245,9 +246,11 @@ export function resolveProjectConfig(
   }
 
   const recordings = runRecordings(raw, cli);
+  const visible = locatorsVisible(raw.locators, 'locators');
   const targets = resolveTargets(raw.targets, options.projectRoot, (target, where) => ({
     trace: targetRecording(recordings.trace, target.trace, `${where} trace`, 'trace'),
     video: targetRecording(recordings.video, target.video, `${where} video`, 'video'),
+    locators: { visible: locatorsVisible(target.locators, `${where} locators`) ?? visible ?? false },
   }));
   const tests = normalizeTests(raw.tests, options.projectRoot);
 
@@ -686,6 +689,19 @@ function targetRecording(run: RunRecording, own: unknown, where: string, kind: R
   return { mode: run.fallback, source: 'default' };
 }
 
+/** Checks a `locators` object and returns its `visible`, or undefined when it isn't set. */
+function locatorsVisible(value: unknown, where: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    throw new ConfigurationError('INVALID_CONFIG', `${where} must be an object, got ${describeValue(value)}`);
+  }
+  rejectUnknownKeys(where, value, ['visible']);
+  const { visible } = value;
+  if (visible !== undefined && typeof visible !== 'boolean') {
+    throw new ConfigurationError('INVALID_CONFIG', `${where}.visible must be a boolean, got ${describeValue(visible)}`);
+  }
+  return visible;
+}
 
 function isArtifactStore(value: unknown): value is ArtifactStore {
   return (
@@ -1010,6 +1026,9 @@ function computeConfigDigest(
   // one leaves the replays valid, like a reporter.
   // `targets` digest by declaration below and never enter the clone: an
   // engine holds `secrets.get()` handles, which refuse to serialize.
+  // The top-level `locators` is left out of the clone. It's digested with
+  // each resolved target instead, so a default gives the same digest
+  // whether it's set on the config or on a target.
   const {
     failOnSkippedFailure: _failOnSkippedFailure,
     maxDuration: _maxDuration,
@@ -1018,6 +1037,7 @@ function computeConfigDigest(
     output: _output,
     trace: _trace,
     video: _video,
+    locators: _locators,
     targets: _targets,
     credentials: _credentials,
     secrets: _secrets,

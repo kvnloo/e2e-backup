@@ -22,7 +22,7 @@ import { prepareObservation } from '@e2e-dev/core/lib/agent/observation';
 import { createEngineSession } from '@e2e-dev/core/lib/engine/session';
 import { Deadline } from '@e2e-dev/core/lib/internal/time';
 import { LocatorEngine } from '@e2e-dev/core/lib/locator/engine';
-import { createScreen } from '@e2e-dev/core/lib/locator/screen';
+import { createScreen, type ScreenContext } from '@e2e-dev/core/lib/locator/screen';
 import { AttemptBudget } from '@e2e-dev/core/lib/run/budget';
 import { StepRecorder } from '@e2e-dev/core/lib/run/steps';
 import type { Screen } from '@e2e-dev/core/lib/types';
@@ -42,6 +42,8 @@ export interface ScreenOverOptions {
   readonly tapModifiers?: boolean;
   /** Action and assertion timeout in milliseconds. */
   readonly timeoutMs: number;
+  /** The target's query defaults (`visible: false` if unset). */
+  readonly locators?: ScreenContext['locators'];
 }
 
 /** A screen and the recorder of its steps over the engine `options` describe. */
@@ -79,6 +81,7 @@ export function screenOver(options: ScreenOverOptions): { screen: Screen; steps:
     secrets: { resolve: async () => 'plaintext' },
     renderTree: (observation) =>
       prepareObservation(observation, { redact: (text) => text, redactCut: (text) => text, maxBytes: 64_000 }).text,
+    locators: options.locators ?? { visible: false },
   });
   return { screen, steps };
 }

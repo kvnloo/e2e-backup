@@ -120,6 +120,7 @@ describe('invokeTool', () => {
       attemptDir: '/project/.e2e/results/attempt',
       recorder: undefined,
       warn: () => undefined,
+      locators: { visible: false },
     });
     await expect(invokeTool('observe', tools['observe']!, { verbose: true }, extra)).rejects.toMatchObject({
       code: 'INVALID_ARGUMENT',

@@ -23,6 +23,15 @@ describe('locateQuery', () => {
     expect(locateQuery({ testId: 'items' }).code).toBe('screen.getByTestId("items")');
   });
 
+  it("matches only visible nodes under the target's visible default, with the same screen call as in a test", () => {
+    for (const args of [{ text: 'Save' }, { label: 'Email' }, { placeholder: 'you@example.test' }, { testId: 'items' }]) {
+      const query = locateQuery(args, true);
+      expect(query.expression).toMatchObject({ query: { visible: true } });
+      expect(query.code).toBe(locateQuery(args).code);
+      expect(locateQuery(args).expression).not.toHaveProperty('query.visible');
+    }
+  });
+
   it('rejects zero or several query kinds and a name without a role', () => {
     expect(() => locateQuery({})).toThrow(/exactly one of role, text, label, placeholder, or testId/);
     expect(() => locateQuery({ role: 'button', text: 'Save' })).toThrow(/exactly one/);

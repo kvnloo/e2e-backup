@@ -43,8 +43,9 @@ after whitespace normalization: `getByRole('button', 'Save')` does not match
 `Save changes`. `{ exact: false }` makes it a case-insensitive substring
 match, and a `RegExp` matches as written.
 
-Every query accepts `visible: true`; see
-[Hidden duplicates](#hidden-duplicates).
+Every query accepts `visible: true`. See
+[Hidden duplicates](#hidden-duplicates) for what it does and how to make it
+the default.
 
 #### `getByRole`
 
@@ -262,6 +263,25 @@ await expect(screen.getByText('No memories yet', { visible: true })).toBeVisible
 await screen.getByPlaceholder('Search memory...', { visible: true }).fill('launch');
 await screen.getByTestId('memory-list', { visible: true }).getByRole('listitem').first().tap();
 ```
+
+On a native app, earlier screens can stay mounted behind the current one,
+so most queries need `visible: true`. It can be made the default with
+[`locators: { visible: true }`](/reference/config#locators) in the config or
+on a target:
+
+```ts title="e2e.config.ts"
+export default {
+  targets: [{ engine: mobile({ platform: 'ios' }), app: { bundleId: 'com.example.app' } }],
+  locators: { visible: true },
+} satisfies E2EConfig;
+```
+
+With it set:
+
+- Hidden nodes are skipped by queries called without `visible`.
+- Hidden nodes are kept by a query called with `{ visible: false }`.
+
+`getByRole` isn't affected, since it never matches a hidden node.
 
 `visible` uses the same visibility check as `toBeVisible()`, `isVisible()`,
 and `waitFor()`: what renders, as Playwright reads it.
@@ -1355,7 +1375,8 @@ export interface TextMatchOptions {
    * When true, nodes the platform reports as hidden are excluded before the
    * exactly-one rule is applied, so a visible node with a hidden twin (a
    * prerendered copy kept after navigation, a closed drawer) still resolves.
-   * Omitted or false keeps every match, hidden ones included.
+   * When false, every match is kept, hidden ones included. When omitted,
+   * the target's `locators.visible` is used, except by `getByRole`.
    */
   visible?: boolean;
 }
