@@ -1288,12 +1288,10 @@ Pointer actions use viewport coordinates when no semantic node is available.
 
 - `dragTo` ends at another point.
 - `swipe` starts a scroll gesture at the given point.
-- `swipeTo` is the one kind without a node form. It's the finger's path from
-  the point to `target`:
-  - a touch swipe on a device or an emulated touchscreen
-  - a pointer drag on any other document platform
-
-  Unlike `dragTo`, there's no hold before the drag.
+- `swipeTo` is the one kind with no node form: the finger's path from the
+  point to `target`, a touch swipe on a device and a pointer drag on a
+  document platform. It differs from `dragTo`, where a platform holds before
+  it drags.
 
 ```ts
 export type PointerAction =

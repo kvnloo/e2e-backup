@@ -76,7 +76,7 @@ web({ viewport: { width: 390, height: 844 }, locale: 'de-DE' });
 | Throws | When |
 | --- | --- |
 | `INVALID_CONFIG` | An option `web()` does not take (`url` or any other app key included), or an unknown key inside `connect` or `basicAuth`. The message names the nearest known key for a likely typo (`viewprt` is `viewport`), else every key. |
-| `INVALID_CONFIG` | `headers`, `basicAuth`, `hasTouch`, `userAgent`, `locale`, or `timezoneId` on a [persistent context](#recovering-a-cdp-transport) (`connect.reconnectEndpoint`, or a provider with `scope: 'attempt'`). |
+| `INVALID_CONFIG` | `headers`, `basicAuth`, `hasTouch: true`, `userAgent`, `locale`, or `timezoneId` on a [persistent context](#recovering-a-cdp-transport) (`connect.reconnectEndpoint`, or a provider with `scope: 'attempt'`). |
 
 #### `browser`
 
@@ -263,9 +263,9 @@ To reuse one sign-in across files, keep isolated contexts (no
 A saved session carries it, not a shared browser.
 
 <Note>
-A persistent context does not support `headers`, `basicAuth`, `hasTouch`,
-`userAgent`, `locale`, `timezoneId` (see [Options](#options)),
-`app.clearState`, or session state capture and restore. `app.clearState` fails with
+A persistent context does not support `headers`, `basicAuth`, `hasTouch: true`, `userAgent`,
+`locale`, `timezoneId` (see [Options](#options)), `app.clearState`, or
+session state capture and restore. `app.clearState` fails with
 `UNSUPPORTED_CAPABILITY`. `app.restart` remains available.
 </Note>
 
@@ -375,20 +375,15 @@ handlers. It's the same as Playwright's `hasTouch` context option.
 web({ hasTouch: true }); // default: false
 ```
 
-- A `tap` on a node or at a point (`screen.tapAt`, `tap({ position })`) is
-  sent as `touchstart` and `touchend`, followed by a click unless the touch
-  is cancelled.
-- A swipe along a path (`screen.swipe({ from, to })`) is sent as
-  `touchstart`, `touchmove`, and `touchend` on Chromium. It's a fast flick
-  when `duration` isn't set, so a scrolling page can keep moving after the
-  call returns. Set `duration` for a slower swipe.
-- Other actions, such as `doubleTap`, `longPress`, and a directional swipe,
-  are still sent as mouse and keyboard input.
+- A tap on a node or at a point (`screen.tapAt`, `tap({ position })`) sends
+  `touchstart` and `touchend`. The browser can then fire a `click`.
+- A tap returns before a navigation it starts commits. To wait for the next
+  page, use [`toHaveURL`](/reference/expect#tohaveurl).
+- `hasTouch` changes only taps. Double taps and long presses use the mouse.
 
 | Throws | When |
 | --- | --- |
 | `INVALID_CONFIG` | A value that is not a boolean. |
-| `UNSUPPORTED_CAPABILITY` | A swipe along a path in Firefox or WebKit, since touch moves can't be sent there. |
 
 #### `userAgent`
 
@@ -1293,9 +1288,9 @@ export interface WebOptions {
    * app with touch handlers. It's the same as Playwright's `hasTouch` context
    * option. Defaults to `false`.
    *
-   * - A `tap` is sent as a touch instead of a click.
-   * - A swipe along a path (`screen.swipe({ from, to })`) is sent as touch
-   *   events on Chromium. It's `UNSUPPORTED_CAPABILITY` in Firefox and WebKit.
+   * A tap sends `touchstart` and `touchend`. The browser can then fire a
+   * `click`. A tap returns before a navigation it starts commits.
+   * `hasTouch` changes only taps. Double taps and long presses use the mouse.
    *
    * `hasTouch: true` on a persistent context (`connect.reconnectEndpoint`, or
    * a provider with `scope: 'attempt'`) is `INVALID_CONFIG`.

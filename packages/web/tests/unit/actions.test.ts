@@ -401,20 +401,7 @@ describe('dispatchPointerAction', () => {
       dblclick: async (x: number, y: number) => { calls.push(`dblclick ${x},${y}`); },
       wheel: async (dx: number, dy: number) => { calls.push(`wheel ${dx},${dy}`); },
     };
-    const touchscreen = { tap: async (x: number, y: number) => { calls.push(`touch tap ${x},${y}`); } };
-    const session = {
-      send: async (_method: string, event: { type: string; touchPoints: { x: number; y: number }[] }) => {
-        calls.push(`${event.type}${event.touchPoints.map(({ x, y }) => ` ${x},${y}`).join('')}`);
-      },
-      detach: async () => { calls.push('detach'); },
-    };
-    const page = {
-      mouse,
-      touchscreen,
-      context: () => ({ newCDPSession: async () => session }),
-      evaluate: async () => { calls.push('frame'); },
-      viewportSize: () => ({ width: 800, height: 600 }),
-    } as unknown as Page;
+    const page = { mouse, evaluate: async () => { calls.push('frame'); }, viewportSize: () => ({ width: 800, height: 600 }) } as unknown as Page;
     return { page, calls };
   }
 
@@ -478,36 +465,6 @@ describe('dispatchPointerAction', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('taps with the touchscreen when the context has one', async () => {
-    const { page, calls } = stubPage();
-    await dispatchPointerAction(page, { x: 10.4, y: 20.5 }, { kind: 'tap' }, undefined, 'firefox');
-    expect(calls).toEqual(['touch tap 10,21']);
-  });
-
-  it('swipes along a path as a finger drag over CDP on chromium with a touchscreen', async () => {
-    const { page, calls } = stubPage();
-    await dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipeTo', target: { x: 110, y: 20 } }, undefined, 'chromium');
-    expect(calls).toEqual(['touchStart 10,20', 'touchMove 60,20', 'touchMove 110,20', 'touchEnd', 'detach']);
-  });
-
-  it("doesn't send a touch when the operation is cancelled while the CDP session opens", async () => {
-    const { page, calls } = stubPage();
-    const controller = new AbortController();
-    controller.abort(new Error('cancelled'));
-    await expect(
-      dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipeTo', target: { x: 110, y: 20 } }, controller.signal, 'chromium'),
-    ).rejects.toThrow('cancelled');
-    expect(calls).toEqual(['detach']);
-  });
-
-  it.each(['firefox', 'webkit'] as const)('refuses a swipe along a path with a touchscreen on %s before sending any input', async (browser) => {
-    const { page, calls } = stubPage();
-    await expect(
-      dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipeTo', target: { x: 110, y: 20 } }, undefined, browser),
-    ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY', message: expect.stringContaining(`touch moves can't be sent in ${browser}`) });
-    expect(calls).toEqual([]);
   });
 
   it('swipes in a direction as a wheel gesture over the point, sized by the viewport', async () => {

@@ -4,7 +4,6 @@ import type { ElementHandle, Page } from 'playwright-core';
 import { Deadline, EngineError, pollCondition, TestError, type KeyModifier, type LocatorAction, type NodeRef, type PointerAction, type ViewportPoint } from '@e2e-dev/core/engine';
 import {
   asActionable,
-  cdpTouchscreen,
   isClassified,
   isNavigationRace,
   isPwTimeout,
@@ -21,7 +20,6 @@ import {
   type ActionTarget,
 } from './support.ts';
 import type { ConnectionBudget } from './operation-budget.ts';
-import type { BrowserName } from './browser-connection.ts';
 
 /** How long a long press holds the button when the action names no duration. */
 const DEFAULT_LONG_PRESS_MS = 500;
@@ -280,8 +278,8 @@ function isFileInput(element: ElementHandle<Element>): Promise<boolean> {
 /**
  * Dispatches one deterministic locator action onto a Playwright target with the
  * platform's own actionability checks. `lookup` resolves the second ref of a
- * drag. Everything else needs only the target. A tap is sent as a touch
- * instead of a click when `touch` is set.
+ * drag; everything else needs only the target. A tap uses the touchscreen
+ * when `touch` is set.
  */
 export async function dispatchLocatorAction(
   target: ActionTarget,
@@ -401,23 +399,21 @@ export async function dispatchLocatorAction(
  * Dispatches one pointer action at a viewport point with nothing resolved
  * behind it: no actionability wait, because there is no element to wait on,
  * and the page decides what the gesture lands on, as it does for a person.
- * Pass the browser's name as `touch` when the context has a touchscreen. Then
- * a tap is sent as a touch, and a swipe along a path as a finger drag
- * (Chromium only).
+ * A tap uses the touchscreen when `touch` is set.
  */
 export async function dispatchPointerAction(
   page: Page,
   at: ViewportPoint,
   action: PointerAction,
   signal?: AbortSignal,
-  touch?: BrowserName,
+  touch = false,
 ): Promise<void> {
   const { mouse } = page;
   const point = nearestPixel(at);
   switch (action.kind) {
     case 'tap':
-      if (touch === undefined) await mouse.click(point.x, point.y);
-      else await page.touchscreen.tap(point.x, point.y);
+      if (touch) await page.touchscreen.tap(point.x, point.y);
+      else await mouse.click(point.x, point.y);
       return;
     case 'doubleTap':
       await mouse.dblclick(point.x, point.y);
@@ -434,27 +430,10 @@ export async function dispatchPointerAction(
     case 'dragTo':
       await performPointDrag(mouse, point, action.target, undefined, signal);
       return;
-    case 'swipeTo': {
-      // A swipe along a path is a pointer drag on a document platform, and a finger drag on a touchscreen.
-      if (touch === undefined) {
-        await performPointDrag(mouse, point, action.target, action.durationMs, signal);
-        return;
-      }
-      if (touch !== 'chromium') {
-        throw new EngineError('UNSUPPORTED_CAPABILITY', `a swipe along a path with web({ hasTouch: true }) is only supported in chromium (touch moves can't be sent in ${touch})`, {
-          retryable: false,
-        });
-      }
-      const session = await page.context().newCDPSession(page);
-      try {
-        signal?.throwIfAborted();
-        await performPointDrag(cdpTouchscreen(session), point, action.target, action.durationMs, signal);
-      } finally {
-        // The swipe can close its tab, so the detach can fail. That failure must not replace the drag's error.
-        void session.detach().catch(() => undefined);
-      }
+    case 'swipeTo':
+      // A swipe along a path is a pointer drag on a document platform.
+      await performPointDrag(mouse, point, action.target, action.durationMs, signal);
       return;
-    }
     case 'swipe':
       // The pointer moves to the point first so the scrollable under it receives the wheel.
       await mouse.move(point.x, point.y);

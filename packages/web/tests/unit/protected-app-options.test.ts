@@ -112,7 +112,10 @@ describe('web({ testIdAttribute })', () => {
 describe('web({ hasTouch })', () => {
   it('rejects a value that is not a boolean as INVALID_CONFIG', () => {
     expect(() => web({ hasTouch: 'yes' as unknown as boolean })).toThrow(
-      expect.objectContaining({ code: 'INVALID_CONFIG', message: 'web({ hasTouch }) must be a boolean, got "yes"' }),
+      expect.objectContaining({ code: 'INVALID_CONFIG', message: 'web({ hasTouch }) must be a boolean, got a string' }),
+    );
+    expect(() => web({ hasTouch: 1n as unknown as boolean })).toThrow(
+      expect.objectContaining({ code: 'INVALID_CONFIG', message: 'web({ hasTouch }) must be a boolean, got a bigint' }),
     );
   });
 });

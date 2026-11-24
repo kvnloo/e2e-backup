@@ -278,7 +278,7 @@ purpose. Use the workaround, or keep the test in Playwright.
 
 | Playwright | Use today |
 | --- | --- |
-| `devices['iPhone 15']`, `isMobile`, `deviceScaleFactor` | `web({ viewport, userAgent, hasTouch })`, or a mobile target for a real device |
+| `devices['iPhone 15']`, `isMobile`, `deviceScaleFactor` | `web({ viewport, userAgent, hasTouch })`; a mobile target for a simulator, emulator, or device |
 | `waitForURL(glob)`, `waitForFunction()` | A `RegExp`; `expect.poll` over `browser.evaluate` |
 | `waitForResponse(predicate)`, `waitForRequest()`, `page.on('request')`, `response.ok()` | `browser.waitForResponse(pattern)`, or `{ method, url }` to filter on the request's method, then check the response in the test, `status` for `ok()`. For requests, a `browser.route` handler that records `route.request`, then calls `route.fallback()` |
 | `route.fulfill({ response })`, `route.abort(code)`, `route.fetch(options)`, `request.postDataJSON()` | `status`, `headers`, and `body` from `route.fetch()`; `JSON.parse(route.request.postData)` |

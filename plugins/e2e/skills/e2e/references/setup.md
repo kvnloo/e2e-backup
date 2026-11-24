@@ -242,7 +242,7 @@ start a script that brings them up and serves the app.
 | `connect` | `{ cdpEndpoint }` attaches to a remote Chromium over CDP; `cdpEndpoint` is required, and both it and `reconnectEndpoint` are resolvers `(signal) => url` or `(signal) => ({ endpoint, headers })` for authenticated CDP connections, not strings, else `INVALID_CONFIG` at load. With `reconnectEndpoint` it rides one persistent default context, needs a fresh browser from `cdpEndpoint` every attempt, and reconnects only to the original browser and page. |
 | `headers` | Sent to the app's origin only (scheme, host, and port of `app.url`; Vercel's `x-vercel-protection-bypass`, ngrok's `ngrok-skip-browser-warning`), `agent.act` included; `credentialOrigins: ['https://api.example.com']` adds exact origins for `headers` and `basicAuth`. A request keeps them through its redirects, to any origin. Disables the browser HTTP cache and service workers. |
 | `basicAuth` | `{ username, password }` for a `401` challenge from the app's origin, or one `credentialOrigins` lists (a redirect to `www` or `https:` is another origin; WebKit answers any origin when one is on a default port or an IPv6 host); `password` may be `secrets.get('name')`, resolved per attempt and redacted like any secret, the base64 `Authorization` credential too. |
-| `hasTouch` | Touchscreen emulation, off by default. A `tap` is sent as a touch, and `screen.swipe({ from, to })` as a finger drag on Chromium (`UNSUPPORTED_CAPABILITY` in Firefox and WebKit). |
+| `hasTouch` | Touchscreen emulation, off by default. A tap sends `touchstart` and `touchend`, and the browser can then fire a `click`. Double taps and long presses use the mouse. |
 | `userAgent` | The `User-Agent` every attempt sends and `navigator.userAgent` reports. |
 | `locale`, `timezoneId` | The language (`'de-DE'`: `navigator.language`, `Intl`, `Accept-Language`) and IANA time zone (`'Europe/Berlin'`) every attempt runs in. |
 | `colorScheme`, `reducedMotion` | The `prefers-color-scheme` (`'light'`, `'dark'`, `'no-preference'`) and `prefers-reduced-motion` (`'reduce'`, `'no-preference'`) every page reports to its `@media` rules and `matchMedia`, from first paint. |
@@ -256,7 +256,7 @@ start a script that brings them up and serves the app.
   the handle (a reference, not the value) in `app.command.env`, a template
   literal, or `context`; read those from `process.env`.
 - `reconnectEndpoint` or an attempt-scoped provider rides one persistent
-  context without `headers`, `basicAuth`, `hasTouch`, `userAgent`, `locale`, `timezoneId`, `app.clearState()`, or
+  context without `headers`, `basicAuth`, `hasTouch: true`, `userAgent`, `locale`, `timezoneId`, `app.clearState()`, or
   session state. Recovery never repeats a dispatched operation; exhausting
   the budget is `OPERATION_TIMEOUT`. Without `reconnectEndpoint` a dropped
   connection is reacquired at the next attempt.

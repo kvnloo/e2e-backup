@@ -140,7 +140,7 @@ export interface WebConnectOptions {
    * same browser after a transport drop. Called once before the next
    * operation, within its budget. The original browser and page must survive.
    * Dispatched operations are never retried. The host owns browser cleanup.
-   * Context replacement, headers, basicAuth, hasTouch, userAgent, locale, and timezoneId are unavailable in this mode.
+   * Context replacement, headers, basicAuth, `hasTouch: true`, userAgent, locale, and timezoneId are unavailable in this mode.
    */
   readonly reconnectEndpoint?: CdpEndpointResolver;
 }
@@ -245,9 +245,9 @@ export interface WebOptions {
    * app with touch handlers. It's the same as Playwright's `hasTouch` context
    * option. Defaults to `false`.
    *
-   * - A `tap` is sent as a touch instead of a click.
-   * - A swipe along a path (`screen.swipe({ from, to })`) is sent as touch
-   *   events on Chromium. It's `UNSUPPORTED_CAPABILITY` in Firefox and WebKit.
+   * A tap sends `touchstart` and `touchend`. The browser can then fire a
+   * `click`. A tap returns before a navigation it starts commits.
+   * `hasTouch` changes only taps. Double taps and long presses use the mouse.
    *
    * `hasTouch: true` on a persistent context (`connect.reconnectEndpoint`, or
    * a provider with `scope: 'attempt'`) is `INVALID_CONFIG`.
@@ -1105,7 +1105,7 @@ export class PlaywrightSurface {
   performAt(point: ViewportPoint, action: PointerAction, operation: OperationContext): Promise<void> {
     return this.acted(operation, this.guard(operation, `${action.kind} at point`, (currentOperation) => {
       this.requireSession().requireObservation();
-      return dispatchPointerAction(this.requirePage(), point, action, currentOperation.signal, this.hasTouch ? this.browserName : undefined);
+      return dispatchPointerAction(this.requirePage(), point, action, currentOperation.signal, this.hasTouch);
     }, classifyInputError));
   }
 

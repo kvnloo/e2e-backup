@@ -2,7 +2,7 @@
 
 import { statSync, type Stats } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
-import type { CDPSession, ElementHandle, FrameLocator, Locator as PwLocator, Mouse, Page } from 'playwright-core';
+import type { ElementHandle, FrameLocator, Locator as PwLocator, Mouse, Page } from 'playwright-core';
 import { EngineError, withinCleanupBudget, type EngineCleanupContext, type Momentum, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
 import { ConfigurationError, InfrastructureError, TestError } from '@e2e-dev/core/engine';
 
@@ -479,37 +479,9 @@ export function nearestPixel(point: ViewportPoint): ViewportPoint {
   return { x: Math.round(point.x), y: Math.round(point.y) };
 }
 
-/**
- * Returns Chromium's touchscreen with the mouse's `move`, `down`, and `up`, so
- * a finger can be dragged with `performPointDrag`. Each call is sent as
- * `Input.dispatchTouchEvent` over CDP, since Playwright's touchscreen only
- * has `tap`.
- *
- * The finger is placed by a move before `down`, and dragged by a move after
- * it.
- */
-export function cdpTouchscreen(session: CDPSession): Pick<Mouse, 'move' | 'down' | 'up'> {
-  let at = { x: 0, y: 0 };
-  let touching = false;
-  return {
-    move: async (x, y) => {
-      at = { x, y };
-      if (touching) await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [at] });
-    },
-    down: async () => {
-      touching = true;
-      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] });
-    },
-    up: async () => {
-      touching = false;
-      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    },
-  };
-}
-
 /** A pointer drag from one viewport point to another, on whole pixels, with an intermediate move so drag handlers see motion; paced over `durationMs` when given. */
 export async function performPointDrag(
-  mouse: Pick<Mouse, 'move' | 'down' | 'up'>,
+  mouse: Mouse,
   start: ViewportPoint,
   end: ViewportPoint,
   durationMs?: number,

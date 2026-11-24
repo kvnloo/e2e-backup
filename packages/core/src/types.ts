@@ -522,12 +522,7 @@ export interface SwipeOptions {
   duration?: never;
 }
 
-/**
- * A swipe along a path between two viewport points. The gesture is:
- *
- * - a touch swipe on a device or an emulated touchscreen
- * - a pointer drag on any other document platform
- */
+/** A swipe along a path between two viewport points: a touch swipe on a device, a pointer drag on a document platform. */
 export interface SwipePathOptions {
   /** Where the finger goes down. */
   from: ScreenPoint;

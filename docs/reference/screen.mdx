@@ -482,7 +482,7 @@ await screen.swipe({ from: { x: '50%', y: '80%' }, to: { x: '50%', y: '20%' } })
   one. The engine decides how far each carries.
 
 `{ from, to, duration? }` is a swipe along a path between two viewport
-points.
+points: a touch swipe on a device, a pointer drag on a document platform.
 Use it to reveal a row action, dismiss a sheet, or drag a card between
 columns.
 
@@ -491,12 +491,6 @@ columns.
 - `duration` is how long the gesture takes, an integer from 16 through
   10000 ms. Omitted, it is the engine's default.
 
-The gesture is a touch swipe or a pointer drag:
-
-- A touch swipe on a device, and on Chromium with
-  [`web({ hasTouch: true })`](/reference/web#hastouch).
-- A pointer drag on a web target without `hasTouch`.
-
 Uses `config.actionTimeout` and takes no `timeout` option.
 
 | Throws | When |
@@ -504,7 +498,6 @@ Uses `config.actionTimeout` and takes no `timeout` option.
 | `ACTION_FAILED` | The gesture is rejected. |
 | `INVALID_ARGUMENT` | A mix of the two shapes, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
 | `UNSUPPORTED_CAPABILITY` | The engine does not list `swipe` in its actions (a direction) or `swipeTo` in its pointer actions (a path). |
-| `UNSUPPORTED_CAPABILITY` | A path on a `web({ hasTouch: true })` target in Firefox or WebKit. |
 
 #### `screen.scrollUntilVisible`
 
@@ -1416,12 +1409,7 @@ export interface SwipeOptions {
   duration?: never;
 }
 
-/**
- * A swipe along a path between two viewport points. The gesture is:
- *
- * - a touch swipe on a device or an emulated touchscreen
- * - a pointer drag on any other document platform
- */
+/** A swipe along a path between two viewport points: a touch swipe on a device, a pointer drag on a document platform. */
 export interface SwipePathOptions {
   /** Where the finger goes down. */
   from: ScreenPoint;

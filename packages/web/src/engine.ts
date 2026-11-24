@@ -96,7 +96,7 @@ export function web(options: WebOptions = {}): WebEngine {
   if (options.testIdAttribute !== undefined) validateTestIdAttribute(options.testIdAttribute);
   if (options.chromiumSandbox !== undefined) validateChromiumSandbox(options.chromiumSandbox);
   if (options.hasTouch !== undefined && typeof options.hasTouch !== 'boolean') {
-    throw new ConfigurationError('INVALID_CONFIG', `web({ hasTouch }) must be a boolean, got ${JSON.stringify(options.hasTouch)}`);
+    throw new ConfigurationError('INVALID_CONFIG', `web({ hasTouch }) must be a boolean, got ${kindOf(options.hasTouch)}`);
   }
   if (options.userAgent !== undefined) validateUserAgent(options.userAgent, options.headers);
   if (options.locale !== undefined) validateLocale(options.locale, options.headers);

@@ -1,15 +1,17 @@
-/** Touch emulation in a real Chromium. A tap is sent as a touch and a swipe along a path as a finger drag when `web({ hasTouch: true })` is set. */
+/** Touch emulation in a real Chromium. A tap sends touch events when `web({ hasTouch: true })` is set. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import type { OperationContext, SemanticNode } from '@e2e-dev/core/engine';
+import type { LocatorAction, OperationContext } from '@e2e-dev/core/engine';
 import { PlaywrightSurface } from '../../src/surface.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 const LISTEN = `<script>
   window.events = [];
-  for (const type of ['touchstart', 'touchmove', 'touchend', 'click']) document.addEventListener(type, (event) => window.events.push(type));
+  for (const type of ['touchstart', 'touchend', 'click']) {
+    document.addEventListener(type, (event) => window.events.push(event.shiftKey ? type + '+shift' : type));
+  }
 </script>`;
 
 const PAGE = `<button style="width:200px;height:100px">Go</button>${LISTEN}`;
@@ -23,43 +25,29 @@ const projectRoot = mkdtempSync(path.join(tmpdir(), 'e2e-touch-'));
 
 afterAll(() => rmSync(projectRoot, { recursive: true, force: true }));
 
-/** Runs `act` on a fresh page of a surface built with `hasTouch`, and returns the types of the events dispatched on the page. */
+/** Runs `act` on a page of a surface built with `hasTouch`, and returns the types of the events dispatched on the page `act` leaves. */
 async function eventsOf(hasTouch: boolean, act: (surface: PlaywrightSurface) => Promise<void>, content = PAGE): Promise<string[]> {
   const surface = new PlaywrightSurface({ hasTouch });
   try {
     await surface.init({ runId: 'touch', targetName: 'web', projectRoot, app: {}, env: {}, headed: false, workerSlot: 0, signal, log: () => undefined });
     await surface.startAttempt({ attemptId: 'a', artifactsDir: projectRoot, signal, resolveSecret: noSecrets, ...ignoreTrace });
-    const page = await surface.ensurePage();
-    await page.setContent(content);
+    await (await surface.ensurePage()).setContent(content);
     await act(surface);
-    return await page.evaluate(() => [
-      ...(window as unknown as { events: string[] }).events,
-      ...(document.querySelector('input')?.checked === true ? ['checked'] : []),
-    ]);
+    return await (await surface.ensurePage()).evaluate(() => (window as unknown as { events: string[] }).events);
   } finally {
     await surface.endAttempt({ signal, timeoutMs: 10_000 });
     await surface.dispose({ signal, timeoutMs: 10_000 });
   }
 }
 
-/** Returns the first node of `role` in a tree, depth first. */
-function findRole(node: SemanticNode, role: string): SemanticNode | undefined {
-  if (node.role === role) return node;
-  for (const child of node.children ?? []) {
-    const found = findRole(child, role);
-    if (found !== undefined) return found;
-  }
-  return undefined;
+/** Performs `action` on the first node of `role` the surface locates. */
+async function performOn(surface: PlaywrightSurface, role: string, action: LocatorAction = { kind: 'tap' }): Promise<void> {
+  const [node] = await surface.locate({ kind: 'query', query: { kind: 'role', value: { kind: 'string', value: role, exact: true } } }, operation());
+  if (node === undefined) throw new Error(`no ${role} was located`);
+  await surface.perform(node.ref, action, operation());
 }
 
-/** Taps the first node of `role` in an observation. */
-async function tapFirst(surface: PlaywrightSurface, role: string): Promise<void> {
-  const node = findRole((await surface.observe(operation())).root, role);
-  if (node === undefined) throw new Error(`the observation doesn't have a ${role}`);
-  await surface.perform(node.ref, { kind: 'tap' }, operation());
-}
-
-const tapButton = (surface: PlaywrightSurface) => tapFirst(surface, 'button');
+const tapButton = (surface: PlaywrightSurface) => performOn(surface, 'button');
 
 describe('web({ hasTouch })', () => {
   it('taps a node with touch events followed by a click', async () => {
@@ -67,7 +55,16 @@ describe('web({ hasTouch })', () => {
   });
 
   it("taps a checkbox that doesn't show a box through its label with touch events", async () => {
-    expect(await eventsOf(true, (surface) => tapFirst(surface, 'checkbox'), LABELLED)).toEqual(['touchstart', 'touchend', 'click', 'click', 'checked']);
+    const events = await eventsOf(true, async (surface) => {
+      await performOn(surface, 'checkbox');
+      expect(await (await surface.ensurePage()).isChecked('input')).toBe(true);
+    }, LABELLED);
+    expect(events.slice(0, 3)).toEqual(['touchstart', 'touchend', 'click']);
+  });
+
+  it('holds the modifiers of a touch tap for the click that follows it', async () => {
+    const events = await eventsOf(true, (surface) => performOn(surface, 'button', { kind: 'tap', modifiers: ['Shift'] }));
+    expect(events.at(-1)).toBe('click+shift');
   });
 
   it('taps a point with touch events', async () => {
@@ -78,12 +75,13 @@ describe('web({ hasTouch })', () => {
     expect(events).toEqual(['touchstart', 'touchend', 'click']);
   });
 
-  it('swipes along a path with touch moves on chromium', async () => {
+  it('keeps tapping with touch events after the context is replaced', async () => {
     const events = await eventsOf(true, async (surface) => {
-      await surface.observe(operation());
-      await surface.performAt({ x: 20, y: 50 }, { kind: 'swipeTo', target: { x: 180, y: 50 } }, operation());
+      await surface.reset(operation());
+      await (await surface.ensurePage()).setContent(PAGE);
+      await tapButton(surface);
     });
-    expect(events).toEqual(['touchstart', 'touchmove', 'touchmove', 'touchend']);
+    expect(events).toEqual(['touchstart', 'touchend', 'click']);
   });
 
   it('clicks without touch events by default', async () => {
