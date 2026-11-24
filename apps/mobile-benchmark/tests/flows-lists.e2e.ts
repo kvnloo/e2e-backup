@@ -30,7 +30,7 @@ test('gestures: long-press, then swipe left', async ({ app, device, screen }) =>
   await expect(screen.getByText('Step 2 of 3')).toBeVisible();
   // `direction` is the scroll direction: content to the right comes into
   // view when the finger moves left.
-  await screen.getByTestId('swipe-target').swipe({ direction: 'right', distance: 0.65, speed: 'fast' });
+  await screen.getByTestId('swipe-target').swipe({ direction: 'right', momentum: 'fast' });
   await expect(screen.getByText('Step 3 of 3')).toBeVisible();
 });
 

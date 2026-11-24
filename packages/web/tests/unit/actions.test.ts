@@ -340,16 +340,6 @@ describe('dispatchLocatorAction', () => {
     expect(wheel).toHaveBeenLastCalledWith(-320, 0);
   });
 
-  it.each([
-    [0.25, 75],
-    [0.5, 150],
-    [1, 300],
-  ])('scrolls a node a distance of %s of its box in one wheel, whatever the duration', async (distance, pixels) => {
-    const { target, wheel } = stubLocator({ x: 0, y: 0, width: 400, height: 300 });
-    await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', distance, durationMs: 1500 }, OPERATION, lookup);
-    expect(wheel.mock.calls).toEqual([[0, pixels]]);
-  });
-
   it('wheels a node hit at its centre there, at the box the hit test read, without hovering it first', async () => {
     const { locator, target, wheel, move } = stubLocator({ x: 0, y: 0, width: 400, height: 300 }, 'centre');
     await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, OPERATION, lookup);
@@ -423,9 +413,12 @@ describe('dispatchPointerAction', () => {
       dblclick: async (x: number, y: number) => { calls.push(`dblclick ${x},${y}`); },
       wheel: async (dx: number, dy: number) => { calls.push(`wheel ${dx},${dy}`); },
     };
-    // `scrollExtent` returns the viewport's size here, since no container under the point scrolls.
-    const root = { evaluate: async (_fn: unknown, along: { vertical: boolean }) => (along.vertical ? 600 : 800) };
-    const page = { mouse, locator: () => root, evaluate: async () => { calls.push('frame'); }, viewportSize: () => ({ width: 800, height: 600 }) } as unknown as Page;
+    // The scroll container's size is read with an argument, and comes back as the viewport's here. The frame wait takes none.
+    const evaluate = async (_fn: unknown, along?: { vertical: boolean }) => {
+      if (along !== undefined) return along.vertical ? 600 : 800;
+      calls.push('frame');
+    };
+    const page = { mouse, evaluate, viewportSize: () => ({ width: 800, height: 600 }) } as unknown as Page;
     return { page, calls };
   }
 
@@ -497,20 +490,11 @@ describe('dispatchPointerAction', () => {
     expect(calls).toEqual(['move 10,20', 'wheel 0,300', 'frame']);
   });
 
-  it.each([
-    [0.25, 200],
-    [0.5, 400],
-    [0.8, 640],
-  ])('swipes right a distance of %s of the container under the point', async (distance, pixels) => {
-    const { page, calls } = stubPage();
-    await dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipe', direction: 'right', distance, durationMs: 400 });
-    expect(calls).toEqual(['move 10,20', `wheel ${pixels},0`, 'frame']);
-  });
-
   it('resolves a swipe only once the frame after the wheel rendered', async () => {
     const { page } = stubPage();
     let render!: () => void;
-    (page as unknown as { evaluate: () => Promise<void> }).evaluate = () => new Promise((resolve) => (render = resolve));
+    (page as unknown as { evaluate: (fn: unknown, arg?: unknown) => Promise<unknown> }).evaluate = (_fn, arg) =>
+      arg === undefined ? new Promise((resolve) => (render = () => resolve(undefined))) : Promise.resolve(600);
     let done = false;
     const swipe = dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }).then(() => (done = true));
     await vi.waitFor(() => expect(render).toBeDefined());

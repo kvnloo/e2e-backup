@@ -6,7 +6,7 @@ import { isKeyModifier, KEY_MODIFIERS, SCROLL_STEP, type KeyModifier } from '../
 import type { LocatorAction, LocatorExpression, Observation, SemanticNode } from '../engine/surface.ts';
 import { locatorBrand } from '../internal/brands.ts';
 import { isSecret } from '../secrets.ts';
-import { TestError } from '../internal/errors.ts';
+import { TestError, asEngineError } from '../internal/errors.ts';
 import { isPercentage, requireFinitePoint } from '../internal/geometry.ts';
 import { isCheckable, isValueControl } from '../internal/roles.ts';
 import { isPlainObject, rejectUnknownOptions } from '../internal/options.ts';
@@ -266,6 +266,9 @@ class ScreenImpl implements Screen {
     const internals = this.ownLocator(target, 'scrollUntilVisible');
     rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'distance', 'speed', 'momentum', 'timeout']);
     const step = swipeAction('scrollUntilVisible', options?.direction ?? 'down', options, SCROLL_STEP);
+    // On a device, a step longer than one drag is split into drags of at most
+    // `SCROLL_STEP.distance` each.
+    const dragsMs = Math.ceil(step.distance / SCROLL_STEP.distance) * step.durationMs;
     const { engine } = this.context;
     // On `screen`, the scroll container under the screen's center scrolls. On
     // a locator, the node scrolls, so a scroll container pages without the
@@ -285,17 +288,15 @@ class ScreenImpl implements Screen {
           ...(cause === undefined ? {} : { cause }),
         });
       const reads = engine.reads(deadline);
-      let sampled = false;
       let stepped = false;
       for (;;) {
         let node: SemanticNode | null;
         try {
           ({ node } = await engine.tryRead(internals.expression, reads));
         } catch (cause) {
-          if (sampled && reads.cutOff(cause)) throw notVisible(cause);
+          if (stepped && reads.cutOff(cause)) throw notVisible(cause);
           throw cause;
         }
-        sampled = true;
         if (isNodeVisible(node)) {
           // After a step, a node more than a fifth of its container from the
           // middle is moved to the middle, clear of a sticky header or footer
@@ -304,8 +305,7 @@ class ScreenImpl implements Screen {
           if (stepped && engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView', center: true }, deadline);
           return;
         }
-        // A step isn't sent when its drag can't finish before the deadline.
-        if (deadline.remaining() <= step.durationMs) throw notVisible();
+        if (deadline.expired()) throw notVisible();
         try {
           await swipeStep(deadline);
           stepped = true;
@@ -317,6 +317,9 @@ class ScreenImpl implements Screen {
           if (deadline.expired() || (isOperationTimeout(cause) && deadline.remaining() < POLL_INTERVAL_MS)) {
             throw notVisible(cause);
           }
+          // A device refuses a step whose drags can't finish in the time left,
+          // before it sends any of them. That's the deadline as well.
+          if (asEngineError(cause)?.code === 'NOT_ACTIONABLE' && deadline.remaining() <= dragsMs) throw notVisible(cause);
           throw cause;
         }
       }

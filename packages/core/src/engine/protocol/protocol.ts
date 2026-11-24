@@ -14,7 +14,8 @@
  */
 
 import { E2EError, ConfigurationError, ERROR_CATEGORIES, InfrastructureError, TestError, asEngineError, isE2EError } from '../../internal/errors.ts';
-import { ENGINE_ERROR_CODES, EngineError, type EngineErrorCode, type EngineSpiVersion, type LocatorAction, type LocatorActionKind, type PointerActionKind } from '../contract.ts';
+import { upgradeSwipe } from '../../internal/swipe.ts';
+import { ENGINE_ERROR_CODES, EngineError, type EngineErrorCode, type EngineSpiVersion, type LocatorAction, type LocatorActionKind, type PointerAction, type PointerActionKind, type SwipeAction } from '../contract.ts';
 import type { Engine, EngineSnapshot } from '../index.ts';
 import { RPC_ERRORS, isRpcErrorObject, type RpcErrorObject } from './connection.ts';
 
@@ -190,11 +191,17 @@ export type WireSnapshot = Omit<EngineSnapshot, 'pixels'> & { readonly pixels?: 
 
 type FilePayloadAction = Extract<LocatorAction, { kind: 'setInputFilePayloads' }>;
 
+/** A swipe on the wire. A client older than `distance` sends `momentum` alone. */
+type WireSwipeAction = Omit<SwipeAction, 'distance' | 'durationMs'> & Partial<Pick<SwipeAction, 'distance' | 'durationMs'>>;
+
 /** Locator actions on the wire: file bytes, like snapshot pixels, cross as base64. */
-export type WireLocatorAction = Exclude<LocatorAction, FilePayloadAction> | {
+export type WireLocatorAction = Exclude<LocatorAction, FilePayloadAction | SwipeAction> | WireSwipeAction | {
   readonly kind: 'setInputFilePayloads';
   readonly files: readonly (Omit<FilePayloadAction['files'][number], 'buffer'> & { readonly buffer: string })[];
 };
+
+/** Pointer actions on the wire. */
+export type WirePointerAction = Exclude<PointerAction, SwipeAction> | WireSwipeAction;
 
 /** Encodes file payload bytes without changing other locator actions. */
 export function encodeLocatorAction(action: LocatorAction): WireLocatorAction {
@@ -202,10 +209,16 @@ export function encodeLocatorAction(action: LocatorAction): WireLocatorAction {
   return { ...action, files: action.files.map((file) => ({ ...file, buffer: Buffer.from(file.buffer.buffer, file.buffer.byteOffset, file.buffer.byteLength).toString('base64') })) };
 }
 
-/** Restores file payload bytes at the engine protocol boundary. */
+/** Restores file payload bytes, and an older client's swipe, at the engine protocol boundary. */
 export function decodeLocatorAction(action: WireLocatorAction): LocatorAction {
+  if (action.kind === 'swipe') return upgradeSwipe(action);
   if (action.kind !== 'setInputFilePayloads') return action;
   return { ...action, files: action.files.map((file) => ({ ...file, buffer: new Uint8Array(Buffer.from(file.buffer, 'base64')) })) };
+}
+
+/** Restores an older client's swipe at the engine protocol boundary. */
+export function decodePointerAction(action: WirePointerAction): PointerAction {
+  return action.kind === 'swipe' ? upgradeSwipe(action) : action;
 }
 
 /** Params of `attempt/deriveSecret`: the value the client resolved, for the forms the engine derives from it. */

@@ -549,6 +549,10 @@ export class AgentDeviceSurface {
   private screenBeforeAction: ProjectedScreen | undefined;
   /** The most recent projection of the screen, from any observe or locate. */
   private latestScreen: ProjectedScreen | undefined;
+  /** How many actions this surface had sent when `latestScreen` was projected. */
+  private latestScreenActions = 0;
+  /** How many actions this surface has sent, counted by `markAction`. */
+  private actions = 0;
   /** Budget a control that came with the last action gets to finish arriving; see DEFAULT_TRANSITION_MS. */
   private readonly transitionMs: number;
   /** Whether snapshots keep interactive nodes only, from the `snapshot` option. */
@@ -1213,6 +1217,7 @@ export class AgentDeviceSurface {
       originUnknown: raw.warnings?.includes(ORIGIN_WARNING) === true,
     };
     this.latestScreen = projected;
+    this.latestScreenActions = this.actions;
     const read = projected.viewport;
     if (read !== undefined && (this.knownViewport === undefined || sameScreen(read, this.knownViewport))) this.knownViewport = read;
     return projected;
@@ -1532,6 +1537,7 @@ export class AgentDeviceSurface {
   private markAction(before: ProjectedScreen | undefined): void {
     this.screenBeforeAction = before;
     this.lastActionAt = Date.now();
+    this.actions += 1;
   }
 
   async perform(ref: NodeRef, action: LocatorAction, operation: OperationContext, input: InputBudget): Promise<void> {
@@ -1546,17 +1552,19 @@ export class AgentDeviceSurface {
     // whole screen when there isn't one.
     if (ref.id === ROOT_ID) {
       if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);
+      if (deterministic) await this.waitOutTransition(operation, input);
+      // A capture from before the last input can have the wrong containers:
+      // the input may have replaced the screen, or a fill read the field
+      // before it typed. In that case, the screen is read again. The
+      // viewport is read after it, since the screen may have rotated.
+      const latest = this.latestScreen;
+      const before = latest === undefined || this.latestScreenActions !== this.actions ? this.project(await this.capture(operation.signal, false, input)) : latest;
       const viewport = this.knownViewport;
       if (viewport === undefined) throw notActionable('the screen size is not known yet, so the swipe distance cannot be measured. Observe the screen first.');
-      if (deterministic) await this.waitOutTransition(operation, input);
-      // The last action may have replaced the screen, so a capture from before
-      // it can have the wrong containers. In that case, the screen is read again.
-      const latest = this.latestScreen;
-      const before = latest === undefined || latest === this.screenBeforeAction ? this.project(await this.capture(operation.signal, false, input)) : latest;
       const centre = { x: viewport.width / 2, y: viewport.height / 2 };
       // The boxes in a capture that couldn't place its window on the screen are
       // in another frame, so its containers aren't trusted.
-      const box = (before === undefined || before.originUnknown ? undefined : scrollBoxAt(before.index, centre)) ?? { x: 0, y: 0, ...viewport };
+      const box = (before.originUnknown ? undefined : scrollBoxAt(before.index, centre)) ?? { x: 0, y: 0, ...viewport };
       await this.command('swipe', (client) => this.pan(client, swipeDrags(box, action.direction, action.distance), action.durationMs, input), operation.signal);
       this.noteGesture(operation);
       this.markAction(before);

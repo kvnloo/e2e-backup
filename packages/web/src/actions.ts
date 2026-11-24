@@ -15,6 +15,7 @@ import {
   performPointerDrag,
   performPointSwipe,
   POST_DISPATCH_PATTERN,
+  scrollIntoViewNearest,
   statPath,
   translatePwError,
   targetPage,
@@ -342,7 +343,15 @@ export async function dispatchLocatorAction(
       await locator.hover({ timeout });
       return;
     case 'scrollIntoView':
-      await locator.scrollIntoViewIfNeeded({ timeout });
+      // `center` comes after a scroll step, for a node already read as
+      // visible. Playwright's scrollIntoViewIfNeeded also waits for the node
+      // to stop moving, which a node with an endless animation never does, so
+      // the browser's own minimal scroll brings it in without that wait.
+      if (action.center === true) {
+        await scrollIntoViewNearest(target);
+      } else {
+        await locator.scrollIntoViewIfNeeded({ timeout });
+      }
       return;
     case 'selectOption': {
       const value = action.value;

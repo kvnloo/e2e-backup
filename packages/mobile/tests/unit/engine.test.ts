@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from 'agent-device';
 import { decodePng, encodePng } from '../helpers/png.ts';
 import type { EngineFixtureContext, EngineSnapshot, FixtureOperations, LocatorExpression, OperationContext, SemanticNode } from '@e2e-dev/core/engine';
-import { describeEngine } from '@e2e-dev/core/engine';
+import { connectEngine, describeEngine, loopbackTransport } from '@e2e-dev/core/engine';
 import type { Device } from '../../src/device.ts';
 import type { RawNode } from '../../src/nodes.ts';
 import { buildEngine, mobile } from '../../src/engine.ts';
@@ -4663,24 +4663,6 @@ describe('deterministic actions', () => {
     expect(presses.every((call) => call.signal instanceof AbortSignal)).toBe(true);
   });
 
-  it('sends a swipe as the same drags for a test and for the agent', async () => {
-    const h = harness({ settle: false });
-    await openAttempt(h);
-    await sleep(0);
-    const root = await screenRootOf(h);
-    const scroller = await observed(h, 'Scroller');
-    const swipe = { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 } as const;
-    const agent: OperationContext = { ...operation(), origin: 'agent' };
-
-    await h.engine.perform!(root.ref, swipe, test());
-    await h.engine.perform!(root.ref, swipe, agent);
-    await h.engine.perform!(scroller.ref, swipe, test());
-    await h.engine.perform!(scroller.ref, swipe, agent);
-    const pans = h.fake.calls.filter((call) => call.method === 'interactions.pan').map((call) => call.args);
-    const node = { ...swipeDrags(scroller.rect!, 'down', 0.5)[0], durationMs: 400 };
-    expect(pans).toEqual([SCREEN_DOWN, SCREEN_DOWN, node, node]);
-  });
-
   it('re-reads a control until it rests before a test acts on it after a gesture that skipped the stabilization wait', async () => {
     autoAdvanceTimers();
     const h = harness({ settle: false, transition: 0 });
@@ -4849,8 +4831,11 @@ describe('deterministic actions', () => {
         { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'button', label: 'Row 5', rect: { x: 0, y: 380, width: 390, height: 40 } },
         { ref: '@e4', index: 3, parentIndex: 1, depth: 2, type: 'button', label: 'Row 9', rect: { x: 0, y: 650, width: 390, height: 40 } },
         { ref: '@e5', index: 4, parentIndex: 0, depth: 1, type: 'button', label: 'Continue', rect: { x: 0, y: 760, width: 390, height: 60 } },
-        // A row cut off at the list's bottom edge: its box ends where the list does.
+        // Rows flush with the list's top and bottom edges.
         { ref: '@e6', index: 5, parentIndex: 1, depth: 2, type: 'button', label: 'Row 12', rect: { x: 0, y: 680, width: 390, height: 20 } },
+        { ref: '@e7', index: 6, parentIndex: 1, depth: 2, type: 'button', label: 'Row 1', rect: { x: 0, y: 100, width: 390, height: 40 } },
+        // A row that reaches past the list's bottom edge.
+        { ref: '@e8', index: 7, parentIndex: 1, depth: 2, type: 'button', label: 'Row 13', rect: { x: 0, y: 680, width: 390, height: 40 } },
       ],
     };
     /** The drag sent for a swipe down of half the list. It starts a quarter up from the list's bottom edge. */
@@ -4906,19 +4891,19 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([]);
     });
 
-    it('leaves a node fully inside its scroll container where it is, as a browser does', async () => {
+    it('leaves a node inside its scroll container where it is, a row flush with an edge too, and one outside any container', async () => {
       const h = await listHarness();
-      for (const name of ['Row 9', 'Row 5', 'Continue']) {
+      for (const name of ['Row 9', 'Row 5', 'Row 1', 'Row 12', 'Continue']) {
         await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView' }, operation());
       }
       expect(pans(h)).toEqual([]);
     });
 
-    it("drags a node cut off at its scroll container's edge to the middle", async () => {
+    it("drags a node that reaches past its scroll container's edge to the middle", async () => {
       const h = await listHarness();
-      await h.engine.perform!((await observed(h, 'Row 12')).ref, { kind: 'scrollIntoView' }, operation());
-      // Row 12's centre is 290 below the list's middle.
-      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -290, durationMs: 800 }]);
+      await h.engine.perform!((await observed(h, 'Row 13')).ref, { kind: 'scrollIntoView' }, operation());
+      // Row 13's centre is 300 below the list's middle.
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -300, durationMs: 800 }]);
     });
 
     it('with center, also drags a fully visible node more than a fifth of its container from the middle', async () => {
@@ -4930,13 +4915,72 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -270, durationMs: 800 }]);
     });
 
-    it('sends no drag before a positioned tap on a fully visible node', async () => {
+    it('drags a swipe from a client older than distance, as its momentum stands for', async () => {
+      const local = harness({ settle: false, transition: 0 });
+      local.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
+      const h = { ...local, engine: connectEngine({ manifest: describeEngine(local.engine), transport: loopbackTransport(local.engine) }) };
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      // @ts-expect-error an older client sends momentum alone, with no distance or durationMs
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', momentum: 'slow' }, operation());
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -150, durationMs: 1500 }]);
+    });
+
+    it('swipes a native list that fills part of the screen, and brings its rows into view within it', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      h.fake.respond('capture.snapshot', () => ({
+        ...SETTINGS_SNAPSHOT,
+        nodes: [
+          { ref: '@e1', index: 0, depth: 0, type: 'application', label: 'Settings', rect: { x: 0, y: 0, width: 390, height: 844 } },
+          // agent-device reports an Android RecyclerView or ListView as a list.
+          { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'RecyclerView', kind: 'list', rect: { x: 0, y: 300, width: 390, height: 300 } },
+          { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'button', label: 'Row 8', rect: { x: 0, y: 580, width: 390, height: 40 } },
+        ],
+      }));
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      await h.engine.perform!((await observed(h, 'Row 8')).ref, { kind: 'scrollIntoView' }, operation());
+      expect(pans(h)).toEqual([
+        { x: 195, y: 525, dx: 0, dy: -150, durationMs: 400 },
+        { x: 195, y: 525, dx: 0, dy: -150, durationMs: 800 },
+      ]);
+    });
+
+    it('reads the screen again for its containers after a fill', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'Search')).ref, { kind: 'fill', value: 'blue', sensitive: false }, operation());
+      // Typing brought up a list of results under the screen centre.
+      h.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(h.fake.lastArgs('interactions.pan')).toEqual(LIST_DOWN);
+    });
+
+    it('measures the screen after reading it again, so a rotated screen is swiped across its new size', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'About')).ref, { kind: 'tap' }, operation());
+      h.fake.respond('capture.snapshot', () => ({
+        ...SETTINGS_SNAPSHOT,
+        viewport: { width: 844, height: 390 },
+        nodes: [{ ref: '@e1', index: 0, depth: 0, type: 'application', label: 'Settings', rect: { x: 0, y: 0, width: 844, height: 390 } }],
+      }));
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(h.fake.lastArgs('interactions.pan')).toEqual({ x: 422, y: 292.5, dx: 0, dy: -195, durationMs: 400 });
+    });
+
+    it('reports a split swipe whose later drag no longer fits its budget as possibly committed', async () => {
       const h = await listHarness();
-      // `tap({ position })` brings its node into view first, then taps the point.
-      await h.engine.perform!((await observed(h, 'Row 9')).ref, { kind: 'scrollIntoView' }, operation());
-      await h.engine.performAt!({ x: 30, y: 670 }, { kind: 'tap' }, operation());
-      expect(pans(h)).toEqual([]);
-      expect(h.fake.lastArgs('interactions.press')).toMatchObject({ x: 30, y: 670 });
+      const root = await screenRootOf(h);
+      // The first drag is acknowledged late, so too little of the budget is left for the second.
+      h.fake.respond('interactions.pan', () => sleep(700));
+      await expect(
+        h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 1000 }),
+      ).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+      expect(pans(h)).toHaveLength(1);
     });
   });
 

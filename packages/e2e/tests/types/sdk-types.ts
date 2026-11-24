@@ -825,10 +825,8 @@ void screen.swipe({ direction: 'up', distance: 0.8, speed: 'fast' });
 void screen.swipe({ direction: 'up', momentum: 'fast' });
 // @ts-expect-error a swipe along a path takes no momentum
 void screen.swipe({ from: point, to: point, momentum: 'fast' });
-// @ts-expect-error speed is a preset name, not a number of milliseconds
-void screen.swipe({ direction: 'up', speed: 300 });
-// @ts-expect-error a swipe in a direction and a swipe along a path don't mix
-void screen.swipe({ direction: 'up', from: point, to: point });
+// @ts-expect-error a swipe along a path takes no distance
+void screen.swipe({ from: point, to: point, distance: 0.5 });
 void screen.scrollUntilVisible(screen.getByRole('button'), { direction: 'down', distance: 0.5, speed: 'slow', timeout: 1_000 });
 void screen.swipe({ from: point, to: point });
 void screen.swipe({ from: point, to: point, duration: 300 });

@@ -92,7 +92,7 @@ function targetBoundingBox(target: ActionTarget, timeout: number): Promise<Rect 
 }
 
 /** Minimal scroll that brings one target into view, without centring it. */
-async function scrollIntoViewNearest(target: ActionTarget): Promise<void> {
+export async function scrollIntoViewNearest(target: ActionTarget): Promise<void> {
   const scroll = (el: Element): void => {
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   };
@@ -491,16 +491,10 @@ export function staleOr(cause: unknown, operation: string): Error {
  * container, so the swipe scrolls what a person's wheel over the point would.
  */
 export async function performPointSwipe(page: Page, point: ViewportPoint, direction: ScrollDirection, distance: number): Promise<void> {
-  const extent = await page.locator(':root').evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
+  const extent = await page.evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
   await page.mouse.move(point.x, point.y);
   const [deltaX, deltaY] = wheelDelta(direction, Math.round(extent * distance));
   await wheelRendered(page, deltaX, deltaY);
-}
-
-/** Swipes the screen by wheeling at the viewport's center (see `performPointSwipe`). */
-export async function performViewportSwipe(page: Page, direction: ScrollDirection, distance: number): Promise<void> {
-  const viewport = await currentViewport(page);
-  await performPointSwipe(page, { x: viewport.width / 2, y: viewport.height / 2 }, direction, distance);
 }
 
 /**
@@ -618,10 +612,11 @@ function wheelAim(element: Element): WheelAim {
  * axis and whose style lets it scroll.
  *
  * The element at the point is found inside open shadow roots. On the way up,
- * the walk crosses from a shadow root to its host. The viewport's size is
+ * the walk goes from a slotted element to its slot, and from a shadow root
+ * to its host. The viewport's size is
  * returned when no element scrolls, and for a pane inside an iframe.
  */
-function scrollExtent(_root: Element, { vertical, at }: { vertical: boolean; at: ViewportPoint }): number {
+function scrollExtent({ vertical, at }: { vertical: boolean; at: ViewportPoint }): number {
   let node = document.elementFromPoint(at.x, at.y);
   while (node?.shadowRoot) {
     const inner = node.shadowRoot.elementFromPoint(at.x, at.y);
@@ -634,7 +629,7 @@ function scrollExtent(_root: Element, { vertical, at }: { vertical: boolean; at:
     const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;
     if (overflows && /auto|scroll|overlay/.test(overflow)) return vertical ? node.clientHeight : node.clientWidth;
     const root = node.getRootNode();
-    node = node.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+    node = node.assignedSlot ?? node.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
   }
   return vertical ? window.innerHeight : window.innerWidth;
 }

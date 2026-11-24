@@ -62,19 +62,19 @@ export class InputBudget {
    * nothing: `OPERATION_TIMEOUT`, or `ACTION_MAY_HAVE_COMMITTED` once an
    * earlier input of this operation went out. A gesture that holds (`holdMs`)
    * at least as long as the budget left could only be cut off mid-gesture, so
-   * it is refused unsent. An input that does not answer in time may have
+   * it is refused unsent: `NOT_ACTIONABLE`, or `ACTION_MAY_HAVE_COMMITTED`
+   * once an earlier input went out. An input that does not answer in time may have
    * landed, so it is `ACTION_MAY_HAVE_COMMITTED` and the runner never repeats it.
    */
   send<T>(dispatch: (signal: AbortSignal) => Promise<T>, holdMs = 0): Promise<T> {
     const remaining = this.remainingMs();
     if (remaining <= 0) return Promise.reject(this.spent());
     if (holdMs >= remaining) {
+      const left = `holds for ${holdMs} ms, but only ${Math.floor(remaining)} ms of its timeout are left`;
       return Promise.reject(
-        new EngineError(
-          'NOT_ACTIONABLE',
-          `${this.label} holds for ${holdMs} ms, but only ${Math.floor(remaining)} ms of its timeout are left; raise the timeout or shorten the hold`,
-          { retryable: false },
-        ),
+        this.sent
+          ? new EngineError('ACTION_MAY_HAVE_COMMITTED', `${this.label} sent part of its input, and the rest ${left}`, { retryable: false })
+          : new EngineError('NOT_ACTIONABLE', `${this.label} ${left}; raise the timeout or shorten the hold`, { retryable: false }),
       );
     }
     const answerMs = Math.max(remaining, MIN_ANSWER_MS);
@@ -191,10 +191,8 @@ export function swipeDrags(box: Rect, direction: ScrollDirection, distance: numb
  * Returns the drag that moves `rect` to the middle of `container`, or
  * undefined when the node stays where it is:
  *
- * - Without `center`, a node fully inside its container stays, as a
- *   browser's `scrollIntoViewIfNeeded` leaves it. A device clips a box to the
- *   screen, so a box that touches the container's top or bottom edge counts
- *   as cut off.
+ * - Without `center`, a node inside its container, edges included, stays.
+ *   A pull-to-refresh list takes a drag on its first row as a refresh.
  * - With `center`, a fully visible node also moves when its centre is more
  *   than a fifth of the container from the middle, as with Maestro's
  *   `centerElement`. A node that far out can be under a sticky header or
@@ -206,7 +204,7 @@ export function swipeDrags(box: Rect, direction: ScrollDirection, distance: numb
  */
 export function centringDrag(rect: Rect, container: Rect, center: boolean): Drag | undefined {
   const offset = rect.y + rect.height / 2 - (container.y + container.height / 2);
-  const inside = rect.y > container.y && rect.y + rect.height < container.y + container.height;
+  const inside = rect.y >= container.y && rect.y + rect.height <= container.y + container.height;
   if (inside && !(center && Math.abs(offset) > container.height / 5)) return undefined;
   return swipeDrags(container, offset > 0 ? 'down' : 'up', Math.abs(offset) / container.height)[0];
 }

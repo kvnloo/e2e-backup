@@ -19,6 +19,7 @@ import {
   OBSERVED_NAME_LIMIT,
   OBSERVED_TEXT_LIMIT,
   resolveExpression,
+  SCROLL_STEP,
   type EngineAppInfo,
   type EngineAttemptContext,
   type EngineCleanupContext,
@@ -37,6 +38,7 @@ import {
   type PointerAction,
   type SelectOption,
   type SemanticNode,
+  type SwipeAction,
   type ViewportPoint,
 } from '@e2e-dev/core/engine';
 import { AGENT_DESKTOP_VERSION, installPinned, pinnedExecutable, pinnedInstalled, resolveExecutable } from './binary.ts';
@@ -1176,7 +1178,7 @@ export class DesktopSurface {
       const target = screen?.scrollTarget;
       if (target === undefined && screen?.cutShort === true) throw partialRead('what in it scrolls');
       if (target === undefined) throw notActionable('the window has nothing that scrolls');
-      await this.scroll(this.binding({ id: target, revision: '' }), action.direction, action.distance, operation);
+      await this.scroll(this.binding({ id: target, revision: '' }), action, operation);
       return this.settle(operation);
     }
     const binding = this.binding(ref);
@@ -1246,7 +1248,7 @@ export class DesktopSurface {
         await this.select(binding, optionLabel(action.value), operation);
         break;
       case 'swipe':
-        await this.scroll(binding, action.direction, action.distance, operation);
+        await this.scroll(binding, action, operation);
         break;
       case 'longPress':
       case 'setInputFiles':
@@ -1392,11 +1394,14 @@ export class DesktopSurface {
    * Scrolls by wheel notches, the unit agent-desktop takes. agent-desktop
    * doesn't report how far a notch moves, so a `distance` of 1 is sent as ten
    * notches. A swipe of the default 0.5 is sent as five notches, the same as a
-   * plain swipe before.
+   * plain swipe before. A `SCROLL_STEP` (a `scrollUntilVisible` step or the
+   * agent's page) stays two notches, since a longer step could skip rows of
+   * a short pane.
    */
-  private async scroll(binding: NodeBinding, direction: string, distance: number, operation: OperationContext): Promise<void> {
-    const amount = Math.max(1, Math.round(distance * 10));
-    await this.refCommand('scroll', binding, operation, ['--direction', direction, '--amount', String(amount)]);
+  private async scroll(binding: NodeBinding, action: SwipeAction, operation: OperationContext): Promise<void> {
+    const step = action.distance === SCROLL_STEP.distance && action.durationMs === SCROLL_STEP.durationMs;
+    const amount = step ? 2 : Math.max(1, Math.round(action.distance * 10));
+    await this.refCommand('scroll', binding, operation, ['--direction', action.direction, '--amount', String(amount)]);
   }
 
   /** Physical pointer input at a point in the window: only with `headed`, and only then declared. */
