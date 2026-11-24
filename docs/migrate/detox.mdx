@@ -176,7 +176,7 @@ on purpose.
 | `permissions` for `health`, `homekit`, `speech`, `faceid`, `userTracking`; values `always`, `inuse`, `limited` | Tap the prompt's button, or `device.alert('accept')` |
 | `device.sendUserNotification()`, `.pinch()` | `client.apps.push()`, `client.interactions.pinch()` on [`unstable_raw`](/reference/mobile#unstable_raw) |
 | `launchApp({ languageAndLocale })` | On iOS, `app.launchArguments: { AppleLanguages: ['fr'], AppleLocale: 'fr_FR' }`, see [Run the app in another language](/mobile#run-the-app-in-another-language) |
-| Jest `globalSetup`, `globalTeardown` | Start dependencies before the run |
+| Jest `globalSetup`, `globalTeardown` | [Services](/services), or start dependencies before the run |
 | `device.reverseTcpPort()` | Run `adb reverse` in a CI step |
 | `.getAttributes()` | `.textContent()`, `.inputValue()`, `.isEnabled()`, `.isVisible()`, `.isChecked()`, `.boundingBox()` |
 | `device.setStatusBar()` | `xcrun simctl status_bar`. `toHaveScreenshot` holds the status bar fixed |

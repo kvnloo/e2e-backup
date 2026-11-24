@@ -60,6 +60,10 @@ import { nextRerunDir, pruneArtifacts } from '@e2e-dev/core/lib/run/artifacts';
 import { carryForward, fileDurationKey, lastFailedIds, readLastRun, reportArtifactPaths, type RerunCollection } from './last-run.ts';
 import { loadTimings, writeTimings } from './timings.ts';
 import { childProcessSpawner } from './worker/handle.ts';
+import { copyServiceValues, NO_SERVICES, startServices, type RunServices } from './services.ts';
+import type { SpawnUnitRunner } from './unit-runner.ts';
+import { setServiceValues } from '@e2e-dev/core/lib/run/service-values';
+import { UNSHARED } from '@e2e-dev/core/lib/run/process-pool';
 import { setSecretRegistry } from '@e2e-dev/core/lib/secrets';
 import type { RecordingMode } from '@e2e-dev/core/lib/types';
 import type { BuiltinReporter, E2EConfig, Reporter } from '../run-types.ts';
@@ -266,6 +270,10 @@ export interface RunOptions {
   reporterTimeout?: number | undefined;
   /** Budget for each test filter's call, in ms; 5 minutes unless set. Only the test harness sets it; there is no flag. */
   filterTimeout?: number | undefined;
+  /** How long a service may take to yield, in ms; 60 seconds unless set. Only the test harness sets it; there is no flag. */
+  serviceStartTimeout?: number | undefined;
+  /** How long the code after a service's `yield` may take, in ms; 10 seconds unless set. Only the test harness sets it; there is no flag. */
+  serviceStopTimeout?: number | undefined;
   /**
    * The process's stdout and stderr, when the caller claimed them (the CLI):
    * what user code in this process prints is held while the config loads
@@ -491,8 +499,10 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
   const results: ResultRecord[] = [];
   const serialGroups: SerialGroupRecord[] = [];
   const targetProvenance = new Map<string, TargetProvenance>();
-  /** The services and app commands the targets' engines declared, once started. */
+  /** The app commands the targets declare, once started. */
   let processes: AppProcesses | undefined;
+  /** The config's services, once started. */
+  let services: RunServices = NO_SERVICES;
   let sessionStore: SessionStore | undefined;
   /** The engines' prepare/finish pairing: every prepared target is finished at teardown. */
   const engines = new PreparedEngines();
@@ -1104,7 +1114,24 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
           ...(reused ? { outcome: 'reused' as const } : {}),
         }),
     };
-    processes = hasWork ? await startDeclaredProcesses(targets, config.projectRoot, processHooks, interrupted, debug) : undefined;
+    // The config's services start before the app commands, each one a setup
+    // step, since a command's `env` function reads their values.
+    const serviceStep = (name: string) => ({ kind: 'service' as const, label: `service "${name}"` });
+    if (hasWork) {
+      services = await debug.time('services.start', () =>
+        startServices(config.services, interrupted, {
+          starting: (name) => emit({ type: 'setup', step: serviceStep(name), state: 'started' }),
+          ready: (name, durationMs) => emit({ type: 'setup', step: serviceStep(name), state: 'finished', durationMs }),
+        }, {
+          ...(options.serviceStartTimeout === undefined ? {} : { startMs: options.serviceStartTimeout }),
+          ...(options.serviceStopTimeout === undefined ? {} : { stopMs: options.serviceStopTimeout }),
+        }),
+      );
+    }
+    if (interrupted.aborted) return;
+    processes = hasWork
+      ? await startDeclaredProcesses(targets, config.projectRoot, processHooks, interrupted, debug, UNSHARED, copyServiceValues(services.wire, services.call))
+      : undefined;
     // A run cancelled while the app was starting runs no test: the interrupt
     // alone decides the outcome.
     if (interrupted.aborted) return;
@@ -1151,7 +1178,9 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
       await registerAiTraceRecorder(aiTraceRecorder, loadAiSdk);
     }
     const holdSteps = options.hold?.steps === true;
-    const spawn =
+    // An in-process worker reads the services' values here, and calls their functions directly.
+    if (inProcess) setServiceValues(copyServiceValues(services.wire, services.call));
+    const spawnWorker =
       workerConfigPath === undefined
         ? inProcessSpawner({
             config,
@@ -1181,8 +1210,24 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
             debug: debug.enabled,
             aiTrace: aiTrace !== undefined,
             holdSteps,
+            services: services.wire,
             envFor: workerEnvFor(plans, env),
           });
+    // A worker process calls a service function through a message, answered
+    // here without the scheduler seeing it.
+    const spawn: SpawnUnitRunner = (targetName, workerSlot, events) => {
+      const runner = spawnWorker(targetName, workerSlot, {
+        ...events,
+        onMessage: (message) => {
+          if (message.type !== 'service-call') {
+            events.onMessage(message);
+            return;
+          }
+          void services.call(message.call, message.args).then((reply) => runner.send({ type: 'service-reply', requestId: message.requestId, reply }));
+        },
+      });
+      return runner;
+    };
 
     const hold = options.hold;
     pendingNonRun = [];
@@ -1269,12 +1314,14 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
     // Engines finish first: every worker is gone, and what `prepare` leased
     // (a cloud device billed by the minute) should not wait on the app's
     // shutdown. Services go down after the apps that depended on them; a
-    // failing service teardown command is a cleanup error of the run, not a
+    // service that fails to stop is a cleanup error of the run, not a
     // crash.
+    setServiceValues(undefined);
     for (const teardown of [
       () => engines.finish({ runId, env, timeoutMs: config.cleanupTimeout, notice, onFailure: (cause) => recordFailure(cause, 'cleanup') }),
       () => sessionStore?.cleanup(),
       () => processes?.stop((cause) => recordFailure(cause, 'cleanup')),
+      () => services.stop((cause) => recordFailure(cause, 'cleanup')),
     ]) {
       try {
         await teardown();

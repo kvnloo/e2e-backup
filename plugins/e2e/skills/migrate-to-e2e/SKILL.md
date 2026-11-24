@@ -127,10 +127,12 @@ once and the progress file says so; later sessions skip this step.
      variables, and `command.env`, not the shell's environment, so pass
      what the server read from the old runner's environment in
      `command.env`.
-   - e2e has no `services` key. Databases, queues, and mock servers start
-     before the run with the command the CI job uses, or `app.command` runs
-     a script that brings them up and then serves the app. Name the command
-     in the progress file.
+   - A database, a queue, or a mock server the app needs becomes a service:
+     `services` in the config, each from `defineService`, which `e2e run`
+     starts before `app.command` and stops after it. `app.command.env` can
+     be a function that reads their addresses
+     (https://e2e.com/docs/services). One the CI job already starts can stay
+     there. Name each in the progress file.
    - A reset or seed the source ran per test (`runScript` with `http.post`,
      `cy.task('db:reset')`, an API call in `beforeEach`) becomes `fetch` in a
      `beforeEach` or a fixture, so each test still starts from known data.

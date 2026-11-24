@@ -28,6 +28,7 @@ import { SharedAppProcesses } from '@e2e-dev/core/lib/run/process-pool';
 import { outputLayout } from '@e2e-dev/core/lib/run/output';
 import { processSecrets, registerStaticSecrets } from '@e2e-dev/core/lib/run/secrecy';
 import { openStandaloneAttempt, type OneShotAttempt } from '../run/standalone-kinds.ts';
+import { unstartedServices } from '../run/services.ts';
 import type { StandaloneAttempt } from '@e2e-dev/core/lib/run/standalone-attempt';
 import { selectStandaloneTest, testLocation } from '../run/standalone-test.ts';
 import { createSessionCatalog, isGrammarVerb, type SessionCatalog } from '../session-tools/catalog.ts';
@@ -440,6 +441,7 @@ export class SessionHost {
         signal: abort.signal,
         timeoutMs: ttlMs + CLOSE_GRACE_MS,
         processes: this.apps,
+        services: unstartedServices('e2e mcp'),
         notice: (scope, message) => this.log('info', `${scope}: ${message}`),
         ...(test === undefined ? {} : { test, agent: test.pair.agent }),
       });

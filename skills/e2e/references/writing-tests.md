@@ -172,7 +172,7 @@ Hooks nest: outer `beforeEach` first, inner `afterEach` first. `beforeAll`
 reruns per retry and per serial group (each a fresh module realm) on the
 test timeout; `afterAll` runs on `config.cleanupTimeout`. A failing
 `beforeAll` is a `HOOK_FAILED` run error skipping every test in its scope.
-`beforeAll` and `afterAll` get worker fixtures only: `platform`, worker
+`beforeAll` and `afterAll` get worker fixtures only: `platform`, `services`, worker
 fixtures from `test.extend`, and on mobile `device`, `app`, and `screen`
 (a device keeps its state between tests). On web, `browser`, `app`, and
 `screen` are test fixtures, so UI setup goes in `beforeEach`. Naming a test

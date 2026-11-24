@@ -163,6 +163,7 @@ const TOP_LEVEL_KEYS = new Set([
   'reporters',
   'agents',
   'filters',
+  'services',
   'cache',
   'credentials',
   'secrets',
@@ -985,7 +986,7 @@ function resolveAgents(
 }
 
 function computeConfigDigest(
-  raw: ProjectConfig & { readonly reporters?: unknown; readonly filters?: unknown },
+  raw: ProjectConfig & { readonly reporters?: unknown; readonly filters?: unknown; readonly services?: unknown },
   projectId: string,
   targets: readonly ResolvedTarget[],
 ): string {
@@ -1007,13 +1008,16 @@ function computeConfigDigest(
   // `failOnSkippedFailure` decides only the exit code, never what runs, and
   // `maxDuration` only when the run stops. A test filter decides what runs
   // before any worker starts and never changes what a test does, so adding
-  // one leaves the replays valid, like a reporter.
+  // one leaves the replays valid, like a reporter. A service is a dependency
+  // the app reads at run time, like an app command, so it never enters the
+  // digest either.
   // `targets` digest by declaration below and never enter the clone: an
   // engine holds `secrets.get()` handles, which refuse to serialize.
   const {
     failOnSkippedFailure: _failOnSkippedFailure,
     maxDuration: _maxDuration,
     filters: _filters,
+    services: _services,
     artifacts: _artifacts,
     output: _output,
     trace: _trace,

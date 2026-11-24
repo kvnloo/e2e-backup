@@ -35,8 +35,8 @@ describe('declaredCommands', () => {
       ).targets,
     );
     expect(commands).toEqual([
-      { label: 'target "t0" command', command: dev, readyUrl: 'http://localhost:3000/', key: expect.any(String), targetNames: ['t0', 't1'] },
-      { label: 'target "t2" command', command: { executable: 'pnpm', args: ['api'] }, readyUrl: 'http://localhost:4000/', key: expect.any(String), targetNames: ['t2'] },
+      { label: 'target "t0" command', command: dev, readyUrl: 'http://localhost:3000/', port: 3000, key: expect.any(String), targetNames: ['t0', 't1'] },
+      { label: 'target "t2" command', command: { executable: 'pnpm', args: ['api'] }, readyUrl: 'http://localhost:4000/', port: 4000, key: expect.any(String), targetNames: ['t2'] },
     ]);
     expect(declaredCommands(configOf({ url: 'http://localhost:3000' }, {}).targets)).toEqual([]);
   });
@@ -52,6 +52,7 @@ describe('declaredCommands', () => {
         label: 'target "t0" command',
         command: { executable: 'pnpm', args: ['dev', '--port', '4321'], env: { PORT: '4321' } },
         readyUrl: 'http://127.0.0.1:4321/',
+        port: 4321,
         key: expect.any(String),
         targetNames: ['t0', 't1'],
       },

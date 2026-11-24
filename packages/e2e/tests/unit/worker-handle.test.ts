@@ -14,6 +14,7 @@ import { defineEngine, type EngineCleanupContext, type EngineHandle } from '@e2e
 import { SessionStore } from '@e2e-dev/core/lib/run/sessions';
 import { TargetWorker } from '../../src/run/worker/session.ts';
 import { childProcessSpawner } from '../../src/run/worker/handle.ts';
+import { NO_SERVICES } from '../../src/run/services.ts';
 
 /** A promise the test releases after observing a lifecycle event. */
 function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T | PromiseLike<T>) => void } {
@@ -82,6 +83,7 @@ describe('ChildProcessRunner', () => {
         debug: false,
         aiTrace: false,
         holdSteps: false,
+        services: NO_SERVICES.wire,
         envFor: () => ({ ...process.env, NODE_OPTIONS: `--import ${pathToFileURL(preload).href}` }),
       });
       let exit: string | undefined;

@@ -4,11 +4,10 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
-import type { Readiness } from '../config/command.ts';
+import type { Readiness, SpawnedCommand } from '../config/command.ts';
 import { InfrastructureError } from '../internal/errors.ts';
 import { createRedactor } from '../internal/redact.ts';
 import { sleep } from '../internal/time.ts';
-import type { CommandConfig } from '../types.ts';
 
 const INHERITED_ENV = ['PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'SystemRoot', 'COMSPEC'] as const;
 
@@ -43,7 +42,7 @@ const REDACTED_ENV_MIN_LENGTH = 4;
  * too. `inherited` is what `inheritEnv` copied.
  */
 function childEnv(
-  command: CommandConfig,
+  command: SpawnedCommand,
   source: NodeJS.ProcessEnv,
 ): { env: Record<string, string>; inherited: [string, string][] } {
   const fold = process.platform === 'win32' ? (name: string) => name.toUpperCase() : (name: string) => name;
@@ -148,6 +147,11 @@ export interface ManagedProcessHooks {
   readonly ready?: (label: string, url: string | undefined, durationMs: number, reused: boolean) => void;
   /** The owned command exited after URL readiness and before `stop` was requested. */
   readonly unexpectedExit?: (cause: InfrastructureError) => void;
+  /**
+   * The command's `env`, built right before the spawn. A process that's
+   * reused never calls it. Without it, `command.env` is used.
+   */
+  readonly spawnEnv?: () => Promise<Readonly<Record<string, string>> | undefined>;
 }
 
 /**
@@ -165,7 +169,7 @@ export class ManagedProcess {
 
   constructor(
     private readonly label: string,
-    private readonly command: CommandConfig,
+    private readonly command: SpawnedCommand,
     private readonly projectRoot: string,
     private readonly readiness: Readiness,
     private readonly hooks: ManagedProcessHooks = {},
@@ -235,9 +239,11 @@ export class ManagedProcess {
       }
       if (aborted()) return;
     }
-    const { env, inherited } = childEnv(this.command, this.hooks.env ?? process.env);
+    const command = this.hooks.spawnEnv === undefined ? this.command : { ...this.command, env: await this.hooks.spawnEnv() };
+    if (aborted()) return;
+    const { env, inherited } = childEnv(command, this.hooks.env ?? process.env);
     this.redact = createRedactor(
-      [...inherited, ...Object.entries(this.command.env ?? {})].filter(([, value]) => value.length >= REDACTED_ENV_MIN_LENGTH),
+      [...inherited, ...Object.entries(command.env ?? {})].filter(([, value]) => value.length >= REDACTED_ENV_MIN_LENGTH),
     );
 
     const logFd = this.openLog();

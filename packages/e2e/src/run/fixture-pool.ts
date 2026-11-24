@@ -1,6 +1,6 @@
 /**
  * One pool for every fixture a piece of test code reads: the built-in ones
- * (`agent`, `app`, `screen`, `platform`, `session`), the target engine's, and
+ * (`agent`, `app`, `screen`, `platform`, `services`, `session`), the target engine's, and
  * the `test.extend()` chain it was registered through. Each has a scope, and
  * code sees the fixtures that live at least as long as it does: a test and
  * its per-test hooks see test and worker fixtures, a suite hook and a worker
@@ -27,7 +27,7 @@ export function attemptBuiltIns(fixtures: object): BuiltInReader {
 
 /**
  * The built-in fixtures of code with no attempt behind it: the ones the
- * target alone decides (`platform`). Any other fails with the error
+ * target or the worker decides (`platform`, `services`). Any other fails with the error
  * `unavailable` returns, which says why no attempt is behind the code.
  */
 export function attemptlessBuiltIns(target: BuiltInTarget, unavailable: (name: string) => Error): BuiltInReader {
@@ -209,7 +209,7 @@ export class WorkerFixturePool {
 
   /**
    * Built-in `name` as a worker fixture receives it: its value when the
-   * target alone decides it, else an object that forwards to the attempt or
+   * target or the worker decides it, else an object that forwards to the attempt or
    * suite hook running at the time it is used.
    */
   builtIn(name: string): unknown {

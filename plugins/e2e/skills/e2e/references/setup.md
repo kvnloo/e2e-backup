@@ -229,9 +229,20 @@ writes.
 - A new app can start from the example:
   `npx create-next-app --example https://github.com/e2e-inc/e2e/tree/main/examples/with-next my-app`.
 
-There is no `services` key in this version: it is an unknown key wherever it
-appears. Start dependency processes before the run, or have `app.command`
-start a script that brings them up and serves the app.
+A dependency the app needs (an email API, an OAuth provider, a database) is
+a service: `services: { email }` at the top of the config, each from
+`defineService({ async *start({ signal }) { ...; yield { url, clear }; ... } })`.
+Code before the `yield` starts it, the yielded plain object is its value, and
+code after the `yield` stops it. `e2e run` starts services in key order before
+the app commands and stops them after; every worker shares one instance.
+`app.command.env` can then be a function, `({ services }) => ({ API_URL: services.email.url })`,
+called once after the services start. Use `export default defineConfig({ ... })`
+in place of `satisfies E2EConfig` so `services` is typed there. Tests read the
+`services` fixture (typed through `base.extend<{}, {}, typeof config>()`): data
+is a copy, and each function is async and runs in the runner process, so
+`await services.email.clear()` in `beforeEach`. Nothing resets a service
+between tests. A class instance in the yielded value is `INVALID_SERVICE_VALUE`;
+yield plain objects and functions. See https://e2e.com/docs/services.
 
 `web()` options:
 

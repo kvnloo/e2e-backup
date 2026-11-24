@@ -53,6 +53,7 @@ export default {
 | [`video`](#video) | `RecordingMode` | `'off'` |
 | [`agents`](#agents) | `Record<string, AgentConfig>` | `default`, no model |
 | [`filters`](#filters) | `TestFilter[]` | - |
+| [`services`](#services) | `Record<string, Service>` | - |
 | [`cache`](#cache) | `CacheMode \| CacheConfig` | `'read-write'`, `'read-only'` in CI |
 | [`credentials`](#credentials) | `Record<string, CredentialConfig>` | - |
 | [`secrets`](#secrets) | `Record<string, SecretConfig>` | - |
@@ -408,7 +409,7 @@ target. A target with `app` needs an [engine](#engine).
 The old spellings are unknown keys and fail at config load with
 `INVALID_CONFIG`: `web({ url })` and the other app options of `web()` and
 `mobile()`, `mobile({ app })` (now `app.bundleId`), an app key directly on the
-target, a top-level `app` or `url`, and [`services`](#services) anywhere.
+target, and a top-level `app` or `url`.
 </Note>
 
 #### `url`
@@ -608,6 +609,13 @@ command: {
   copies a variable only when it is set. `env` wins over an inherited value.
 - Every `args` entry and `env` value is a string. An `undefined` `env` value
   is dropped.
+- `env` can be a function, sync or async. It receives `{ services }`, the
+  values of the config's [`services`](#services) as a test sees them. It's
+  called one time per run, after the services start and before the command
+  is spawned, and not at all when `reuseExisting` uses a process that's
+  already running. `{port}` expands in the values it returns, and they get the
+  same checks as an `env` object. `e2e list` and the other commands that
+  only read the config never call it.
 - `startupTimeout` is the budget of the [`readyUrl`](#readyurl) probe.
 - `shutdownTimeout` is the grace period before force-kill.
 - In `e2e run`, a command that exits after readiness fails the run with `APP_UNREACHABLE` if a dependent target has unfinished work.
@@ -637,6 +645,7 @@ command: {
 | --- | --- |
 | `INVALID_CONFIG` | A bare `'*'` in `inheritEnv`. |
 | `INVALID_CONFIG` | An `args` entry or `env` value that is not a string, a number or a `secrets.get()` handle included. |
+| `INVALID_CONFIG` | An `env` function that throws or returns something other than an object of strings, when the run starts the command. In `e2e mcp` and `openHost`, which start no services, it throws when it reads one. |
 | `INVALID_CONFIG` | `reuseExisting` on an app whose `url` asks for port 0: a process already running cannot serve the port the run assigns. |
 | `APP_URL_REQUIRED` | An `app.command` with neither `app.url` nor `app.readyUrl`, at config load. |
 | `APP_ALREADY_RUNNING` | Without `reuseExisting`, a `readyUrl` that already answers. |
@@ -696,15 +705,6 @@ app: {
   targets that declare the same command on a fixed port share one.
 - The default [`identity`](#identity) derives from the declared `:0`.
 - Tests read the allocated URL from [`app.baseUrl`](/reference/app).
-
-#### services
-
-<Note>
-This version starts no dependency processes (a database, an API mock, a dev
-server several targets share), and `services` is an unknown key wherever it
-appears. Start them before the run, or have `app.command` start a script that
-brings them up and serves the app. A services API returns in a later release.
-</Note>
 
 ### output
 
@@ -1221,6 +1221,60 @@ rules, is at most 256 characters, and is unique among `filters`.
 
 The declarations are under [`TestFilter`](#testfilter), exported from `e2e`.
 
+### services
+
+The dependencies of the app under test, by name, each from `defineService`.
+See [Services](/services) for a full example.
+
+```ts title="e2e.config.ts"
+import { defineConfig } from 'e2e';
+import { web } from '@e2e-dev/web';
+import { email } from './services/email.ts';
+
+export default defineConfig({
+  services: { email },
+  targets: [
+    {
+      engine: web(),
+      app: {
+        url: 'http://127.0.0.1:0',
+        command: { executable: 'node', args: ['app/server.mjs'], env: ({ services }) => ({ PORT: '{port}', EMAIL_API_URL: services.email.url }) },
+      },
+    },
+  ],
+});
+```
+
+- `e2e run` starts each service in key order, before any app command, and
+  stops them in reverse order after the app commands stop. If one fails to
+  start, the ones already started are stopped.
+- One instance of each service is shared by every worker. Tests read it
+  through the [`services` fixture](/reference/test#fixtures), and an
+  [`env` function](#command) through its argument.
+- A service's `start` gets `{ signal }`. It aborts when the run is cancelled
+  or the service hasn't yielded within 60 seconds, and when the code after
+  the `yield` hasn't finished within 10 seconds.
+- The key is the name in errors, in `env`, and in the fixture.
+- `e2e list`, `e2e doctor`, and the other commands that only read the config
+  start no service. `e2e mcp` and `openHost` don't start them either, so an
+  `env` function or a test there that reads a service fails, naming it.
+- Services stay out of the config digest, so adding one keeps the replay
+  cache valid.
+
+`defineConfig` returns the config it's given. Use it in place of
+`satisfies E2EConfig` to type `services` in an `env` function from the
+config's `services`. `typeof config` still types the fixtures of
+[`test.extend`](/reference/test#test-extend).
+
+| Throws | When |
+| --- | --- |
+| `INVALID_CONFIG` | `services` isn't an object, or an entry isn't from `defineService`, at config load. |
+| `SERVICE_START_FAILED` | `start` throws, finishes without yielding, or doesn't yield within 60 seconds. |
+| `INVALID_SERVICE_VALUE` | The yielded value isn't a plain object, holds a class instance, or doesn't survive `structuredClone`. |
+| `SERVICE_STOP_FAILED` | The code after the `yield` throws, yields again, or doesn't finish within 10 seconds. |
+
+The declarations are under [`Service`](#service), exported from `e2e`.
+
 ### credentials
 
 Named accounts. Each entry is a username and a password the model never sees.
@@ -1626,12 +1680,15 @@ way TypeScript resolves it:
 
 ### `E2EConfig`
 
+`Services` is the type of `services` in an `env` function, typed by
+`defineConfig`.
+
 ```ts
-export interface E2EConfig {
+export interface E2EConfig<Services = Readonly<Record<string, unknown>>> {
   /** Stable project id, 1 through 256 characters; defaults to the root `package.json` name. */
   projectId?: string;
   /** The surfaces tests run on; required, at least one, each naming its engine. */
-  targets: readonly Target[];
+  targets: readonly Target<Services>[];
   /** Test file globs relative to the project root (`*`, `?`, and a whole `**` segment; a leading `!` excludes); default every `*.e2e.ts` under `tests/`. */
   tests?: string | readonly string[];
   /** Test attempt deadline in milliseconds; default 120000. */
@@ -1668,6 +1725,8 @@ export interface E2EConfig {
   agents?: Readonly<Record<string, AgentConfig>>;
   /** Test filters, in order, run with `--changed-since`: each judges the tests the one before it kept. */
   filters?: readonly TestFilter[];
+  /** Dependencies of the app under test, by name, each from `defineService`; started before the app commands. */
+  services?: Readonly<Record<string, Service>>;
   /** Replay cache mode or options; default `read-write`, `read-only` in CI. */
   cache?: CacheMode | CacheConfig;
   /** Named accounts: a username and a password the model never sees. */
@@ -1702,16 +1761,25 @@ export interface Target {
 
 ### `CommandConfig`
 
+`Services` is the type of `services` in an `env` function, typed by
+`defineConfig`.
+
 ```ts
-export interface CommandConfig {
+export interface CommandConfig<Services = Readonly<Record<string, unknown>>> {
   /** Resolved with `PATH`; never shell-interpreted. */
   executable: string;
   /** Passed verbatim; `{port}` expands to the app's port. */
   args?: readonly string[];
   /** Working directory, resolved from the project root. */
   cwd?: string;
-  /** Added to the inherited set; `{port}` expands in values. */
-  env?: Readonly<Record<string, string>>;
+  /**
+   * Added to the inherited set; `{port}` expands in values. A function is
+   * called one time per run, after the services start, with the same
+   * `services` a test gets.
+   */
+  env?:
+    | Readonly<Record<string, string>>
+    | ((context: { readonly services: Services }) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>);
   /** Variables copied from the runner's environment when set: exact names, or prefixes ending in `*`. */
   inheritEnv?: readonly string[];
   /** Ready-probe budget in milliseconds; default 60000. */
@@ -1724,6 +1792,32 @@ export interface CommandConfig {
   reuseExisting?: boolean;
 }
 ```
+
+### `Service`
+
+```ts
+/** A dependency of the app under test that `e2e run` starts before the app commands. */
+export interface Service<Value extends object = object> {
+  /**
+   * An async generator that yields once: the code before the `yield` starts
+   * the service, the yielded object is what the config and the tests get,
+   * and the code after the `yield` stops it.
+   */
+  start(context: { readonly signal: AbortSignal }): AsyncGenerator<Value, void, undefined>;
+}
+
+/** Declares a service. */
+export function defineService<Value extends object>(service: Service<Value>): Service<Value>;
+
+/** Returns `config` as it is, with `services` in `env` typed from the config's `services`. */
+export function defineConfig<
+  Services extends Readonly<Record<string, Service>> = {},
+  const Config extends E2EConfig<ServiceValues<Services>> = E2EConfig<ServiceValues<Services>>,
+>(config: Config & { readonly services?: Services }): Config;
+```
+
+A test and an `env` function get each function of a yielded value as an
+async function (`ServiceValue<Value>`), and every other value as a copy.
 
 ### `ArtifactsConfig`
 

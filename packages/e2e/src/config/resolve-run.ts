@@ -1,11 +1,13 @@
 /**
  * The runner's config: the project config `@e2e-dev/core` resolves too
- * (`resolveProjectConfig`), plus the reporters and test filters only a run
- * reads.
+ * (`resolveProjectConfig`), plus the reporters, test filters, and services
+ * only a run reads.
  */
 
 import { ConfigurationError } from '@e2e-dev/core/lib/internal/errors';
+import { isPlainObject } from '@e2e-dev/core/lib/internal/options';
 import { didYouMean } from '@e2e-dev/core/lib/internal/suggest';
+import type { Service } from '@e2e-dev/core/lib/types';
 import { BUILTIN_REPORTER_LIST, builtinReporter } from '../report/builtin.ts';
 import { BUILTIN_REPORTERS, builtinMark, isBuiltinReporter } from '../report/builtin-id.ts';
 import { ellipsize } from '../report/format.ts';
@@ -23,6 +25,8 @@ export interface ResolvedRunConfig extends ResolvedConfig {
   readonly reporters: readonly Reporter[];
   /** The test filters, in order; empty when unset. A run with `--changed-since` applies them. */
   readonly filters: readonly TestFilter[];
+  /** The services by name, in the order a run starts them; empty when unset. */
+  readonly services: ReadonlyMap<string, Service>;
 }
 
 /** The flags that replace config keys, `--reporter` among them. */
@@ -30,7 +34,7 @@ export interface RunCliOverrides extends CliOverrides {
   reporters?: readonly BuiltinReporter[];
 }
 
-/** Resolves a config file's export for the runner: the project config, then its reporters and filters. */
+/** Resolves a config file's export for the runner: the project config, then its reporters, filters, and services. */
 export function resolveConfig(
   raw: E2EConfig,
   options: {
@@ -41,7 +45,29 @@ export function resolveConfig(
   },
 ): ResolvedRunConfig {
   const resolved = resolveProjectConfig(raw, options);
-  return { ...resolved, reporters: resolveReporters(raw, options.cli ?? {}), filters: resolveTestFilters(raw.filters) };
+  return { ...resolved, reporters: resolveReporters(raw, options.cli ?? {}), filters: resolveTestFilters(raw.filters), services: resolveServices(raw.services) };
+}
+
+/**
+ * Resolves `services`: an object of service name to a service from
+ * `defineService`, checked structurally, never with `instanceof`, since the
+ * config may import another copy of `e2e`. Workers and `e2e list` resolve
+ * it too and never start a service.
+ */
+function resolveServices(raw: E2EConfig['services']): ReadonlyMap<string, Service> {
+  if (raw === undefined) return new Map();
+  if (!isPlainObject(raw)) {
+    throw new ConfigurationError('INVALID_CONFIG', 'services must be an object of service name to service: services: { email: defineService({ ... }) }');
+  }
+  return new Map(
+    Object.entries(raw).map(([name, service]) => {
+      const start: unknown = isPlainObject(service) ? service['start'] : undefined;
+      if (typeof start !== 'function') {
+        throw new ConfigurationError('INVALID_CONFIG', `services.${name} must be a service from defineService({ async *start() { ... } })`);
+      }
+      return [name, service];
+    }),
+  );
 }
 
 /**

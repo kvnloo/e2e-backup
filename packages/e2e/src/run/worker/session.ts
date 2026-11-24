@@ -289,6 +289,9 @@ export class TargetWorker {
         }
         return;
       }
+      case 'service-reply':
+        // A worker process takes the replies to its service calls before a message reaches here (`entry.ts`).
+        return;
       default:
         message satisfies never;
     }

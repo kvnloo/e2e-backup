@@ -548,7 +548,7 @@ The module is re-imported for every retry, serial group, and setup test, so
 It receives [worker fixtures](#worker-fixtures) only:
 
 - The [built-in fixtures](#fixtures) whose scope is worker on the target:
-  `platform`, and on a mobile target `device`, `app`, and `screen`.
+  `platform`, `services`, and on a mobile target `device`, `app`, and `screen`.
 - The worker fixtures of the `test` it was registered through. The ones it
   names are set up, and the ones declared with `auto: true`.
 
@@ -855,7 +855,7 @@ A static, non-empty array of unique names. Each name matches
 
 ### Fixtures
 
-Built-in fixtures are the fixtures a `test` has without `test.extend`: five
+Built-in fixtures are the fixtures a `test` has without `test.extend`: six
 on every engine, and the ones the target's engine contributes. Each has a
 scope on each engine.
 
@@ -865,6 +865,7 @@ scope on each engine.
 | [`app`](/reference/app) | `App` | test | worker |
 | [`screen`](/reference/screen) | `Screen` | test | worker |
 | `platform` | `string` | worker | worker |
+| [`services`](#services) | `Record<string, unknown>` | worker | worker |
 | [`session`](#test-setup) | `SetupSession` | test | test |
 | [`browser`](/reference/web) | `Browser` | test | - |
 | [`device`](/reference/mobile#device) | `Device` | - | worker |
@@ -903,6 +904,38 @@ Built-in fixtures are lazy. Destructuring in the parameter list acquires
 them before the body's first statement. [Your own
 fixtures](#your-own-fixtures) are set up before the first `beforeEach`.
 </Note>
+
+#### `services`
+
+The values of the config's [`services`](/reference/config#services), by
+name. Each worker gets a copy of the yielded data. Each function becomes an
+async function that calls the real one in the runner process and resolves
+to a copy of its result.
+
+```ts
+test.beforeEach(async ({ services }) => {
+  await services.email.clear();
+});
+```
+
+- It's typed from the config when the config's type is the third type
+  argument of [`test.extend`](#test-extend), and the config comes from
+  `defineConfig` or ends in `satisfies E2EConfig`. Without it, `services` is
+  a record of `unknown` values.
+- Every worker shares one instance of each service, so a test that changes
+  one changes it for every test. Nothing resets it between tests.
+- A call doesn't have a timeout. The test's deadline covers it.
+- A fixture of your own named `services` [extends this one](#extending-a-fixture),
+  so it's a worker fixture. Rename a test fixture with that name.
+- `e2e mcp` and `openHost` start no services. A test there that reads one
+  fails with an error that names it.
+  An `@e2e-dev/core` session doesn't have it.
+
+| Throws | When |
+| --- | --- |
+| `INVALID_ARGUMENT` | A function's arguments don't survive `structuredClone`. |
+| The function's error | The function throws in the runner process. The test gets a copy whose message names the service and the function (`services.email.clear() failed: ...`). |
+| `Error` | The function's result doesn't survive `structuredClone`. |
 
 #### Your own fixtures
 
@@ -1063,7 +1096,7 @@ test('signs out', async ({ app, platform, device }) => {
   targets that run it. With `requires: ['device']`, `device` is typed as
   `Device`. On a `describe`, these options don't change the types.
 - With a type annotation such as `const config: E2EConfig`, the engine types
-  are lost. To keep them, use `satisfies E2EConfig` instead.
+  are lost. To keep them, use `satisfies E2EConfig` or `defineConfig` instead.
 
 #### Extending a fixture
 
@@ -1396,6 +1429,8 @@ export interface TestFixtures {
   readonly screen: Screen;
   /** The target's platform label: `web`, `ios`, `android`, or an engine's own string. */
   readonly platform: string;
+  /** The values of the config's `services`, by name: their data copied, and each function an async call to the runner. */
+  readonly services: Readonly<Record<string, unknown>>;
 }
 
 export interface SetupFixtures extends TestFixtures {
@@ -1422,6 +1457,8 @@ export type FixtureScope = 'test' | 'worker';
 export interface WorkerFixtures {
   /** The target's platform label: `web`, `ios`, `android`, or an engine's own string. */
   readonly platform: string;
+  /** The values of the config's `services`, by name: their data copied, and each function an async call to the runner. */
+  readonly services: Readonly<Record<string, unknown>>;
 }
 
 /** @deprecated `beforeAll` and `afterAll` receive the worker fixtures: use `WorkerFixtures`. */

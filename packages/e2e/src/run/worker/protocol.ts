@@ -19,6 +19,7 @@ import type { McpToolResult } from '../../session-tools/tools.ts';
 import type { HeldTestOpening } from '../step-attachment-wire.ts';
 import type { StepHold } from '../step-hold.ts';
 import type { StepProgress } from '@e2e-dev/core/lib/run/steps';
+import type { ServiceReply, ServiceWire } from '../services.ts';
 
 /** One runnable pair on the wire; the worker resolves the test function. */
 export interface WirePair {
@@ -77,6 +78,8 @@ export interface WorkerBootstrap {
   readonly aiTrace: boolean;
   /** Whether each top-level step waits for the runner's `step-release` (`e2e run --step`). */
   readonly holdSteps: boolean;
+  /** The values of the services the runner started, which the `services` fixture hands out. */
+  readonly services: ServiceWire;
 }
 
 export interface RunUnitMessage {
@@ -189,6 +192,13 @@ type StepAttachmentCancelMessage = {
   readonly requestId: string;
 };
 
+/** The answer to a `service-call`. */
+export type ServiceReplyMessage = {
+  readonly type: 'service-reply';
+  readonly requestId: string;
+  readonly reply: ServiceReply;
+};
+
 export type MainToWorker =
   | RunUnitMessage
   | InterruptMessage
@@ -199,6 +209,7 @@ export type MainToWorker =
   | HoldRequestMessage
   | StepAttachmentRequestMessage
   | StepAttachmentCancelMessage
+  | ServiceReplyMessage
   | ContinueMessage;
 
 export interface ReadyMessage {
@@ -343,6 +354,20 @@ type StepAttachmentReplyMessage = {
   readonly response: StepAttachmentResponse;
 };
 
+/**
+ * A test called a function of a service's value. The runner calls the real
+ * function and answers with a `service-reply`. A call doesn't have a timeout:
+ * the test's deadline covers it.
+ */
+export interface ServiceCallMessage {
+  readonly type: 'service-call';
+  readonly requestId: string;
+  /** The function's index in `ServiceWire.functions`. */
+  readonly call: number;
+  /** The arguments, serialized in base64. */
+  readonly args: string;
+}
+
 /** The hold `holdId` names ended without a release: its step was abandoned, or its attempt ended. */
 export interface StepCancelMessage {
   readonly type: 'step-cancel';
@@ -455,6 +480,7 @@ export type WorkerToMain =
   | ScreenReplyMessage
   | LogsReplyMessage
   | StepAttachmentReplyMessage
+  | ServiceCallMessage
   | OutputMessage
   | NoticeMessage
   | ResultMessage

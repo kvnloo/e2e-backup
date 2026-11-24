@@ -20,6 +20,8 @@ import { StreamRedactor } from '@e2e-dev/core/lib/internal/redact';
 import { ConfigLoadHold, writtenChunk } from '../process-output.ts';
 import { processSecrets, registerStaticSecrets, staticSecretLedger } from '@e2e-dev/core/lib/run/secrecy';
 import { SessionStore } from '@e2e-dev/core/lib/run/sessions';
+import { setServiceValues } from '@e2e-dev/core/lib/run/service-values';
+import { copyServiceValues, type ServiceReply } from '../services.ts';
 import type {
   ChildProcessInbound,
   OutputMessage,
@@ -145,6 +147,10 @@ function captureOutput(pairInFlight: () => OutputMessage['pair']): () => void {
   };
 }
 
+/** The service calls waiting for the runner's `service-reply`, by request id. */
+const serviceCalls = new Map<string, (reply: ServiceReply) => void>();
+let serviceCallCount = 0;
+
 function fatal(cause: unknown): void {
   send({ type: 'fatal', error: serializeError(classifyError(cause)) });
   exitAfterFlush(1);
@@ -184,6 +190,15 @@ async function bootstrap(
       }
       setSecretRegistry(resolved);
       registerStaticSecrets(resolved.allSecrets);
+      setServiceValues(
+        copyServiceValues(message.services, (call, args) => {
+          serviceCallCount += 1;
+          const requestId = String(serviceCallCount);
+          const reply = new Promise<ServiceReply>((resolve) => serviceCalls.set(requestId, resolve));
+          void send({ type: 'service-call', requestId, call, args });
+          return reply;
+        }),
+      );
       return { config: resolved, target: named };
     },
     (stream, chunk) => process[stream].write(chunk),
@@ -307,6 +322,11 @@ function main(): void {
         () => bootstrap(message.bootstrap, debug, aiTrace),
       );
       worker.start();
+      return;
+    }
+    if (message.type === 'service-reply') {
+      serviceCalls.get(message.requestId)?.(message.reply);
+      serviceCalls.delete(message.requestId);
       return;
     }
     worker?.handle(message);

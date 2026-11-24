@@ -17,6 +17,7 @@ import { outputLayout } from './output.ts';
 import type { ProcessPool } from './process-pool.ts';
 import { PreparedEngines, recordingNotices, startDeclaredProcesses, validateEngine } from './provision.ts';
 import { processSecrets } from './secrecy.ts';
+import { setUnstartedServices } from './service-values.ts';
 import { SessionStore } from './sessions.ts';
 import {
   launchAttempt, reserveAttempt, type AttemptPolicy, type AttemptReservation, type StandaloneAttempt, type StandaloneSessionOptions,
@@ -31,6 +32,11 @@ export interface StandaloneHostOptions {
   readonly env: NodeJS.ProcessEnv;
   readonly signal: AbortSignal;
   readonly processes?: ProcessPool | undefined;
+  /**
+   * What an `app.command.env` function receives as `services`, and the
+   * `services` fixture holds; empty unless set.
+   */
+  readonly services?: Readonly<Record<string, unknown>> | undefined;
   readonly notice?: (target: string, message: string) => void;
   readonly debug?: DebugTrace;
 }
@@ -156,7 +162,8 @@ export async function openWorker<Sessions extends EngineSessions, Extra>(
       runId, hostId: options.hostId, projectRoot: config.projectRoot, env: options.env, signal, headed: options.headed, notice,
     });
     const hooks = { ci: config.ci, env: options.env, notice: (message: string) => notice('app', message) };
-    processes = await startDeclaredProcesses([target], config.projectRoot, hooks, signal, debug, options.processes);
+    if (options.services !== undefined) setUnstartedServices(options.services);
+    processes = await startDeclaredProcesses([target], config.projectRoot, hooks, signal, debug, options.processes, options.services);
     if (signal.aborted) throw new InfrastructureError('CANCELLED', `opening a host on target "${target.name}" was cancelled`);
     executor = policy.sessions({
       config, target, runId, hostId: options.hostId, artifactsRoot: layout.results, sessionStore,

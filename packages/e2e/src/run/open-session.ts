@@ -11,6 +11,7 @@ import { registerProviderKeys, registerStaticSecrets } from '@e2e-dev/core/lib/r
 import { warnOfNodeDebug } from './node-debug.ts';
 import { selectTarget } from './select-target.ts';
 import { openStandaloneHost } from './standalone-kinds.ts';
+import { unstartedServices } from './services.ts';
 import type { StepProgress, StepRecord } from '@e2e-dev/core/lib/run/steps';
 import { reserveHostedRun } from './public-ownership.ts';
 import { redactOpening } from '@e2e-dev/core/lib/run/redact-opening';
@@ -90,6 +91,7 @@ async function openHostWorker<Fixtures extends object>(options: OpenHostOptions)
     const { config, target } = await allocateTargetPorts(loaded, selectTarget(loaded, options.target, 'pass `target` to openHost'));
     const host = await openStandaloneHost({
       config, target, headed: options.headed ?? false, env,
+      services: unstartedServices('openHost'),
       signal: options.signal ?? new AbortController().signal,
       ...(options.onNotice === undefined ? {} : { notice: options.onNotice }),
     });

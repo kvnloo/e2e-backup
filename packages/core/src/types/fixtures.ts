@@ -5,6 +5,7 @@
 
 import type { EngineHandle } from '../engine/index.ts';
 import type { TestFixtures } from '../types.ts';
+import type { ServiceValues } from './services.ts';
 
 /**
  * How long one fixture instance lives. `test`, the default, is one instance
@@ -25,6 +26,8 @@ export type FixtureScope = 'test' | 'worker';
 export interface WorkerFixtures {
   /** The target's platform label: `web`, `ios`, `android`, or an engine's own string. */
   readonly platform: string;
+  /** The values of the config's `services`, by name: their data copied, and each function an async call to the runner. */
+  readonly services: Readonly<Record<string, unknown>>;
 }
 
 /** @deprecated `beforeAll` and `afterAll` receive the worker fixtures: use `WorkerFixtures`. */
@@ -117,12 +120,13 @@ export type FixtureOverride<Base, Worker, K extends keyof Base, Sees, WorkerSees
  * Engine fixtures, `app`, and `screen` are worker fixtures on a target
  * whose engine has `isolation: 'worker'`, and test fixtures otherwise.
  * `platform` is in both halves, so an intersection of members with
- * different platforms reduces to `never`.
+ * different platforms reduces to `never`. `services`, typed from the
+ * config's `services`, is in the worker half.
  */
 export type ConfigFixtures<Config, Half extends FixtureScope, Handle = ConfigEngines<Config>> = unknown extends Config
   ? {}
   : Handle extends EngineHandle<infer Fixtures, infer Platform, infer Isolation>
-    ? { readonly platform: Platform } & (Half extends ([Isolation] extends ['worker'] ? 'worker' : 'test')
+    ? { readonly platform: Platform } & (Half extends 'worker' ? { readonly services: ConfigServices<Config> } : {}) & (Half extends ([Isolation] extends ['worker'] ? 'worker' : 'test')
       ? Pick<TestFixtures, 'app' | 'screen'> & Fixtures
       : {}) & { readonly [Name in Exclude<ConfigFixtureNames<ConfigEngines<Config>>, keyof Fixtures>]?: undefined }
     : never;
@@ -132,7 +136,10 @@ export type ConfigFixtures<Config, Half extends FixtureScope, Handle = ConfigEng
  * this, a fixture typed on the base `test` (`device: Device`, say) would keep
  * that type on every target, even where it's `undefined`.
  */
-export type ConfigBase<Base, Config> = unknown extends Config ? Base : Omit<Base, ConfigFixtureNames<ConfigEngines<Config>> | 'app' | 'screen'>;
+export type ConfigBase<Base, Config> = unknown extends Config ? Base : Omit<Base, ConfigFixtureNames<ConfigEngines<Config>> | 'app' | 'screen' | 'services'>;
+
+/** The value of each service in `Config`, by name; empty when it declares none. */
+type ConfigServices<Config> = Config extends { readonly services?: infer Services } ? ServiceValues<NonNullable<Services>> : {};
 
 /**
  * `Fixtures` without the targets that a test's `requires` and `platforms`

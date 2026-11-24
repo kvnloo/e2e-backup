@@ -97,7 +97,7 @@ jq '.run.results[] | select(.selected and .status != "passed") | .attempts[-1]
 
 | Code | Usual cause | Fix |
 | --- | --- | --- |
-| `CONFIG_LOAD_FAILED` | The config throws while loading (a refused engine option is `INVALID_CONFIG` instead) or imports a missing package, subpath, or removed export such as `defineConfig` | Install the dependency, or fix the import or line quoted |
+| `CONFIG_LOAD_FAILED` | The config throws while loading (a refused engine option is `INVALID_CONFIG` instead) or imports a missing package, subpath, or removed export such as `createAgent` from `e2e/agent` | Install the dependency, or fix the import or line quoted |
 | `INVALID_CONFIG`, `INVALID_GLOB` | Unknown or foreign key (`app`, `webServer`, `use`, `projects`, `baseURL`), two of `list`, `dot`, and `line` together; a `tests` glob with braces, classes, an absolute path, or no wildcard | The message names the key or glob to write; the app is declared in the target's `app` |
 | `CONFIG_NOT_FOUND` | Wrong `--config` path, or an MCP `open_session` in a directory with no config | Fix the path; in a directory with no config, pass `engine` to `open_session` (topic `mcp`) |
 | `CONFIG_AMBIGUOUS` | Both `.ts` and `.mts` present | Keep one |
@@ -107,6 +107,9 @@ jq '.run.results[] | select(.selected and .status != "passed") | .attempts[-1]
 | `INVALID_CHANGED_SINCE` | `--changed-since` names no commit in the checkout, shares no history with HEAD (a shallow clone, or unrelated histories), or git is missing | Run from a git checkout with git installed; check the ref; fetch it and more history (`git fetch --unshallow`, or `fetch-depth: 0` on `actions/checkout`); for unrelated histories, name a ref on HEAD's history |
 | `COLLECTION_ERROR` | `async` describe body, `test.setup` inside `describe`, an option forbidden in a serial group, registration outside collection | Restructure per `writing-tests` |
 | `HOOK_FAILED` | `beforeAll` or `afterAll` threw; its scope's tests skip | Fix the hook; the report carries its error |
+| `SERVICE_START_FAILED` | A service's `start` threw, finished without a `yield`, or didn't yield within 60 seconds | Fix the service code the message names; pass `signal` to what it starts |
+| `INVALID_SERVICE_VALUE` | A service yielded a class instance or a value `structuredClone` can't copy | Yield a plain object of data and functions, such as `{ url, reset: () => emulator.reset() }` |
+| `SERVICE_STOP_FAILED` | The code after a service's `yield` threw, yielded again, or ran past 10 seconds | Make the stop code finish; a service yields once |
 | `UNSUPPORTED_ARTIFACT` | A test's or target's `video` on an engine that cannot record | Drop it there, or set it at the config root or CLI (such targets skip with a notice) |
 | `BROWSER_INSTALL_FAILED`, `LAUNCH_TIMEOUT` | Browser download failed; engine init or attempt start exceeded `launchTimeout` | Run the quoted `npx @e2e-dev/web install <names>` or `pnpm exec e2e-web install <names>` (`--with-deps` on bare Linux); raise the root `launchTimeout` (60 s default) |
 | `APP_UNREACHABLE` | The app failed readiness or its command exited. An exit after readiness stops only dependent targets with unfinished work. On a device, the message can identify a failed iOS automation runner | Read the exit details and any log excerpt. Set `app.command.log` if requested. Check `app.url`, the port, and the command settings. Runner: rerun, else `npx agent-device daemon stop` and reboot the simulator |

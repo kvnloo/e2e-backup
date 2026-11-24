@@ -6,7 +6,7 @@
  * provision differently.
  */
 
-import { engineAppInfo } from '../config/app.ts';
+import { engineAppInfo, spawnedCommand } from '../config/app.ts';
 import type { ResolvedTarget } from '../config/resolve.ts';
 import type { EnginePrepareResult } from '../engine/index.ts';
 import { ENGINE_SPI_VERSION, type EngineSpiVersion } from '../engine/contract.ts';
@@ -272,7 +272,8 @@ export interface ProcessHooks extends Omit<ManagedProcessHooks, 'unexpectedExit'
  * Starts every distinct app command the targets declare, in target order,
  * deduplicated across targets (two browsers on one dev server share one
  * process). `pool` decides whether each is started for this call or shared
- * with others that declare it. Nothing more is acquired once `signal`
+ * with others that declare it. A function `env` is called with `services`
+ * right before its command spawns, never for a process that's reused. Nothing more is acquired once `signal`
  * aborted; what was acquired is returned for release either way.
  */
 export async function startDeclaredProcesses(
@@ -282,6 +283,7 @@ export async function startDeclaredProcesses(
   signal: AbortSignal,
   debug: DebugTrace,
   pool: ProcessPool = UNSHARED,
+  services: Readonly<Record<string, unknown>> = {},
 ): Promise<AppProcesses> {
   const held: AppProcesses[] = [];
   const processes: AppProcesses = {
@@ -292,11 +294,12 @@ export async function startDeclaredProcesses(
   // A cleanup failure after a failed start is a notice at most: the startup failure is the one reported.
   const onCleanupFailure = (failure: unknown): void => hooks.notice?.(`cleanup after a failed start: ${String(failure)}`);
   try {
-    for (const { label, command, readyUrl, key, targetNames } of declaredCommands(targets)) {
+    for (const { label, command, readyUrl, port, key, targetNames } of declaredCommands(targets)) {
       if (signal.aborted) return processes;
       const start = async (scope: AbortSignal): Promise<AppProcesses> => {
-        const app = new ManagedProcess(label, command, projectRoot, { readyUrl }, {
+        const app = new ManagedProcess(label, { ...command, env: undefined }, projectRoot, { readyUrl }, {
           ...hooks,
+          spawnEnv: async () => (await spawnedCommand(command, `target "${targetNames[0]}" app.command`, port, services)).env,
           unexpectedExit: (cause) => hooks.commandExited?.(targetNames, cause),
         });
         const stop: AppProcesses['stop'] = async (onFailure) => {

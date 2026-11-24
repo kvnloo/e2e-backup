@@ -33,6 +33,7 @@ import { engineAppInfo, joinLink, refusesLink } from '../config/app.ts';
 import type { ResolvedAgentConfig, ResolvedConfig, ResolvedTarget } from '../config/resolve.ts';
 import type { App, CommandConfig, Expectable, FixtureScope, RecordingOptions, SetupSession, TestFixtures } from '../types.ts';
 import type { StepRecord, StepRecorder } from './steps.ts';
+import { serviceValues } from './service-values.ts';
 
 export interface ArtifactSink {
   /** Absolute attempt artifact directory, for runner-written artifacts. */
@@ -291,8 +292,9 @@ export type BuiltInTarget = Pick<ResolvedTarget, 'name' | 'platform' | 'fixtureS
 
 /**
  * One core fixture: its scope, and how it is built. Most are built from the
- * attempt (`create`); one the target alone decides (`ofTarget`) needs no
- * attempt, so code that outlives every attempt can read it.
+ * attempt (`create`). One the target or the worker process decides
+ * (`ofTarget`) needs no attempt, so code that outlives every attempt can read
+ * it.
  */
 type CoreFixture<Value> = { readonly scope: CoreFixtureScope } & (
   | { create(context: CoreFixtureContext): Value }
@@ -317,6 +319,7 @@ export const CORE_FIXTURES: { readonly [Name in keyof CoreFixtureValues]: CoreFi
   app: { scope: 'engine', create: ({ environment, engine }) => createApp(environment, engine) },
   screen: { scope: 'engine', create: ({ screenContext }) => createScreen(screenContext) },
   platform: { scope: 'worker', ofTarget: (target) => target.platform },
+  services: { scope: 'worker', ofTarget: () => serviceValues() },
   session: {
     scope: 'test',
     create: ({ environment }) => ({
@@ -342,7 +345,7 @@ function coreFixture(name: string): CoreFixture<unknown> | undefined {
   return Object.hasOwn(CORE_FIXTURE, name) ? CORE_FIXTURE[name] : undefined;
 }
 
-/** Whether reading `name` takes an attempt: true of every fixture but a core one the target alone decides. */
+/** Whether reading `name` takes an attempt: true of every fixture but a core one the target or the worker decides. */
 function needsAttempt(name: string): boolean {
   const fixture = coreFixture(name);
   return fixture === undefined || !('ofTarget' in fixture);
@@ -367,7 +370,7 @@ export interface BuiltInFixtures {
    * Undefined when no target has a built-in fixture of that name.
    */
   scope(name: string): FixtureScope | 'unresolved' | undefined;
-  /** Whether reading `name` takes an attempt on the engine: every built-in but the ones the target alone decides. */
+  /** Whether reading `name` takes an attempt on the engine: every built-in but the ones the target or the worker decides. */
   needsAttempt(name: string): boolean;
   /** The value of a built-in that needs no attempt. */
   attemptless(name: string): unknown;

@@ -5,15 +5,15 @@
  */
 
 import type { EngineAppDeclaration, EngineAppInfo, EngineHandle } from '../engine/index.ts';
-import { ConfigurationError } from '../internal/errors.ts';
+import { ConfigurationError, errorMessage } from '../internal/errors.ts';
 import { obj } from '../internal/objects.ts';
 import { checkLaunchArguments, engineLaunchArguments } from '../internal/launch-arguments.ts';
 import { rejectUnknownKeys } from '../internal/options.ts';
 import { didYouMean } from '../internal/suggest.ts';
 import { isImplicitTestHost, isRefusedLinkScheme, normalizeBaseUrl, portOf, requestsFreePort, siteOf, withPort, type NormalizedBaseUrl } from '../internal/urls.ts';
 import type { AppPermissionState, CommandConfig, ResolvedLaunchArguments, TargetApp } from '../types.ts';
-import { checkLog, digestCommand, isRecord, normalizeCommand } from './command.ts';
-import { httpUrl } from './validate.ts';
+import { checkLog, digestCommand, envVariables, isRecord, normalizeCommand, type SpawnedCommand } from './command.ts';
+import { describeValue, httpUrl } from './validate.ts';
 
 /** A target's `app` as checked: every field's shape, nothing resolved yet. */
 export interface TargetAppDeclaration {
@@ -233,14 +233,49 @@ function expandPort(value: string, port: number | undefined, label: string): str
   return value.replaceAll(PORT_TOKEN, String(port));
 }
 
-/** The command with `{port}` expanded in every `args` entry and `env` value. */
+/**
+ * The command with `{port}` expanded in every `args` entry and `env` value.
+ * A function `env` is kept until the run calls it (`spawnedCommand`).
+ */
 function expandCommandPort(command: CommandConfig, label: string, port: number | undefined): CommandConfig {
   const { args, env } = command;
   return obj({
     ...command,
     args: args?.map((arg) => expandPort(arg, port, `${label}.args`)),
-    env: env === undefined ? undefined : Object.fromEntries(Object.entries(env).map(([key, value]) => [key, expandPort(value, port, `${label}.env.${key}`)])),
+    env: env === undefined || typeof env === 'function' ? env : expandEnvPort(env, label, port),
   });
+}
+
+/** The variables with `{port}` expanded in every value. */
+function expandEnvPort(env: Readonly<Record<string, string>>, label: string, port: number | undefined): Readonly<Record<string, string>> {
+  return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, expandPort(value, port, `${label}.env.${key}`)]));
+}
+
+/**
+ * The command a run spawns for a target's `app.command`. A function `env` is
+ * called with `services`. The variables it returns get the checks a plain
+ * `env` gets at config load, and `{port}` expands in them to `port`, the
+ * port of the target's URL. `label` names the command in errors
+ * (`target "web" app.command`).
+ */
+export async function spawnedCommand(
+  command: CommandConfig,
+  label: string,
+  port: number | undefined,
+  services: Readonly<Record<string, unknown>>,
+): Promise<SpawnedCommand> {
+  const { env, ...rest } = command;
+  if (typeof env !== 'function') return { ...rest, env };
+  let returned: unknown;
+  try {
+    returned = await env({ services });
+  } catch (cause) {
+    throw new ConfigurationError('INVALID_CONFIG', `${label}.env threw: ${errorMessage(cause)}`, { cause });
+  }
+  if (!isRecord(returned)) {
+    throw new ConfigurationError('INVALID_CONFIG', `${label}.env must return an object of variable name to string, got ${describeValue(returned)}`);
+  }
+  return { ...rest, env: expandEnvPort(envVariables(returned, `${label}.env`), label, port) };
 }
 
 /**
