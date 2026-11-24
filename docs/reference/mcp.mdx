@@ -285,6 +285,8 @@ Test lines: 2, 1 read not listed.
   and fails as it does in a test, and a function you pass, such as a
   `browser.route` handler, is called like a test's.
 - `return` a JSON value to get it back. `console.log` lines come back too.
+- Queries on `screen` use the target's
+  [`locators.visible`](/reference/config#locators), as in a test.
 - A line that fails throws the error a test gets, with its `code`. Uncaught,
   it stops the code and the result is an error result. The app stays where
   the passing lines left it.
@@ -354,13 +356,14 @@ Test line: await screen.getByRole("button", "Sign in").tap();
   id are tried in that order, and the first that matches the target and
   nothing else on the live screen wins, as [`locate`](#locate) would report it.
 - A locator that also matches twins is narrowed: to nodes that render
-  (`{ visible: true }`, left out of the line when the target's
-  [`locators.visible`](/reference/config#locators) is true), then
-  under a container
+  (`{ visible: true }`), then under a container
   (`getByRole("listitem").filter({ hasText: "Offer B" })`), then by position
   (`.nth(1)`, with a comment saying so). A position is used only when the
   live twins are the ones the observation listed, each in place or all
   moved together.
+- `{ visible: true }` is left out of generated text, label, placeholder, and
+  test ID lines when the target's
+  [`locators.visible`](/reference/config#locators) is true.
 - A control with no name, label, placeholder, text, or test id is found by
   its role: alone when it is the only one (`getByRole("spinbutton")`, with
   a comment), else narrowed like twins.

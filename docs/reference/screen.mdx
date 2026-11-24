@@ -43,9 +43,8 @@ after whitespace normalization: `getByRole('button', 'Save')` does not match
 `Save changes`. `{ exact: false }` makes it a case-insensitive substring
 match, and a `RegExp` matches as written.
 
-Every query accepts `visible: true`. See
-[Hidden duplicates](#hidden-duplicates) for what it does and how to make it
-the default.
+Every query accepts `visible: true`; see
+[Hidden duplicates](#hidden-duplicates).
 
 #### `getByRole`
 
@@ -254,7 +253,9 @@ screen.getByTestId(/total-budgeted$/);
 Every query accepts `visible: true`, which drops nodes the platform reports
 as hidden before the exactly-one rule runs. Frameworks often keep a hidden
 copy of content in the document, such as a closed drawer or an inactive tab
-panel, and without `visible` both copies match.
+panel. With the default config, a text or test ID query matches both copies.
+Set `visible: true` on the query or in
+[`locators`](/reference/config#locators) to skip the hidden copy.
 
 ```ts
 await browser.reload();
@@ -264,24 +265,9 @@ await screen.getByPlaceholder('Search memory...', { visible: true }).fill('launc
 await screen.getByTestId('memory-list', { visible: true }).getByRole('listitem').first().tap();
 ```
 
-On a native app, earlier screens can stay mounted behind the current one,
-so most queries need `visible: true`. It can be made the default with
-[`locators: { visible: true }`](/reference/config#locators) in the config or
-on a target:
-
-```ts title="e2e.config.ts"
-export default {
-  targets: [{ engine: mobile({ platform: 'ios' }), app: { bundleId: 'com.example.app' } }],
-  locators: { visible: true },
-} satisfies E2EConfig;
-```
-
-With it set:
-
-- Hidden nodes are skipped by queries called without `visible`.
-- Hidden nodes are kept by a query called with `{ visible: false }`.
-
-`getByRole` isn't affected, since it never matches a hidden node.
+`getByRole` skips nodes hidden from the accessibility tree and doesn't use
+the `locators` default. Pass `{ visible: true }` to a role query that must
+also skip a node that doesn't render.
 
 `visible` uses the same visibility check as `toBeVisible()`, `isVisible()`,
 and `waitFor()`: what renders, as Playwright reads it.

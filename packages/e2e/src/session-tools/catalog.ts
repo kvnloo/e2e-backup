@@ -248,11 +248,11 @@ export function locateQuery(args: LocateArgs, visible = false): LocateQuery {
     };
   }
   if (name !== undefined) throw new ConfigurationError('INVALID_ARGUMENT', 'name only narrows a role query');
-  if (testId !== undefined) return { expression: testIdQuery(testId, { visible }, undefined), code: `screen.getByTestId(${JSON.stringify(testId)})`, notFound };
+  if (testId !== undefined) return { expression: testIdQuery(testId, undefined, undefined, visible), code: `screen.getByTestId(${JSON.stringify(testId)})`, notFound };
   const options = exact ? '' : `, { exact: false }`;
-  if (text !== undefined) return { expression: textQuery('text', text, { exact, visible }, undefined), code: `screen.getByText(${JSON.stringify(text)}${options})`, notFound };
-  if (label !== undefined) return { expression: textQuery('label', label, { exact, visible }, undefined), code: `screen.getByLabel(${JSON.stringify(label)}${options})`, notFound };
-  return { expression: textQuery('placeholder', placeholder!, { exact, visible }, undefined), code: `screen.getByPlaceholder(${JSON.stringify(placeholder)}${options})`, notFound };
+  if (text !== undefined) return { expression: textQuery('text', text, { exact }, undefined, visible), code: `screen.getByText(${JSON.stringify(text)}${options})`, notFound };
+  if (label !== undefined) return { expression: textQuery('label', label, { exact }, undefined, visible), code: `screen.getByLabel(${JSON.stringify(label)}${options})`, notFound };
+  return { expression: textQuery('placeholder', placeholder!, { exact }, undefined, visible), code: `screen.getByPlaceholder(${JSON.stringify(placeholder)}${options})`, notFound };
 }
 
 /**

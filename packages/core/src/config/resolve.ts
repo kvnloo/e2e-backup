@@ -693,7 +693,7 @@ function targetRecording(run: RunRecording, own: unknown, where: string, kind: R
 function locatorsVisible(value: unknown, where: string): boolean | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) {
-    throw new ConfigurationError('INVALID_CONFIG', `${where} must be an object, got ${describeValue(value)}`);
+    throw new ConfigurationError('INVALID_CONFIG', `${where} must be a plain object, got ${describeValue(value)}`);
   }
   rejectUnknownKeys(where, value, ['visible']);
   const { visible } = value;
@@ -1026,9 +1026,6 @@ function computeConfigDigest(
   // one leaves the replays valid, like a reporter.
   // `targets` digest by declaration below and never enter the clone: an
   // engine holds `secrets.get()` handles, which refuse to serialize.
-  // The top-level `locators` is left out of the clone. It's digested with
-  // each resolved target instead, so a default gives the same digest
-  // whether it's set on the config or on a target.
   const {
     failOnSkippedFailure: _failOnSkippedFailure,
     maxDuration: _maxDuration,
@@ -1037,7 +1034,6 @@ function computeConfigDigest(
     output: _output,
     trace: _trace,
     video: _video,
-    locators: _locators,
     targets: _targets,
     credentials: _credentials,
     secrets: _secrets,

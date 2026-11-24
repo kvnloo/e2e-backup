@@ -24,10 +24,10 @@ function emailField(id: string, hidden: boolean): SemanticNode {
 
 const NODES: readonly SemanticNode[] = [emailField('shown', false), emailField('drawer', true)];
 
-function screenWith(visible: boolean): Screen {
+function screenWith(visible: boolean, nodes: readonly SemanticNode[] = NODES): Screen {
   return screenOver({
-    observe: () => snapshot(NODES),
-    locate: (expression) => resolveExpression(expression, NODES),
+    observe: () => snapshot(nodes),
+    locate: (expression) => resolveExpression(expression, nodes),
     timeoutMs: 300,
     locators: { visible },
   }).screen;
@@ -55,5 +55,12 @@ describe('locators.visible', () => {
 
     expect(await query(screen).count()).toBe(2);
     expect(await query(screen, { visible: true }).count()).toBe(1);
+  });
+
+  it('applies to a query chained under another locator', async () => {
+    const form: SemanticNode = { ref: { id: 'form', revision: '' }, role: 'form', name: 'Sign in', children: NODES };
+
+    expect(await screenWith(true, [form]).getByRole('form').getByTestId('email').count()).toBe(1);
+    expect(await screenWith(false, [form]).getByRole('form').getByTestId('email').count()).toBe(2);
   });
 });

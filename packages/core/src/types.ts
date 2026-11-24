@@ -1578,8 +1578,9 @@ export interface Target {
 /** Defaults for screen queries. An option passed to a query takes precedence. */
 export interface LocatorsConfig {
   /**
-   * The default `visible` option of every query except `getByRole` (false if
-   * unset). Set it to true when most queries need `{ visible: true }`.
+   * The default `visible` option of every query except `getByRole`. An
+   * omitted target value inherits the project value, which defaults to
+   * `false`. Set it to true when most queries need `{ visible: true }`.
    */
   visible?: boolean;
 }

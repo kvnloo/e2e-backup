@@ -290,7 +290,9 @@ An id is its factory called with no options. An unknown id is
 Defaults for screen queries. With `visible: true`, hidden nodes are skipped
 by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
 `getByTestId`, as if `{ visible: true }` were passed to each query.
-`getByRole` never matches a hidden node.
+`getByRole` skips nodes hidden from the accessibility tree and doesn't use
+this default. Pass `{ visible: true }` to a role query that must also skip a
+node that doesn't render.
 
 ```ts
 locators: { visible: true }, // default: { visible: false }
@@ -302,8 +304,8 @@ locators: { visible: true }, // default: { visible: false }
   matches are kept with `screen.getByText('Saved', { visible: false })`.
 - The same default is used by `run_code`, `locate`, and the test lines of an
   [`e2e mcp`](/reference/mcp) session.
-- A value that isn't an object, a `visible` that isn't a boolean, or an
-  unknown key is `INVALID_CONFIG`.
+- A value that isn't a plain object or a `visible` that isn't a boolean is
+  `INVALID_CONFIG`.
 - See [Hidden duplicates](/reference/screen#hidden-duplicates).
 
 ### targets
@@ -1734,8 +1736,9 @@ export interface Target {
 /** Defaults for screen queries. An option passed to a query takes precedence. */
 export interface LocatorsConfig {
   /**
-   * The default `visible` option of every query except `getByRole` (false if
-   * unset). Set it to true when most queries need `{ visible: true }`.
+   * The default `visible` option of every query except `getByRole`. An
+   * omitted target value inherits the project value, which defaults to
+   * `false`. Set it to true when most queries need `{ visible: true }`.
    */
   visible?: boolean;
 }

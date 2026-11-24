@@ -177,11 +177,6 @@ class ScreenImpl implements Screen {
     return this.wrap === undefined ? expression : this.wrap(expression);
   }
 
-  /** Returns the query's options, with the target's `locators.visible` when `visible` isn't set. */
-  private withDefaultVisible(options: TextMatchOptions | undefined): TextMatchOptions {
-    return { ...options, visible: options?.visible ?? this.context.locators.visible };
-  }
-
   getByRole(role: Role | RoleAlias, nameOrOptions?: TextMatch | RoleOptions, maybeOptions?: Omit<RoleOptions, 'name'>): Locator {
     const named = isTextMatch(nameOrOptions);
     if (!named && maybeOptions !== undefined) {
@@ -195,33 +190,33 @@ class ScreenImpl implements Screen {
 
   getByLabel(text: TextMatch, options?: TextMatchOptions): Locator {
     rejectUnknownOptions('getByLabel', options, TEXT_OPTION_KEYS, 'INVALID_LOCATOR');
-    return new LocatorImpl(this.context, this.build(textQuery('label', text, this.withDefaultVisible(options), this.scope)));
+    return new LocatorImpl(this.context, this.build(textQuery('label', text, options, this.scope, this.context.locators.visible)));
   }
 
   getByPlaceholder(text: TextMatch, options?: TextMatchOptions): Locator {
     rejectUnknownOptions('getByPlaceholder', options, TEXT_OPTION_KEYS, 'INVALID_LOCATOR');
     return new LocatorImpl(
       this.context,
-      this.build(textQuery('placeholder', text, this.withDefaultVisible(options), this.scope)),
+      this.build(textQuery('placeholder', text, options, this.scope, this.context.locators.visible)),
     );
   }
 
   getByText(text: TextMatch, options?: TextMatchOptions): Locator {
     rejectUnknownOptions('getByText', options, TEXT_OPTION_KEYS, 'INVALID_LOCATOR');
-    return new LocatorImpl(this.context, this.build(textQuery('text', text, this.withDefaultVisible(options), this.scope)));
+    return new LocatorImpl(this.context, this.build(textQuery('text', text, options, this.scope, this.context.locators.visible)));
   }
 
   getByDisplayValue(value: TextMatch, options?: TextMatchOptions): Locator {
     rejectUnknownOptions('getByDisplayValue', options, TEXT_OPTION_KEYS, 'INVALID_LOCATOR');
     return new LocatorImpl(
       this.context,
-      this.build(textQuery('displayValue', value, this.withDefaultVisible(options), this.scope)),
+      this.build(textQuery('displayValue', value, options, this.scope, this.context.locators.visible)),
     );
   }
 
   getByTestId(id: TextMatch, options?: { visible?: boolean }): Locator {
     rejectUnknownOptions('getByTestId', options, ['visible'], 'INVALID_LOCATOR');
-    return new LocatorImpl(this.context, this.build(testIdQuery(id, this.withDefaultVisible(options), this.scope)));
+    return new LocatorImpl(this.context, this.build(testIdQuery(id, options, this.scope, this.context.locators.visible)));
   }
 
   async tapAt(point: ScreenPoint, options?: ActionOptions): Promise<void> {
