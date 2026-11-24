@@ -307,10 +307,9 @@ export default {
   declares [`app.linkBase`](/reference/config#linkbase); without it, `app.open`
   takes no path and a link goes through [`device.openLink`](#openlink).
   With `app.open(path, { relaunch: true })`, the app is stopped first if it's
-  running, then launched from the link. `app.launchArguments` and
-  `app.permissions` aren't applied to that launch. On an iOS simulator, an
-  `http(s)` link is opened only after the app has launched, so only a
-  custom-scheme link is passed as the launch URL.
+  running, then launched from the link. On an iOS simulator, an `http(s)`
+  link is opened only after the app has launched, so only a custom-scheme
+  link is passed as the launch URL.
 - `app.appPath` is the build the suite runs against. The engine installs
   nothing on its own: [`device.installApp()`](#installapp) installs it where
   the suite says so. A device provider installs it on the device it leases.
@@ -322,13 +321,15 @@ export default {
 | Throws | When |
 | --- | --- |
 | `INVALID_CONFIG` | At config load: no `app.bundleId` and no `app.appPath`; an `app.url` (not supported yet); a link in `bundleId` (a test opens one with `device.openLink`); an unknown permission name; an Apple launch argument such as `AppleLocale`, or a list item `am start` cannot carry, in an object on an Android target. |
-| `UNSUPPORTED_CAPABILITY` | `app.open()`, `app.restart()`, or `app.clearState()` on a target with no `app.bundleId` before its build is installed. |
+| `UNSUPPORTED_CAPABILITY` | `app.open()`, `app.restart()`, or `app.clearState()` on a target with no `app.bundleId` before its build is installed. `app.open(path, { relaunch: true })` on a target with a device provider, since a provider's driver can open the link in the running app, or on a target that sets `app.launchArguments` or `app.permissions`. |
 
 #### Launch arguments and permissions
 
 `app.launchArguments` and `app.permissions` ride every fresh launch of the
 pinned app: `app.open()`, `app.restart()`, and `app.clearState()`, which
-resets the permissions with the data.
+resets the permissions with the data. A launch from a link
+(`app.open(path, { relaunch: true })`) can't pass them, so it's refused on a
+target that sets them.
 
 ```ts title="e2e.config.ts"
 export default {
@@ -468,7 +469,7 @@ them to finish.
 | `keyboard` | `type` and `press` into the focused field, the agent's `type` and `press` without a target and the fallback of `type_at` and `press_at`, and `dismiss`, the agent's `dismiss_keyboard`. |
 | `locate` | Every `screen` query. Text and label queries answer with the innermost match, since a device echoes both up the tree (a React Native input is a host view and the field inside it, both labelled). On Android a test id query, a string or a RegExp, also matches a resource id without its `<package>:id/` prefix, for any package but the framework's `android`, when nothing on the screen matches the full id. `screen.locator('id=…')` is agent-device's selector and takes the full id. |
 | `validateApp` | Requires `app.bundleId` or `app.appPath` and refuses `app.url` for now, with a note on reaching this machine from the platform's device. A target with either is a `native-app` target, so `requires: ['native-app']` selects device targets. |
-| `session` | `back`, `restart`, `reset`, and `openLink`, behind `app.open(path)` on a target with `app.linkBase`. `linkRelaunch` is declared. `openLink` with `{ relaunch: true }` is sent as one agent-device `open --relaunch`, so the app is stopped and launched from the link in one command. No `open`: `app.open()` with no path is served with `restart`, the fresh launch of the pinned app; the agent's `navigate` verb is unavailable, and `device.openLink(url)` opens a deep link or web link. |
+| `session` | `back`, `restart`, `reset`, and `openLink`, behind `app.open(path)` on a target with `app.linkBase`. `linkRelaunch` is declared, except on a target with a device provider. `openLink` with `{ relaunch: true }` is sent as one agent-device `open --relaunch`, so the app is stopped and launched from the link in one command. No `open`: `app.open()` with no path is served with `restart`, the fresh launch of the pinned app; the agent's `navigate` verb is unavailable, and `device.openLink(url)` opens a deep link or web link. |
 | `artifacts` | Redacted screenshots under `screenshots/NNN-<label>.png`; a screenshot that cannot be redacted fails instead of being written. Video, when the attempt's [video mode](/reference/config#video) records, as `video/video.mp4`, or a device provider's own recording. |
 | `location` | `<bundle id> / <screen title>`, the replay cache's anchor. The title is the navigation bar's on iOS and the toolbar's on Android. |
 | `state` | Not declared. `test.setup` and `session:` are unavailable. |

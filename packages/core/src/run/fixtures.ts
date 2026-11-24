@@ -621,14 +621,19 @@ export function createApp(
   };
 
   /**
-   * Runs one recorded navigation, resolved against the base URL, on the test
-   * budget. With relaunch, the context is recreated first, as in
-   * `app.restart()`, within the same budget.
+   * One recorded navigation: resolved against the base URL, on the test budget.
+   * With relaunch, the engine's `restart` runs first, within the same budget.
    */
-  const navigate = (api: string, label: string, url: string | undefined, relaunch: boolean): Promise<void> =>
-    steps.run('app', api, label, async () => {
+  const navigate = (url: string | undefined, relaunch: boolean): Promise<void> =>
+    steps.run('app', 'app.open', url ?? '/', async () => {
       requireAppUrl(target);
       const resolved = url === undefined ? target.app.base.href : resolveNavigationUrl(url, target.app.base).url;
+      if (relaunch && !engine.session.verbs.has('navigate')) {
+        throw new ConfigurationError(
+          'UNSUPPORTED_CAPABILITY',
+          `app.open(path, { relaunch: true }) can't open the path on target "${target.name}" because engine ${target.engine?.name ?? 'none'} has no session.open`,
+        );
+      }
       const deadline = new Deadline(lifecycleMs());
       if (relaunch) await engine.session.app.restart(engine.operation(deadline.remaining()));
       await openAt(resolved, deadline.remaining());
@@ -659,6 +664,10 @@ export function createApp(
    * cannot launch, such as a build not installed yet. A link with relaunch
    * is refused unless `linkRelaunch` is declared on the engine. Otherwise the
    * link would be opened in the running app by an older engine.
+   *
+   * A relaunch also refuses a link whose scheme differs from `app.linkBase`:
+   * the pinned app is stopped first, and on iOS the OS routes a custom
+   * scheme to whichever app owns it, which can be another app.
    */
   const launchPinnedApp = (openPath: string | undefined, relaunch: boolean): Promise<void> =>
     steps.run('app', 'app.open', openPath ?? '', async () => {
@@ -670,6 +679,12 @@ export function createApp(
           throw new ConfigurationError(
             'UNSUPPORTED_CAPABILITY',
             `app.open(path, { relaunch: true }) can't start the app from a link on target "${target.name}" because engine ${target.engine?.name ?? 'none'} does not declare linkRelaunch`,
+          );
+        }
+        if (relaunch && new URL(link).protocol !== new URL(linkBase).protocol) {
+          throw new TestError(
+            'INVALID_ARGUMENT',
+            `app.open("${openPath}", { relaunch: true }) on target "${target.name}" takes a path or a link with the scheme of app.linkBase, since a link with another scheme can open another app`,
           );
         }
         await engine.session.app.openLink(link, engine.operation(lifecycleMs()), relaunch ? { relaunch: true } : undefined);
@@ -693,20 +708,14 @@ export function createApp(
   return {
     baseUrl: target.app.base === undefined ? undefined : baseUrlOf(target.app.base),
     async open(openPath?: string, options?: AppOpenOptions): Promise<void> {
-      if (openPath !== undefined && typeof openPath !== 'string') {
-        throw new TestError('INVALID_ARGUMENT', 'app.open takes a path string first, then options: app.open(path, { relaunch: true })');
-      }
       rejectUnknownOptions('app.open', options, ['relaunch']);
       if (options?.relaunch !== undefined && typeof options.relaunch !== 'boolean') {
         throw new TestError('INVALID_ARGUMENT', 'app.open relaunch must be a boolean');
       }
       const relaunch = options?.relaunch === true;
-      if (target.app.base === undefined && !engine.session.verbs.has('navigate')) {
-        await launchPinnedApp(openPath, relaunch);
-        return;
-      }
-
-      await navigate('app.open', openPath ?? '/', openPath, relaunch);
+      await (target.app.base === undefined && !engine.session.verbs.has('navigate')
+        ? launchPinnedApp(openPath, relaunch)
+        : navigate(openPath, relaunch));
     },
     restart: () => steer('app.restart', (operation) => engine.session.app.restart(operation)),
     clearState: () => steer('app.clearState', (operation) => engine.session.app.reset(operation)),

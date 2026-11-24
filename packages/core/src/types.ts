@@ -681,9 +681,9 @@ export interface App {
   readonly baseUrl: string | undefined;
   /**
    * Opens the app: the declared URL, a path relative to it, or any absolute
-   * http(s) URL. On a device target, which has no URL, the pinned app is
-   * launched fresh. A path is opened as a link in it when `app.linkBase` is
-   * declared on the target.
+   * http(s) URL. On a device target, which has no URL, it launches the pinned
+   * app fresh and takes no path. With `relaunch`, the app starts fresh before
+   * the path opens.
    */
   open(path?: string, options?: AppOpenOptions): Promise<void>;
   /**
@@ -720,8 +720,9 @@ export interface AppOpenOptions {
    *
    * - On a device target with `app.linkBase`, the pinned app is stopped if
    *   it's running, then launched from the link.
-   * - On a target with a URL, the context is recreated as in `app.restart()`,
-   *   then the path is opened instead of the base URL.
+   * - On a web target, the open tabs are closed and a new one is opened in
+   *   the same browser context, as in `app.restart()`. Then the path is
+   *   opened instead of the base URL.
    */
   readonly relaunch?: boolean;
 }

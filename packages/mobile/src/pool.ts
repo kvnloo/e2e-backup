@@ -284,6 +284,16 @@ export class DevicePool {
   }
 
   /**
+   * Whether `app.open(path, { relaunch: true })` can launch the app from the
+   * link: only on a device the engine drives itself. A provider's driver can
+   * launch the app first and then hand it the link (Revyl's does), so a
+   * provider's leases don't relaunch from a link.
+   */
+  get linkRelaunch(): boolean {
+    return !(this.source instanceof LeasedDevices);
+  }
+
+  /**
    * The agent-device session a worker slot drives its device under: the
    * `session` option or `e2e-<target>`, then `-<slot>`. A `launch()` host's
    * id follows the target, since every unnamed host's target is named alike.

@@ -176,13 +176,11 @@ void (async () => {
   void video.path;
 })();
 
-void (async () => {
-  await appFixture.open('/orders/42', { relaunch: true });
-  // @ts-expect-error relaunch is a boolean
-  await appFixture.open('/orders/42', { relaunch: 'yes' });
-  // @ts-expect-error relaunch is the only app.open option
-  await appFixture.open('/orders/42', { timeout: 1_000 });
-})();
+void (appFixture.open('/orders/42', { relaunch: true }) satisfies Promise<void>);
+// @ts-expect-error relaunch is a boolean
+void appFixture.open('/orders/42', { relaunch: 'yes' });
+// @ts-expect-error relaunch is the only app.open option
+void appFixture.open('/orders/42', { timeout: 1_000 });
 
 void (screen.tree() satisfies Promise<string>);
 void (screen.debug({ timeout: 1000 }) satisfies Promise<void>);

@@ -817,7 +817,8 @@ export interface Engine {
    * `relaunch`, the pinned app is stopped if it's running, then launched from
    * the link.
    *
-   * Without it, `app.open(path, { relaunch: true })` fails with
+   * On a target with `app.linkBase`, without it,
+   * `app.open(path, { relaunch: true })` fails with
    * `UNSUPPORTED_CAPABILITY` before the engine is called, so the link is never
    * opened in the running app by an engine that predates the field.
    */

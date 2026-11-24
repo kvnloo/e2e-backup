@@ -534,6 +534,12 @@ describe('engine protocol', () => {
     await remote.dispose!(cleanup);
   });
 
+  it("keeps the server's linkRelaunch only while the server answers openLink", () => {
+    const linking = toy({ session: { openLink: async () => {} }, linkRelaunch: true });
+    expect(overLoopback(linking).remote.linkRelaunch).toBe(true);
+    expect(overLoopback(linking, { session: { openLink: async () => {} } }).remote.linkRelaunch).toBeUndefined();
+  });
+
   it('answers locators on the client from observations when asked to', async () => {
     const { remote } = overLoopback(toy(), { resolveLocators: true });
     expect(remote.capabilities.has('location')).toBe(true);
@@ -574,7 +580,6 @@ describe('engine protocol', () => {
       { ...base, methods: ['engine/readStyle'] },
       { ...base, methods: ['engine/observe'], actions: ['tap'] },
       { ...base, methods: ['engine/observe'], tapModifiers: true },
-      { ...base, methods: ['engine/observe'], linkRelaunch: true },
       { ...base, methods: ['engine/observe'], selectsDevice: true },
       // The client serves prepare for finish alone, which would drop the device it never forwards.
       { ...base, methods: ['lifecycle/finish'], selectsDevice: true },

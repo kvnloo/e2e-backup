@@ -512,9 +512,10 @@ environment: 'staging', // default: 'test' for a local host or no URL, else 'pro
 #### `launchArguments`
 
 Arguments every fresh launch passes the app: `app.open()`, `app.restart()`,
-and `app.clearState()`. Give a list of strings, the arguments themselves, or
-an object of argument name to value. On iOS and macOS an entry becomes
-`-name value`.
+and `app.clearState()`. A launch from a link can't pass them
+([mobile](/reference/mobile#launch-arguments-and-permissions)). Give a list
+of strings, the arguments themselves, or an object of argument name to value.
+On iOS and macOS an entry becomes `-name value`.
 On Android it becomes an `am start` extra of the value's type: `--es` for a
 string, `--ez` for a boolean, `--ei` for a whole number (`--el` beyond Java's
 `int`), `--ef` for a fraction, `--esa` for a list.
@@ -556,8 +557,8 @@ permissions: { camera: 'grant' },
 
 Each is `'grant'`, `'deny'`, or `'reset'`.
 
-- A `mobile()` target sets each one before every fresh launch. See
-  [permissions](/reference/mobile#engine).
+- A `mobile()` target sets each one before every fresh launch except a
+  launch from a link. See [permissions](/reference/mobile#engine).
 - A `web()` target takes `'grant'` only and grants it to every page of the
   attempt, on any origin. Headless Chromium refuses a permission left out. See
   [Granting browser permissions](/web#granting-browser-permissions).

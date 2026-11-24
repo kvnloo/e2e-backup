@@ -59,12 +59,12 @@ export default {
     {
       name: 'ios-simulator',
       engine: ios,
-      app: { bundleId: APP_ID, appPath: process.env.E2E_MOBILE_BENCHMARK_IOS_APP, identity: `${APP_ID}-ios` },
+      app: { bundleId: APP_ID, appPath: process.env.E2E_MOBILE_BENCHMARK_IOS_APP, identity: `${APP_ID}-ios`, linkBase: 'e2e-benchmark://' },
     },
     {
       name: 'android-emulator',
       engine: android,
-      app: { bundleId: APP_ID, appPath: process.env.E2E_MOBILE_BENCHMARK_ANDROID_APP, identity: `${APP_ID}-android` },
+      app: { bundleId: APP_ID, appPath: process.env.E2E_MOBILE_BENCHMARK_ANDROID_APP, identity: `${APP_ID}-android`, linkBase: 'e2e-benchmark://' },
     },
   ],
   // One worker per simulator in the pool; an engine with fewer devices

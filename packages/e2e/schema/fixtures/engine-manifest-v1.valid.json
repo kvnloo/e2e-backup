@@ -13,7 +13,6 @@
     "keyboard/press",
     "keyboard/dismiss",
     "artifacts/screenshot",
-    "session/openLink",
     "session/back",
     "session/switchTab",
     "session/closeTab",

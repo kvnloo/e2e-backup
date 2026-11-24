@@ -37,7 +37,7 @@ export function buildEngine(surface: AgentDeviceSurface): MobileEngine {
     // `e2e run --device` names the device `prepare` binds; see DevicePool.prepare.
     ...(surface.pool.selectsDevice ? { selectsDevice: true } : {}),
     launchArgumentValues: true,
-    linkRelaunch: true,
+    ...(surface.pool.linkRelaunch ? { linkRelaunch: true } : {}),
     prepare: (info) => surface.pool.prepare(info),
     finish: (info) => surface.pool.finish(info),
     doctor: (info) => surface.doctor(info),

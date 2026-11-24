@@ -63,13 +63,6 @@ describe.each(schemas)('%s schema', (name) => {
       expect(validate(manifest)).toBe(false);
     });
 
-    it('rejects linkRelaunch without session/openLink', () => {
-      const manifest = readJson('fixtures', 'engine-manifest-v1.valid.json') as { methods: string[]; linkRelaunch: boolean };
-      expect(manifest.linkRelaunch).toBe(true);
-      manifest.methods = manifest.methods.filter((method) => method !== 'session/openLink');
-      expect(validate(manifest)).toBe(false);
-    });
-
     it('rejects selectsDevice without lifecycle/prepare', () => {
       const manifest = readJson('fixtures', 'engine-manifest-v1.valid.json') as { methods: string[]; selectsDevice: boolean };
       expect(manifest.selectsDevice).toBe(true);

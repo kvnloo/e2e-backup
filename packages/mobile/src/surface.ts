@@ -968,12 +968,17 @@ export class AgentDeviceSurface {
    * device anyway. An unbound open reports the URL as its app name, which is
    * no identity, and the package that took the link as its bundle id when
    * the OS told it; the next snapshot names the foreground app either way.
+   *
    * With `relaunch`, the app is stopped first if it's running, then launched
-   * from the link.
+   * from the link. The target's launch arguments and permissions can't ride
+   * a launch from a link, so a target that sets them is refused.
    */
   async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget, relaunch = false): Promise<void> {
     const target = app ?? this.pinnedApp;
     if (relaunch && target === undefined) throw unsupported(`relaunching the app from a link needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
+    if (relaunch && (launchArgumentList(this.options.platform, this.app.launchArgumentValues ?? this.app.launchArguments) !== undefined || Object.keys(this.app.permissions ?? {}).length > 0)) {
+      throw unsupported("relaunching the app from a link doesn't pass the target's `app.launchArguments` or `app.permissions`, so a target that sets them can't relaunch from a link");
+    }
     if (target === undefined && this.options.platform === 'ios') {
       throw new TestError(
         'INVALID_ARGUMENT',
