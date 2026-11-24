@@ -500,6 +500,19 @@ On a device, the swipe is one or more drags:
 On the web, the swipe is one wheel event of `distance` of the container,
 so `speed` doesn't change anything there.
 
+<a id="momentum" />
+`momentum` is deprecated. It still works, and the first use in a run prints
+a warning. Each value stands for a `distance` and a `speed`:
+
+| `momentum` | `distance` | `speed` |
+| --- | --- | --- |
+| `'slow'` | `0.25` | `'slow'` |
+| `'none'` | `0.5` | `'normal'` |
+| `'fast'` | `0.8` | `'fast'` |
+
+A `distance` or `speed` set beside `momentum` wins over the value it stands
+for.
+
 `{ from, to, duration? }` is a swipe along a path between two viewport
 points: a touch swipe on a device, a pointer drag on a document platform.
 Use it to reveal a row action, dismiss a sheet, or drag a card between
@@ -515,7 +528,7 @@ Uses `config.actionTimeout` and takes no `timeout` option.
 | Throws | When |
 | --- | --- |
 | `ACTION_FAILED` | The gesture is rejected. |
-| `INVALID_ARGUMENT` | A mix of the two shapes, a `distance` that isn't above 0 and at most 1, a `speed` that isn't `'slow'`, `'normal'`, or `'fast'`, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
+| `INVALID_ARGUMENT` | A mix of the two shapes, a `distance` that isn't above 0 and at most 1, a `speed` that isn't `'slow'`, `'normal'`, or `'fast'`, a `momentum` that isn't `'slow'`, `'none'`, or `'fast'`, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
 | `UNSUPPORTED_CAPABILITY` | The engine does not list `swipe` in its actions (a direction) or `swipeTo` in its pointer actions (a path). |
 
 #### `screen.scrollUntilVisible`
@@ -541,6 +554,7 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 | `options.direction` | `ScrollDirection` | `'down'` |
 | `options.distance` | `number` | `0.65` |
 | `options.speed` | `SwipeSpeed` | 800 ms a step |
+| `options.momentum` | `Momentum` (deprecated) | - |
 | `options.timeout` | `number` | `30000` |
 
 - Each step scrolls `distance` of the container (one drag on a device).
@@ -549,6 +563,8 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
   coasting inside that 35%.
 - `speed` sets another duration, as [`screen.swipe`](#screen-swipe)
   defines it. With a faster one, a short row can coast past unseen.
+- `momentum` is deprecated and stands for a `distance` and a `speed`, as
+  under [`screen.swipe`](#momentum).
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
   whole scroll, each swipe included.
 - On a locator each step swipes that node. So a feed or a table that is its
@@ -1006,10 +1022,12 @@ scrollIntoView(options?: ActionOptions): Promise<void>;
 await screen.getByRole('contentinfo').scrollIntoView();
 ```
 
-On a device, only what's on screen is in the tree, so the node is already
-in view. It's dragged to the middle when it's more than a fifth of its
-scroll container from the middle, clear of a sticky header or footer at
-the edge. Otherwise, it doesn't move.
+On a device, it does what a browser's `scrollIntoViewIfNeeded` does. A node
+fully inside its scroll container doesn't move, and otherwise it's dragged
+to the container's middle. Only what's on screen is in the tree, and a box
+is clipped to the screen, so a box that touches the container's top or
+bottom edge counts as cut off. So `tap({ position })` and the agent's
+`scroll_to` don't move a fully visible node.
 
 #### `swipe`
 
@@ -1446,6 +1464,12 @@ export interface SwipeOptions {
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;
+  /**
+   * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
+   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.8` with
+   * `speed: 'fast'`. A `distance` or `speed` set beside it wins.
+   */
+  momentum?: Momentum;
   from?: never;
   to?: never;
   duration?: never;
@@ -1459,6 +1483,8 @@ export interface ScrollUntilVisibleOptions {
   distance?: number;
   /** How fast the finger moves in each step. By default, each step takes 800 ms, slow enough that the list doesn't coast past the part of the last view left on screen. */
   speed?: SwipeSpeed;
+  /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. */
+  momentum?: Momentum;
   /** Milliseconds for the whole scroll. Default `30000`. */
   timeout?: number;
 }
@@ -1472,6 +1498,7 @@ export interface SwipePathOptions {
   /** Gesture duration, an integer from 16 through 10000 ms; omitted = the engine's default. */
   duration?: number;
   direction?: never;
+  momentum?: never;
   distance?: never;
   speed?: never;
 }
@@ -1528,6 +1555,9 @@ export type SelectOption =
 
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
+
+/** @deprecated Use a swipe's `distance` and `speed`. How far a swipe went, before those replaced it. */
+export type Momentum = 'none' | 'slow' | 'fast';
 
 ```
 

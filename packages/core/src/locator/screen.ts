@@ -254,7 +254,7 @@ class ScreenImpl implements Screen {
       );
       return;
     }
-    rejectUnknownOptions('swipe', options, ['direction', 'distance', 'speed']);
+    rejectUnknownOptions('swipe', options, ['direction', 'distance', 'speed', 'momentum']);
     const action = swipeAction('swipe', options.direction, options, SWIPE);
     await this.context.steps.run('screen', 'screen.swipe', options.direction, async () => {
       const { engine } = this.context;
@@ -264,7 +264,7 @@ class ScreenImpl implements Screen {
 
   async scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void> {
     const internals = this.ownLocator(target, 'scrollUntilVisible');
-    rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'distance', 'speed', 'timeout']);
+    rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'distance', 'speed', 'momentum', 'timeout']);
     const step = swipeAction('scrollUntilVisible', options?.direction ?? 'down', options, SCROLL_STEP);
     const { engine } = this.context;
     // On `screen`, the scroll container under the screen's center scrolls. On
@@ -297,9 +297,11 @@ class ScreenImpl implements Screen {
         }
         sampled = true;
         if (isNodeVisible(node)) {
-          // A node that's visible before any step doesn't get a gesture, since
-          // a list at its top could take one as a pull to refresh.
-          if (stepped && engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView' }, deadline);
+          // After a step, a node more than a fifth of its container from the
+          // middle is moved to the middle, clear of a sticky header or footer
+          // at the edge. A node that's visible before any step doesn't get a
+          // gesture, since a list at its top could take one as a pull to refresh.
+          if (stepped && engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView', center: true }, deadline);
           return;
         }
         // A step isn't sent when its drag can't finish before the deadline.
@@ -601,7 +603,7 @@ class LocatorImpl extends ScreenImpl implements Locator {
   }
 
   override swipe(options: SwipeOptions & ActionOptions): Promise<void> {
-    rejectUnknownOptions('swipe', options, ['direction', 'distance', 'speed', 'timeout']);
+    rejectUnknownOptions('swipe', options, ['direction', 'distance', 'speed', 'momentum', 'timeout']);
     const action = swipeAction('swipe', options.direction, options, SWIPE);
     return this.action('locator.swipe', () => this.context.engine.perform(this.expression, action, options.timeout));
   }

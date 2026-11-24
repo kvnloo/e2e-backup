@@ -11,11 +11,11 @@ import type { RecordedAction } from './cache/trace.ts';
 import type { PROJECT_TOOL_EVENT_PREFIX } from './agent/action-names.ts';
 import type { StepCacheInfo } from './run/steps.ts';
 import type { EngineHandle } from './engine/index.ts';
-import type { KeyModifier, ScrollDirection, SelectOption, ViewportPoint } from './engine/contract.ts';
+import type { KeyModifier, Momentum, ScrollDirection, SelectOption, ViewportPoint } from './engine/contract.ts';
 import type { CacheStore } from './cache/store.ts';
 import type { FixtureDefinitions, FixtureOverrides, WorkerFixtures } from './types/fixtures.ts';
 
-export type { KeyModifier, ScrollDirection, SelectOption } from './engine/contract.ts';
+export type { KeyModifier, Momentum, ScrollDirection, SelectOption } from './engine/contract.ts';
 export type { CacheReadResult, CacheStore } from './cache/store.ts';
 export type { DerivedReason } from './cache/trace.ts';
 export type { StepCacheInfo } from './run/steps.ts';
@@ -522,6 +522,12 @@ export interface SwipeOptions {
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;
+  /**
+   * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
+   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.8` with
+   * `speed: 'fast'`. A `distance` or `speed` set beside it wins.
+   */
+  momentum?: Momentum;
   from?: never;
   to?: never;
   duration?: never;
@@ -535,6 +541,8 @@ export interface ScrollUntilVisibleOptions {
   distance?: number;
   /** How fast the finger moves in each step. By default, each step takes 800 ms, slow enough that the list doesn't coast past the part of the last view left on screen. */
   speed?: SwipeSpeed;
+  /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. */
+  momentum?: Momentum;
   /** Milliseconds for the whole scroll. Default `30000`. */
   timeout?: number;
 }
@@ -548,6 +556,7 @@ export interface SwipePathOptions {
   /** Gesture duration in milliseconds; omitted = the engine's default. */
   duration?: number;
   direction?: never;
+  momentum?: never;
   distance?: never;
   speed?: never;
 }

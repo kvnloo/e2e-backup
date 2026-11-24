@@ -334,6 +334,9 @@ container under the screen's center:
 - `speed` is how fast the finger moves: `'slow'` (1500 ms), `'normal'` (400
   ms, the default), or `'fast'` (150 ms). It's ignored by the wheel on the
   web.
+- `momentum` is deprecated: write `distance` and `speed` instead. It still
+  works, and stands for `'slow'` 0.25 at `'slow'` speed, `'none'` the
+  defaults, and `'fast'` 0.8 at `'fast'` speed.
 - On a device, each drag starts a quarter in from the container's edge. The
   content keeps coasting after the finger lifts.
 

@@ -12,6 +12,8 @@
 
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
+/** @deprecated Use a swipe's `distance` and `speed`. How far a swipe went, before those replaced it. */
+export type Momentum = 'none' | 'slow' | 'fast';
 /**
  * One step of a scroll that reads the screen between steps
  * (`scrollUntilVisible` and the agent's `scroll_to`). It's 0.65 of the
@@ -301,8 +303,18 @@ export type LocatorAction =
         | 'clear'
         | 'focus'
         | 'blur'
-        | 'hover'
-        | 'scrollIntoView';
+        | 'hover';
+    }
+  | {
+      readonly kind: 'scrollIntoView';
+      /**
+       * Set to also move a node that is fully visible to the middle of its
+       * scroll container when it's more than a fifth of the container from
+       * the middle. `scrollUntilVisible` sets it after a scroll step, so a
+       * node a sticky header or footer covers at the edge comes clear of it.
+       * An engine that brings nodes into view by other means can ignore it.
+       */
+      readonly center?: boolean;
     }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'fill'; readonly value: string; readonly sensitive: boolean }

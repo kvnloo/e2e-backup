@@ -614,14 +614,13 @@ export class ActionDispatcher {
         const found = observation.kind === 'semantic' ? nodeReading(observation, needle, scope) : undefined;
         if (found !== undefined) {
           // An engine that can bring a node in does, whatever the box says: a
-          // windowed list renders a row a little before it is visible. On a
-          // device, a row near its list's edge is dragged to the middle. For
-          // an engine that can't, one more page is taken for a row still past
-          // the edge. A row that's in view before any page doesn't get a
-          // gesture, since a list at its top could take one as a pull to
-          // refresh.
-          if (this.verbs.has('scrollTo') && (screens > 0 || !isInViewport(found.rect, observation.viewport))) {
-            await this.session.perform(found.ref, { kind: 'scrollIntoView' }, this.accounting.actionOperation());
+          // windowed list renders a row a little before it is visible. After
+          // a page, a row more than a fifth of its list from the middle is
+          // moved to the middle too, as `scrollUntilVisible` does. For an
+          // engine that can't, one more page is taken for a row still past
+          // the edge.
+          if (this.verbs.has('scrollTo')) {
+            await this.session.perform(found.ref, { kind: 'scrollIntoView', ...(screens > 0 ? { center: true } : {}) }, this.accounting.actionOperation());
             return { name: 'scrollUntil', text, direction, screens, ...paged };
           }
           if (isInViewport(found.rect, observation.viewport)) return { name: 'scrollUntil', text, direction, screens, ...paged };

@@ -109,11 +109,20 @@ describe('support helpers', () => {
     ]);
   });
 
-  it('drags a node near its container edge to the middle, and leaves one near the middle where it is', () => {
+  it('leaves a node fully inside its container where it is, and drags one cut off at the edge to the middle', () => {
     const container = { x: 0, y: 100, width: 200, height: 400 };
-    expect(centringDrag({ x: 0, y: 380, width: 200, height: 20 }, container)).toEqual({ x: 100, y: 400, dx: 0, dy: -90 });
-    expect(centringDrag({ x: 0, y: 190, width: 200, height: 20 }, container)).toEqual({ x: 100, y: 200, dx: 0, dy: 100 });
-    expect(centringDrag({ x: 0, y: 350, width: 200, height: 20 }, container)).toBeUndefined();
+    expect(centringDrag({ x: 0, y: 380, width: 200, height: 20 }, container, false)).toBeUndefined();
+    expect(centringDrag({ x: 0, y: 190, width: 200, height: 20 }, container, false)).toBeUndefined();
+    // A box that ends at the container's bottom edge may be clipped there.
+    expect(centringDrag({ x: 0, y: 480, width: 200, height: 20 }, container, false)).toEqual({ x: 100, y: 400, dx: 0, dy: -190 });
+    expect(centringDrag({ x: 0, y: 100, width: 200, height: 20 }, container, false)).toEqual({ x: 100, y: 200, dx: 0, dy: 190 });
+  });
+
+  it('with center, also drags a fully visible node more than a fifth of its container from the middle', () => {
+    const container = { x: 0, y: 100, width: 200, height: 400 };
+    expect(centringDrag({ x: 0, y: 380, width: 200, height: 20 }, container, true)).toEqual({ x: 100, y: 400, dx: 0, dy: -90 });
+    expect(centringDrag({ x: 0, y: 190, width: 200, height: 20 }, container, true)).toEqual({ x: 100, y: 200, dx: 0, dy: 100 });
+    expect(centringDrag({ x: 0, y: 350, width: 200, height: 20 }, container, true)).toBeUndefined();
   });
 
   it('constrains labels to safe filenames', () => {

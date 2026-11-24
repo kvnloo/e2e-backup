@@ -4295,6 +4295,8 @@ describe('deterministic actions', () => {
         { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'button', label: 'Row 5', rect: { x: 0, y: 380, width: 390, height: 40 } },
         { ref: '@e4', index: 3, parentIndex: 1, depth: 2, type: 'button', label: 'Row 9', rect: { x: 0, y: 650, width: 390, height: 40 } },
         { ref: '@e5', index: 4, parentIndex: 0, depth: 1, type: 'button', label: 'Continue', rect: { x: 0, y: 760, width: 390, height: 60 } },
+        // A row cut off at the list's bottom edge: its box ends where the list does.
+        { ref: '@e6', index: 5, parentIndex: 1, depth: 2, type: 'button', label: 'Row 12', rect: { x: 0, y: 680, width: 390, height: 20 } },
       ],
     };
     /** The drag sent for a swipe down of half the list. It starts a quarter up from the list's bottom edge. */
@@ -4350,13 +4352,37 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([]);
     });
 
-    it('drags a node near its container edge to the middle over a scroll step, and leaves the rest where they are', async () => {
+    it('leaves a node fully inside its scroll container where it is, as a browser does', async () => {
       const h = await listHarness();
       for (const name of ['Row 9', 'Row 5', 'Continue']) {
         await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView' }, operation());
       }
-      // Row 9's centre is 270 below the list's middle, more than a fifth of the list.
+      expect(pans(h)).toEqual([]);
+    });
+
+    it("drags a node cut off at its scroll container's edge to the middle", async () => {
+      const h = await listHarness();
+      await h.engine.perform!((await observed(h, 'Row 12')).ref, { kind: 'scrollIntoView' }, operation());
+      // Row 12's centre is 290 below the list's middle.
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -290, durationMs: 800 }]);
+    });
+
+    it('with center, also drags a fully visible node more than a fifth of its container from the middle', async () => {
+      const h = await listHarness();
+      for (const name of ['Row 9', 'Row 5']) {
+        await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView', center: true }, operation());
+      }
+      // Row 9's centre is 270 below the list's middle, more than a fifth of the list; Row 5's is at the middle.
       expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -270, durationMs: 800 }]);
+    });
+
+    it('sends no drag before a positioned tap on a fully visible node', async () => {
+      const h = await listHarness();
+      // `tap({ position })` brings its node into view first, then taps the point.
+      await h.engine.perform!((await observed(h, 'Row 9')).ref, { kind: 'scrollIntoView' }, operation());
+      await h.engine.performAt!({ x: 30, y: 670 }, { kind: 'tap' }, operation());
+      expect(pans(h)).toEqual([]);
+      expect(h.fake.lastArgs('interactions.press')).toMatchObject({ x: 30, y: 670 });
     });
   });
 

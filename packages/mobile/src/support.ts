@@ -188,18 +188,26 @@ export function swipeDrags(box: Rect, direction: ScrollDirection, distance: numb
 }
 
 /**
- * Returns the drag that moves `rect` to the middle of `container`, the way
- * Maestro's `centerElement` does. It returns undefined when the node's centre
- * is within a fifth of the container from the middle. A node further out can
- * be under a sticky header or footer, and the drag brings it clear.
+ * Returns the drag that moves `rect` to the middle of `container`, or
+ * undefined when the node stays where it is:
+ *
+ * - Without `center`, a node fully inside its container stays, as a
+ *   browser's `scrollIntoViewIfNeeded` leaves it. A device clips a box to the
+ *   screen, so a box that touches the container's top or bottom edge counts
+ *   as cut off.
+ * - With `center`, a fully visible node also moves when its centre is more
+ *   than a fifth of the container from the middle, as with Maestro's
+ *   `centerElement`. A node that far out can be under a sticky header or
+ *   footer, and the drag brings it clear.
  *
  * The drag is vertical only. A node in a vertical list often sits off the
  * list's horizontal middle, and a sideways drag on a row can trigger the
  * row's swipe action.
  */
-export function centringDrag(rect: Rect, container: Rect): Drag | undefined {
+export function centringDrag(rect: Rect, container: Rect, center: boolean): Drag | undefined {
   const offset = rect.y + rect.height / 2 - (container.y + container.height / 2);
-  if (Math.abs(offset) <= container.height / 5) return undefined;
+  const inside = rect.y > container.y && rect.y + rect.height < container.y + container.height;
+  if (inside && !(center && Math.abs(offset) > container.height / 5)) return undefined;
   return swipeDrags(container, offset > 0 ? 'down' : 'up', Math.abs(offset) / container.height)[0];
 }
 

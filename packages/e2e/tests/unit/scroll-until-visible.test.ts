@@ -73,7 +73,7 @@ function scrollScreen(script: ScrollScript) {
           actions: script.bringsIntoView === true ? ['swipe', 'scrollIntoView'] : ['swipe'],
           perform: async (ref, action, operation) => {
             if (action.kind === 'scrollIntoView') {
-              broughtIntoView.push(ref.id);
+              broughtIntoView.push(action.center === true ? `${ref.id} to the middle` : ref.id);
               return;
             }
             if (action.kind !== 'swipe') throw new Error(`unexpected ${action.kind}`);
@@ -121,7 +121,7 @@ describe('screen.scrollUntilVisible', () => {
   });
 
   it.each([
-    ['momentum, replaced by distance and speed', { momentum: 'fast' }],
+    ['a momentum that is not a preset', { momentum: 'warp' }],
     ['a distance of 0', { distance: 0 }],
     ['a distance above 1', { distance: 1.5 }],
     ['a speed that is not a preset', { speed: 'warp' }],
@@ -137,7 +137,35 @@ describe('screen.scrollUntilVisible', () => {
     const { screen, swipes, broughtIntoView } = scrollScreen({ screens: [[], [TARGET]], bringsIntoView: true });
     await screen.scrollUntilVisible(screen.getByText('Accept'));
     expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...STEP }]);
-    expect(broughtIntoView).toEqual(['target']);
+    expect(broughtIntoView).toEqual(['target to the middle']);
+  });
+
+  it.each([
+    ['slow', { distance: 0.25, durationMs: 1500 }],
+    ['none', { distance: 0.5, durationMs: 400 }],
+    ['fast', { distance: 0.8, durationMs: 150 }],
+  ] as const)('still takes the deprecated momentum %s, as a distance and a speed', async (momentum, gesture) => {
+    const { screen, swipes } = scrollScreen({ screens: [[], [TARGET]] });
+    await screen.scrollUntilVisible(screen.getByText('Accept'), { momentum });
+    expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...gesture }]);
+  });
+
+  it('lets a distance or speed set beside momentum win, and warns about momentum once a process', async () => {
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const { screen, swipes } = scrollScreen({ screens: [[], [], [TARGET]] });
+      await screen.scrollUntilVisible(screen.getByText('Accept'), { momentum: 'fast', distance: 0.3 });
+      expect(swipes).toEqual([
+        { ref: 'root', direction: 'down', distance: 0.3, durationMs: 150 },
+        { ref: 'root', direction: 'down', distance: 0.3, durationMs: 150 },
+      ]);
+      await screen.scrollUntilVisible(screen.getByText('Accept'), { momentum: 'slow', speed: 'normal' });
+      const warnings = warn.mock.calls.map(([text]) => String(text)).filter((text) => text.includes('momentum'));
+      expect(warnings.length).toBeLessThanOrEqual(1);
+      expect(warnings.every((text) => text === 'e2e: [warning] swipe momentum is deprecated. Pass distance and speed.\n')).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('does not send a gesture for a target that is visible on the first read', async () => {

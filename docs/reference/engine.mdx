@@ -1186,7 +1186,7 @@ honors in `actions` and `pointerActions`.
 | `focus` | - | yes | - |
 | `blur` | - | yes | - |
 | `hover` | - | yes | yes |
-| `scrollIntoView` | - | yes | - |
+| `scrollIntoView` | `center?` | yes | - |
 | `selectOption` | `value` | yes | - |
 | `setInputFiles` | `paths`; empty clears the input | yes | - |
 | `setInputFilePayloads` | `files` with `name`, `mimeType`, and `Uint8Array` `buffer`. An empty `files` array clears the input. The runner uses it to clear when the engine declares this action without `setInputFiles`. | yes | - |
@@ -1244,8 +1244,18 @@ export type LocatorAction =
         | 'clear'
         | 'focus'
         | 'blur'
-        | 'hover'
-        | 'scrollIntoView';
+        | 'hover';
+    }
+  | {
+      readonly kind: 'scrollIntoView';
+      /**
+       * Set to also move a node that is fully visible to the middle of its
+       * scroll container when it's more than a fifth of the container from
+       * the middle. `scrollUntilVisible` sets it after a scroll step, so a
+       * node a sticky header or footer covers at the edge comes clear of it.
+       * An engine that brings nodes into view by other means can ignore it.
+       */
+      readonly center?: boolean;
     }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'fill'; readonly value: string; readonly sensitive: boolean }
@@ -2429,7 +2439,7 @@ return context.fixture('printer', printer, { print: { kind: 'resource' } });
 `TextPattern`, `SemanticQuery`, `LocatorExpression`,
 `NodeRef`, `SemanticNode`, `ViewportPoint`, `ViewportSize`,
 `ObservationPixels`, `LocatorAction`, `LocatorActionKind`, `PointerAction`,
-`PointerActionKind`, `ScrollDirection`, `SwipeAction`, `SelectOption`, `Key`,
+`PointerActionKind`, `ScrollDirection`, `SwipeAction`, `Momentum` (deprecated), `SelectOption`, `Key`,
 `KeyModifier`, `KeyName`, `ParsedKey`, `ENGINE_SPI_VERSION`,
 `LOCATOR_ACTION_KINDS`, `KNOWN_LOCATOR_ACTION_KINDS`, `POINTER_ACTION_KINDS`, `KEY_MODIFIERS`,
 `KEY_NAMES`, `parseKey`, `ENGINE_ERROR_CODES`, `RETRYABLE_ENGINE_ERROR_CODES`,

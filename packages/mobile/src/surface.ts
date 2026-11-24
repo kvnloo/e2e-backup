@@ -1638,11 +1638,11 @@ export class AgentDeviceSurface {
           return undefined;
         }
         case 'scrollIntoView': {
-          // Only what's on screen is listed on a device, so the node is already
-          // in view. A node near its container's edge is dragged to the middle,
-          // clear of a sticky header or footer that may cover it.
+          // Only what's on screen is listed on a device, so the node is at
+          // least partly in view. A node cut off at its container's edge is
+          // dragged to the middle (`centringDrag`).
           const rect = target.node.rect;
-          const drag = rect === undefined || target.container === undefined || target.originUnknown ? undefined : centringDrag(rect, target.container);
+          const drag = rect === undefined || target.container === undefined || target.originUnknown ? undefined : centringDrag(rect, target.container, action.center === true);
           if (drag === undefined) return undefined;
           await this.pan(client, [drag], SCROLL_STEP.durationMs, input);
           this.noteGesture(operation);
