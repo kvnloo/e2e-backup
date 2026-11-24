@@ -63,8 +63,9 @@ export class InputBudget {
    * earlier input of this operation went out. A gesture that holds (`holdMs`)
    * at least as long as the budget left could only be cut off mid-gesture, so
    * it is refused unsent: `NOT_ACTIONABLE`, or `ACTION_MAY_HAVE_COMMITTED`
-   * once an earlier input went out. An input that does not answer in time may have
-   * landed, so it is `ACTION_MAY_HAVE_COMMITTED` and the runner never repeats it.
+   * once an earlier input went out. An input that does not answer in time
+   * may have landed, so it is `ACTION_MAY_HAVE_COMMITTED` and the runner
+   * never repeats it.
    */
   send<T>(dispatch: (signal: AbortSignal) => Promise<T>, holdMs = 0): Promise<T> {
     const remaining = this.remainingMs();

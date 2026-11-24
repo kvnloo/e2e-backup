@@ -511,21 +511,22 @@ export interface PressSequentiallyOptions extends ActionOptions {
   delay?: number;
 }
 
-/** How fast the finger moves in a swipe. Each drag takes 1500 ms for `slow`, 400 ms for `normal`, and 150 ms for `fast`. */
+/** How fast the finger moves in a swipe. Each drag takes 1500 ms for `slow`, 400 ms for `normal`, and 150 ms for `fast`. It's ignored where the scroll is a wheel event instead of a drag. */
 export type SwipeSpeed = 'slow' | 'normal' | 'fast';
 
 /** A swipe in a direction. */
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the content scrolls, as a share of the swiped box along the swipe (above 0 and at most 1). The box is the node, or the scroll container under the screen's center for `screen`. Default `0.5`. */
+  /** How far the content scrolls, as a share of the swiped box along the swipe (above 0 and at most 1). The box is the node, or for `screen` on the web and on a device, the scroll container under the screen's center. Default `0.5`. */
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;
   /**
    * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
-   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.8` with
-   * `speed: 'fast'`. A `distance` or `speed` set beside it wins.
+   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.65` with
+   * `speed: 'fast'`. A `distance` or `speed` set beside it wins. It will be
+   * removed no earlier than April 1, 2027.
    */
   momentum?: Momentum;
   from?: never;
@@ -539,9 +540,9 @@ export interface ScrollUntilVisibleOptions {
   direction?: ScrollDirection;
   /** How far each step scrolls, as a share of the scroll container's box. Default `0.65`. */
   distance?: number;
-  /** How fast the finger moves in each step. By default, each step takes 800 ms, slow enough that the list doesn't coast past the part of the last view left on screen. */
+  /** How fast the finger moves in each step. Default: 800 ms a step. */
   speed?: SwipeSpeed;
-  /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. */
+  /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. It will be removed no earlier than April 1, 2027. */
   momentum?: Momentum;
   /** Milliseconds for the whole scroll. Default `30000`. */
   timeout?: number;
@@ -584,8 +585,8 @@ export interface Screen {
   swipe(options: SwipeOptions | SwipePathOptions): Promise<void>;
   /**
    * Scrolls until a locator resolves visibly or times out. On `screen`, the
-   * scroll container under the screen's center scrolls, and on a locator,
-   * the node scrolls. After at least one step, the found node is brought into
+   * scroll container under the screen's center scrolls on the web and on a
+   * device, and on a locator, the node scrolls. After at least one step, the found node is brought into
    * view when the engine supports it, so it isn't left at the container's edge.
    */
   scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void>;

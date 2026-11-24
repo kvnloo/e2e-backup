@@ -1214,8 +1214,8 @@ A `swipe` scrolls the content by `distance` of a box along the swipe:
   center, or the whole viewport when there isn't one.
 - On a node, the box is the node's box.
 
-Each drag takes `durationMs`. It's ignored on a platform that scrolls
-without a drag, such as a wheel. `SCROLL_STEP` in `e2e/engine` is the step
+Each drag takes `durationMs`. It's ignored where the scroll is a wheel
+event instead of a drag. `SCROLL_STEP` in `e2e/engine` is the step
 used by `scrollUntilVisible` and the agent's `scroll_to` (0.65 of the
 container over 800 ms).
 
@@ -1263,9 +1263,10 @@ export type LocatorAction =
       /**
        * Set to also move a node that is fully visible to the middle of its
        * scroll container when it's more than a fifth of the container from
-       * the middle. `scrollUntilVisible` sets it after a scroll step, so a
-       * node a sticky header or footer covers at the edge comes clear of it.
-       * An engine that brings nodes into view by other means can ignore it.
+       * the middle. `scrollUntilVisible` and the agent's `scroll_to` set it
+       * after a scroll step. A node at the edge can be under a sticky header
+       * or footer, and the drag moves it out. It's ignored where the scroll
+       * is a wheel event instead of a drag.
        */
       readonly center?: boolean;
     }
@@ -1298,6 +1299,12 @@ export interface SwipeAction {
   readonly distance: number;
   /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
+  /**
+   * @deprecated Read `distance` and `durationMs`. A swipe from an older
+   * client that sends only this is given the `distance` and `durationMs` it
+   * stands for. It will be removed no earlier than April 1, 2027.
+   */
+  readonly momentum?: Momentum;
 }
 
 /** Every action kind; what an engine declares in `actions`. */

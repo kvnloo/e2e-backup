@@ -473,9 +473,9 @@ await screen.swipe({
 await screen.swipe({ from: { x: '50%', y: '80%' }, to: { x: '50%', y: '20%' } });
 ```
 
-`{ direction, distance?, speed? }` is a scroll gesture. It scrolls the
-scroll container under the screen's center, or the whole screen when
-there isn't one.
+`{ direction, distance?, speed? }` is a scroll gesture. On the web and on
+a device, it scrolls the scroll container under the screen's center, or
+the whole screen when there isn't one.
 
 - `direction` is the way the content scrolls, not the finger: `'down'`
   reveals what is below.
@@ -494,21 +494,27 @@ On a device, the swipe is one or more drags:
   It ends no closer than a tenth to the far edge, so one drag scrolls 0.65
   of the container at most. A longer `distance` is split into equal drags.
 - The content keeps coasting after the finger lifts, as it does for a
-  person, so it can scroll further than `distance`. The next action waits
-  for the screen to settle.
+  person, so it can scroll further than `distance`. After a swipe, an
+  action on a control checks whether that control is still moving.
 
-On the web, the swipe is one wheel event of `distance` of the container,
-so `speed` doesn't change anything there.
+On the web, the swipe moves the pointer to the screen's center and sends
+one wheel event of `distance` of the container, so `speed` doesn't change
+anything there. For a pane inside an iframe, use `locator.swipe()`.
 
 <a id="momentum" />
-`momentum` is deprecated. It still works, and the first use in a run prints
-a warning. Each value stands for a `distance` and a `speed`:
+`momentum` is deprecated. It still works, and the first use in each worker
+process prints a warning. It will be removed no earlier than April 1,
+2027. Each value stands for a `distance` and a `speed`:
 
 | `momentum` | `distance` | `speed` |
 | --- | --- | --- |
 | `'slow'` | `0.25` | `'slow'` |
 | `'none'` | `0.5` | `'normal'` |
-| `'fast'` | `0.8` | `'fast'` |
+| `'fast'` | `0.65` | `'fast'` |
+
+Before, on the web, `'slow'` scrolled 0.75 of the viewport or the node and
+`'fast'` 1.5, and on the desktop, `'slow'` sent 2 wheel notches and
+`'fast'` 10.
 
 A `distance` or `speed` set beside `momentum` wins over the value it stands
 for.
@@ -528,7 +534,7 @@ Uses `config.actionTimeout` and takes no `timeout` option.
 | Throws | When |
 | --- | --- |
 | `ACTION_FAILED` | The gesture is rejected. |
-| `INVALID_ARGUMENT` | A mix of the two shapes, a `distance` that isn't above 0 and at most 1, a `speed` that isn't `'slow'`, `'normal'`, or `'fast'`, a `momentum` that isn't `'slow'`, `'none'`, or `'fast'`, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
+| `INVALID_ARGUMENT` | A mix of the two shapes, a `distance` that isn't above 0 and at most 1, a `speed` that isn't `'slow'`, `'normal'`, or `'fast'`, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
 | `UNSUPPORTED_CAPABILITY` | The engine does not list `swipe` in its actions (a direction) or `swipeTo` in its pointer actions (a path). |
 
 #### `screen.scrollUntilVisible`
@@ -536,8 +542,8 @@ Uses `config.actionTimeout` and takes no `timeout` option.
 ```ts
 /**
  * Scrolls until a locator resolves visibly or times out. On `screen`, the
- * scroll container under the screen's center scrolls, and on a locator,
- * the node scrolls. After at least one step, the found node is brought into
+ * scroll container under the screen's center scrolls on the web and on a
+ * device, and on a locator, the node scrolls. After at least one step, the found node is brought into
  * view when the engine supports it, so it isn't left at the container's edge.
  */
 scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void>;
@@ -557,10 +563,8 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 | `options.momentum` | `Momentum` (deprecated) | - |
 | `options.timeout` | `number` | `30000` |
 
-- Each step scrolls `distance` of the container (one drag on a device).
-  With the default step, 35% of the last view stays on screen, so no row
-  passes unseen. The 800 ms drag is slow enough that the list stops
-  coasting inside that 35%.
+- Each step scrolls `distance` of the container. The default step leaves
+  part of the last view on screen, so rows aren't skipped.
 - `speed` sets another duration, as [`screen.swipe`](#screen-swipe)
   defines it. With a faster one, a short row can coast past unseen.
 - `momentum` is deprecated and stands for a `distance` and a `speed`, as
@@ -574,17 +578,15 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
   ([Mobile visibility](/reference/mobile#visibility)).
 - After at least one step, the node is brought into view with
   [`scrollIntoView`](#scrollintoview) when the engine supports it. A node
-  that's visible on the first read doesn't get a gesture.
-  - On the web, it's scrolled into view.
-  - On a device, a node more than a fifth of its container from the middle
-    is dragged to the middle, clear of a sticky header or footer at the
-    edge.
+  that's visible on the first read doesn't get a gesture. On a device, the
+  node can also be dragged to the middle of its container
+  ([Mobile visibility](/reference/mobile#visibility)).
 
 | Throws | When |
 | --- | --- |
 | `INVALID_LOCATOR` | `target` is not a runner locator, or was made by another target's screen. |
 | `INVALID_ARGUMENT` | An option it doesn't take, a `distance` that isn't above 0 and at most 1, or a `speed` that isn't a preset. |
-| `LOCATOR_NOT_FOUND` | The deadline expires first, a swipe it cut short included. |
+| `LOCATOR_NOT_FOUND` | The deadline expires first, a swipe it cut short included, or a device refuses a step that no longer fits before it. |
 
 ### Screen reads
 
@@ -1022,12 +1024,8 @@ scrollIntoView(options?: ActionOptions): Promise<void>;
 await screen.getByRole('contentinfo').scrollIntoView();
 ```
 
-On a device, it does what a browser's `scrollIntoViewIfNeeded` does. A node
-fully inside its scroll container doesn't move, and otherwise it's dragged
-to the container's middle. Only what's on screen is in the tree, and a box
-is clipped to the screen, so a box that touches the container's top or
-bottom edge counts as cut off. So `tap({ position })` and the agent's
-`scroll_to` don't move a fully visible node.
+On a device, a node that reaches past its scroll container's edge is
+dragged toward the middle ([Mobile visibility](/reference/mobile#visibility)).
 
 #### `swipe`
 
@@ -1490,21 +1488,22 @@ export interface PressSequentiallyOptions extends ActionOptions {
   delay?: number;
 }
 
-/** How fast the finger moves in a swipe. Each drag takes 1500 ms for `slow`, 400 ms for `normal`, and 150 ms for `fast`. */
+/** How fast the finger moves in a swipe. Each drag takes 1500 ms for `slow`, 400 ms for `normal`, and 150 ms for `fast`. It's ignored where the scroll is a wheel event instead of a drag. */
 export type SwipeSpeed = 'slow' | 'normal' | 'fast';
 
 /** A swipe in a direction. */
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the content scrolls, as a share of the swiped box along the swipe (above 0 and at most 1). The box is the node, or the scroll container under the screen's center for `screen`. Default `0.5`. */
+  /** How far the content scrolls, as a share of the swiped box along the swipe (above 0 and at most 1). The box is the node, or for `screen` on the web and on a device, the scroll container under the screen's center. Default `0.5`. */
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;
   /**
    * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
-   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.8` with
-   * `speed: 'fast'`. A `distance` or `speed` set beside it wins.
+   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.65` with
+   * `speed: 'fast'`. A `distance` or `speed` set beside it wins. It will be
+   * removed no earlier than April 1, 2027.
    */
   momentum?: Momentum;
   from?: never;
@@ -1518,9 +1517,9 @@ export interface ScrollUntilVisibleOptions {
   direction?: ScrollDirection;
   /** How far each step scrolls, as a share of the scroll container's box. Default `0.65`. */
   distance?: number;
-  /** How fast the finger moves in each step. By default, each step takes 800 ms, slow enough that the list doesn't coast past the part of the last view left on screen. */
+  /** How fast the finger moves in each step. Default: 800 ms a step. */
   speed?: SwipeSpeed;
-  /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. */
+  /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. It will be removed no earlier than April 1, 2027. */
   momentum?: Momentum;
   /** Milliseconds for the whole scroll. Default `30000`. */
   timeout?: number;
@@ -1593,9 +1592,8 @@ export type SelectOption =
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
-/** @deprecated Use a swipe's `distance` and `speed`. How far a swipe went, before those replaced it. */
+/** @deprecated Use `distance` and `speed` on the swipe. It will be removed no earlier than April 1, 2027. */
 export type Momentum = 'none' | 'slow' | 'fast';
-
 ```
 
 ## Related

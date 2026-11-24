@@ -305,11 +305,12 @@ substring; a `RegExp` matches as written.
   `frameLocator`, and `filter({ hasText })` stop at a closed root; query the
   text inside or filter with `has`.
 - With `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`,
-  the container under the screen's center scrolls (`down`, 0.65 of it a step
-  by default) until the locator resolves visibly, else it fails with
-  `LOCATOR_NOT_FOUND`. On a locator, that node scrolls instead. On a device,
-  a node near the container's edge is dragged to the middle after at least
-  one step.
+  the container under the screen's center scrolls on the web and on a
+  device (`down`, 0.65 of it a step by default) until the locator resolves
+  visibly, else it fails with `LOCATOR_NOT_FOUND`. On a locator, that node
+  scrolls instead. On a device, the node can also be dragged to the middle
+  of its container
+  ([Mobile visibility](https://e2e.com/docs/reference/mobile#visibility)).
 
 ### Actions
 
@@ -327,19 +328,16 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 on a device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, and
 `modifiers`.
 
-A locator swipe crosses the node's box, and a `screen.swipe` scrolls the
-container under the screen's center:
+A locator swipe crosses the node's box. On the web and on a device, a
+`screen.swipe` scrolls the container under the screen's center:
 
 - `distance` is how far the content scrolls, as a share of that box (above
   0 and at most 1). It's `0.5` by default.
 - `speed` is how fast the finger moves: `'slow'` (1500 ms), `'normal'` (400
-  ms, the default), or `'fast'` (150 ms). It's ignored by the wheel on the
-  web.
-- `momentum` is deprecated: write `distance` and `speed` instead. It still
-  works, and stands for `'slow'` 0.25 at `'slow'` speed, `'none'` the
-  defaults, and `'fast'` 0.8 at `'fast'` speed.
-- On a device, each drag starts a quarter in from the container's edge. The
-  content keeps coasting after the finger lifts.
+  ms, the default), or `'fast'` (150 ms). On the web, `speed` doesn't change
+  anything.
+- `momentum` is deprecated. Use `distance` and `speed`.
+- On a device, the content keeps coasting after the finger lifts.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the
@@ -351,7 +349,7 @@ Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 `INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
 `screen.swipe({ from, to, duration? })` swipes along a path,
-`screen.swipe({ direction, distance?, speed? })` scrolls the container under the screen's center. Viewport
+`screen.swipe({ direction, distance?, speed? })` scrolls the container under the screen's center on the web and on a device. Viewport
 points also take percentages from `'0%'` through `'100%'`, rounded to the
 nearest pixel: `{ x: '50%', y: '50%' }`. Prefer a locator; a point moves with
 the layout.

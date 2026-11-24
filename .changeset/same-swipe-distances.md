@@ -6,4 +6,4 @@
 "@e2e-dev/desktop": patch
 ---
 
-`screen.swipe`, `locator.swipe`, and `scrollUntilVisible` take `distance` and `speed`, and a swipe moves the same share of what it scrolls on every engine. `momentum` still works and is deprecated. A screen swipe scrolls the container under the screen's center, and on a device `locator.scrollIntoView()` is supported. [screen.swipe](https://e2e.com/docs/reference/screen#screen-swipe)
+`screen.swipe`, `locator.swipe`, and `scrollUntilVisible` take `distance` and `speed`, with the same meaning on the web and on a device. `momentum` is deprecated, and on the web it scrolls shorter distances than before. On a device, `locator.scrollIntoView()` is supported.
