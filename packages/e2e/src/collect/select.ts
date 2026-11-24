@@ -723,10 +723,7 @@ function classifyPair(
     return {
       ...base,
       disposition: 'skip',
-      skip: {
-        cause: test.mode === 'fixme' ? 'fixme' : test.mode === 'todo' ? 'todo' : 'explicit',
-        reason: options.skipReason,
-      },
+      skip: { cause: test.mode === 'fixme' || test.mode === 'todo' ? test.mode : 'explicit', reason: options.skipReason },
     };
   }
 

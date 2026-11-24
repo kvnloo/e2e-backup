@@ -789,7 +789,7 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     return collector.registerTest('test', mode, title, options, [], fn, chain, namedBy);
   };
   /** The `test()` call forms. */
-  const registrar = (api: string, skip?: boolean | 'fixme' | 'todo'): TestRegistrar<object> => (
+  const registrar = (api: string, skip?: boolean | 'fixme'): TestRegistrar<object> => (
     title: string,
     optionsOrFn: TestOptions | TestBody,
     maybeFn?: TestBody,
@@ -861,11 +861,10 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
       return undefined;
     },
     todo(title: string, ...args: unknown[]): TestCase {
-      requireCollector('test.todo()');
       if (args.length > 0) {
         throw new CollectionError('test.todo() takes a title only; register a test with a body through test.skip(title, fn) or test.fixme(title, fn)');
       }
-      return registrar('test.todo()', 'todo')(title, () => {});
+      return registerOne('test.todo()', 'todo', title, {}, () => {});
     },
     fixme(first?: string | boolean, second?: TestBody | string): TestCase | undefined {
       const call = parseModifierCall(first, second);
