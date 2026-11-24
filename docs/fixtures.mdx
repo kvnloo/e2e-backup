@@ -158,6 +158,17 @@ export const test = base.extend<{ signedOut: void }, {}, typeof config>({
 });
 ```
 
+With `requires` or `platforms` on a test, its fixtures are typed for the
+targets that run it:
+
+```ts title="tests/menu.e2e.ts"
+import { test } from './fixtures.ts';
+
+test('closes the menu with Escape', { requires: ['browser'] }, async ({ browser }) => {
+  await browser.keyboard.press('Escape');
+});
+```
+
 If you [extend `device`](#extend-a-built-in-fixture), your override is called
 on web too, with `device` set to `undefined`.
 

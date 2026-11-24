@@ -13,7 +13,7 @@ import type { StepCacheInfo } from './run/steps.ts';
 import type { EngineHandle } from './engine/index.ts';
 import type { KeyModifier, Momentum, ScrollDirection, SelectOption, ViewportPoint } from './engine/contract.ts';
 import type { CacheStore } from './cache/store.ts';
-import type { ConfigBase, ConfigFixtures, FixtureDefinitions, FixtureOverrides, WorkerFixtures } from './types/fixtures.ts';
+import type { ConfigBase, ConfigFixtures, FixtureDefinitions, FixtureOverrides, SelectedFixtures, WorkerFixtures } from './types/fixtures.ts';
 
 export type { KeyModifier, Momentum, ScrollDirection, SelectOption } from './engine/contract.ts';
 export type { CacheReadResult, CacheStore } from './cache/store.ts';
@@ -870,8 +870,16 @@ export interface DescribeAPI extends DescribeRegistrar {
 export interface TestRegistrar<Fixtures = TestFixtures & WorkerFixtures> {
   /** Registers one test synchronously during module evaluation. */
   (title: string, fn: TestFn<Fixtures>): TestCase;
-  /** Registers one configured test synchronously during module evaluation. */
-  (title: string, options: TestOptions, fn: TestFn<Fixtures>): TestCase;
+  /**
+   * Registers one configured test synchronously during module evaluation.
+   * Its fixtures are typed for the targets its `requires` and `platforms`
+   * options keep.
+   */
+  <const Required extends Capability = never, const Platform extends string = string>(
+    title: string,
+    options: TestOptions & { readonly requires?: readonly Required[]; readonly platforms?: readonly Platform[] },
+    fn: TestFn<SelectedFixtures<Fixtures, Required, Platform>>,
+  ): TestCase;
 }
 
 /**

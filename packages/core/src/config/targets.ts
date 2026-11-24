@@ -68,7 +68,7 @@ export function resolveTargets(
   const seen = new Set<string>();
   const defaulted = new Set<string>();
   const fixtureScopes = new Map<string, FixtureScope>();
-  return (declared as readonly unknown[]).map((entry, index): ResolvedTarget => {
+  const targets = (declared as readonly unknown[]).map((entry, index): ResolvedTarget => {
     if (!isRecord(entry)) throw new ConfigurationError('INVALID_CONFIG', `targets[${index}] must be an object, got ${describeValue(entry)}`);
     const target = entry as Target;
     // Errors raised before the name settles point at the entry itself.
@@ -103,9 +103,6 @@ export function resolveTargets(
     if (target.name === undefined) defaulted.add(name);
     const engine = target.engine === undefined ? undefined : protocolEngine(target.engine);
     const declaredApp = checkTargetApp(name, engine, target.app);
-    for (const fixture of Object.keys(engine?.fixtures ?? {})) {
-      if (fixtureScopes.get(fixture) !== 'test') fixtureScopes.set(fixture, engine?.isolation === 'worker' ? 'worker' : 'test');
-    }
     return {
       name,
       index,
@@ -117,6 +114,14 @@ export function resolveTargets(
       fixtureScopes,
     };
   });
+
+  for (const { engine } of targets) {
+    for (const fixture of Object.keys(engine?.fixtures ?? {})) {
+      if (fixtureScopes.get(fixture) !== 'test') fixtureScopes.set(fixture, engine?.isolation === 'worker' ? 'worker' : 'test');
+    }
+  }
+
+  return targets;
 }
 
 /**

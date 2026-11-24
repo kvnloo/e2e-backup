@@ -1059,6 +1059,9 @@ test('signs out', async ({ app, platform, device }) => {
 - If a target's platform type is `string`, as on a target without an
   engine, fixtures aren't narrowed by a `platform` check. Check the fixture
   instead (`device !== undefined`).
+- With `requires` or `platforms` on a test, its fixtures are typed for the
+  targets that run it. With `requires: ['device']`, `device` is typed as
+  `Device`. On a `describe`, these options don't change the types.
 - With a type annotation such as `const config: E2EConfig`, the engine types
   are lost. To keep them, use `satisfies E2EConfig` instead.
 
@@ -1115,8 +1118,16 @@ export interface DescribeAPI extends DescribeRegistrar {
 export interface TestRegistrar<Fixtures = TestFixtures & WorkerFixtures> {
   /** Registers one test synchronously during module evaluation. */
   (title: string, fn: TestFn<Fixtures>): TestCase;
-  /** Registers one configured test synchronously during module evaluation. */
-  (title: string, options: TestOptions, fn: TestFn<Fixtures>): TestCase;
+  /**
+   * Registers one configured test synchronously during module evaluation.
+   * Its fixtures are typed for the targets its `requires` and `platforms`
+   * options keep.
+   */
+  <const Required extends Capability = never, const Platform extends string = string>(
+    title: string,
+    options: TestOptions & { readonly requires?: readonly Required[]; readonly platforms?: readonly Platform[] },
+    fn: TestFn<SelectedFixtures<Fixtures, Required, Platform>>,
+  ): TestCase;
 }
 
 /**

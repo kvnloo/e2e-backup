@@ -48,6 +48,7 @@ import {
   type TestFilter,
   type TestFilterCandidate,
   type TestFilterContext,
+  type TestOptions,
   type TestRegistrar,
   type EachRegistrar,
   type Unique,
@@ -1133,6 +1134,21 @@ handsetBase('narrows the base fixtures on the platform', async ({ platform, pane
   if (platform === 'web') await pane.goto('/');
   else await handset.closeApp();
 });
+// A test's requires and platforms options narrow the fixtures to the targets they keep.
+configTest('requires pane', { requires: ['pane'] }, async ({ platform, pane }) => {
+  platform satisfies 'web';
+  await pane.goto('/');
+});
+configTest('runs on ios', { platforms: ['ios'] }, async ({ handset }) => { await handset.closeApp(); });
+configTest.skipIf(false)('requires handset', { requires: ['handset'] }, async ({ app, handset }) => {
+  await app.open('/');
+  await handset.closeApp();
+});
+// @ts-expect-error a capability that isn't a fixture keeps every target, so handset is possibly undefined
+configTest('requires the keyboard', { requires: ['keyboard'] }, async ({ handset }) => { await handset.closeApp(); });
+const options: TestOptions = { requires: ['handset'] };
+// @ts-expect-error options typed as TestOptions keep every target
+configTest('takes options', options, async ({ handset }) => { await handset.closeApp(); });
 // @ts-expect-error a fixture in the first type argument still needs a definition
 test.extend<{ start: () => Promise<void> }, {}, typeof mixedConfig>({});
 // The original fixture value passed to an override is undefined on targets without the fixture.
