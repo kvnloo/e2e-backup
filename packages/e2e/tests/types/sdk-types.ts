@@ -1075,6 +1075,82 @@ test.extend<{ draft: string }>({
 // A fixture of an earlier extend is extended the same way.
 withWorkspace.extend({ workspace: async ({ workspace }, use) => { await use(workspace); } });
 
+// With the config type as the third argument, each target has the fixture
+// types of its engine. A fixture that only other targets have is possibly
+// undefined until a platform check.
+interface Pane { goto(url: string): Promise<void> }
+interface Handset { closeApp(): Promise<void> }
+// app has a narrower type on pane, like WebApp on the web engine. Every target still has app.
+const paneEngine = defineEngine<{ readonly pane: Pane; readonly app: App }, 'web', 'attempt'>({ name: 'pane', version: '1.0.0', spiVersion: 1, platform: 'web', fixtures: { pane: () => ({ goto: async () => {} }) } });
+const handsetEngine = defineEngine<{ readonly handset: Handset }, 'ios', 'worker'>({ name: 'handset', version: '1.0.0', spiVersion: 1, platform: 'ios', isolation: 'worker', fixtures: { handset: () => ({ closeApp: async () => {} }) } });
+const mixedConfig = { targets: [{ engine: paneEngine }, { engine: handsetEngine }] } satisfies E2EConfig;
+const configTest = test.extend<{}, {}, typeof mixedConfig>();
+configTest('narrows on the platform', async ({ app, platform, pane, handset }) => {
+  await app.open('/');
+  if (platform === 'web') {
+    await pane.goto('/');
+    return;
+  }
+  await handset.closeApp();
+});
+configTest('narrows on the fixture', async ({ handset }) => {
+  if (handset !== undefined) await handset.closeApp();
+});
+// @ts-expect-error handset is undefined on the web target
+configTest('reads a fixture without a check', async ({ handset }) => { await handset.closeApp(); });
+// @ts-expect-error the config has no Android target
+configTest('compares a platform no target has', async ({ platform }) => { void (platform === 'android'); });
+configTest.beforeAll(async ({ platform, handset }) => {
+  if (platform === 'ios') await handset.closeApp();
+});
+// @ts-expect-error pane has test scope on web and is unavailable in suite hooks
+configTest.beforeAll(async ({ pane }) => { void pane; });
+// Fixture types are narrowed by a platform check inside a definition in the same extend call.
+test.extend<{ start: () => Promise<void> }, {}, typeof mixedConfig>({
+  start: async ({ platform, pane, handset }, use) => {
+    await use(async () => {
+      if (platform === 'web') await pane.goto('/');
+      else await handset.closeApp();
+    });
+  },
+})('starts', async ({ start, handset }) => {
+  await start();
+  if (handset !== undefined) await handset.closeApp();
+});
+test.extend<{}, { warmed: boolean }, typeof mixedConfig>({
+  warmed: [async ({ platform, handset }, use) => {
+    if (platform === 'ios') await handset.closeApp();
+    await use(true);
+  }, { scope: 'worker' }],
+}).beforeAll(async ({ warmed }) => { warmed satisfies boolean; });
+// A fixture typed on the base `test`, as in an engine package's `test`, is still undefined on targets without it.
+const handsetBase = test.extend<{ pane: Pane }, { handset: Handset }>().extend<{}, {}, typeof mixedConfig>();
+// @ts-expect-error handset is undefined on the web target
+handsetBase('reads handset without a check', async ({ handset }) => { await handset.closeApp(); });
+// @ts-expect-error pane is undefined on the ios target
+handsetBase('reads pane without a check', async ({ pane }) => { await pane.goto('/'); });
+handsetBase('narrows the base fixtures on the platform', async ({ platform, pane, handset }) => {
+  if (platform === 'web') await pane.goto('/');
+  else await handset.closeApp();
+});
+// @ts-expect-error a fixture in the first type argument still needs a definition
+test.extend<{ start: () => Promise<void> }, {}, typeof mixedConfig>({});
+// The original fixture value passed to an override is undefined on targets without the fixture.
+configTest.extend({ handset: async ({ handset }, use) => { await use(handset); } });
+// @ts-expect-error handset has type Handset | undefined, so a string can't be passed to use
+configTest.extend({ handset: async ({}, use) => { await use('not a handset'); } });
+// With an E2EConfig type annotation, the inferred engine types are lost, so engine fixtures aren't typed.
+const annotatedConfig: E2EConfig = mixedConfig;
+// @ts-expect-error handset is absent from the annotated config type
+test.extend<{}, {}, typeof annotatedConfig>()('names handset', async ({ handset }) => { void handset; });
+const inferredEngine = defineEngine({ name: 'tv', version: '1.0.0', spiVersion: 1, platform: 'tv', isolation: 'worker' });
+void (inferredEngine.platform satisfies 'tv' | undefined);
+void (inferredEngine.isolation satisfies 'worker' | undefined);
+// @ts-expect-error the literal 'ios' requires platform: 'ios' in the spec
+defineEngine<{}, 'ios'>({ name: 'tv', version: '1.0.0', spiVersion: 1 });
+// @ts-expect-error the literal 'worker' requires isolation: 'worker' in the spec
+defineEngine<{}, string, 'worker'>({ name: 'tv', version: '1.0.0', spiVersion: 1 });
+
 // A test, a group, and a call each pin a configured agent by name.
 test('as the buyer', { agent: 'buyer' }, async () => {});
 test('traced on retries', { trace: 'on-all-retries', video: 'retain-on-failure' }, async () => {});

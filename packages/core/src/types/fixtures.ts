@@ -3,6 +3,9 @@
  * test, and what `test.extend()` takes. Re-exported from `types.ts`.
  */
 
+import type { EngineHandle } from '../engine/index.ts';
+import type { TestFixtures } from '../types.ts';
+
 /**
  * How long one fixture instance lives. `test`, the default, is one instance
  * per test attempt that names it, shared by its `beforeEach` hooks, its
@@ -90,7 +93,11 @@ export type FixtureDefinitions<Base, Extra, Worker = {}, ExtraWorker = {}> = {
  * fixtures, and the ones declared beside it.
  */
 export type FixtureOverrides<Sees, WorkerSees, Base = Sees, Worker = WorkerSees> = {
-  readonly [K in keyof Base]?: FixtureOverride<Base, Worker, K, Sees, WorkerSees>;
+  // Map over keys shared by all members of a union `Base`, such as
+  // `ConfigFixtures`. Mapping directly over `keyof Base` would map each
+  // member separately. Each override type would then be a union of fixture
+  // functions, and the parameter types could not be inferred.
+  readonly [K in Extract<keyof Base, PropertyKey>]?: FixtureOverride<Base, Worker, K, Sees, WorkerSees>;
 };
 /**
  * A fixture that extends `K`, one the base already has: it hands over the
@@ -100,3 +107,41 @@ export type FixtureOverrides<Sees, WorkerSees, Base = Sees, Worker = WorkerSees>
 export type FixtureOverride<Base, Worker, K extends keyof Base, Sees, WorkerSees> = K extends keyof Worker
   ? FixtureFn<WorkerSees, Base[K]> | WorkerFixtureDefinition<WorkerSees, Base[K]>
   : TestFixtureDefinition<Sees, Base[K]>;
+
+/**
+ * Test or worker fixture types for each target in `Config`, the third type
+ * argument of `test.extend`. Each union member is one target, with the
+ * fixtures of that target's engine. A fixture that only other targets have
+ * is typed as `undefined`, like its runtime value.
+ *
+ * Engine fixtures, `app`, and `screen` are worker fixtures on a target
+ * whose engine has `isolation: 'worker'`, and test fixtures otherwise.
+ * `platform` is in both halves, so an intersection of members with
+ * different platforms reduces to `never`.
+ */
+export type ConfigFixtures<Config, Half extends FixtureScope, Handle = ConfigEngines<Config>> = unknown extends Config
+  ? {}
+  : Handle extends EngineHandle<infer Fixtures, infer Platform, infer Isolation>
+    ? { readonly platform: Platform } & (Half extends ([Isolation] extends ['worker'] ? 'worker' : 'test')
+      ? Pick<TestFixtures, 'app' | 'screen'> & Fixtures
+      : {}) & { readonly [Name in Exclude<ConfigFixtureNames<ConfigEngines<Config>>, keyof Fixtures>]?: undefined }
+    : never;
+
+/**
+ * `Base` without the fixtures that `ConfigFixtures` types per target. Without
+ * this, a fixture typed on the base `test` (`device: Device`, say) would keep
+ * that type on every target, even where it's `undefined`.
+ */
+export type ConfigBase<Base, Config> = unknown extends Config ? Base : Omit<Base, ConfigFixtureNames<ConfigEngines<Config>> | 'app' | 'screen'>;
+
+/** The engine handle of each target in `Config`. A target without an engine has a plain `EngineHandle`. */
+type ConfigEngines<Config> = Config extends { readonly targets: readonly (infer Each)[] }
+  ? Each extends { readonly engine: infer Handle extends EngineHandle } ? Handle : EngineHandle
+  : never;
+
+/**
+ * Engine fixture names from `Handle`, excluding core fixtures. Core
+ * fixtures such as `app` and `screen` are defined on every target and may
+ * have a narrower type on some engines.
+ */
+type ConfigFixtureNames<Handle> = Handle extends EngineHandle<infer Fixtures> ? Exclude<keyof Fixtures, keyof TestFixtures> : never;

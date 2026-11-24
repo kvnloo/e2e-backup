@@ -116,6 +116,51 @@ On a mobile target `device` is a worker fixture, so this one runs one time
 per worker and `beforeAll` gets it. See
 [Extending a fixture](/reference/test#extending-a-fixture).
 
+## Run one test on web and mobile
+
+You can run the same test on targets whose engines have different fixtures.
+For example, in a config with web and iOS targets, `device` is `undefined` on
+web.
+
+```ts title="e2e.config.ts"
+import type { E2EConfig } from 'e2e';
+import { mobile } from '@e2e-dev/mobile';
+import { web } from '@e2e-dev/web';
+
+export default {
+  targets: [
+    { engine: web(), app: { url: 'http://localhost:3000' } },
+    { engine: mobile({ platform: 'ios' }), app: { bundleId: 'com.example.app' } },
+  ],
+} satisfies E2EConfig;
+```
+
+Use `satisfies E2EConfig` instead of a type annotation such as
+`const config: E2EConfig`. With the annotation, the engine types are lost.
+
+Pass `typeof config` as the third type argument of `test.extend`. Check
+`platform === 'ios'` to narrow `device` to `Device`:
+
+```ts title="tests/fixtures.ts"
+import { test as base } from 'e2e';
+import type config from '../e2e.config.ts';
+
+export const test = base.extend<{ signedOut: void }, {}, typeof config>({
+  /** Signs the app out. On iOS, the keychain is cleared first, since `app.clearState()` doesn't clear it. */
+  signedOut: async ({ app, platform, device }, use) => {
+    if (platform === 'ios') {
+      await device.clearKeychain();
+    }
+
+    await app.clearState();
+    await use();
+  },
+});
+```
+
+If you [extend `device`](#extend-a-built-in-fixture), your override is called
+on web too, with `device` set to `undefined`.
+
 ## Share a fixture across a worker
 
 A worker fixture is set up one time per worker and target, by the first test

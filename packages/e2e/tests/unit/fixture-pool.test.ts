@@ -9,7 +9,7 @@ import type { FixtureScope } from '@e2e-dev/core/lib/types';
 
 /** A web-like target, whose attempts are isolated, or a device-like one, whose state outlives them. */
 function toyTarget(isolation: 'attempt' | 'worker' = 'attempt'): BuiltInTarget {
-  return { name: 'toy', platform: 'toy', engine: { name: 'toy', isolation, fixtures: { gadget: () => ({}) } } };
+  return { name: 'toy', platform: 'toy', engine: { name: 'toy', isolation, fixtures: { gadget: () => ({}) } }, fixtureScopes: new Map() };
 }
 
 type Fixtures = Record<string, unknown>;

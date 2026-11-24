@@ -1,7 +1,7 @@
 /**
  * Which fixtures a piece of test code needs, and in what order: the ones its
  * functions name, the ones those fixtures name in turn, and the `auto` ones.
- * Planning runs no fixture, so the rules it enforces (a name the target has,
+ * Planning runs no fixture, so the rules it enforces (a name some target has,
  * a suite hook or worker fixture that reads worker fixtures only, no cycle)
  * fail at collection, and again in the worker before anything is set up.
  */
@@ -219,9 +219,9 @@ interface PlanRequest {
  * Plans the fixtures of `chain` that `users` need on `target`: the ones they
  * name, the ones those name, and the `auto` ones (a suite hook sets up no
  * test fixture, `auto` or not). Throws a `FixtureUseError`, before anything
- * is set up, for a name the target has no fixture for, a test fixture named
- * by a suite hook or a worker fixture, a cycle, and a fixture whose declared
- * scope or `auto` is not the one of the fixture it extends.
+ * is set up, for a name no target in the config has a fixture for, a test
+ * fixture named by a suite hook or a worker fixture, a cycle, and a fixture
+ * whose declared scope or `auto` is not the one of the fixture it extends.
  */
 function planFixtures(request: PlanRequest): FixturePlan {
   const { target, chain, scope, users } = request;

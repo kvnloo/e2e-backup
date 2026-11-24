@@ -129,12 +129,17 @@ jq '.run.results[] | select(.selected and .status != "passed") | .attempts[-1]
 | `STEP_TIMEOUT`, `STEP_BUDGET_EXHAUSTED` | Goal too big or ambiguous, or a slow provider | Split the goal, use on-screen wording, add vocabulary via `agents.<name>.context` or `agentContext`; raise `maxSteps` or `maxModelCalls` (budget), the config `timeout` (`act`), `judgmentTimeout` (judgments); `--debug` |
 | `CONTEXT_OVERFLOW` | Screen plus step history did not fit the model's context window (`act` after one shrink-and-retry; a judgment on the first overflow) | Lower `agents.<name>.maxObservationBytes`, split the step, or pick a larger-window model |
 | `POLICY_DENIED` | A URL whose scheme is not `http:` or `https:` (`file:`, `view-source:`, `data:`); a password `Secret` into a non-password sink; reading a secure field, `toHaveValue`, `toHaveText`, `toContainText`, `toHaveAttribute` included; `vision: 'only'` with pixels withheld | http(s) or `about:blank` only; passwords into password inputs only; assert the outcome, not the value |
-| `UNSUPPORTED_CAPABILITY` | A fixture the engine lacks (`browser` on a device), `schema` or `vision` on `act`, an action the surface lacks | Declare `requires: ['browser']`; drop the option or action |
+| `UNSUPPORTED_CAPABILITY` | `schema` or `vision` on `act`, an action the surface lacks | Drop the option or action |
 | `SESSION_UNAVAILABLE`, `SESSION_CONTRACT` | `session: 'x'` with no setup saving `x`; a setup that skipped a declared name. `SESSION_MISMATCH`, `SESSION_EXPIRED`, `SESSION_INVALID`: the stored session is another run's or app's, expired, or corrupt | Add or fix the `test.setup`; rerun it |
 | `ONLY_IN_CI` | `test.only` reached CI | Remove it |
 | `PAUSE_UNAVAILABLE` | `screen.pause()` reached CI | Remove it before you commit, or ask the user to run the test with `e2e run` in a terminal |
 | `AUTH_CREDENTIAL_UNAVAILABLE`, `AUTH_CREDENTIAL_INVALID` | `credentials.user('x')` for an undeclared name; the app rejected a configured credential | Add it to `config.credentials`; fix the stored value |
 | `SECRET_UNAVAILABLE` | `secrets.get('x')` for an undeclared name | Add it to `config.secrets`; `E2E_SECRET_X` only overrides a declared one |
+
+A `TypeError` from `browser` or `device` (`Cannot read properties of undefined`)
+means the test was run on a target without that fixture, where it's
+`undefined`. Set `requires: ['browser']` or `requires: ['device']` on the test,
+or check `platform` first.
 
 ## Tools
 
