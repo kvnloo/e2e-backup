@@ -280,11 +280,11 @@ export type LocatorAction =
       /** Keys held for the click, as on the `doubleTap` and `secondaryTap` kinds. */
       readonly modifiers?: readonly KeyModifier[];
       /**
-       * The mouse button for the click, left out for the primary button.
-       * It's sent only to an engine that declares `tapButtons`. For any
-       * other engine, it's refused before dispatch.
+       * The middle mouse button, set for a middle click. It's sent only to
+       * an engine that declares `tapButtons`. For any other engine, it's
+       * refused before dispatch.
        */
-      readonly button?: 'middle' | 'right';
+      readonly button?: 'middle';
     }
   | {
       readonly kind: 'doubleTap' | 'secondaryTap';

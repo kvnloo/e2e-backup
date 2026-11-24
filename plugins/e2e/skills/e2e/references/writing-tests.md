@@ -312,7 +312,7 @@ substring; a `RegExp` matches as written.
 
 Each action resolves one node, waits up to `config.actionTimeout` (30 s, or
 `{ timeout }`) for it to be actionable, and does one thing: `tap()` (alias
-`click()`, takes `{ button: 'middle' }` or `'right'`), `doubleTap()` (alias
+`click()`, takes `{ button: 'middle' }` or `{ button: 'right' }`), `doubleTap()` (alias
 `dblclick()`), `secondaryTap()` (each takes `{ modifiers: ['Shift'] }`),
 `longPress({ duration? })`
 (100 to 10000 ms; default 500 on the web, 1000 on a device),
@@ -615,7 +615,8 @@ the active tab stays where it was. `waitForPopup(() => trigger)` makes the
 tab the trigger opens active and resolves with it. When the active tab
 closes, its opener is active again, or the tab active most recently when
 the opener is gone. `tabs()`, `newTab()`, `tab.activate()`, and
-`tab.close()` move between tabs.
+`tab.close()` move between tabs. On Chromium, a tab opened by a middle click
+on a link isn't listed by `tabs()` or seen by `waitForPopup`.
 
 - `goto(url, { waitUntil?, timeout? })`, `reload({ timeout? })`,
   `back({ timeout? })`, `forward({ timeout? })`: navigation on the test

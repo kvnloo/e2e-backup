@@ -275,10 +275,15 @@ test('taps are pressed with the mouse button they name', async ({ app, screen, b
     const status = document.querySelector('p')!;
     const pressed = (event: MouseEvent) => {
       event.preventDefault();
-      status.textContent = [event.type, event.button, event.shiftKey && 'shift', event.ctrlKey && 'ctrl'].filter((part) => part !== false).join(' ');
+      // Chromium follows a right click's contextmenu with an auxclick for button 2.
+      if (event.type === 'auxclick' && event.button === 2) return;
+      status.textContent = [event.type, event.button, event.shiftKey && 'shift', event.ctrlKey && 'ctrl', event.altKey && 'alt']
+        .filter((part) => part !== false)
+        .join(' ');
     };
     link.addEventListener('click', pressed);
     link.addEventListener('auxclick', pressed);
+    link.addEventListener('contextmenu', pressed);
     return null;
   });
   const next = screen.getByRole('link', { name: 'Next' });
@@ -287,6 +292,8 @@ test('taps are pressed with the mouse button they name', async ({ app, screen, b
   await expect(status).toHaveText('auxclick 1');
   await next.click({ button: 'middle', modifiers: ['Shift', 'Control'] });
   await expect(status).toHaveText('auxclick 1 shift ctrl');
+  await next.tap({ button: 'right', modifiers: ['Alt'] });
+  await expect(status).toHaveText('contextmenu 2 alt');
   await next.tap({ button: 'left' });
   await expect(status).toHaveText('click 0');
 });

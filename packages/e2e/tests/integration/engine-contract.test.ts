@@ -1037,72 +1037,51 @@ test('takes evidence', async ({ app }) => {
     60_000,
   );
 
-  it(
-    'hands click modifiers only to an engine that declares tapModifiers, and refuses them before perform otherwise',
-    async () => {
-      const file = `import { test } from 'e2e';
-
-test('shift-clicks', async ({ app, screen }) => {
-  await app.open('/');
-  await screen.getByRole('button', { name: 'Submit' }).click({ modifiers: ['Shift'] });
-});
-`;
-      const run = async (fake: FakeEngineHandle) => {
-        const { outcome, project } = await runProject(
-          { 'tests/modifiers.e2e.ts': file },
-          { appUrl: APP_URL, config: engineConfig(fake.engine) },
-        );
-        project.cleanup();
-        const result = resultByTitle(outcome, 'shift-clicks');
-        return { result, performs: fake.callsOf(result.attempts[0]!.id, 'perform').map((call) => call.action) };
-      };
-
-      const declaring = await run(createFakeEngine({ tapModifiers: true }));
-      expect(declaring.result.status).toBe('passed');
-      expect(declaring.performs).toEqual([{ kind: 'tap', modifiers: ['Shift'] }]);
-
-      const predating = await run(createFakeEngine());
-      expect(predating.result.status).toBe('failed');
-      expect(predating.result.attempts[0]!.error).toMatchObject({
-        code: 'UNSUPPORTED_CAPABILITY',
-        category: 'configuration',
-        message: expect.stringContaining('modifiers on the "tap" action'),
-      });
-      expect(predating.performs).toEqual([]);
+  it.each([
+    {
+      flag: 'tapModifiers',
+      call: "click({ modifiers: ['Shift'] })",
+      behavior: { tapModifiers: true },
+      action: { kind: 'tap', modifiers: ['Shift'] },
+      refusal: 'modifiers on the "tap" action',
     },
-    60_000,
-  );
-
-  it(
-    'sends a middle button to perform only when the engine declares tapButtons',
-    async () => {
+    {
+      flag: 'tapButtons',
+      call: "tap({ button: 'middle' })",
+      behavior: { tapButtons: true },
+      action: { kind: 'tap', button: 'middle' },
+      refusal: 'the middle button on the "tap" action',
+    },
+  ])(
+    'hands $call only to an engine that declares $flag, and refuses it before perform otherwise',
+    async ({ call, behavior, action, refusal }) => {
       const file = `import { test } from 'e2e';
 
-test('middle-clicks', async ({ app, screen }) => {
+test('clicks', async ({ app, screen }) => {
   await app.open('/');
-  await screen.getByRole('button', { name: 'Submit' }).tap({ button: 'middle' });
+  await screen.getByRole('button', { name: 'Submit' }).${call};
 });
 `;
       const run = async (fake: FakeEngineHandle) => {
         const { outcome, project } = await runProject(
-          { 'tests/buttons.e2e.ts': file },
+          { 'tests/clicks.e2e.ts': file },
           { appUrl: APP_URL, config: engineConfig(fake.engine) },
         );
         project.cleanup();
-        const result = resultByTitle(outcome, 'middle-clicks');
-        return { result, performs: fake.callsOf(result.attempts[0]!.id, 'perform').map((call) => call.action) };
+        const result = resultByTitle(outcome, 'clicks');
+        return { result, performs: fake.callsOf(result.attempts[0]!.id, 'perform').map((record) => record.action) };
       };
 
-      const declaring = await run(createFakeEngine({ tapButtons: true }));
+      const declaring = await run(createFakeEngine(behavior));
       expect(declaring.result.status).toBe('passed');
-      expect(declaring.performs).toEqual([{ kind: 'tap', button: 'middle' }]);
+      expect(declaring.performs).toEqual([action]);
 
       const predating = await run(createFakeEngine());
       expect(predating.result.status).toBe('failed');
       expect(predating.result.attempts[0]!.error).toMatchObject({
         code: 'UNSUPPORTED_CAPABILITY',
         category: 'configuration',
-        message: expect.stringContaining('the middle button on the "tap" action'),
+        message: expect.stringContaining(refusal),
       });
       expect(predating.performs).toEqual([]);
     },

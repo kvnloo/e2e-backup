@@ -249,9 +249,10 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set when `button` on the `tap` action is honored by `perform` (a click
-   * with the middle or right mouse button). Without it, a tap with a button
-   * fails with `UNSUPPORTED_CAPABILITY` before it reaches the engine.
+   * Set when `button` on the `tap` action is honored by `perform`, for
+   * middle clicks. Without it, `tap({ button: 'middle' })` fails with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left or right
+   * tap doesn't need it.
    */
   readonly tapButtons?: boolean;
   /**
@@ -415,7 +416,7 @@ member. Three gaps end differently:
 | `perform` + `actions` | `actions` | `observe` | Node actions of the declared kinds, with platform actionability checks. |
 | `locate` | `location` | `observe` | `screen`, `Locator`, `expect(locator)`. |
 | `tapModifiers: true` | - | `perform` | `modifiers` on `tap`, `doubleTap`, and `secondaryTap`. |
-| `tapButtons: true` | - | `perform` | A middle or right `button` on `tap`. |
+| `tapButtons: true` | - | `perform` | A middle `button` on `tap`. |
 | `selectsDevice: true` | - | `prepare` | `e2e run --device`, the device `prepare` binds. |
 | `launchArgumentValues: true` | - | - | The object form of `app.launchArguments`, in `EngineAppInfo.launchArgumentValues`. |
 | `performAt` + `pointerActions` | `pointer` | `observe` | One pointer action at a viewport point, with no node behind it. |
@@ -494,12 +495,10 @@ An undeclared verb is absent from the toolset.
 
 #### Test APIs
 
-The test-facing APIs each engine member backs. These calls fail with
-`UNSUPPORTED_CAPABILITY` before they reach the engine:
-
-- A `screen` or `Locator` method for an undeclared kind.
-- A call with `modifiers` and no `tapModifiers`.
-- A call with a middle or right `button` and no `tapButtons`.
+The test-facing APIs each engine member backs. A `screen` or `Locator`
+method for an undeclared kind, or a call with `modifiers` and no
+`tapModifiers`, fails with `UNSUPPORTED_CAPABILITY` before it reaches the
+engine. Without `tapButtons`, `tap({ button: 'middle' })` fails the same way.
 
 | API | Needs |
 | --- | --- |
@@ -507,7 +506,7 @@ The test-facing APIs each engine member backs. These calls fail with
 | `screen` and `Locator` actions | `perform`, each only for a kind listed in `actions` |
 | `screen.swipe()` | `perform` with `swipe` on the observation root |
 | `modifiers` on a tap (`row.click({ modifiers: ['Shift'] })`) | `tapModifiers: true`; the keys are held for the click |
-| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true` for `middle` and `right`. A `left` tap is sent without `button`. |
+| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true` for `middle`. A `right` tap is sent as `secondaryTap`, and a `left` tap without `button`. |
 | `screen.tapAt`, `tap({ position })` | `performAt` with the `tap` pointer kind |
 | `screen.doubleTapAt` | `performAt` with the `doubleTap` pointer kind |
 | `screen.swipe({ from, to })` | `performAt` with the `swipeTo` pointer kind |
@@ -1245,10 +1244,10 @@ async perform(ref, action, context) {
 export type LocatorAction =
   | {
       readonly kind: 'tap';
-      /** Keys held for the click. They're sent only to an engine that declares `tapModifiers`. */
+      /** Keys held for the click, as on the `doubleTap` and `secondaryTap` kinds. */
       readonly modifiers?: readonly KeyModifier[];
-      /** The mouse button for the click, left out for the primary button. It's sent only to an engine that declares `tapButtons`. */
-      readonly button?: 'middle' | 'right';
+      /** The middle mouse button, set for a middle click. It's sent only to an engine that declares `tapButtons`. For any other engine, it's refused before dispatch. */
+      readonly button?: 'middle';
     }
   | {
       readonly kind: 'doubleTap' | 'secondaryTap';

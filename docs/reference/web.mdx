@@ -1024,8 +1024,9 @@ await screen.getByRole('textbox', 'Verification code').fill(code);
   cookies and storage, and makes it active. Navigate it with `goto`.
 - A tab whose opener closed before the tab loaded is listed too, on
   Chromium. A page a test opens through `surfaceOf(engine)` is not.
-- A tab opened by a middle click on a link (`tap({ button: 'middle' })`)
-  isn't seen by `waitForPopup` on Chromium, so the wait times out.
+- On Chromium, a tab opened by a middle click on a link
+  (`tap({ button: 'middle' })`) doesn't have an opener. It isn't listed by
+  `tabs()` or seen by `waitForPopup`, so the wait times out.
 - The screencast records the active tab, one video segment per change. A tab
   that closes itself keeps no segment, since its page closes before the
   recording can be saved. A provider's own recording covers every tab.

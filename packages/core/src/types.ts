@@ -499,8 +499,9 @@ export interface TapOptions extends ClickOptions {
   position?: Point;
   /**
    * The mouse button to click with: `left` (default), `middle`, or `right`.
-   * `middle` and `right` fail with `UNSUPPORTED_CAPABILITY` on an engine
-   * without `tapButtons`. They can't be combined with `position` yet.
+   * A right tap is a `secondaryTap`. A middle tap needs an engine that
+   * declares `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise. Neither can be
+   * combined with `position` yet.
    */
   button?: 'left' | 'middle' | 'right';
 }

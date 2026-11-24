@@ -977,6 +977,13 @@ describe('coordinate input', () => {
     expect(performedAt).toEqual([]);
   });
 
+  it('taps a position with an explicit left button through the pointer path', async () => {
+    const { engine, performedAt } = pointer();
+    const { fixtures } = runtime(engine);
+    await fixtures.screen.getByLabel('Pad').tap({ position: { x: 1, y: 2 }, button: 'left' });
+    expect(performedAt).toEqual(['tap @ 101,202']);
+  });
+
   it('fails UNSUPPORTED_CAPABILITY without a pointer tap, before the locator is resolved', async () => {
     const locates: number[] = [];
     const observes: number[] = [];

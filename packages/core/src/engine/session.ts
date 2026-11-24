@@ -466,9 +466,6 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
       if ('modifiers' in action && action.modifiers !== undefined && !tapModifiers) {
         unsupported(`modifiers on the "${action.kind}" action`);
       }
-      if ('button' in action && action.button !== undefined && !tapButtons) {
-        unsupported(`the ${action.button} button on the "${action.kind}" action`);
-      }
       if (action.kind === 'press') requireKey(action.key);
       rejectSupersededLocate(ref);
       if (action.kind === 'dragTo') rejectSupersededLocate(action.target);

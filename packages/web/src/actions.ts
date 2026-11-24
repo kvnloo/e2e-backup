@@ -167,7 +167,7 @@ function controlPoint(label: HTMLLabelElement): { x: number; y: number } | null 
 async function clickControl(
   target: ActionTarget,
   verb: 'tap' | 'check' | 'uncheck',
-  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; button?: 'middle' | 'right' },
+  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; button?: 'middle' },
 ): Promise<void> {
   const { signal, ...click } = options;
   const deadline = new Deadline(options.timeout);

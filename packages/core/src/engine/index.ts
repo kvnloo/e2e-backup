@@ -806,12 +806,13 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set when `button` on the `tap` action is honored by `perform` (a click
-   * with the middle or right mouse button). Without it, a tap with a button
-   * fails with `UNSUPPORTED_CAPABILITY` before it reaches the engine.
+   * Set when `button` on the `tap` action is honored by `perform`, for
+   * middle clicks. Without it, `tap({ button: 'middle' })` fails with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left or right
+   * tap doesn't need it.
    *
    * The button is never sent to an engine written before this field, so a
-   * middle or right click can't turn into a primary click there.
+   * middle click can't turn into a primary click there.
    */
   readonly tapButtons?: boolean;
   /**

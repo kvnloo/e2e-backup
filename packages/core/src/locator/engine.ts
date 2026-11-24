@@ -205,14 +205,11 @@ export class LocatorEngine {
 
   /**
    * Refuses an action the session would refuse, before the locator is
-   * resolved. These are `UNSUPPORTED_CAPABILITY`:
-   *
-   * - an undeclared kind
-   * - modifiers on an engine without `tapModifiers`
-   * - a button on an engine without `tapButtons`
-   *
-   * A `press` key outside the grammar is `INVALID_ARGUMENT`. Waiting for a
-   * node the engine could never act on would report it as missing instead.
+   * resolved: an undeclared kind, or modifiers on an engine that does not
+   * declare `tapModifiers`, is `UNSUPPORTED_CAPABILITY`, a `press` key
+   * outside the grammar is `INVALID_ARGUMENT`. Waiting for a node the engine
+   * could never act on would report it as missing instead. A middle button
+   * on an engine without `tapButtons` is `UNSUPPORTED_CAPABILITY` too.
    */
   private checkAction(action: LocatorAction): void {
     if (!this.session.actions.has(action.kind)) {
@@ -240,7 +237,7 @@ export class LocatorEngine {
     if ('button' in action && action.button !== undefined && !this.session.tapButtons) {
       throw new ConfigurationError(
         'UNSUPPORTED_CAPABILITY',
-        `the ${action.button} button on the "${action.kind}" action is not available on this target: tapButtons is not declared on its engine`,
+        `the ${action.button} button on the "${action.kind}" action is not available on this target: its engine does not declare tapButtons`,
       );
     }
     if (action.kind === 'press') requireKey(action.key);
