@@ -275,10 +275,8 @@ case-sensitive) for a `getByRole` name, `getByLabel`, `getByPlaceholder`, and
 missed query makes a negated assertion pass, so check it positively.
 `getByText` and `getByLabel` return the innermost match, so a container
 echoing its child does not count twice. `exact: false` is a case-insensitive
-substring, and a `RegExp` is matched as written. On iOS, a control's texts
-are merged into its label (`Trail Mix, 250 g`), so `getByText` can also be
-given one `, `-separated part. The match is the control, so its text is the
-whole label.
+substring; a `RegExp` matches as written. On iOS, when no label matches
+whole, `getByText('Trail Mix')` matches a control labelled `Trail Mix, 250 g`.
 
 - Exactly one match per action, read, or assertion. Two fail at once with
   `LOCATOR_AMBIGUOUS`; at zero, actions and reads poll until the action

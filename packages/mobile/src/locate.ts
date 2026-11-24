@@ -27,11 +27,10 @@ export function resolveExpression(
     case 'query': {
       const candidates =
         expression.scope === undefined ? index : descendantsOf(resolveExpression(expression.scope, index, platform), index);
-      const full = candidates.filter((entry) => matchesQuery(entry, expression.query, platform, false));
-      const matches =
-        full.length === 0 && platform === 'android' && expression.query.kind === 'testId'
-          ? candidates.filter((entry) => matchesQuery(entry, expression.query, platform, true))
-          : full;
+      const full = candidates.filter((entry) => matchesQuery(entry, expression.query, false));
+      const fallback =
+        (platform === 'android' && expression.query.kind === 'testId') || (platform === 'ios' && expression.query.kind === 'text');
+      const matches = full.length === 0 && fallback ? candidates.filter((entry) => matchesQuery(entry, expression.query, true)) : full;
       return ECHOED_QUERY_KINDS.has(expression.query.kind) ? innermostOnly(matches) : matches;
     }
     case 'filter': {
@@ -118,21 +117,8 @@ function subtreeHasText(
 }
 
 /**
- * The separator between the parts of a merged label on iOS.
- *
- * When an accessibility element doesn't have a label, its label is built
- * from its subviews' labels, joined with ", " (React Native's
- * `RCTRecursiveAccessibilityLabel` on the new architecture). On the old
- * architecture, they're joined with a space. The texts below the element
- * aren't listed in the XCTest tree. So on iOS, the label of a button over
- * "Trail Mix" and "250 g" is `Trail Mix, 250 g`. On Android and the web,
- * each text is listed as a child node that can be matched by `getByText`.
- *
- * To get the same result on iOS, a text query is also tested against each
- * part of the label of a node without any text below it. Texts, images, and
- * fields are skipped, since their labels aren't merged. One catch is that
- * the tree doesn't say whether the app set the label, so a label the app
- * set with ", " in it is split the same way.
+ * React Native joins child labels with a comma and a space. XCTest exposes
+ * the same string when the app sets the label itself.
  */
 const MERGED_LABEL_SEPARATOR = ', ';
 
@@ -148,10 +134,11 @@ const STATE_KEYS = ['checked', 'disabled', 'selected', 'expanded', 'pressed'] as
  * browser's role query does; the other kinds
  * answer with every node and leave visibility to the action or assertion,
  * unless the query says `visible`, which drops hidden nodes for every kind.
- * `withoutPackage` matches a test id by its short form (`ANDROID_RESOURCE_ID`).
- * On iOS, a text query is also tested against each part of a merged label (`MERGED_LABEL_SEPARATOR`).
+ * `fallback` is set on the second pass, which runs when nothing matched.
+ * Then a test id is matched by its short form (`ANDROID_RESOURCE_ID`), and a
+ * text by one part of a merged iOS label (`MERGED_LABEL_SEPARATOR`).
  */
-function matchesQuery(entry: ProjectedNode, query: SemanticQuery, platform: MobilePlatform, withoutPackage: boolean): boolean {
+function matchesQuery(entry: ProjectedNode, query: SemanticQuery, fallback: boolean): boolean {
   const node = entry.node;
   if (query.visible === true && node.states?.hidden === true) return false;
   switch (query.kind) {
@@ -177,19 +164,21 @@ function matchesQuery(entry: ProjectedNode, query: SemanticQuery, platform: Mobi
       const placeholder = node.attributes?.['placeholder'];
       return placeholder !== undefined && matchesText(placeholder, query.value);
     }
-    case 'text': {
-      if (node.name !== undefined && matchesText(node.name, query.value)) return true;
-      if (node.text === undefined) return false;
-      if (matchesText(node.text, query.value)) return true;
-      if (platform !== 'ios' || node.role === 'text' || node.role === 'image' || mayTakeText(node)) return false;
-      return node.text.split(MERGED_LABEL_SEPARATOR).some((part) => matchesText(part, query.value)) && !hasTextBelow(node);
-    }
+    case 'text':
+      if (fallback) {
+        if (node.text === undefined || node.role === 'text' || node.role === 'image' || mayTakeText(node) || hasTextBelow(node)) return false;
+        return node.text.split(MERGED_LABEL_SEPARATOR).some((part) => part.trim() !== '' && matchesText(part, query.value));
+      }
+      return (
+        (node.name !== undefined && matchesText(node.name, query.value)) ||
+        (node.text !== undefined && matchesText(node.text, query.value))
+      );
     case 'displayValue':
       return node.value !== undefined && matchesText(node.value, query.value);
     case 'testId':
       return (
         node.testId !== undefined &&
-        (withoutPackage ? matchesWithoutPackage(node.testId, query.value) : matchesText(node.testId, query.value))
+        (fallback ? matchesWithoutPackage(node.testId, query.value) : matchesText(node.testId, query.value))
       );
   }
 }

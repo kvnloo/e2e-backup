@@ -88,13 +88,33 @@ describe('locator expressions over a device snapshot', () => {
       { ref: '@e5', index: 4, parentIndex: 0, depth: 1, type: 'StaticText', label: 'Hello, world', identifier: 'static' },
       { ref: '@e6', index: 5, parentIndex: 0, depth: 1, type: 'Image', label: 'Sunset, Italy', identifier: 'image' },
       { ref: '@e7', index: 6, parentIndex: 0, depth: 1, type: 'TextField', label: 'Doe, Jane', value: 'Doe, Jane', identifier: 'field' },
+      { ref: '@e8', index: 7, parentIndex: 0, depth: 1, type: 'Other', label: 'Size, Large', value: 'Large', identifier: 'valued' },
+      { ref: '@e9', index: 8, parentIndex: 0, depth: 1, type: 'Button', label: 'Save, ', identifier: 'trailing' },
     ];
-    expect(testIds(query('text', 'Dismiss'), { platform: 'ios', nodes })).toEqual(['merged']);
-    expect(testIds(query('text', 'Close'), { platform: 'ios', nodes })).toEqual(['merged']);
-    expect(testIds(query('text', 'Forgot password'), { platform: 'ios', nodes })).toEqual(['flattened']);
-    expect(testIds(query('text', 'Hello'), { platform: 'ios', nodes })).toEqual([]);
-    expect(testIds(query('text', 'Italy'), { platform: 'ios', nodes })).toEqual([]);
-    expect(testIds(query('text', 'Jane'), { platform: 'ios', nodes })).toEqual([]);
+    const ids = (expression: LocatorExpression) => testIds(expression, { platform: 'ios', nodes });
+    const pattern = (value: TextPattern): LocatorExpression => ({ kind: 'query', query: { kind: 'text', value } });
+    expect(ids(query('text', 'Dismiss'))).toEqual(['merged']);
+    expect(ids(query('text', 'Close'))).toEqual(['merged']);
+    expect(ids(query('text', 'Forgot password'))).toEqual(['flattened']);
+    expect(ids(query('text', 'Save'))).toEqual(['trailing']);
+    expect(ids(query('text', 'Dis'))).toEqual([]);
+    expect(ids(pattern({ kind: 'string', value: 'dis', exact: false }))).toEqual(['merged']);
+    expect(ids(pattern({ kind: 'regexp', source: '^Close$', flags: '' }))).toEqual(['merged']);
+    expect(ids(pattern({ kind: 'regexp', source: '^$', flags: '' }))).toEqual([]);
+    expect(ids(query('text', 'Hello'))).toEqual([]);
+    expect(ids(query('text', 'Italy'))).toEqual([]);
+    expect(ids(query('text', 'Jane'))).toEqual([]);
+    expect(ids(query('text', 'Size'))).toEqual([]);
+  });
+
+  it('prefers a whole iOS label over one part of a merged label', () => {
+    const nodes: readonly RawNode[] = [
+      { ref: '@e1', index: 0, depth: 0, type: 'Application', label: 'Fixture' },
+      { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'StaticText', label: 'Feed', identifier: 'title' },
+      { ref: '@e3', index: 2, parentIndex: 0, depth: 1, type: 'Button', label: 'Feed, tab, 2 of 3', identifier: 'tab' },
+    ];
+    expect(testIds(query('text', 'Feed'), { platform: 'ios', nodes })).toEqual(['title']);
+    expect(testIds(query('text', 'tab'), { platform: 'ios', nodes })).toEqual(['tab']);
   });
 
   it('leaves the label of an iOS container whole when its texts are listed below it', () => {
@@ -102,12 +122,9 @@ describe('locator expressions over a device snapshot', () => {
       { ref: '@e1', index: 0, depth: 0, type: 'Application', label: 'Fixture' },
       { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'Other', label: 'Save, Cancel', identifier: 'container' },
       { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'Button', label: 'Save', identifier: 'save' },
-      { ref: '@e4', index: 3, parentIndex: 0, depth: 1, type: 'Other', label: 'Hello, world', identifier: 'host' },
-      { ref: '@e5', index: 4, parentIndex: 3, depth: 2, type: 'StaticText', label: 'Hello, world' },
     ];
     expect(testIds(query('text', 'Save'), { platform: 'ios', nodes })).toEqual(['save']);
     expect(testIds(query('text', 'Cancel'), { platform: 'ios', nodes })).toEqual([]);
-    expect(testIds(query('text', 'Hello'), { platform: 'ios', nodes })).toEqual([]);
   });
 
   it('leaves an Android label whole', () => {

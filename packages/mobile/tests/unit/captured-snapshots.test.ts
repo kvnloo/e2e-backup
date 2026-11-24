@@ -11,7 +11,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CaptureSnapshotResult } from 'agent-device';
-import type { SemanticNode, TextPattern } from '@e2e-dev/core/engine';
+import type { SemanticNode } from '@e2e-dev/core/engine';
 import { resolveExpression } from '../../src/locate.ts';
 import { keyboardBand, projectSnapshot, screenRoot, screenTitle } from '../../src/nodes.ts';
 import type { MobilePlatform } from '../../src/options.ts';
@@ -134,51 +134,14 @@ describe('captured device snapshots', () => {
   }
 });
 
-/**
- * Returns the role and test id of each node that `getByText` matches on one captured screen.
- * The test id comes from the node, or from its parent when the node doesn't have one.
- */
-function textMatches(platform: MobilePlatform, scenario: string, value: TextPattern): string[][] {
-  const { projected } = project(path.join(ROOT, platform, `${scenario}.json`));
-  const matches = resolveExpression({ kind: 'query', query: { kind: 'text', value } }, projected.index, platform);
-  return matches.map((entry) => [entry.node.role ?? '', entry.node.testId ?? entry.parent?.node.testId ?? '']);
-}
-
-function exact(value: string): TextPattern {
-  return { kind: 'string', value, exact: true };
-}
-
-describe('text queries on an iOS label merged from a control\'s texts', () => {
-  it('finds a button by one part of its merged label, like the text inside the button on Android', () => {
-    expect(textMatches('ios', 'bottom-tabs', exact('Feed'))).toEqual([['button', 'tab-feed']]);
-    expect(textMatches('android', 'bottom-tabs', exact('Feed'))).toEqual([['text', 'tab-feed']]);
-    expect(textMatches('ios', 'product-catalog', exact('500 g · $6.99'))).toEqual([['other', 'product-trail-mix-500']]);
-    expect(textMatches('android', 'product-catalog', exact('500 g · $6.99'))).toEqual([['text', 'product-trail-mix-500']]);
-  });
-
-  it('finds a flattened form by one part of its merged label, like the text inside the form on Android', () => {
-    expect(textMatches('ios', 'flattened-login', exact('SIGN IN'))).toEqual([['other', '']]);
-    expect(textMatches('android', 'flattened-login', exact('SIGN IN'))).toEqual([['text', '']]);
-  });
-
-  it('matches every control whose merged label has the part', () => {
-    expect(textMatches('ios', 'product-catalog', exact('Trail Mix'))).toEqual([
-      ['other', 'product-trail-mix-250'],
-      ['other', 'product-trail-mix-500'],
-      ['other', 'product-trail-mix-1000'],
-    ]);
-  });
-
-  it('applies exact, substring, and RegExp matching to each part', () => {
-    expect(textMatches('ios', 'bottom-tabs', exact('Fee'))).toEqual([]);
-    expect(textMatches('ios', 'bottom-tabs', exact('feed'))).toEqual([]);
-    expect(textMatches('ios', 'bottom-tabs', exact('Feed, tab'))).toEqual([]);
-    expect(textMatches('ios', 'product-catalog', exact('Trail'))).toEqual([]);
-    expect(textMatches('ios', 'bottom-tabs', { kind: 'string', value: 'fee', exact: false })).toEqual([['button', 'tab-feed']]);
-    expect(textMatches('ios', 'bottom-tabs', { kind: 'regexp', source: '^Feed$', flags: '' })).toEqual([['button', 'tab-feed']]);
-  });
-
-  it('still matches the whole merged label', () => {
-    expect(textMatches('ios', 'bottom-tabs', exact('Feed, tab, 2 of 3'))).toEqual([['button', 'tab-feed']]);
+describe('text queries on a merged iOS label', () => {
+  it('finds a product card on iOS by the text Android lists inside it', () => {
+    const matches = (platform: MobilePlatform) => {
+      const { projected } = project(path.join(ROOT, platform, 'product-catalog.json'));
+      const expression = { kind: 'query', query: { kind: 'text', value: { kind: 'string', value: '500 g · $6.99', exact: true } } } as const;
+      return resolveExpression(expression, projected.index, platform).map((entry) => [entry.node.role, entry.node.testId ?? entry.parent?.node.testId]);
+    };
+    expect(matches('ios')).toEqual([['other', 'product-trail-mix-500']]);
+    expect(matches('android')).toEqual([['text', 'product-trail-mix-500']]);
   });
 });

@@ -191,7 +191,7 @@ await screen.getByPlaceholder('Search memory...').fill('launch');
 #### `getByText`
 
 ```ts
-/** Creates a lazy visible-text query. One part of a label merged from several texts is also matched on some engines (the mobile engine on iOS). */
+/** Creates a lazy visible-text query. */
 getByText(text: TextMatch, options?: TextMatchOptions): Locator;
 ```
 
@@ -209,10 +209,9 @@ do not contain each other remain `LOCATOR_AMBIGUOUS`.
 
 ##### Merged labels on iOS
 
-On iOS, a control's texts are merged into its label (`Trail Mix, 250 g`),
-so one part of that label is also matched by `getByText`. See the
-[mobile engine's `locate`](/reference/mobile#capabilities) for which nodes
-are split.
+On iOS, a control's texts are merged into its label (`Trail Mix, 250 g`).
+When no label matches whole, one part of such a label is matched by
+`getByText`. See [Merged labels on iOS](/reference/mobile#merged-labels-on-ios).
 
 #### `getByDisplayValue`
 

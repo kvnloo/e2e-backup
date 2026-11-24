@@ -411,7 +411,7 @@ them to finish.
 | `perform` | `tap`, `doubleTap`, `longPress`, `fill`, `clear`, `hover`, `check`, `uncheck`, `press` (`Enter`, `Space`, or one character), `swipe`, `dragTo`, and `focus` on editable fields. A tap on a `switch` or `checkbox` lands on its innermost control, since UIKit reports a settings row as one labelled switch with the real toggle as a child. `check` and `uncheck` need a `checked` state. Switches report one on both platforms, and so does a native Android `CheckBox`; a React Native checkbox or radio reports one only when the app sets `accessibilityState.checked`. A control with no state is `UNSUPPORTED_CAPABILITY`, so tap it instead. `doubleTap` is two presses, 284 to 285 ms apart on iOS (the cadence of agent-device's XCTest tap): agent-device's own double-tap gesture reaches a React Native `Pressable` as one press. A detector with a window of 300 ms or less can read the pair as two single taps. `longPress` holds for one second unless the test passes `duration`, past a React Native `Pressable`'s `delayLongPress` of 500 ms and the longer thresholds apps set; agent-device's own default hold is shorter and registers as a tap on those. `blur`, `selectOption`, `setInputFiles`, `scrollIntoView`, and `secondaryTap` are not declared, and neither is `tapModifiers`, so `tap` or `doubleTap` with `modifiers` is `UNSUPPORTED_CAPABILITY`. An action on a node that a newer snapshot replaced finds the node again instead of acting on a different element. |
 | `performAt` | `tap`, `doubleTap`, `longPress`, and `swipeTo` at a bare screen point, so `screen.tapAt`, `screen.doubleTapAt`, `tap({ position })`, `screen.swipe({ from, to })`, and the agent's `tap_at` reach a control the tree does not list. No `hover`, `secondaryTap`, or `dragTo` at a point: touch has none without a node, so `hover_at` needs a listed control. |
 | `keyboard` | `type` and `press` into the focused field, the agent's `type` and `press` without a target and the fallback of `type_at` and `press_at`, and `dismiss`, the agent's `dismiss_keyboard`. |
-| `locate` | Every `screen` query. Text and label queries answer with the innermost match, since a device echoes both up the tree (a React Native input is a host view and the field inside it, both labelled). On iOS, a text query is also tested against each part of a merged label. A control's texts are joined into its label with `, ` and aren't listed in the tree. So the label of a React Native button over `Trail Mix` and `250 g` is `Trail Mix, 250 g`. The button is matched by `getByText('Trail Mix')`, the same way the text inside it is matched on Android. The text of that match is the whole label. `exact` is applied to each part. Texts, images, fields, and nodes with any text below them are never split. The tree doesn't say whether the app set the label, so a label the app set with `, ` in it is split the same way. On React Native's old architecture, the texts are joined with a space, so those labels aren't split. On Android a test id query, a string or a RegExp, also matches a resource id without its `<package>:id/` prefix, for any package but the framework's `android`, when nothing on the screen matches the full id. `screen.locator('id=…')` is agent-device's selector and takes the full id. |
+| `locate` | Every `screen` query. Text and label queries answer with the innermost match, since a device echoes both up the tree (a React Native input is a host view and the field inside it, both labelled). On iOS, a text query that matches no label whole is tested against each part of a merged label (see [Merged labels on iOS](#merged-labels-on-ios)). On Android a test id query, a string or a RegExp, also matches a resource id without its `<package>:id/` prefix, for any package but the framework's `android`, when nothing on the screen matches the full id. `screen.locator('id=…')` is agent-device's selector and takes the full id. |
 | `validateApp` | Requires `app.bundleId` or `app.appPath` and refuses `app.url` for now, with a note on reaching this machine from the platform's device. A target with either is a `native-app` target, so `requires: ['native-app']` selects device targets. |
 | `session` | `back`, `restart`, `reset`, and `openLink`, behind `app.open(path)` on a target with `app.linkBase`. No `open`: `app.open()` with no path is served with `restart`, the fresh launch of the pinned app; the agent's `navigate` verb is unavailable, and `device.openLink(url)` opens a deep link or web link. |
 | `artifacts` | Redacted screenshots under `screenshots/NNN-<label>.png`; a screenshot that cannot be redacted fails instead of being written. Video, when the attempt's [video mode](/reference/config#video) records, as `video/video.mp4`, or a device provider's own recording. |
@@ -1219,6 +1219,34 @@ On iOS only an `Other` carries one, and the state words after the role set
 `StaticText` and `Text` on iOS and `TextView` on Android are `text`, and an
 Android `WebView` is `document`. Neither is a `getByRole` role: find text
 with `getByText`.
+
+## Merged labels on iOS
+
+On iOS, the texts inside a control are joined into its label with `, `, and
+they aren't listed in the tree. So the label of a React Native card over
+`Trail Mix` and `250 g` is `Trail Mix, 250 g`. When no label matches a
+`getByText` query whole, each part of a merged label is tested, and the card
+is matched by `getByText('Trail Mix')`. On Android, the text inside the card
+is matched instead.
+
+```ts
+// iOS tree: a card labelled "Trail Mix, 250 g"
+await screen.getByText('Trail Mix').tap();
+```
+
+- `exact` and a `RegExp` are applied to each part.
+- The match is the whole control. An action on it acts on the control's
+  centre, and its text is the whole label.
+- A scoped query or `filter({ has })` doesn't split the label of the scope
+  node.
+- A text with `, ` in it (`Hello, Ada` in `Hello, Ada, Sign out`) isn't
+  matched as a part.
+- These nodes are never split: a text, an image, a field, an `Other` with a
+  value, and a node with a named or texted node below it.
+- The tree doesn't say whether the app set the label, so a label the app set
+  with `, ` in it is split the same way.
+- On React Native's old architecture, the texts are joined with a space, so
+  those labels aren't split.
 
 ## Visibility
 

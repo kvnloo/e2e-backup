@@ -543,7 +543,7 @@ export interface Screen {
   getByLabel(text: TextMatch, options?: TextMatchOptions): Locator;
   /** Creates a lazy placeholder query. */
   getByPlaceholder(text: TextMatch, options?: TextMatchOptions): Locator;
-  /** Creates a lazy visible-text query. One part of a label merged from several texts is also matched on some engines (the mobile engine on iOS). */
+  /** Creates a lazy visible-text query. */
   getByText(text: TextMatch, options?: TextMatchOptions): Locator;
   /** Creates a lazy displayed-value query. */
   getByDisplayValue(value: TextMatch, options?: TextMatchOptions): Locator;
