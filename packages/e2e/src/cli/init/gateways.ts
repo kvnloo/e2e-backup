@@ -10,6 +10,9 @@ import { isLoopbackHost } from '@e2e-dev/core/lib/internal/urls';
 /** The local server an OpenAI-compatible gateway points at unless an endpoint is given. */
 export const DEFAULT_ENDPOINT = 'http://127.0.0.1:11434/v1';
 
+/** What every gateway needs. zod is a peer of `ai` and every provider; npm and pnpm install peers, Yarn does not. */
+export const AI_DEPENDENCIES: Readonly<Record<string, string>> = { ai: '^7.0.0', zod: '^4.1.8' };
+
 export type GatewayId = 'vercel' | 'openrouter' | 'openai-compatible' | 'chatgpt' | 'copilot' | 'opencode-console' | 'grok';
 
 export interface GatewayPreset {
@@ -33,7 +36,7 @@ export const GATEWAYS: readonly GatewayPreset[] = [
   {
     id: 'vercel',
     label: 'Vercel AI Gateway',
-    hint: 'one key for every provider; reads AI_GATEWAY_API_KEY',
+    hint: 'uses AI_GATEWAY_API_KEY from your env',
     dependencies: {},
     import: "import { gateway } from 'ai';",
     comment: 'The Vercel AI Gateway serves the model id and reads AI_GATEWAY_API_KEY, or the OIDC token of a linked Vercel project.',
@@ -43,7 +46,7 @@ export const GATEWAYS: readonly GatewayPreset[] = [
   {
     id: 'openrouter',
     label: 'OpenRouter',
-    hint: 'one key for every provider; reads OPENROUTER_API_KEY',
+    hint: 'uses OPENROUTER_API_KEY from your env',
     dependencies: { '@openrouter/ai-sdk-provider': '^3.0.0' },
     import: "import { openrouter } from '@openrouter/ai-sdk-provider';",
     comment: 'OpenRouter serves the model id and reads OPENROUTER_API_KEY.',
@@ -52,7 +55,7 @@ export const GATEWAYS: readonly GatewayPreset[] = [
   },
   {
     id: 'openai-compatible',
-    label: 'OpenAI-compatible endpoint',
+    label: 'OpenAI-compatible / local endpoint',
     hint: 'any /v1 chat endpoint: Ollama, vLLM, LiteLLM, a vendor API',
     dependencies: { '@ai-sdk/openai-compatible': '^3.0.0' },
     import: "import { createOpenAICompatible } from '@ai-sdk/openai-compatible';",

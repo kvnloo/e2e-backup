@@ -726,7 +726,7 @@ describe('select', () => {
 
   it('explains empty discovery with the globs, the root, and any look-alike files', () => {
     expect(() => select(emptyCollection(), config())).toThrow(
-      `no test file matched "tests/**/*.e2e.ts" under ${ROOT}; create tests/example.e2e.ts (e2e init writes one), or set tests in the config; pass --pass-with-no-tests to allow this`,
+      `no test file matched "tests/**/*.e2e.ts" under ${ROOT}; create a test file such as tests/example.e2e.ts, or set tests in the config; pass --pass-with-no-tests to allow this`,
     );
     expect(() =>
       select(emptyCollection(['tests/login.test.ts', 'tests/a.spec.ts', 'tests/b.spec.ts', 'tests/c.spec.ts']), config()),
@@ -838,7 +838,7 @@ describe('select with what the test filters left out', () => {
     });
     /** The pair of the test titled `title` in `selection`. */
     const pair = (selection: ReturnType<typeof select>, title: string) => selection.pairs.find((entry) => entry.test.title === title)!;
-    const outside = { cause: 'filtered', reason: 'outside the shard' };
+    const outside = { cause: 'filtered', reason: 'outside the shard', otherShard: true };
     const unaffected = { cause: 'filtered', reason: 'unaffected', filter: 'areas' };
     // Leaving b out does not move the cut: shard 1 is still a and b, shard 2 still c and d.
     const excluded = leftOut(col, [['b', 'areas', 'unaffected']]);

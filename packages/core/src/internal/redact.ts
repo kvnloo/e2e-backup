@@ -785,7 +785,6 @@ export class SecretLedger {
     return cut;
   }
 
-
   safeRedactionBoundary(text: string, offset: number): number {
     return this.compile().safeRedactionBoundary(text, offset);
   }

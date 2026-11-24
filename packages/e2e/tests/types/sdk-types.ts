@@ -60,8 +60,9 @@ import {
   beforeAll,
   beforeEach,
   describe,
+  foldLastRun,
 } from '../../src/index.ts';
-import type { Engine, EngineAttemptContext, EngineCleanupContext, EngineDisposeContext, EngineFixtureContext, EngineHandle, EngineObserveOptions, EngineSnapshot } from '../../src/engine/index.ts';
+import type { Engine, EngineAppInfo, EngineAttemptContext, EngineCleanupContext, EngineDisposeContext, EngineFixtureContext, EngineHandle, EngineObserveOptions, EngineSnapshot } from '../../src/engine/index.ts';
 import {
   BASE_RULES,
   createGrammarTools,
@@ -246,6 +247,20 @@ customExecutorObservation.keyboardVisible satisfies boolean | undefined;
 ({ targets: [{ engine, app: { bundleId: 'dev.shop.app', permissions: { camera: 'allow' } } }] }) satisfies E2EConfig;
 // @ts-expect-error launch arguments are the strings the launch command takes
 ({ targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: [1] } }] }) satisfies E2EConfig;
+// An object value is a string, number, boolean, or list of strings, or undefined straight from the environment.
+declare const tokenFromEnv: string | undefined;
+({
+  targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: { AppleLanguages: ['fr'], AppleLocale: 'fr_FR', e2e: true, retries: 3, token: tokenFromEnv } } }],
+}) satisfies E2EConfig;
+// @ts-expect-error an object value is flat: no nested object
+({ targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: { locale: { language: 'fr' } } } }] }) satisfies E2EConfig;
+// @ts-expect-error a list value holds strings only
+({ targets: [{ engine, app: { bundleId: 'dev.shop.app', launchArguments: { languages: [1] } } }] }) satisfies E2EConfig;
+// An engine that predates the object form spreads `launchArguments`; the object arrives in `launchArgumentValues` only.
+declare const engineApp: EngineAppInfo;
+[...(engineApp.launchArguments ?? [])] satisfies string[];
+engineApp.launchArgumentValues?.['AppleLanguages'] satisfies string | number | boolean | readonly string[] | undefined;
+
 // @ts-expect-error the app URL is the target's app.url, not a key of the target itself
 ({ targets: [{ engine, url: 'http://localhost:3000' }] }) satisfies E2EConfig;
 // @ts-expect-error an engine only drives the app: the target declares it
@@ -477,6 +492,11 @@ declare const finishedRun: FinishedRun;
 finishedRun.status satisfies RunStatus;
 finishedRun.exitCode satisfies RunExitCode;
 finishedRun.lastRun satisfies FinishedRun['report'] | undefined;
+// A reporter folds a --last-failed rerun into the runs before it the way the runner does.
+foldLastRun(finishedRun.report, finishedRun.lastRun ?? finishedRun.report) satisfies Report;
+finishedRun.report.run.shard?.index satisfies number | undefined;
+// @ts-expect-error the shard marker is set or absent, never false
+({ cause: 'filtered', reason: 'outside the shard', otherShard: false }) satisfies NonNullable<Report['run']['results'][number]['skip']>;
 // @ts-expect-error the run status is a closed union
 'skipped' satisfies RunStatus;
 // @ts-expect-error the exit codes are the closed set a run ends with
@@ -786,6 +806,11 @@ void screen.getByLabel('Plan').selectOption({ value: 'pro' });
 void screen.getByLabel('Plan').selectOption({ value: 'pro', index: 1 });
 // @ts-expect-error role queries never match hidden nodes; visible is the one visibility knob
 screen.getByRole('button', { hidden: true });
+
+// A locator's screenshot is a file path under a label, as app.screenshot's is.
+void (screen.getByTestId('summary').screenshot('summary') satisfies Promise<string>);
+// @ts-expect-error the file goes with the attempt's artifacts; there is no path option.
+void screen.getByTestId('summary').screenshot({ path: 'summary.png' });
 
 // Coordinate input: a viewport point on screen, a node-relative one on a locator.
 declare const point: import('../../src/index.ts').Point;
