@@ -763,7 +763,12 @@ void (screen.doubleTapAt(point, { timeout: 1_000 }) satisfies Promise<void>);
 void screen.doubleTapAt({ x: 1 });
 // @ts-expect-error viewport double-taps accept action timeout, not locator modifiers.
 void screen.doubleTapAt(point, { modifiers: ['Shift'] });
-void screen.swipe({ direction: 'up', momentum: 'fast' });
+void screen.swipe({ direction: 'up', distance: 0.8, speed: 'fast' });
+// @ts-expect-error speed is a preset name, not a number of milliseconds
+void screen.swipe({ direction: 'up', speed: 300 });
+// @ts-expect-error a swipe in a direction and a swipe along a path don't mix
+void screen.swipe({ direction: 'up', from: point, to: point });
+void screen.scrollUntilVisible(screen.getByRole('button'), { direction: 'down', distance: 0.5, speed: 'slow', timeout: 1_000 });
 void screen.swipe({ from: point, to: point });
 void screen.swipe({ from: point, to: point, duration: 300 });
 void screen.getByRole('image').tap({ position: point, timeout: 1_000 });

@@ -25,8 +25,8 @@ interface Paged {
   /** Engine observations between each swipe and the next one, the last one up to the end of the scroll. */
   readonly capturesPerPage: number[];
   readonly swipes: number;
-  /** The momentum of each swipe sent while paging. */
-  readonly momenta: (string | undefined)[];
+  /** The distance and duration of each swipe sent while paging. */
+  readonly gestures: { distance: number; durationMs: number }[];
   readonly error: string | undefined;
   readonly found: string | undefined;
 }
@@ -59,7 +59,7 @@ async function scrollTo(text: string, turning: Turning, withClock = false, textO
   let observations = 0;
   let page = 0;
   const atSwipe: number[] = [];
-  const momenta: (string | undefined)[] = [];
+  const gestures: { distance: number; durationMs: number }[] = [];
   const list: ScriptedNode = { id: 'list', role: 'list', name: 'Ledger', children: rowsOf(0, PER_PAGE, textOf) };
   const clock: ScriptedNode = { id: 'clock', role: 'status', name: 'Clock', text: clockText(0), rect: { x: 0, y: 0, width: 100, height: 20 } };
   const counter: ScriptedNode = { id: 'counter', role: 'status', name: 'Inbox', text: '0 unread', rect: { x: 0, y: 0, width: 100, height: 20 } };
@@ -77,7 +77,7 @@ async function scrollTo(text: string, turning: Turning, withClock = false, textO
     perform: (_ref, action) => {
       if (action.kind !== 'swipe') return;
       atSwipe.push(observations);
-      momenta.push(action.momentum);
+      gestures.push({ distance: action.distance, durationMs: action.durationMs });
       const next = turning === 'never' ? page : page + 1;
       if (turning === 'now') turn(next);
       if (turning === 'late') setTimeout(() => turn(page + 1), 40);
@@ -118,7 +118,7 @@ async function scrollTo(text: string, turning: Turning, withClock = false, textO
   } finally {
     project.cleanup();
   }
-  return { capturesPerPage, swipes: atSwipe.length, momenta, error, found };
+  return { capturesPerPage, swipes: atSwipe.length, gestures, error, found };
 }
 
 describe('scroll_to a text, reads per page', () => {
@@ -130,9 +130,9 @@ describe('scroll_to a text, reads per page', () => {
     expect(result.capturesPerPage).toEqual([1, 1, 1, 1]);
   });
 
-  it('pages with fast swipes, 0.8 of the list each', async () => {
+  it('pages in the steps scrollUntilVisible takes, 0.65 of the list over 800 ms each', async () => {
     const result = await scrollTo('Row 13', 'now');
-    expect(result.momenta).toEqual(['fast', 'fast', 'fast', 'fast']);
+    expect(result.gestures).toEqual(Array.from({ length: 4 }, () => ({ distance: 0.65, durationMs: 800 })));
   });
 
   it('keeps reading a page that turns after the stability poll, instead of ending the list', async () => {

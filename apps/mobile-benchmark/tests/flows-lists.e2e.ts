@@ -9,7 +9,7 @@ import { expect, openScenario, test } from './fixtures.ts';
 test('infinite scroll reaches the target item', async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Infinite Scroll List');
   const target = screen.getByTestId('item-137');
-  await screen.scrollUntilVisible(target, { direction: 'down', momentum: 'none', timeout: 120_000 });
+  await screen.scrollUntilVisible(target, { direction: 'down', timeout: 120_000 });
   await target.tap();
   await expect(screen.getByTestId('success-message')).toHaveText('Found item 137');
 });
@@ -30,7 +30,7 @@ test('gestures: long-press, then swipe left', async ({ app, device, screen }) =>
   await expect(screen.getByText('Step 2 of 3')).toBeVisible();
   // `direction` is the scroll direction: content to the right comes into
   // view when the finger moves left.
-  await screen.getByTestId('swipe-target').swipe({ direction: 'right', momentum: 'fast' });
+  await screen.getByTestId('swipe-target').swipe({ direction: 'right', distance: 0.65, speed: 'fast' });
   await expect(screen.getByText('Step 3 of 3')).toBeVisible();
 });
 
@@ -40,7 +40,7 @@ test('gestures: long-press, then swipe left', async ({ app, device, screen }) =>
 test('gestures: double-tap completes the flow', { platforms: ['android'] }, async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Gestures');
   await screen.getByTestId('long-press-target').longPress({ duration: 1200 });
-  await screen.getByTestId('swipe-target').swipe({ direction: 'right', momentum: 'fast' });
+  await screen.getByTestId('swipe-target').swipe({ direction: 'right', distance: 0.65, speed: 'fast' });
   await screen.getByTestId('double-tap-target').doubleTap();
   await expect(screen.getByTestId('success-message')).toHaveText('All gestures completed');
 });
@@ -73,7 +73,7 @@ test('async states: load, pull to refresh, claim through the toast', async ({ ap
   await expect
     .poll(async () => {
       if (await claim.isVisible()) return true;
-      await list.swipe({ direction: 'up', momentum: 'fast' });
+      await list.swipe({ direction: 'up', distance: 0.65, speed: 'fast' });
       return false;
     }, { timeout: 20_000 })
     .toBe(true);
@@ -96,9 +96,10 @@ test('async states: load, pull to refresh, claim through the toast', async ({ ap
   await expect(claimed).toHaveText('Reward claimed');
 });
 
-// Row 512 is about 40 screens down, at half a screen per scrollUntilVisible
-// swipe, so the test needs more than the default budget. Only the rows on
-// screen enter the tree, so the count is a screenful, never the 600 loaded.
+// Row 512 is about 40 screens down and scrollUntilVisible pages 0.65 of the
+// list per swipe, so the test needs more than the default budget. Only the
+// rows on screen enter the tree, so the count is a screenful, never the 600
+// loaded.
 test('huge virtualized list reaches row 512', { timeout: 300_000 }, async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Huge Virtualized List');
   const rows = screen.getByTestId('huge-list').getByText(/^Row \d{4}$/);
@@ -107,7 +108,7 @@ test('huge virtualized list reaches row 512', { timeout: 300_000 }, async ({ app
   expect(onScreen).toBeGreaterThan(0);
   expect(onScreen).toBeLessThan(600);
   const target = screen.getByTestId('row-512');
-  await screen.scrollUntilVisible(target, { direction: 'down', momentum: 'none', timeout: 240_000 });
+  await screen.scrollUntilVisible(target, { direction: 'down', timeout: 240_000 });
   await target.tap();
   await expect(screen.getByTestId('success-message')).toHaveText('Found Row 0512');
 });

@@ -12,7 +12,7 @@ import { createEngineSession } from '@e2e-dev/core/lib/engine/session';
 import { resolveConfig } from '../../src/config/resolve-run.ts';
 import { secrets } from '@e2e-dev/core/lib/secrets';
 import { snapshot } from '../helpers/snapshot.ts';
-import type { OperationContext, SemanticNode } from '@e2e-dev/core/lib/engine/surface';
+import type { LocatorAction, OperationContext, SemanticNode } from '@e2e-dev/core/lib/engine/surface';
 
 const OP: OperationContext = {
   signal: new AbortController().signal,
@@ -360,7 +360,7 @@ describe('createEngineSession', () => {
       code: 'UNSUPPORTED_CAPABILITY',
       message: expect.stringMatching(/no engine capability for the "check" action: engine toy does not implement it/),
     });
-    await expect(session.swipe('down', undefined, OP)).rejects.toThrow(/no engine capability for swipe gestures/);
+    await expect(session.swipe({ kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, OP)).rejects.toThrow(/no engine capability for swipe gestures/);
     expect(calls).toEqual([]);
   });
 
@@ -386,7 +386,7 @@ describe('createEngineSession', () => {
   });
 
   it('swipes the viewport as perform(root, swipe), observing first when nothing named the root yet', async () => {
-    const performed: { id: string; revision: string; kind: string; direction?: string; momentum?: string }[] = [];
+    const performed: { id: string; revision: string; action: LocatorAction }[] = [];
     let observes = 0;
     const session = createEngineSession({
       engine: defineEngine(
@@ -397,19 +397,21 @@ describe('createEngineSession', () => {
           },
           actions: ['swipe'],
           perform: async (ref, action) =>
-            void performed.push({ id: ref.id, revision: ref.revision, kind: action.kind, ...(action.kind === 'swipe' ? { direction: action.direction, ...(action.momentum === undefined ? {} : { momentum: action.momentum }) } : {}) }),
+            void performed.push({ id: ref.id, revision: ref.revision, action }),
         }),
       ),
       targetName: 'toy-target',
     });
-    await session.swipe('down', undefined, OP);
+    const down = { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 } as const;
+    await session.swipe(down, OP);
     expect(observes).toBe(1);
-    expect(performed).toEqual([{ id: 'screen', revision: 'b1', kind: 'swipe', direction: 'down' }]);
+    expect(performed).toEqual([{ id: 'screen', revision: 'b1', action: down }]);
     // A later observation names the root again; the swipe reuses it without observing.
     await session.observe(OP);
-    await session.swipe('left', 'fast', OP);
+    const left = { kind: 'swipe', direction: 'left', distance: 0.8, durationMs: 150 } as const;
+    await session.swipe(left, OP);
     expect(observes).toBe(2);
-    expect(performed[1]).toEqual({ id: 'screen', revision: 'b2', kind: 'swipe', direction: 'left', momentum: 'fast' });
+    expect(performed[1]).toEqual({ id: 'screen', revision: 'b2', action: left });
   });
 
   it('carries the engine location and viewport onto the observation', async () => {

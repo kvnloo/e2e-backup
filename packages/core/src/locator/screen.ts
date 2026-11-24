@@ -2,7 +2,7 @@
 
 import nodePath from 'node:path';
 import { describeValue } from '../config/validate.ts';
-import { isKeyModifier, KEY_MODIFIERS, type KeyModifier } from '../engine/contract.ts';
+import { isKeyModifier, KEY_MODIFIERS, SCROLL_STEP, type KeyModifier } from '../engine/contract.ts';
 import type { LocatorAction, LocatorExpression, Observation, SemanticNode } from '../engine/surface.ts';
 import { locatorBrand } from '../internal/brands.ts';
 import { isSecret } from '../secrets.ts';
@@ -11,6 +11,7 @@ import { isPercentage, requireFinitePoint } from '../internal/geometry.ts';
 import { isCheckable, isValueControl } from '../internal/roles.ts';
 import { isPlainObject, rejectUnknownOptions } from '../internal/options.ts';
 import { realmSlot } from '../internal/realm-slot.ts';
+import { SWIPE, swipeAction } from '../internal/swipe.ts';
 import { obj } from '../internal/objects.ts';
 import { isTextMatch, normalizeText } from '../internal/text.ts';
 import type {
@@ -19,7 +20,6 @@ import type {
   FilePayload,
   LongPressOptions,
   Locator,
-  Momentum,
   Point,
   PressSequentiallyOptions,
   Role,
@@ -28,7 +28,7 @@ import type {
   Screen,
   ScreenCoordinate,
   ScreenPoint,
-  ScrollDirection,
+  ScrollUntilVisibleOptions,
   Secret,
   SelectOption,
   SwipeOptions,
@@ -254,30 +254,28 @@ class ScreenImpl implements Screen {
       );
       return;
     }
-    rejectUnknownOptions('swipe', options, ['direction', 'momentum']);
+    rejectUnknownOptions('swipe', options, ['direction', 'distance', 'speed']);
+    const action = swipeAction('swipe', options.direction, options, SWIPE);
     await this.context.steps.run('screen', 'screen.swipe', options.direction, async () => {
       const { engine } = this.context;
-      await engine.session.swipe(options.direction, options.momentum, engine.operation());
+      await engine.session.swipe(action, engine.operation());
     });
   }
 
-  async scrollUntilVisible(
-    target: Locator,
-    options?: { direction?: ScrollDirection; momentum?: Momentum; timeout?: number },
-  ): Promise<void> {
+  async scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void> {
     const internals = this.ownLocator(target, 'scrollUntilVisible');
-    rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'momentum', 'timeout']);
-    const direction = options?.direction ?? 'down';
-    const momentum = options?.momentum ?? 'slow';
+    rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'distance', 'speed', 'timeout']);
+    const step = swipeAction('scrollUntilVisible', options?.direction ?? 'down', options, SCROLL_STEP);
     const { engine } = this.context;
-    // On `screen` the viewport scrolls; on a locator the node itself does, so
-    // a scroll container pages without the pointer having to hover it first.
-    // Every swipe is bounded by the scroll's own deadline, not the action timeout.
+    // On `screen` the scroll container under the screen's center scrolls; on
+    // a locator the node itself does, so a scroll container pages without the
+    // pointer having to hover it first. Every swipe is bounded by the
+    // scroll's own deadline, not the action timeout.
     const scope = this.scope;
     const swipeStep = (deadline: Deadline) =>
       scope === undefined
-        ? engine.session.swipe(direction, momentum, engine.operationWithin(deadline))
-        : engine.performUntil(scope, { kind: 'swipe', direction, momentum }, deadline);
+        ? engine.session.swipe(step, engine.operationWithin(deadline))
+        : engine.performUntil(scope, step, deadline);
     const label = describeExpression(internals.expression);
     await this.context.steps.run('screen', 'screen.scrollUntilVisible', label, async () => {
       const deadline = engine.deadline(options?.timeout ?? 30_000);
@@ -297,7 +295,10 @@ class ScreenImpl implements Screen {
           throw cause;
         }
         sampled = true;
-        if (isNodeVisible(node)) return;
+        if (isNodeVisible(node)) {
+          if (engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView' }, deadline);
+          return;
+        }
         if (deadline.expired()) throw notVisible();
         try {
           await swipeStep(deadline);
@@ -595,14 +596,9 @@ class LocatorImpl extends ScreenImpl implements Locator {
   }
 
   override swipe(options: SwipeOptions & ActionOptions): Promise<void> {
-    rejectUnknownOptions('swipe', options, ['direction', 'momentum', 'timeout']);
-    return this.action('locator.swipe', () =>
-      this.context.engine.perform(
-        this.expression,
-        { kind: 'swipe', direction: options.direction, ...(options.momentum !== undefined ? { momentum: options.momentum } : {}) },
-        options.timeout,
-      ),
-    );
+    rejectUnknownOptions('swipe', options, ['direction', 'distance', 'speed', 'timeout']);
+    const action = swipeAction('swipe', options.direction, options, SWIPE);
+    return this.action('locator.swipe', () => this.context.engine.perform(this.expression, action, options.timeout));
   }
 
   async textContent(): Promise<string | null> {

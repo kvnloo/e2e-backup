@@ -433,9 +433,10 @@ double-click on Save), and a double-click on a submit button submits twice.
 A tool has to be chosen, and each one says what takes a plain tap instead.
 
 Mobile engines declare `hover`, `doubleTap`, `longPress`, `check`,
-`uncheck`, `dragTo`, and `session.back`. So a device offers `hover`,
-`double_tap`, `long_press`, `check`, `drag`, and `back`. They declare no
-`secondaryTap`, `selectOption`, `scrollIntoView`, or `setInputFiles`.
+`uncheck`, `dragTo`, `scrollIntoView`, and `session.back`. So a device
+offers `hover`, `double_tap`, `long_press`, `check`, `drag`, `scroll_to` by
+node id, and `back`. They declare no `secondaryTap`, `selectOption`, or
+`setInputFiles`.
 
 A tab the app opens on the web stays in the background. The result of the
 action that opened it says `The app opened a new tab (tab 2 of 2). The

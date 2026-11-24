@@ -467,10 +467,10 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
       if (action.kind === 'dragTo') rejectSupersededLocate(action.target);
       await performRaw(ref, action, operation);
     },
-    async swipe(direction, momentum, operation) {
+    async swipe(action, operation) {
       if (!actions.has('swipe')) unsupported('swipe gestures');
       const target = root ?? (await session.observe(operation)).root;
-      await performRaw(target, { kind: 'swipe', direction, ...(momentum === undefined ? {} : { momentum }) }, operation);
+      await performRaw(target, action, operation);
     },
     async performAt(point, action, operation) {
       if (!pointerActions.has(action.kind)) unsupported(`the "${action.kind}" action at a point`);

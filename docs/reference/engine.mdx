@@ -1191,15 +1191,19 @@ honors in `actions` and `pointerActions`.
 | `setInputFiles` | `paths`; empty clears the input | yes | - |
 | `setInputFilePayloads` | `files` with `name`, `mimeType`, and `Uint8Array` `buffer`. An empty `files` array clears the input. The runner uses it to clear when the engine declares this action without `setInputFiles`. | yes | - |
 | `dragTo` | `target`: a `NodeRef` or a `ViewportPoint` | yes | yes |
-| `swipe` | `direction`, `momentum?` | yes | yes |
+| `swipe` | `direction`, `distance`, `durationMs` | yes | yes |
 | `swipeTo` | `target`, `durationMs?` | - | yes |
 
 The grammar is closed. Anything beyond it is an agent-side `defineTool`.
 
-A `swipe` travels a share of the node (or of the viewport, on the root),
-measured along the swipe. Take the share from `SWIPE_SHARE[momentum ?? 'none']` in
-`e2e/engine` (`slow` 0.25, `none` 0.5, `fast` 0.8), so a test's swipes move
-the same distance on every engine.
+A `swipe` scrolls `distance` of a scroll container's box along the swipe.
+On the root, that's the container under the viewport's center, or the
+whole viewport when there is none. On a node, it's the node's nearest
+scroll container, the node itself when it is one, or else the node's own
+box. Each drag takes `durationMs`. A platform that scrolls without a drag,
+such as a wheel, ignores it. `SCROLL_STEP` in `e2e/engine` is the step
+`scrollUntilVisible` and the agent's `scroll_to` take: 0.65 of the
+container over 800 ms.
 
 #### Locator actions
 
@@ -1252,11 +1256,24 @@ export type LocatorAction =
       readonly files: readonly { readonly name: string; readonly mimeType: string; readonly buffer: Uint8Array }[];
     }
   | { readonly kind: 'dragTo'; readonly target: NodeRef }
-  | {
-      readonly kind: 'swipe';
-      readonly direction: ScrollDirection;
-      readonly momentum?: Momentum;
-    };
+  | SwipeAction;
+
+/**
+ * A scroll gesture in a direction. `direction` is the way the content
+ * scrolls: `down` reveals what is below.
+ */
+export interface SwipeAction {
+  readonly kind: 'swipe';
+  readonly direction: ScrollDirection;
+  /**
+   * How far the content scrolls, as a share of the scroll container's box
+   * along the swipe, above 0 and at most 1. On a touch surface, a distance
+   * longer than one drag is split into several drags.
+   */
+  readonly distance: number;
+  /** How long each drag takes; a platform that scrolls without a drag (a wheel) ignores it. */
+  readonly durationMs: number;
+}
 
 /** Every action kind; what an engine declares in `actions`. */
 export type LocatorActionKind = LocatorAction['kind'];
@@ -1301,11 +1318,7 @@ export type PointerAction =
   | { readonly kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'hover' }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'dragTo'; readonly target: ViewportPoint }
-  | {
-      readonly kind: 'swipe';
-      readonly direction: ScrollDirection;
-      readonly momentum?: Momentum;
-    }
+  | SwipeAction
   | {
       readonly kind: 'swipeTo';
       readonly target: ViewportPoint;
@@ -2413,13 +2426,13 @@ return context.fixture('printer', printer, { print: { kind: 'resource' } });
 `TextPattern`, `SemanticQuery`, `LocatorExpression`,
 `NodeRef`, `SemanticNode`, `ViewportPoint`, `ViewportSize`,
 `ObservationPixels`, `LocatorAction`, `LocatorActionKind`, `PointerAction`,
-`PointerActionKind`, `ScrollDirection`, `Momentum`, `SelectOption`, `Key`,
+`PointerActionKind`, `ScrollDirection`, `SwipeAction`, `SelectOption`, `Key`,
 `KeyModifier`, `KeyName`, `ParsedKey`, `ENGINE_SPI_VERSION`,
 `LOCATOR_ACTION_KINDS`, `KNOWN_LOCATOR_ACTION_KINDS`, `POINTER_ACTION_KINDS`, `KEY_MODIFIERS`,
 `KEY_NAMES`, `parseKey`, `ENGINE_ERROR_CODES`, `RETRYABLE_ENGINE_ERROR_CODES`,
 `Secret`, `isSecret`, `TextMatch`, `JsonValue`, `JsonValueRules`,
 `ResolveExpressionOptions`, `PollConditionOptions`, `WithoutUndefined`,
-`FixtureOperation`, `EngineIsolation`, `OBSERVED_NAME_LIMIT`, `OBSERVED_TEXT_LIMIT`, and `SWIPE_SHARE` are
+`FixtureOperation`, `EngineIsolation`, `OBSERVED_NAME_LIMIT`, `OBSERVED_TEXT_LIMIT`, and `SCROLL_STEP` are
 exported from `e2e/engine`. So are the [engine protocol](/reference/engine-protocol)'s
 `connectEngine`, `serveEngine`, `describeEngine`, `spawnTransport`,
 `socketTransport`, `loopbackTransport`, `ENGINE_METHODS`,

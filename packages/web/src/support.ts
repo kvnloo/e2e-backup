@@ -3,7 +3,7 @@
 import { statSync, type Stats } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 import type { ElementHandle, FrameLocator, Locator as PwLocator, Mouse, Page } from 'playwright-core';
-import { EngineError, SWIPE_SHARE, withinCleanupBudget, type EngineCleanupContext, type Momentum, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
+import { EngineError, withinCleanupBudget, type EngineCleanupContext, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
 import { ConfigurationError, InfrastructureError, TestError } from '@e2e-dev/core/engine';
 
 export const DEFAULT_VIEWPORT = { width: 1280, height: 720 } as const;
@@ -454,18 +454,23 @@ export function staleOr(cause: unknown, operation: string): Error {
   return translatePwError(cause, operation);
 }
 
-export async function performViewportSwipe(
-  page: Page,
-  direction: ScrollDirection,
-  momentum: Momentum,
-): Promise<void> {
-  const viewport = await currentViewport(page);
-  const distance = swipeDistance(
-    direction === 'up' || direction === 'down' ? viewport.height : viewport.width,
-    momentum,
-  );
-  const [deltaX, deltaY] = wheelDelta(direction, distance);
+/**
+ * Wheels at `point`, by `distance` of the scroll container under it: the
+ * nearest element there that scrolls along the swipe's axis, or the
+ * viewport when none does. The wheel scrolls that container, so the swipe
+ * scrolls what a person's wheel over the point would.
+ */
+export async function performPointSwipe(page: Page, point: ViewportPoint, direction: ScrollDirection, distance: number): Promise<void> {
+  const extent = await page.locator(':root').evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
+  await page.mouse.move(point.x, point.y);
+  const [deltaX, deltaY] = wheelDelta(direction, Math.round(extent * distance));
   await wheelRendered(page, deltaX, deltaY);
+}
+
+/** A swipe on the screen: wheels at the viewport's center, see `performPointSwipe`. */
+export async function performViewportSwipe(page: Page, direction: ScrollDirection, distance: number): Promise<void> {
+  const viewport = await currentViewport(page);
+  await performPointSwipe(page, { x: viewport.width / 2, y: viewport.height / 2 }, direction, distance);
 }
 
 /**
@@ -515,7 +520,7 @@ export async function performPointDrag(
 export async function performElementSwipe(
   target: ActionTarget,
   direction: ScrollDirection,
-  momentum: Momentum,
+  distance: number,
   timeout: number,
 ): Promise<void> {
   // A node the pointer already hovers takes the wheel where it is; one hit at
@@ -532,11 +537,11 @@ export async function performElementSwipe(
       retryable: false,
     });
   }
-  const distance = swipeDistance(
-    direction === 'up' || direction === 'down' ? box.height : box.width,
-    momentum,
-  );
-  const [deltaX, deltaY] = wheelDelta(direction, distance);
+  const along = { vertical: direction === 'up' || direction === 'down' };
+  const extent = await (target.kind === 'locator'
+    ? target.locator.evaluate(scrollExtent, along, { timeout })
+    : target.element.evaluate(scrollExtent, along));
+  const [deltaX, deltaY] = wheelDelta(direction, Math.round(extent * distance));
   const page = await targetPage(target);
   if (aimed.aim === 'centre') await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await wheelRendered(page, deltaX, deltaY);
@@ -579,8 +584,23 @@ function wheelAim(element: Element): WheelAim {
   return hit !== null && element.contains(hit) ? { aim: 'centre', box } : { aim: 'blocked' };
 }
 
-function swipeDistance(extent: number, momentum: Momentum): number {
-  return Math.round(extent * SWIPE_SHARE[momentum]);
+/**
+ * Page-side: the client size, along the swipe's axis, of the container a
+ * wheel scrolls from `element`, or from the element at `at` when given: the
+ * nearest one, itself included, whose content overflows along that axis and
+ * whose style lets it scroll. The walk crosses out of a shadow root to its
+ * host. With none, it is the viewport.
+ */
+function scrollExtent(element: Element, { vertical, at }: { vertical: boolean; at?: ViewportPoint }): number {
+  let node = at === undefined ? element : document.elementFromPoint(at.x, at.y);
+  while (node !== null) {
+    const overflow = getComputedStyle(node)[vertical ? 'overflowY' : 'overflowX'];
+    const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;
+    if (overflows && /auto|scroll|overlay/.test(overflow)) return vertical ? node.clientHeight : node.clientWidth;
+    const root = node.getRootNode();
+    node = node.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+  }
+  return vertical ? window.innerHeight : window.innerWidth;
 }
 
 function wheelDelta(direction: ScrollDirection, distance: number): [number, number] {

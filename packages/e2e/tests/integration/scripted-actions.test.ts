@@ -57,7 +57,7 @@ test('every node action reaches the engine', async ({ app, screen }) => {
   await screen.getByRole('button', { name: 'Attachment' }).setInputFiles(['fixtures/one.txt', '/tmp/two.txt']);
   await screen.getByTestId('drag').dragTo(screen.getByTestId('drop'));
   await submit.scrollIntoView();
-  await screen.getByRole('list', { name: 'Feed' }).swipe({ direction: 'down', momentum: 'slow' });
+  await screen.getByRole('list', { name: 'Feed' }).swipe({ direction: 'down', distance: 0.25, speed: 'slow' });
   await screen.getByRole('list', { name: 'Feed' }).swipe({ direction: 'left' });
   await screen.getByRole('button', { name: 'Increment' }).tap();
   await screen.getByRole('button', { name: 'Increment' }).tap();
@@ -111,8 +111,8 @@ describe('scripted engine: actions and app hooks', () => {
       ['upload', { kind: 'setInputFiles', paths: [fixtureOne, '/tmp/two.txt'] }],
       ['drag', { kind: 'dragTo', target: { id: 'drop', revision: expect.stringMatching(/^l\d+$/) } }],
       ['submit', { kind: 'scrollIntoView' }],
-      ['feed', { kind: 'swipe', direction: 'down', momentum: 'slow' }],
-      ['feed', { kind: 'swipe', direction: 'left' }],
+      ['feed', { kind: 'swipe', direction: 'down', distance: 0.25, durationMs: 1500 }],
+      ['feed', { kind: 'swipe', direction: 'left', distance: 0.5, durationMs: 400 }],
       ['increment', { kind: 'tap' }],
       ['increment', { kind: 'tap' }],
       ['bold', { kind: 'tap' }],

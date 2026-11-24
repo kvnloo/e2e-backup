@@ -453,10 +453,10 @@ describe('automation runner failures through the engine', () => {
         'perform tap failed: the iOS automation runner is still finishing a command that overran its watchdog (session e2e-ios-0 on iPhone 17 Pro)',
       ),
     });
-    h.fake.respond('interactions.scroll', () => {
+    h.fake.respond('interactions.pan', () => {
       throw runnerBusy();
     });
-    await expect(h.engine.perform!(screen.root.ref, { kind: 'swipe', direction: 'down' }, operation())).rejects.toMatchObject({
+    await expect(h.engine.perform!(screen.root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation())).rejects.toMatchObject({
       code: 'ENGINE_FAILURE',
       message: expect.stringContaining(
         'swipe failed: the iOS automation runner is still finishing a command that overran its watchdog (session e2e-ios-0 on iPhone 17 Pro)',

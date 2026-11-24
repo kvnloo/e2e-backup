@@ -56,7 +56,7 @@ test.describe('scrolling', { requires: ['browser'], tags: ['scroll'] }, () => {
   });
 
   test('a node swipe scrolls only inside a scrollable node', async ({ screen }) => {
-    await screen.getByRole('list', 'Pane').swipe({ direction: 'down', momentum: 'slow' });
+    await screen.getByRole('list', 'Pane').swipe({ direction: 'down', distance: 0.25 });
     await expect(screen.getByRole('status', 'Pane position')).not.toHaveText('0');
     await expect(screen.getByRole('status', 'Scroll position')).toHaveText('0');
   });

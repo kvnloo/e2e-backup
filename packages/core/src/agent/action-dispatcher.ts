@@ -10,14 +10,15 @@
  * and queue as `runTool`.
  */
 
-import { isKeyModifier, KEY_MODIFIERS, type KeyModifier } from '../engine/contract.ts';
+import { isKeyModifier, KEY_MODIFIERS, SCROLL_STEP, type KeyModifier } from '../engine/contract.ts';
 import type { LocatorAction, LocatorActionKind, SemanticNode, ViewportPoint, ViewportSize } from '../engine/surface.ts';
 import { asEngineError, TestError } from '../internal/errors.ts';
 import { requireKey } from '../internal/keys.ts';
+import { SWIPE } from '../internal/swipe.ts';
 import { sleep } from '../internal/time.ts';
 import { clampToViewport, requireFinitePoint, requireViewportSize, viewportShare } from '../internal/geometry.ts';
 import { resolveNavigationUrl } from '../internal/urls.ts';
-import type { ActionEvent, ActionHook, BeforeActionHook, ClickOptions, JsonValue, Momentum, ScrollDirection, Secret } from '../types.ts';
+import type { ActionEvent, ActionHook, BeforeActionHook, ClickOptions, JsonValue, ScrollDirection, Secret } from '../types.ts';
 import { PROJECT_TOOL_EVENT_PREFIX, READ_ONLY_GRAMMAR, type GrammarActionName } from './action-names.ts';
 import { actionEvent, containerKey, describeAction, type PlacedPoint, type Placement, type RecordableAction } from './actions.ts';
 import { describePosition } from '../cache/relocate.ts';
@@ -60,20 +61,9 @@ const ASSERTION_ACTIONS = new Set<string>(Object.values(READ_ONLY_GRAMMAR).flat(
 const MAX_STALE_RELOCATIONS = 2;
 
 /**
- * The momentum of one grammar scroll. With `fast`, each scroll moves 0.8 of
- * the scrolled box (`SWIPE_SHARE`), so a long feed needs only a few actions.
- *
- * On the web, the wheel moves exactly that far, so every row shorter than a
- * fifth of the box shows in at least one look. On a device, the content can
- * fling further than the finger travels, so a short row can pass between
- * two looks.
- */
-const SCROLL_MOMENTUM: Momentum = 'fast';
-
-/**
- * How many pages a scroll to a text may turn. Each page turn is one grammar
- * scroll (`SCROLL_MOMENTUM`), 0.8 of the list. A windowed table of five
- * thousand short rows is about four hundred pages on a browser. The cap
+ * How many pages a scroll to a text may turn. Each page turn is one
+ * `scrollUntilVisible` step (`SCROLL_STEP`), 0.65 of the list. A windowed
+ * table of five thousand short rows is about five hundred pages on a browser. The cap
  * bounds a text that never shows, the step's own clock bounds the time, and a
  * screen that stops moving ends the paging before either.
  */
@@ -556,7 +546,7 @@ export class ActionDispatcher {
       throw new TestError('INVALID_ARGUMENT', `invalid scroll direction "${String(direction)}"`);
     }
     const viewport = async (): Promise<RecordableAction> => {
-      await this.session.swipe(direction, SCROLL_MOMENTUM, this.accounting.actionOperation());
+      await this.session.swipe({ kind: 'swipe', direction, ...SWIPE }, this.accounting.actionOperation());
       return { name: 'scroll', direction };
     };
     if (target === undefined) return this.runAction('scroll', viewport);
@@ -568,7 +558,7 @@ export class ActionDispatcher {
       return this.targeted(resolved, async (node, observation) => {
         await this.session.perform(
           node.ref,
-          { kind: 'swipe', direction, momentum: SCROLL_MOMENTUM },
+          { kind: 'swipe', direction, ...SWIPE },
           this.accounting.actionOperation(),
         );
         // How much of the screen the list covered decides, on replay, whether
@@ -691,11 +681,11 @@ export class ActionDispatcher {
   ): Promise<{ paged: Pick<Extract<RecordableAction, { name: 'scrollUntil' }>, 'node' | 'spans'>; within: ExecutorTarget | undefined }> {
     const resolved = list === undefined ? undefined : this.scrollTargetOrLost(list);
     if (resolved === undefined) {
-      await this.session.swipe(direction, SCROLL_MOMENTUM, this.accounting.actionOperation());
+      await this.session.swipe({ kind: 'swipe', direction, ...SCROLL_STEP }, this.accounting.actionOperation());
       return { paged: {}, within: undefined };
     }
     const { node, observation } = resolved;
-    await this.session.perform(node.ref, { kind: 'swipe', direction, momentum: SCROLL_MOMENTUM }, this.accounting.actionOperation());
+    await this.session.perform(node.ref, { kind: 'swipe', direction, ...SCROLL_STEP }, this.accounting.actionOperation());
     return { paged: { node, ...(node.rect === undefined ? {} : { spans: viewportShare(node.rect, observation.viewport) }) }, within: list };
   }
 

@@ -1,7 +1,7 @@
 /** Shared helpers for the agent-device engine: error constructors, filenames, PNG headers, gestures, the screen location and size. */
 
 import type { CaptureScreenshotResult, PressOptions } from 'agent-device';
-import { EngineError, SWIPE_SHARE, withTimeout, type Momentum, type ScrollDirection, type ViewportSize } from '@e2e-dev/core/engine';
+import { EngineError, withTimeout, type ScrollDirection, type ViewportSize } from '@e2e-dev/core/engine';
 import type { AgentDeviceClient } from './options.ts';
 
 export interface Point {
@@ -152,31 +152,53 @@ export function readPngSize(data: Uint8Array): { width: number; height: number }
   return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
+/** One finger drag in logical pixels, as agent-device's `pan` takes it: where it starts and how far it travels. */
+export interface Drag {
+  readonly x: number;
+  readonly y: number;
+  readonly dx: number;
+  readonly dy: number;
+}
+
+/** Where a drag starts, as a share of the box in from the edge the content comes from. */
+const DRAG_START = 0.25;
+/** Where a drag ends at the latest, as a share of the box in from the far edge. */
+const DRAG_END = 0.1;
+
 /**
- * The finger gesture that scrolls one rect's content in `direction`. Scrolling
- * down reveals what is below, so the finger travels up. It travels the
- * momentum's `SWIPE_SHARE` of the rect's extent, centred on the rect, so it
- * never leaves the rect.
+ * The drags that scroll `box`'s content `direction` by `distance` of the box,
+ * as Appium's WebDriverAgent scrolls. Scrolling down reveals what is below, so
+ * the finger travels up. Each drag starts a quarter in from the edge the
+ * content comes from, centred on the other axis, so it starts on the content
+ * and not on a footer or tab bar along that edge. It ends no closer than a
+ * tenth to the far edge, so one drag moves 0.65 of the box at most. A longer
+ * distance is split into equal drags from the same start.
  */
-export function swipeWithin(
-  rect: Rect,
-  direction: ScrollDirection,
-  momentum: Momentum | undefined,
-): { from: Point; to: Point } {
-  const ratio = SWIPE_SHARE[momentum ?? 'none'];
-  const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-  const dx = (rect.width * ratio) / 2;
-  const dy = (rect.height * ratio) / 2;
-  switch (direction) {
-    case 'down':
-      return { from: { x: centre.x, y: centre.y + dy }, to: { x: centre.x, y: centre.y - dy } };
-    case 'up':
-      return { from: { x: centre.x, y: centre.y - dy }, to: { x: centre.x, y: centre.y + dy } };
-    case 'right':
-      return { from: { x: centre.x + dx, y: centre.y }, to: { x: centre.x - dx, y: centre.y } };
-    case 'left':
-      return { from: { x: centre.x - dx, y: centre.y }, to: { x: centre.x + dx, y: centre.y } };
-  }
+export function swipeDrags(box: Rect, direction: ScrollDirection, distance: number): Drag[] {
+  const vertical = direction === 'up' || direction === 'down';
+  const extent = vertical ? box.height : box.width;
+  const sign = direction === 'down' || direction === 'right' ? -1 : 1;
+  const start = (vertical ? box.y : box.x) + extent * (sign < 0 ? 1 - DRAG_START : DRAG_START);
+  const count = Math.ceil(distance / (1 - DRAG_START - DRAG_END));
+  const travel = (sign * extent * distance) / count;
+  const drag = vertical
+    ? { x: box.x + box.width / 2, y: start, dx: 0, dy: travel }
+    : { x: start, y: box.y + box.height / 2, dx: travel, dy: 0 };
+  return Array.from({ length: count }, () => drag);
+}
+
+/**
+ * The drag that moves `rect` to the middle of `container`, as Maestro's
+ * `centerElement` does: only when the node's centre is more than a fifth of
+ * the container away from the middle, so a node in the outer part, where
+ * a sticky header or footer can cover it, comes clear of it. It is vertical
+ * only: a node in a vertical list often sits off the list's horizontal
+ * middle, and a sideways drag on a row can set off the row's swipe action.
+ */
+export function centringDrag(rect: Rect, container: Rect): Drag | undefined {
+  const offset = rect.y + rect.height / 2 - (container.y + container.height / 2);
+  if (Math.abs(offset) <= container.height / 5) return undefined;
+  return swipeDrags(container, offset > 0 ? 'down' : 'up', Math.abs(offset) / container.height)[0];
 }
 
 /**

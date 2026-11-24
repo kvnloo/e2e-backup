@@ -1092,7 +1092,7 @@ export class DesktopSurface {
       if (screen !== undefined) this.remember(screen.bindings.values());
       const target = screen?.scrollTarget;
       if (target === undefined) throw notActionable('the window has nothing that scrolls');
-      await this.scroll(this.binding({ id: target, revision: '' }), action.direction, action.momentum, operation);
+      await this.scroll(this.binding({ id: target, revision: '' }), action.direction, action.distance, operation);
       return this.settle(operation);
     }
     const binding = this.binding(ref);
@@ -1157,7 +1157,7 @@ export class DesktopSurface {
         await this.select(binding, optionLabel(action.value), operation);
         break;
       case 'swipe':
-        await this.scroll(binding, action.direction, action.momentum, operation);
+        await this.scroll(binding, action.direction, action.distance, operation);
         break;
       case 'longPress':
       case 'setInputFiles':
@@ -1292,8 +1292,13 @@ export class DesktopSurface {
     }
   }
 
-  private async scroll(binding: NodeBinding, direction: string, momentum: string | undefined, operation: OperationContext): Promise<void> {
-    const amount = momentum === 'fast' ? 10 : momentum === 'slow' ? 2 : 5;
+  /**
+   * Scrolls by wheel notches, the unit agent-desktop takes. It doesn't report
+   * how far a notch moves, so ten notches stand for a `distance` of 1, and a
+   * swipe of the default 0.5 sends the five a plain swipe always sent.
+   */
+  private async scroll(binding: NodeBinding, direction: string, distance: number, operation: OperationContext): Promise<void> {
+    const amount = Math.max(1, Math.round(distance * 10));
     await this.refCommand('scroll', binding, operation, ['--direction', direction, '--amount', String(amount)]);
   }
 

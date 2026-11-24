@@ -1066,7 +1066,7 @@ export class PlaywrightSurface {
         const page = this.requirePage();
         if (action.kind === 'swipe' && ref.id === ROOT_NODE_ID) {
           this.requireSession().requireObservation();
-          return performViewportSwipe(page, action.direction, action.momentum ?? 'none');
+          return performViewportSwipe(page, action.direction, action.distance);
         }
         const session = this.requireSession();
         const { refs } = session;

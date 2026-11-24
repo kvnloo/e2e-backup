@@ -12,7 +12,7 @@ import {
   performElementSwipe,
   performPointDrag,
   performPointerDrag,
-  performViewportSwipe,
+  performPointSwipe,
   POST_DISPATCH_PATTERN,
   statPath,
   translatePwError,
@@ -386,8 +386,8 @@ export async function dispatchLocatorAction(
     }
     case 'swipe':
       // The agent's node scroll and `screen` swipes both arrive here: a wheel
-      // gesture over the node, sized by its own box.
-      await performElementSwipe(target, action.direction, action.momentum ?? 'none', timeout);
+      // gesture over the node, sized by the container it scrolls.
+      await performElementSwipe(target, action.direction, action.distance, timeout);
       return;
   }
 }
@@ -429,9 +429,7 @@ export async function dispatchPointerAction(
       await performPointDrag(mouse, point, action.target, action.durationMs, signal);
       return;
     case 'swipe':
-      // The pointer moves to the point first so the scrollable under it receives the wheel.
-      await mouse.move(point.x, point.y);
-      await performViewportSwipe(page, action.direction, action.momentum ?? 'none');
+      await performPointSwipe(page, point, action.direction, action.distance);
       return;
   }
 }

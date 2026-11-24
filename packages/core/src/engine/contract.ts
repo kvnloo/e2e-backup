@@ -12,22 +12,16 @@
 
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
-/** How far a swipe travels, as a share of the swiped box (`SWIPE_SHARE`). */
-export type Momentum = 'none' | 'slow' | 'fast';
 /**
- * The distance a swipe with a direction travels for each momentum, as a
- * share of the swiped box along the swipe. The box is the node (or the
- * viewport, on the screen). The web and mobile engines both use this table,
- * so a momentum travels the same share on each.
- *
- * `slow` is a quarter, so each stop overlaps the one before by three
- * quarters. When a test steps through a list, every row is fully on screen
- * at some stop. With three quarters, rows of the mobile benchmark's scenario
- * list were dragged past.
- *
- * `fast` is 0.8, so a paging scroll view moves past half a page.
+ * One step of a scroll that reads the screen between steps
+ * (`scrollUntilVisible`, the agent's `scroll_to`): 0.65 of the scroll
+ * container, the longest single drag, so 35% of the view before stays on
+ * screen. The drag takes 800 ms because a faster one flings the list past that
+ * 35%. On a 0.65 drag of the mobile benchmark's long list, a 600 ms drag
+ * flung 0.34 of the list on an iOS 27 simulator and once past a whole view,
+ * while 800 ms flung 0.22 there and 0.07 on an Android 16 emulator.
  */
-export const SWIPE_SHARE: Readonly<Record<Momentum, number>> = { slow: 0.25, none: 0.5, fast: 0.8 };
+export const SCROLL_STEP = { distance: 0.65, durationMs: 800 } as const;
 /** One option of a select: its label (a bare string too), its `value` attribute, or its zero-based index. */
 export type SelectOption =
   | string
@@ -319,11 +313,24 @@ export type LocatorAction =
       readonly files: readonly { readonly name: string; readonly mimeType: string; readonly buffer: Uint8Array }[];
     }
   | { readonly kind: 'dragTo'; readonly target: NodeRef }
-  | {
-      readonly kind: 'swipe';
-      readonly direction: ScrollDirection;
-      readonly momentum?: Momentum;
-    };
+  | SwipeAction;
+
+/**
+ * A scroll gesture in a direction. `direction` is the way the content
+ * scrolls: `down` reveals what is below.
+ */
+export interface SwipeAction {
+  readonly kind: 'swipe';
+  readonly direction: ScrollDirection;
+  /**
+   * How far the content scrolls, as a share of the scroll container's box
+   * along the swipe, above 0 and at most 1. On a touch surface, a distance
+   * longer than one drag is split into several drags.
+   */
+  readonly distance: number;
+  /** How long each drag takes; a platform that scrolls without a drag (a wheel) ignores it. */
+  readonly durationMs: number;
+}
 
 /** Every action kind; what an engine declares in `actions`. */
 export type LocatorActionKind = LocatorAction['kind'];
@@ -368,11 +375,7 @@ export type PointerAction =
   | { readonly kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'hover' }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'dragTo'; readonly target: ViewportPoint }
-  | {
-      readonly kind: 'swipe';
-      readonly direction: ScrollDirection;
-      readonly momentum?: Momentum;
-    }
+  | SwipeAction
   | {
       readonly kind: 'swipeTo';
       readonly target: ViewportPoint;

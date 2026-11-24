@@ -3,12 +3,11 @@ import { expect } from 'e2e';
 
 /**
  * The Golden Row is row index 4321 at 36 px a row, 155 556 px down a 480 px
- * viewport. A fast fling on the table moves 0.8 of its height (384 px), so
- * it takes about 405 strides to reach it. No row passes unseen, because a
- * stride is shorter than the viewport. A stride took about 160 ms when
- * measured, about 65 s in all. The timeout is about twice that, so on a
- * slower CI box the scroll fails, not the attempt. The attempt gets the
- * default budget on top, for opening and claiming.
+ * viewport. A scroll step on the table moves 0.65 of its height, 312 px, so
+ * about 499 strides reach it, and no row passes unseen because a stride is
+ * shorter than the viewport; measured at about 160 ms a stride, 80 s in all.
+ * Nearly twice that, so a slower CI box fails the scroll and not the attempt;
+ * the attempt gets the default budget on top for opening and claiming.
  */
 const SCROLL_TIMEOUT_MS = 140_000;
 
@@ -24,7 +23,7 @@ test(
     await expect(claim).toBeHidden();
 
     // The table is its own scroll container, so the table pages, not the page.
-    await viewport.scrollUntilVisible(claim, { momentum: 'fast', timeout: SCROLL_TIMEOUT_MS });
+    await viewport.scrollUntilVisible(claim, { timeout: SCROLL_TIMEOUT_MS });
 
     await expect(rows.filter({ hasText: 'Golden Row' })).toHaveText(/^Row 4322/);
     await expect(rows.filter({ hasText: 'Row 1' })).toHaveCount(0);

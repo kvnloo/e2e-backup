@@ -461,7 +461,7 @@ swipe(options: SwipeOptions | SwipePathOptions): Promise<void>;
 ```
 
 ```ts
-await screen.swipe({ direction: 'up', momentum: 'fast' });
+await screen.swipe({ direction: 'up', distance: 0.8, speed: 'fast' });
 
 const row = (await screen.getByText('Design review').boundingBox())!;
 await screen.swipe({
@@ -473,18 +473,32 @@ await screen.swipe({
 await screen.swipe({ from: { x: '50%', y: '80%' }, to: { x: '50%', y: '20%' } });
 ```
 
-`{ direction, momentum? }` is a scroll gesture on the screen:
+`{ direction, distance?, speed? }` is a scroll gesture. It scrolls the
+scroll container under the screen's center, or the whole screen when
+there is none.
 
 - `direction` is the way the content scrolls, not the finger: `'down'`
   reveals what is below.
-- `momentum` is how far the gesture travels, measured along the swipe as a
-  share of the viewport (or of the node, on a locator). It's `'none'` by
-  default. The shares are the same on the web and on a device:
-  - `'slow'`: 0.25
-  - `'none'`: 0.5
-  - `'fast'`: 0.8 (so a paging scroll view moves past half a page)
+- `distance` is how far the content scrolls, as a share of the container
+  along the swipe: above 0 and at most 1, `0.5` by default.
+- `speed` is how fast the finger moves, `'normal'` by default. Each drag
+  takes:
+  - `'slow'`: 1500 ms
+  - `'normal'`: 400 ms
+  - `'fast'`: 150 ms
 
-  On a device, the content can fling further than the finger travels.
+On a device, the swipe is one or more drags:
+
+- Each drag starts a quarter in from the edge the content comes from, so
+  it starts on the content and not on a footer or tab bar along that edge.
+  It ends no closer than a tenth to the far edge, so one drag scrolls 0.65
+  of the container at most. A longer `distance` is split into equal drags.
+- The content coasts on after the finger lifts, as it does for a person,
+  so it can scroll further than `distance`. The next action waits for the
+  screen to settle.
+
+On the web, the swipe is one wheel event of `distance` of the container,
+so `speed` doesn't change anything there.
 
 `{ from, to, duration? }` is a swipe along a path between two viewport
 points: a touch swipe on a device, a pointer drag on a document platform.
@@ -501,21 +515,19 @@ Uses `config.actionTimeout` and takes no `timeout` option.
 | Throws | When |
 | --- | --- |
 | `ACTION_FAILED` | The gesture is rejected. |
-| `INVALID_ARGUMENT` | A mix of the two shapes, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
+| `INVALID_ARGUMENT` | A mix of the two shapes, a `distance` that isn't above 0 and at most 1, a `speed` that isn't `'slow'`, `'normal'`, or `'fast'`, an out-of-range duration, a coordinate off the plane or not a percentage from `'0%'` through `'100%'`, or a `timeout` key. |
 | `UNSUPPORTED_CAPABILITY` | The engine does not list `swipe` in its actions (a direction) or `swipeTo` in its pointer actions (a path). |
 
 #### `screen.scrollUntilVisible`
 
 ```ts
 /**
- * Scrolls until a locator resolves visibly or times out: the viewport on
- * `screen`, the node itself on a locator. `momentum` is the stride of each
- * step, `slow` unless told otherwise.
+ * Scrolls until a locator resolves visibly or times out: the scroll
+ * container under the screen's center on `screen`, the node itself on a
+ * locator. Once the node is visible, an engine that can bring a node into
+ * view does, so the node isn't left at the container's edge.
  */
-scrollUntilVisible(
-  target: Locator,
-  options?: { direction?: ScrollDirection; momentum?: Momentum; timeout?: number },
-): Promise<void>;
+scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void>;
 ```
 
 ```ts
@@ -527,14 +539,16 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 | --- | --- | --- |
 | `target` | `Locator` | - |
 | `options.direction` | `ScrollDirection` | `'down'` |
-| `options.momentum` | `Momentum` | `'slow'` |
+| `options.distance` | `number` | `0.65` |
+| `options.speed` | `SwipeSpeed` | 800 ms a step |
 | `options.timeout` | `number` | `30000` |
 
-- `momentum` is as [`screen.swipe`](#screen-swipe) defines it. A longer step
-  is faster, but it must not carry the target past the surface unseen, as a
-  virtualized list does. With `'fast'`, fewer steps are needed on a long
-  list. On the web, every row shorter than a fifth of the surface is still
-  fully on screen at some step.
+- Each step scrolls `distance` of the container, one drag on a device. The
+  default step leaves 35% of the last view on screen, so no row passes
+  unseen. Its 800 ms drag is slow enough that the list stops coasting
+  inside that 35%. `speed` gives another duration, as
+  [`screen.swipe`](#screen-swipe) defines it, and a faster one can coast
+  a short row past.
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
   whole scroll, each swipe included.
 - On a locator each step swipes that node. So a feed or a table that is its
@@ -542,11 +556,16 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 - It stops at the first match that is not hidden. On a device, a node under
   the soft keyboard is hidden, so the scroll goes on
   ([Mobile visibility](/reference/mobile#visibility)).
+- Then it brings the node into view with
+  [`scrollIntoView`](#scrollintoview) when the engine has it. On the web the
+  browser scrolls it into view. On a device a node more than a fifth of its
+  container from the middle is dragged to the middle, so it comes clear of
+  a sticky header or footer at the edge.
 
 | Throws | When |
 | --- | --- |
 | `INVALID_LOCATOR` | `target` is not a runner locator, or was made by another target's screen. |
-| `INVALID_ARGUMENT` | An option it does not take. |
+| `INVALID_ARGUMENT` | An option it does not take, a `distance` that isn't above 0 and at most 1, or a `speed` that isn't a preset. |
 | `LOCATOR_NOT_FOUND` | The deadline expires first, a swipe it cut short included. |
 
 ### Screen reads
@@ -985,6 +1004,11 @@ scrollIntoView(options?: ActionOptions): Promise<void>;
 await screen.getByRole('contentinfo').scrollIntoView();
 ```
 
+On a device, the tree lists only what's on screen, so the node is already
+in view. When it's more than a fifth of its scroll container from the
+middle, it's dragged to the middle, clear of a sticky header or footer at
+the edge. Otherwise nothing moves.
+
 #### `swipe`
 
 ```ts
@@ -993,12 +1017,15 @@ swipe(options: SwipeOptions & ActionOptions): Promise<void>;
 ```
 
 ```ts
-await screen.getByTestId('feed').swipe({ direction: 'down', momentum: 'slow' });
+await screen.getByTestId('feed').swipe({ direction: 'down', distance: 0.25 });
 ```
 
-It takes `{ direction, momentum? }` as [`screen.swipe`](#screen-swipe)
-defines them, plus `timeout`, which `screen.swipe` refuses. It has no
-`{ from, to }` form.
+It takes `{ direction, distance?, speed? }` as
+[`screen.swipe`](#screen-swipe) defines them, plus `timeout`, which
+`screen.swipe` refuses. It has no `{ from, to }` form. The node's nearest
+scroll container scrolls, the node itself when it is one. A node in no
+container, such as a card the app drags, takes the swipe within its own
+box.
 
 ### Locator reads
 
@@ -1406,14 +1433,32 @@ export interface PressSequentiallyOptions extends ActionOptions {
   delay?: number;
 }
 
+/** How fast a swipe's finger moves: each drag takes 1500 ms `slow`, 400 ms `normal`, or 150 ms `fast`. */
+export type SwipeSpeed = 'slow' | 'normal' | 'fast';
+
+/** A swipe in a direction. */
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the swipe travels, as a share of the swiped box. Default `none`. The three values are defined under screen.swipe. */
-  momentum?: Momentum;
+  /** How far the content scrolls, as a share of the scroll container's box along the swipe, above 0 and at most 1. Default `0.5`. */
+  distance?: number;
+  /** How fast the finger moves. Default `normal`. */
+  speed?: SwipeSpeed;
   from?: never;
   to?: never;
   duration?: never;
+}
+
+/** `scrollUntilVisible` options. */
+export interface ScrollUntilVisibleOptions {
+  /** The way the content scrolls. Default `down`. */
+  direction?: ScrollDirection;
+  /** How far each step scrolls, as a share of the scroll container's box. Default `0.65`. */
+  distance?: number;
+  /** How fast each step's finger moves. Default: 800 ms a step, slow enough that the list doesn't coast past the part of the last view left on screen. */
+  speed?: SwipeSpeed;
+  /** Milliseconds for the whole scroll. Default `30000`. */
+  timeout?: number;
 }
 
 /** A swipe along a path between two viewport points: a touch swipe on a device, a pointer drag on a document platform. */
@@ -1425,7 +1470,8 @@ export interface SwipePathOptions {
   /** Gesture duration, an integer from 16 through 10000 ms; omitted = the engine's default. */
   duration?: number;
   direction?: never;
-  momentum?: never;
+  distance?: never;
+  speed?: never;
 }
 
 /**
@@ -1481,8 +1527,6 @@ export type SelectOption =
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
-/** How far a swipe travels. The values are defined under screen.swipe. */
-export type Momentum = 'none' | 'slow' | 'fast';
 ```
 
 ## Related

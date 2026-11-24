@@ -119,7 +119,7 @@ describe('CDP session recovery', () => {
       expect(await recovered.evaluate(async () => (await fetch('/kept-route')).text())).toBe('route kept');
       expect(await recovered.evaluate(() => confirm('Handler survived?'))).toBe(true);
       await expect(engine.perform!(stale.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NODE_STALE' });
-      await expect(engine.perform!(observation.root.ref, { kind: 'swipe', direction: 'down' }, operation()))
+      await expect(engine.perform!(observation.root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation()))
         .rejects.toMatchObject({ code: 'NODE_STALE' });
       await expect(engine.performAt!({ x: 1, y: 1 }, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NODE_STALE' });
       await engine.observe!(operation());

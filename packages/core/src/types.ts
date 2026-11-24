@@ -11,11 +11,11 @@ import type { RecordedAction } from './cache/trace.ts';
 import type { PROJECT_TOOL_EVENT_PREFIX } from './agent/action-names.ts';
 import type { StepCacheInfo } from './run/steps.ts';
 import type { EngineHandle } from './engine/index.ts';
-import type { KeyModifier, Momentum, ScrollDirection, SelectOption, ViewportPoint } from './engine/contract.ts';
+import type { KeyModifier, ScrollDirection, SelectOption, ViewportPoint } from './engine/contract.ts';
 import type { CacheStore } from './cache/store.ts';
 import type { FixtureDefinitions, FixtureOverrides, WorkerFixtures } from './types/fixtures.ts';
 
-export type { KeyModifier, Momentum, ScrollDirection, SelectOption } from './engine/contract.ts';
+export type { KeyModifier, ScrollDirection, SelectOption } from './engine/contract.ts';
 export type { CacheReadResult, CacheStore } from './cache/store.ts';
 export type { DerivedReason } from './cache/trace.ts';
 export type { StepCacheInfo } from './run/steps.ts';
@@ -511,15 +511,32 @@ export interface PressSequentiallyOptions extends ActionOptions {
   delay?: number;
 }
 
+/** How fast a swipe's finger moves: each drag takes 1500 ms `slow`, 400 ms `normal`, or 150 ms `fast`. */
+export type SwipeSpeed = 'slow' | 'normal' | 'fast';
+
 /** A swipe in a direction. */
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the swipe travels, as a share of the swiped box. Default `none`. */
-  momentum?: Momentum;
+  /** How far the content scrolls, as a share of the scroll container's box along the swipe, above 0 and at most 1. Default `0.5`. */
+  distance?: number;
+  /** How fast the finger moves. Default `normal`. */
+  speed?: SwipeSpeed;
   from?: never;
   to?: never;
   duration?: never;
+}
+
+/** `scrollUntilVisible` options. */
+export interface ScrollUntilVisibleOptions {
+  /** The way the content scrolls. Default `down`. */
+  direction?: ScrollDirection;
+  /** How far each step scrolls, as a share of the scroll container's box. Default `0.65`. */
+  distance?: number;
+  /** How fast each step's finger moves. Default: 800 ms a step, slow enough that the list doesn't coast past the part of the last view left on screen. */
+  speed?: SwipeSpeed;
+  /** Milliseconds for the whole scroll. Default `30000`. */
+  timeout?: number;
 }
 
 /** A swipe along a path between two viewport points: a touch swipe on a device, a pointer drag on a document platform. */
@@ -531,7 +548,8 @@ export interface SwipePathOptions {
   /** Gesture duration in milliseconds; omitted = the engine's default. */
   duration?: number;
   direction?: never;
-  momentum?: never;
+  distance?: never;
+  speed?: never;
 }
 
 export interface Screen {
@@ -556,14 +574,12 @@ export interface Screen {
   /** Performs a viewport-level swipe: in a direction, or along a path from one point to another. */
   swipe(options: SwipeOptions | SwipePathOptions): Promise<void>;
   /**
-   * Scrolls until a locator resolves visibly or times out: the viewport on
-   * `screen`, the node itself on a locator. `momentum` is the stride of each
-   * step, `slow` unless told otherwise.
+   * Scrolls until a locator resolves visibly or times out: the scroll
+   * container under the screen's center on `screen`, the node itself on a
+   * locator. Once the node is visible, an engine that can bring a node into
+   * view does, so the node isn't left at the container's edge.
    */
-  scrollUntilVisible(
-    target: Locator,
-    options?: { direction?: ScrollDirection; momentum?: Momentum; timeout?: number },
-  ): Promise<void>;
+  scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void>;
   /**
    * Reads the whole screen once, without waiting, as the agent reads it: one
    * node per line, `#id role "name" text="…" [states]`, children indented,

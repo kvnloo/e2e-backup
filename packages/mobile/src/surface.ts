@@ -23,7 +23,7 @@ import {
   raceAbort,
   rejectUnknownKeys,
   stopProviderRecording,
-  SWIPE_SHARE,
+  SCROLL_STEP,
   withinCleanupBudget,
   type EngineAttemptContext,
   type EngineCleanupContext,
@@ -59,6 +59,8 @@ import {
   ROOT_ID,
   screenRoot,
   screenTitle,
+  scrollBoxAt,
+  scrollBoxOf,
   type ProjectedNode,
   type ProjectedSnapshot,
 } from './nodes.ts';
@@ -78,8 +80,10 @@ import {
   sanitizeFilename,
   screenLocation,
   type RawScreenshotResult,
-  swipeWithin,
+  centringDrag,
+  swipeDrags,
   unsupported,
+  type Drag,
   type Rect,
   InputBudget,
 } from './support.ts';
@@ -227,6 +231,10 @@ interface NodeBinding {
   readonly originUnknown: boolean;
   /** Whether `fill` and `clear` may type into the node, judged with the children `node` leaves out. */
   readonly takesText: boolean;
+  /** The box of the scroll container a swipe on the node scrolls: the nearest one around it, itself included. */
+  readonly scrollBox: Rect | undefined;
+  /** The box of the nearest scroll container strictly around the node, where `scrollIntoView` centres it. */
+  readonly container: Rect | undefined;
 }
 
 
@@ -1362,6 +1370,8 @@ export class AgentDeviceSurface {
       originUnknown: snapshot.originUnknown,
       takesText: mayTakeText(entry.node),
       refsGeneration: snapshot.refsGeneration,
+      scrollBox: scrollBoxOf(entry),
+      container: scrollBoxOf(entry.parent),
     };
   }
 
@@ -1442,6 +1452,11 @@ export class AgentDeviceSurface {
   }
 
   /** Records that a test's gesture skipped the stabilization wait, so the next action on a control checks it stopped moving. */
+  /** Sends `drags` one after another, each taking `durationMs`. */
+  private async pan(client: AgentDeviceClient, drags: readonly Drag[], durationMs: number, input: InputBudget): Promise<void> {
+    for (const drag of drags) await input.send(() => client.interactions.pan({ ...drag, durationMs }), durationMs);
+  }
+
   private noteGesture(operation: OperationContext): void {
     if (operation.origin === 'test') this.skippedStabilizationAt = Date.now();
   }
@@ -1518,24 +1533,20 @@ export class AgentDeviceSurface {
     // acting, so its actions settle first.
     const deterministic = operation.origin === 'test';
     const settle = deterministic ? {} : this.settleOptions;
-    // The observation root is the screen: a swipe on it scrolls the whole
-    // viewport, which is the one action a screen takes. The swipe travels
-    // the momentum's `SWIPE_SHARE` of the viewport. The gesture is centred
-    // on the viewport, so a scroll down starts the finger at
-    // `0.5 + amount / 2` of the height. With `fast`, that's 0.9, a tenth of
-    // the height above the bottom edge. A drag that starts on bottom chrome
-    // (a sticky footer or a tab bar) can be lost. Every scroll of the mobile
-    // benchmark's sticky chrome flow was lost that way in one live iOS run.
+    // The observation root is the screen: a swipe on it scrolls the scroll
+    // container under the screen's centre, or the whole screen when there is
+    // none, which is the one action a screen takes.
     if (ref.id === ROOT_ID) {
       if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);
+      const viewport = this.knownViewport;
+      if (viewport === undefined) throw notActionable('the screen size is not known yet, so a swipe has nothing to measure its distance by; observe the screen first');
       if (deterministic) await this.waitOutTransition(operation, input);
       const before = this.latestScreen;
-      const stabilization = gestureStabilization(operation);
-      await this.command(
-        'swipe',
-        (client) => input.send(() => client.interactions.scroll({ direction: action.direction, amount: SWIPE_SHARE[action.momentum ?? 'none'], ...settle, ...stabilization })),
-        operation.signal,
-      );
+      const centre = { x: viewport.width / 2, y: viewport.height / 2 };
+      // A capture that could not place its window on the screen gives boxes in
+      // another frame, so its containers are not trusted.
+      const box = (before === undefined || before.originUnknown ? undefined : scrollBoxAt(before.index, centre)) ?? { x: 0, y: 0, ...viewport };
+      await this.command('swipe', (client) => this.pan(client, swipeDrags(box, action.direction, action.distance), action.durationMs, input), operation.signal);
       this.noteGesture(operation);
       this.markAction(before);
       return;
@@ -1607,17 +1618,29 @@ export class AgentDeviceSurface {
         case 'press':
           return this.pressKey(client, target, action.key, settle, input);
         case 'swipe': {
-          const rect = target.node.rect;
-          if (rect === undefined) throw notActionable(`node ${target.id} has no bounds to swipe within`);
+          // The node's scroll container scrolls, the node itself when it is
+          // one; a node in none, a card the app drags, takes the swipe itself.
+          const box = target.scrollBox ?? target.node.rect;
+          if (box === undefined) throw notActionable(`node ${target.id} has no bounds to swipe within`);
           if (target.originUnknown) {
             throw notActionable(
               `${label} failed: the ${ORIGIN_UNKNOWN_BOUNDS} Nothing was sent. Swipe the screen with screen.swipe({ direction }), or between screen points with screen.swipe({ from, to }) not taken from those bounds.`,
             );
           }
-          const stabilization = gestureStabilization(operation);
-          const sent = await input.send(() => client.interactions.swipe({ ...swipeWithin(rect, action.direction, action.momentum), ...stabilization }));
+          await this.pan(client, swipeDrags(box, action.direction, action.distance), action.durationMs, input);
           this.noteGesture(operation);
-          return sent;
+          return undefined;
+        }
+        case 'scrollIntoView': {
+          // A device lists only what is on screen, so the node is in view
+          // already; a node near its container's edge is dragged to the
+          // middle, clear of a sticky header or footer that may cover it.
+          const rect = target.node.rect;
+          const drag = rect === undefined || target.container === undefined || target.originUnknown ? undefined : centringDrag(rect, target.container);
+          if (drag === undefined) return undefined;
+          await this.pan(client, [drag], SCROLL_STEP.durationMs, input);
+          this.noteGesture(operation);
+          return undefined;
         }
         case 'dragTo': {
           // A test locates the drop target in a capture of its own, after the
@@ -1631,7 +1654,6 @@ export class AgentDeviceSurface {
             }),
           );
         }
-        case 'scrollIntoView':
         case 'selectOption':
         case 'setInputFiles':
         case 'setInputFilePayloads':

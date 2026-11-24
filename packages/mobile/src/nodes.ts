@@ -9,7 +9,7 @@
 
 import type { CaptureSnapshotResult, SnapshotNode } from 'agent-device';
 import type { SemanticNode, ViewportSize } from '@e2e-dev/core/engine';
-import type { Rect } from './support.ts';
+import type { Point, Rect } from './support.ts';
 
 /**
  * One agent-device snapshot node as this engine reads it: agent-device's own
@@ -809,4 +809,29 @@ export function isWithin(entry: ProjectedNode, ancestor: ProjectedNode): boolean
     if (current === ancestor) return true;
   }
   return false;
+}
+
+/**
+ * The box of the nearest scroll container from `entry` up, `entry` included:
+ * a node agent-device marks `scroll-area` (an iOS `ScrollView`, an Android
+ * `ScrollView`, which React Native's lists render as). Undefined when no
+ * container holds the node.
+ */
+export function scrollBoxOf(entry: ProjectedNode | undefined): Rect | undefined {
+  for (let current = entry; current !== undefined; current = current.parent) {
+    if (current.raw.kind === 'scroll-area' && current.node.rect !== undefined) return current.node.rect;
+  }
+  return undefined;
+}
+
+/** The box of the innermost scroll container under `point`, the smallest one that holds it. */
+export function scrollBoxAt(index: readonly ProjectedNode[], point: Point): Rect | undefined {
+  let found: Rect | undefined;
+  for (const entry of index) {
+    const rect = entry.node.rect;
+    if (entry.raw.kind !== 'scroll-area' || rect === undefined) continue;
+    const holds = point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+    if (holds && (found === undefined || rect.width * rect.height < found.width * found.height)) found = rect;
+  }
+  return found;
 }

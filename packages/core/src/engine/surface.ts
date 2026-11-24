@@ -12,13 +12,12 @@ import type {
   LocatorAction,
   LocatorActionKind,
   LocatorExpression,
-  Momentum,
   NodeRef,
   ObservationPixels,
   OperationContext,
   PointerAction,
   PointerActionKind,
-  ScrollDirection,
+  SwipeAction,
   SemanticNode,
   ViewportPoint,
   ViewportSize,
@@ -211,11 +210,7 @@ export interface TargetSession {
    * Performs a viewport-level swipe: `perform(root, swipe)` on the observation
    * root, observing first when no observation has named it yet.
    */
-  swipe(
-    direction: ScrollDirection,
-    momentum: Momentum | undefined,
-    operation: OperationContext,
-  ): Promise<void>;
+  swipe(action: SwipeAction, operation: OperationContext): Promise<void>;
   /** Performs one pointer action at a viewport point, in CSS pixels, with no node behind it. */
   performAt(point: ViewportPoint, action: PointerAction, operation: OperationContext): Promise<void>;
   /** Input to whatever holds focus; each member fails with UNSUPPORTED_CAPABILITY when the engine lacks it. */
