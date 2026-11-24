@@ -768,14 +768,14 @@ describe('web engine lifecycle', () => {
       });
     });
 
-    it('swipes the scroll container under the viewport centre, and a node within its scroll container, by a share of that container', async () => {
+    it('swipes the scroll container under the viewport centre by a share of that container, inside a shadow root too', async () => {
       await inAttempt('sc1', async () => {
         await engine.session!.open!(`${app.url}/`, operation('sc1'));
         const page = surfaceOf(engine)!.page();
         await page.setContent(`
           <body style="margin: 0; height: 3000px">
             <div id="pane" style="position: fixed; top: 200px; left: 0; right: 0; height: 300px; overflow: auto">
-              <div style="height: 200px"></div><button>Row</button><div style="height: 3000px"></div>
+              <div style="height: 3000px"></div>
             </div>
           </body>`);
         const offsets = () => page.evaluate(() => [document.querySelector('#pane')?.scrollTop ?? -1, window.scrollY]);
@@ -783,9 +783,6 @@ describe('web engine lifecycle', () => {
         const observation = await engine.observe!(operation('sc1'));
         await engine.perform!(observation.root.ref, swipe, operation('sc1'));
         await expect.poll(offsets).toEqual([150, 0]);
-        const [row] = await engine.locate!(byRole('button'), operation('sc1'));
-        await engine.perform!(row!.ref, swipe, operation('sc1'));
-        await expect.poll(offsets).toEqual([300, 0]);
 
         // The same pane inside an open shadow root is found and measured too.
         await page.setContent(`<body style="margin: 0; height: 3000px"><div id="host"></div></body>`);

@@ -556,8 +556,9 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 - It stops at the first match that is not hidden. On a device, a node under
   the soft keyboard is hidden, so the scroll goes on
   ([Mobile visibility](/reference/mobile#visibility)).
-- Then it brings the node into view with
-  [`scrollIntoView`](#scrollintoview) when the engine has it. On the web the
+- After at least one step, it brings the node into view with
+  [`scrollIntoView`](#scrollintoview) when the engine has it. A node visible
+  on the first read gets no gesture. On the web the
   browser scrolls it into view. On a device a node more than a fifth of its
   container from the middle is dragged to the middle, so it comes clear of
   a sticky header or footer at the edge.
@@ -1022,10 +1023,9 @@ await screen.getByTestId('feed').swipe({ direction: 'down', distance: 0.25 });
 
 It takes `{ direction, distance?, speed? }` as
 [`screen.swipe`](#screen-swipe) defines them, plus `timeout`, which
-`screen.swipe` refuses. It has no `{ from, to }` form. The node's nearest
-scroll container scrolls, the node itself when it is one. A node in no
-container, such as a card the app drags, takes the swipe within its own
-box.
+`screen.swipe` refuses. It has no `{ from, to }` form. The drag crosses the
+node's own box, so `distance` is a share of the node, and on a scroll
+container that scrolls it.
 
 ### Locator reads
 
@@ -1440,7 +1440,7 @@ export type SwipeSpeed = 'slow' | 'normal' | 'fast';
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the content scrolls, as a share of the scroll container's box along the swipe, above 0 and at most 1. Default `0.5`. */
+  /** How far the content scrolls, as a share along the swipe of the box swiped (the node, or on `screen` the scroll container under its center), above 0 and at most 1. Default `0.5`. */
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;

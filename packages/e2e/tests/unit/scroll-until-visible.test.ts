@@ -140,6 +140,13 @@ describe('screen.scrollUntilVisible', () => {
     expect(broughtIntoView).toEqual(['target']);
   });
 
+  it('sends no gesture for a target visible on the first read', async () => {
+    const { screen, swipes, broughtIntoView } = scrollScreen({ screens: [[TARGET]], bringsIntoView: true });
+    await screen.scrollUntilVisible(screen.getByText('Accept'));
+    expect(swipes).toEqual([]);
+    expect(broughtIntoView).toEqual([]);
+  });
+
   it('returns at once when the target is already visible, with no swipe', async () => {
     const { screen, swipes } = scrollScreen({ screens: [[TARGET]] });
     await screen.scrollUntilVisible(screen.getByText('Accept'));
@@ -163,7 +170,7 @@ describe('screen.scrollUntilVisible', () => {
 
   it('fails as LOCATOR_NOT_FOUND naming the locator once the deadline passes, and records the failed step', async () => {
     const { screen, steps, swipes } = scrollScreen({ screens: [[]] });
-    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 250 })).rejects.toMatchObject({
+    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { speed: 'fast', timeout: 250 })).rejects.toMatchObject({
       code: 'LOCATOR_NOT_FOUND',
       message: 'target did not become visible while scrolling: getByText("Accept")',
       details: { locator: 'getByText("Accept")', name: 'Accept', waitedMs: expect.any(Number) },
@@ -183,7 +190,7 @@ describe('screen.scrollUntilVisible', () => {
   it('bounds a viewport swipe by its own deadline: a hung swipe is LOCATOR_NOT_FOUND within the scroll timeout, not the action timeout', async () => {
     const { screen, steps } = scrollScreen({ screens: [[]], hang: true, actionTimeout: 5_000 });
     const started = Date.now();
-    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 250 })).rejects.toMatchObject({
+    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { speed: 'fast', timeout: 250 })).rejects.toMatchObject({
       code: 'LOCATOR_NOT_FOUND',
       message: 'target did not become visible while scrolling: getByText("Accept")',
       cause: expect.objectContaining({ code: 'OPERATION_TIMEOUT' }),
@@ -196,7 +203,7 @@ describe('screen.scrollUntilVisible', () => {
     const { screen, steps } = scrollScreen({ screens: [[feed()]], hang: true, actionTimeout: 5_000 });
     const started = Date.now();
     await expect(
-      screen.getByRole('list', { name: 'Feed' }).scrollUntilVisible(screen.getByText('Accept'), { timeout: 250 }),
+      screen.getByRole('list', { name: 'Feed' }).scrollUntilVisible(screen.getByText('Accept'), { speed: 'fast', timeout: 250 }),
     ).rejects.toMatchObject({
       code: 'LOCATOR_NOT_FOUND',
       message: 'target did not become visible while scrolling: getByText("Accept")',
@@ -212,16 +219,16 @@ describe('screen.scrollUntilVisible', () => {
     // A swipe whose budget is the deadline's remainder, ending on the engine's
     // own clock a moment before this one reads the deadline as passed.
     const { screen } = scrollScreen({ screens: [[]], hang: 110, actionTimeout: 5_000 });
-    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 200 })).rejects.toMatchObject({
+    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { speed: 'fast', timeout: 200 })).rejects.toMatchObject({
       code: 'LOCATOR_NOT_FOUND',
       cause: expect.objectContaining({ code: 'OPERATION_TIMEOUT' }),
     });
   });
 
-  it('still swipes with less than a poll interval of the budget left', async () => {
+  it('sends no step whose drag cannot finish before the deadline, and fails as LOCATOR_NOT_FOUND', async () => {
     const { screen, swipes } = scrollScreen({ screens: [[], [TARGET]] });
-    await screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 50 });
-    expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...STEP }]);
+    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 500 })).rejects.toMatchObject({ code: 'LOCATOR_NOT_FOUND' });
+    expect(swipes).toEqual([]);
   });
 
   it('keeps an engine timeout far from the deadline as the action failure it is', async () => {

@@ -171,7 +171,7 @@ on purpose.
 | `inputText` and `pressKey: Enter` with no field, `eraseText: N`, `pressKey: backspace`, `tab` | `fill` or `press` on the field's locator; `fill` a shortened `inputValue()` to erase; tap the next field for Tab |
 | `addMedia` | On an iOS simulator, `xcrun simctl addmedia` before `app.open()`; Android is unchecked. See "Photos for a picker test" under [The device fixture](/mobile#the-device-fixture) |
 | `label` on a command | `-`. The call names each step |
-| `scrollUntilVisible: { centerElement, visibilityPercentage, speed }` | `centerElement` is built in: on a device, `scrollUntilVisible` drags a node more than a fifth of its list from the middle to the middle. `visibilityPercentage` has no match, since it stops at the first match the platform shows. For `speed`, use `speed: 'slow'`, `'normal'`, or `'fast'` |
+| `scrollUntilVisible: { centerElement, visibilityPercentage, speed }` | On a device, `scrollUntilVisible` always does what `centerElement: true` does: it drags a node more than a fifth of its list from the middle to the middle. Maestro does that only when asked. `visibilityPercentage` has no match, since it stops at the first match the platform shows. For `speed`, use `speed: 'slow'`, `'normal'`, or `'fast'` |
 | Device logs and crash reports beside a failure | `adb logcat` or `xcrun simctl spawn <udid> log stream`, collected in a fixture |
 | `maestro hierarchy` as a terminal command | A one-line test that calls `screen.debug()` |
 | `--device-locale` | `app.launchArguments: ['-AppleLanguages', '(de)', '-AppleLocale', 'de_DE']` on iOS, see [Run the app in another language](/mobile#run-the-app-in-another-language); on Android, set the device language before the run |

@@ -814,22 +814,28 @@ export function isWithin(entry: ProjectedNode, ancestor: ProjectedNode): boolean
 /**
  * The box of the nearest scroll container from `entry` up, `entry` included:
  * a node agent-device marks `scroll-area` (an iOS `ScrollView`, an Android
- * `ScrollView`, which React Native's lists render as). Undefined when no
+ * `ScrollView`, which React Native's lists render as) or `collection` (an
+ * iOS `CollectionView`, which SwiftUI lists render as). Undefined when no
  * container holds the node.
  */
 export function scrollBoxOf(entry: ProjectedNode | undefined): Rect | undefined {
   for (let current = entry; current !== undefined; current = current.parent) {
-    if (current.raw.kind === 'scroll-area' && current.node.rect !== undefined) return current.node.rect;
+    if (scrolls(current)) return current.node.rect;
   }
   return undefined;
+}
+
+/** Whether agent-device marks the node a scroll container, and it has a box. */
+function scrolls(entry: ProjectedNode): entry is ProjectedNode & { readonly node: { readonly rect: Rect } } {
+  return (entry.raw.kind === 'scroll-area' || entry.raw.kind === 'collection') && entry.node.rect !== undefined;
 }
 
 /** The box of the innermost scroll container under `point`, the smallest one that holds it. */
 export function scrollBoxAt(index: readonly ProjectedNode[], point: Point): Rect | undefined {
   let found: Rect | undefined;
   for (const entry of index) {
-    const rect = entry.node.rect;
-    if (entry.raw.kind !== 'scroll-area' || rect === undefined) continue;
+    if (!scrolls(entry)) continue;
+    const { rect } = entry.node;
     const holds = point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
     if (holds && (found === undefined || rect.width * rect.height < found.width * found.height)) found = rect;
   }

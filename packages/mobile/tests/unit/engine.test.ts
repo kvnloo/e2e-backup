@@ -4316,12 +4316,15 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([LIST_DOWN]);
     });
 
-    it("swipes a node's scroll container, and a node in none within its own box", async () => {
+    it('swipes a node across its own box, inside a scroll container or not', async () => {
       const h = await listHarness();
       const swipe = { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 } as const;
       await h.engine.perform!((await observed(h, 'Row 5')).ref, swipe, operation());
       await h.engine.perform!((await observed(h, 'Continue')).ref, swipe, operation());
-      expect(pans(h)).toEqual([LIST_DOWN, { x: 195, y: 805, dx: 0, dy: -30, durationMs: 400 }]);
+      expect(pans(h)).toEqual([
+        { x: 195, y: 410, dx: 0, dy: -20, durationMs: 400 },
+        { x: 195, y: 805, dx: 0, dy: -30, durationMs: 400 },
+      ]);
     });
 
     it('reads the screen again for its containers when an action came after the last read', async () => {

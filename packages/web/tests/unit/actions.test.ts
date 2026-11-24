@@ -178,10 +178,7 @@ function stubLocator(box = { x: 10, y: 20, width: 200, height: 100 }, aim: 'poin
     setInputFiles: vi.fn(async () => undefined),
     dragTo: vi.fn(async () => undefined),
     boundingBox: vi.fn(async () => box),
-    // `scrollExtent` reads the container the wheel scrolls; here, the node's own box.
-    evaluate: vi.fn(async (fn: { name: string }, along?: { vertical: boolean }) =>
-      fn.name === 'scrollExtent' ? (along?.vertical === true ? box.height : box.width) : aim === 'blocked' ? { aim } : { aim, box },
-    ),
+    evaluate: vi.fn(async () => (aim === 'blocked' ? { aim } : { aim, box })),
     page: () => ({ viewportSize: () => ({ width: 1280, height: 720 }), mouse: { wheel, move }, evaluate: frame }),
   };
   const target: ActionTarget = { kind: 'locator', locator: locator as unknown as PwLocator };
@@ -320,7 +317,7 @@ describe('dispatchLocatorAction', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-  it('scrolls a node with a wheel gesture sized by the container it scrolls: the agent node scroll', async () => {
+  it('scrolls a node with a wheel gesture sized by its own box: the agent node scroll', async () => {
     const { locator, target, wheel, frame } = stubLocator({ x: 0, y: 0, width: 400, height: 300 });
     await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, OPERATION, lookup);
     expect(locator.hover).toHaveBeenCalledWith({ timeout: 7 });
@@ -335,7 +332,7 @@ describe('dispatchLocatorAction', () => {
     [0.25, 75],
     [0.5, 150],
     [1, 300],
-  ])('scrolls a node a distance of %s of the container in one wheel, whatever the duration', async (distance, pixels) => {
+  ])('scrolls a node a distance of %s of its box in one wheel, whatever the duration', async (distance, pixels) => {
     const { target, wheel } = stubLocator({ x: 0, y: 0, width: 400, height: 300 });
     await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', distance, durationMs: 1500 }, OPERATION, lookup);
     expect(wheel.mock.calls).toEqual([[0, pixels]]);

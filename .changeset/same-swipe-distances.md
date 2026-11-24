@@ -15,9 +15,9 @@ To keep a test's old stride, set `distance` to what its `momentum` moved:
 
 - On the web, `'slow'` moved 0.75 of the box and `'fast'` 1.5. Use `distance: 0.75`, and `distance: 1` for `'fast'`, since a swipe now moves one container at most.
 - On a device, a node swipe moved 0.25 for `'slow'` and 0.8 for `'fast'`. A screen swipe moved about 0.6 with any momentum.
-- `'none'` moved 0.5 everywhere, the new default.
+- Elsewhere, `'none'` moved 0.5, the new default.
 
-The swipe scrolls the scroll container under the screen's center, or the node's nearest scroll container on a locator. Before, it was the whole screen or the node's own box.
+A screen swipe scrolls the scroll container under the screen's center, where before it scrolled the whole screen. A locator swipe still crosses the node's own box.
 
 On a device:
 
@@ -25,7 +25,7 @@ On a device:
 - One drag moves at most 0.65 of the container, and a longer `distance` is split into several drags.
 - The content coasts on after the finger lifts.
 
-`scrollUntilVisible` steps 0.65 of the container over 800 ms by default, so a step doesn't coast past the 35% of the last view it leaves on screen. Then it brings the node into view:
+`scrollUntilVisible` steps 0.65 of the container over 800 ms by default, so a step doesn't coast past the 35% of the last view it leaves on screen. After at least one step, it brings the node into view:
 
 - On the web, the browser scrolls it into view.
 - On a device, a node more than a fifth of its container from the middle is dragged to the middle, clear of a sticky header or footer. `locator.scrollIntoView()` now does the same on a device, and the agent gets `scroll_to` by node id there.

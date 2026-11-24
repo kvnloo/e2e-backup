@@ -306,8 +306,8 @@ substring; a `RegExp` matches as written.
 - `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`
   scrolls the container under the screen's center (`down`, 0.65 of it a
   step by default) until the locator resolves visibly, else
-  `LOCATOR_NOT_FOUND`. On a locator it scrolls that node. On a device it
-  then drags a node near the container's edge to the middle.
+  `LOCATOR_NOT_FOUND`. On a locator it scrolls that node. On a device, after
+  a step, it drags a node near the container's edge to the middle.
 
 ### Actions
 
@@ -325,11 +325,11 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 on a device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, and
 `modifiers`.
 
-A swipe scrolls the node's nearest scroll container (for `screen.swipe`, the
-one under the screen's center):
+A locator swipe crosses the node's own box, and `screen.swipe` scrolls the
+container under the screen's center:
 
-- `distance` is how far, as a share of that container: above 0 and at most
-  1, `0.5` by default.
+- `distance` is how far, as a share of that box: above 0 and at most 1,
+  `0.5` by default.
 - `speed` is how fast the finger moves: `'slow'` (1500 ms), `'normal'` (400
   ms, the default), or `'fast'` (150 ms). The web wheel ignores it.
 - On a device, each drag starts a quarter in from the container's edge, and

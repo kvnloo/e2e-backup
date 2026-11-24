@@ -1242,9 +1242,14 @@ so does the focused field.
 - A sticky header or footer drawn over a list isn't always in the tree
   (React Native leaves a plain `View` out), and a node's box is clipped to
   the screen. So a node at the list's edge under a sticky footer can count
-  as visible. `scrollUntilVisible` then drags it to the middle of the list,
-  clear of the footer. A node within a fifth of the list's middle stays
-  where it is, so a cover there isn't cleared.
+  as visible. After a scroll step, `scrollUntilVisible` drags it to the
+  middle of the list, clear of the footer. A node visible before any step,
+  or within a fifth of the list's middle, stays where it is, so a cover
+  there isn't cleared.
+- A screen swipe scrolls the smallest scroll container under the screen's
+  center, whichever way it scrolls, since agent-device doesn't report a
+  container's axis. A container agent-device marks as neither `scroll-area`
+  nor `collection` isn't seen, so the swipe falls back to the whole screen.
 
 ## Video recording cleanup
 

@@ -1198,9 +1198,7 @@ The grammar is closed. Anything beyond it is an agent-side `defineTool`.
 
 A `swipe` scrolls `distance` of a scroll container's box along the swipe.
 On the root, that's the container under the viewport's center, or the
-whole viewport when there is none. On a node, it's the node's nearest
-scroll container, the node itself when it is one, or else the node's own
-box. Each drag takes `durationMs`. A platform that scrolls without a drag,
+whole viewport when there is none. On a node, it's the node's own box. Each drag takes `durationMs`. A platform that scrolls without a drag,
 such as a wheel, ignores it. `SCROLL_STEP` in `e2e/engine` is the step
 `scrollUntilVisible` and the agent's `scroll_to` take: 0.65 of the
 container over 800 ms.
@@ -1266,8 +1264,9 @@ export interface SwipeAction {
   readonly kind: 'swipe';
   readonly direction: ScrollDirection;
   /**
-   * How far the content scrolls, as a share of the scroll container's box
-   * along the swipe, above 0 and at most 1. On a touch surface, a distance
+   * How far the content scrolls, as a share along the swipe of the box
+   * swiped: the node, or on the root the scroll container under the
+   * viewport's center. Above 0 and at most 1. On a touch surface, a distance
    * longer than one drag is split into several drags.
    */
   readonly distance: number;

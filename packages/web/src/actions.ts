@@ -386,7 +386,7 @@ export async function dispatchLocatorAction(
     }
     case 'swipe':
       // The agent's node scroll and `screen` swipes both arrive here: a wheel
-      // gesture over the node, sized by the container it scrolls.
+      // gesture over the node, sized by its own box.
       await performElementSwipe(target, action.direction, action.distance, timeout);
       return;
   }

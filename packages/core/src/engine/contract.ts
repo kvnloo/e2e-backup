@@ -323,8 +323,9 @@ export interface SwipeAction {
   readonly kind: 'swipe';
   readonly direction: ScrollDirection;
   /**
-   * How far the content scrolls, as a share of the scroll container's box
-   * along the swipe, above 0 and at most 1. On a touch surface, a distance
+   * How far the content scrolls, as a share along the swipe of the box
+   * swiped: the node, or on the root the scroll container under the
+   * viewport's center. Above 0 and at most 1. On a touch surface, a distance
    * longer than one drag is split into several drags.
    */
   readonly distance: number;

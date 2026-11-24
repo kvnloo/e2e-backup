@@ -518,7 +518,7 @@ export type SwipeSpeed = 'slow' | 'normal' | 'fast';
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the content scrolls, as a share of the scroll container's box along the swipe, above 0 and at most 1. Default `0.5`. */
+  /** How far the content scrolls, as a share along the swipe of the box swiped (the node, or on `screen` the scroll container under its center), above 0 and at most 1. Default `0.5`. */
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;

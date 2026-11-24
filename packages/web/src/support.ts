@@ -537,10 +537,7 @@ export async function performElementSwipe(
       retryable: false,
     });
   }
-  const along = { vertical: direction === 'up' || direction === 'down' };
-  const extent = await (target.kind === 'locator'
-    ? target.locator.evaluate(scrollExtent, along, { timeout })
-    : target.element.evaluate(scrollExtent, along));
+  const extent = direction === 'up' || direction === 'down' ? box.height : box.width;
   const [deltaX, deltaY] = wheelDelta(direction, Math.round(extent * distance));
   const page = await targetPage(target);
   if (aimed.aim === 'centre') await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -586,20 +583,21 @@ function wheelAim(element: Element): WheelAim {
 
 /**
  * Page-side: the client size, along the swipe's axis, of the container a
- * wheel scrolls from `element`, or from the element at `at` when given: the
- * nearest one, itself included, whose content overflows along that axis and
- * whose style lets it scroll. The element at a point is found inside open
- * shadow roots, and the walk up crosses out of a shadow root to its host.
- * With none, it is the viewport, as it is for a pane inside an iframe.
+ * wheel scrolls at `at`: the nearest element there, itself included, whose
+ * content overflows along that axis and whose style lets it scroll. The
+ * element at the point is found inside open shadow roots, and the walk up
+ * crosses out of a shadow root to its host. With none, it is the viewport,
+ * as it is for a pane inside an iframe.
  */
-function scrollExtent(element: Element, { vertical, at }: { vertical: boolean; at?: ViewportPoint }): number {
-  let node = at === undefined ? element : document.elementFromPoint(at.x, at.y);
-  while (at !== undefined && node?.shadowRoot) {
+function scrollExtent(_root: Element, { vertical, at }: { vertical: boolean; at: ViewportPoint }): number {
+  let node = document.elementFromPoint(at.x, at.y);
+  while (node?.shadowRoot) {
     const inner = node.shadowRoot.elementFromPoint(at.x, at.y);
     if (inner === null || inner === node) break;
     node = inner;
   }
-  while (node !== null) {
+  // The document's own scroller is the viewport, whatever `body`'s style says.
+  while (node !== null && node !== document.body && node !== document.documentElement) {
     const overflow = getComputedStyle(node)[vertical ? 'overflowY' : 'overflowX'];
     const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;
     if (overflows && /auto|scroll|overlay/.test(overflow)) return vertical ? node.clientHeight : node.clientWidth;

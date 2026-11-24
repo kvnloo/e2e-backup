@@ -231,8 +231,6 @@ interface NodeBinding {
   readonly originUnknown: boolean;
   /** Whether `fill` and `clear` may type into the node, judged with the children `node` leaves out. */
   readonly takesText: boolean;
-  /** The box of the scroll container a swipe on the node scrolls: the nearest one around it, itself included. */
-  readonly scrollBox: Rect | undefined;
   /** The box of the nearest scroll container strictly around the node, where `scrollIntoView` centres it. */
   readonly container: Rect | undefined;
 }
@@ -1370,7 +1368,6 @@ export class AgentDeviceSurface {
       originUnknown: snapshot.originUnknown,
       takesText: mayTakeText(entry.node),
       refsGeneration: snapshot.refsGeneration,
-      scrollBox: scrollBoxOf(entry),
       container: scrollBoxOf(entry.parent),
     };
   }
@@ -1451,7 +1448,6 @@ export class AgentDeviceSurface {
     return true;
   }
 
-  /** Records that a test's gesture skipped the stabilization wait, so the next action on a control checks it stopped moving. */
   /**
    * Sends `drags` one after another, each taking `durationMs`. The first one
    * goes out only when the budget holds every drag, so a swipe is never cut
@@ -1463,6 +1459,7 @@ export class AgentDeviceSurface {
     }
   }
 
+  /** Records that a test's gesture may leave the screen moving, so the next action on a control checks it stopped moving. */
   private noteGesture(operation: OperationContext): void {
     if (operation.origin === 'test') this.skippedStabilizationAt = Date.now();
   }
@@ -1627,9 +1624,9 @@ export class AgentDeviceSurface {
         case 'press':
           return this.pressKey(client, target, action.key, settle, input);
         case 'swipe': {
-          // The node's scroll container scrolls, the node itself when it is
-          // one; a node in none, a card the app drags, takes the swipe itself.
-          const box = target.scrollBox ?? target.node.rect;
+          // The drag crosses the node's own box, as a person swipes a card or a
+          // row; on a scroll container, that scrolls it.
+          const box = target.node.rect;
           if (box === undefined) throw notActionable(`node ${target.id} has no bounds to swipe within`);
           if (target.originUnknown) {
             throw notActionable(
