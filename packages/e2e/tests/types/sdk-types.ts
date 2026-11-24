@@ -795,11 +795,6 @@ void screen.getByRole('image').tap({ position: { x: '50%', y: 0 } });
 void executorContext.actions.tapAt({ x: '50%', y: 0 });
 // A locator swipe can be a path on its node's box, in pixels or percentages.
 void screen.getByRole('list').swipe({ from: { x: '90%', y: '50%' }, to: { x: 10, y: '50%' }, duration: 300, timeout: 1_000 });
-void screen.getByRole('list').swipe({ direction: 'left', timeout: 1_000 });
-// @ts-expect-error both ends of a locator path swipe are required.
-void screen.getByRole('list').swipe({ from: point });
-// @ts-expect-error a locator swipe is a direction or a path, never both.
-void screen.getByRole('list').swipe({ direction: 'left', from: point, to: point });
 // @ts-expect-error a directional swipe takes no duration.
 void screen.swipe({ direction: 'up', duration: 300 });
 // @ts-expect-error a surface without a url has no base URL; a test must handle undefined

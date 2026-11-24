@@ -112,7 +112,7 @@ test('shows the home screen', async ({ agent, app, screen }) => {
 | `.typeText(t)` | `.pressSequentially(t)` |
 | `.replaceText(t)`, `.clearText()`, `.tapReturnKey()` | `.fill(t)`, `.clear()`, `.press('Enter')` |
 | `.swipe('up', 'fast')` | `.swipe({ direction: 'down', momentum: 'fast' })`. Detox names the finger's direction, e2e the content's |
-| `.swipe('left', 'slow', 0.75, 0.9, 0.5)`, with an offset and a start point | `.swipe({ from: { x: '90%', y: '50%' }, to: { x: '10%', y: '50%' }, duration: 500 })`. Both points are relative to the element. Detox's offset is relative to the screen, so convert it |
+| `.swipe('left', 'slow', 0.75, 0.9, 0.5)`, with an offset and a start point | `.swipe({ from: { x: '90%', y: '50%' }, to: { x: '15%', y: '50%' }, duration: 500 })`, with `500` as an example duration. Both points are relative to the element, and Detox's offset is relative to the screen, so this assumes a full-width element |
 | `list.scroll(200, 'down')` | `list.swipe({ direction: 'down' })`, with no offset |
 | `waitFor(el).toBeVisible().whileElement(list).scroll(...)` | `list.scrollUntilVisible(el)`, with `{ direction: 'up' }` when Detox scrolls up |
 

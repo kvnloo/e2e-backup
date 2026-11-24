@@ -234,24 +234,8 @@ class ScreenImpl implements Screen {
 
   async swipe(options: SwipeOptions | SwipePathOptions): Promise<void> {
     if (isSwipePath(options)) {
-      rejectUnknownOptions('swipe', options, ['from', 'to', 'duration']);
-      const from = requireScreenPoint(options.from, 'swipe from');
-      const to = requireScreenPoint(options.to, 'swipe to');
-      const durationMs = validateSwipeDuration(options.duration);
-      await this.context.steps.run(
-        'screen',
-        'screen.swipe',
-        `${describePoint(from)} → ${describePoint(to)}`,
-        () =>
-          this.context.engine.performAt(
-            from,
-            obj({
-              kind: 'swipeTo' as const,
-              target: to,
-              durationMs,
-            }),
-          ),
-      );
+      const { from, action, label } = swipePath(options, ['from', 'to', 'duration']);
+      await this.context.steps.run('screen', 'screen.swipe', label, () => this.context.engine.performAt(from, action));
       return;
     }
     rejectUnknownOptions('swipe', options, ['direction', 'momentum']);
@@ -596,21 +580,9 @@ class LocatorImpl extends ScreenImpl implements Locator {
 
   override swipe(options: (SwipeOptions | SwipePathOptions) & ActionOptions): Promise<void> {
     if (isSwipePath(options)) {
-      rejectUnknownOptions('swipe', options, ['from', 'to', 'duration', 'timeout']);
-      const from = requireScreenPoint(options.from, 'swipe from');
-      const to = requireScreenPoint(options.to, 'swipe to');
-      const durationMs = validateSwipeDuration(options.duration);
-      return this.context.steps.run(
-        'locator',
-        'locator.swipe',
-        `${this.label} ${describePoint(from)} → ${describePoint(to)}`,
-        () =>
-          this.context.engine.performWithin(
-            this.expression,
-            from,
-            obj({ kind: 'swipeTo' as const, target: to, durationMs }),
-            options.timeout,
-          ),
+      const { from, action, label } = swipePath(options, ['from', 'to', 'duration', 'timeout']);
+      return this.context.steps.run('locator', 'locator.swipe', `${this.label} ${label}`, () =>
+        this.context.engine.performWithin(this.expression, from, action, options.timeout),
       );
     }
     rejectUnknownOptions('swipe', options, ['direction', 'momentum', 'timeout']);
@@ -763,6 +735,15 @@ class LocatorImpl extends ScreenImpl implements Locator {
 /** Whether swipe options name a path (`from`, `to`) rather than a direction. */
 function isSwipePath(options: SwipeOptions | SwipePathOptions): options is SwipePathOptions {
   return typeof options === 'object' && options !== null && ('from' in options || 'to' in options);
+}
+
+/** Validates a path swipe's options, then returns its start point, its `swipeTo` action, and its step label. */
+function swipePath(options: SwipePathOptions, keys: readonly string[]) {
+  rejectUnknownOptions('swipe', options, keys);
+  const from = requireScreenPoint(options.from, 'swipe from');
+  const to = requireScreenPoint(options.to, 'swipe to');
+  const action = obj({ kind: 'swipeTo' as const, target: to, durationMs: validateSwipeDuration(options.duration) });
+  return { from, action, label: `${describePoint(from)} → ${describePoint(to)}` };
 }
 
 /** Validates a point a test names: finite, and never off the plane. */

@@ -467,7 +467,7 @@ export interface ActionOptions {
  */
 export type Point = ViewportPoint;
 
-/** CSS pixels, or a percentage from `'0%'` through `'100%'` of the viewport's width (`x`) or height (`y`). For `locator.swipe`, the percentage is of the node. */
+/** CSS pixels, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. For `locator.swipe`, the percentage is of the node's box. */
 export type ScreenCoordinate = number | `${number}%`;
 
 /** A viewport point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. */
@@ -525,9 +525,9 @@ export interface SwipeOptions {
 /**
  * A swipe along a path between two points: a touch swipe on a device, a
  * pointer drag on a document platform. The points are on the viewport for
- * `screen.swipe` and on the node for `locator.swipe`. On a node, pixels and
- * percentages are both measured from its top-left corner (the same corner
- * as `tap({ position })`).
+ * `screen.swipe` and on the node for `locator.swipe`. On a node, a pixel
+ * coordinate is an offset from its top-left corner (the same corner as
+ * `tap({ position })`), and a percentage is a share of its box.
  */
 export interface SwipePathOptions {
   /** Where the finger goes down. */
@@ -635,9 +635,7 @@ export interface Locator extends Omit<Screen, 'tree' | 'debug' | 'pause'> {
   scrollIntoView(options?: ActionOptions): Promise<void>;
   /**
    * Performs a swipe scoped to exactly one node: in a direction, or along a
-   * path between two of its points. On the web, a direction swipe is a
-   * wheel event and a path swipe is a pointer drag. So there, pagers built on
-   * pointer events only move with a path swipe.
+   * path between two of its points.
    */
   swipe(options: (SwipeOptions | SwipePathOptions) & ActionOptions): Promise<void>;
   /** Reads normalized text once a match exists, without retrying for a particular value. */

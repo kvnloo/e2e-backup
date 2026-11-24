@@ -104,8 +104,7 @@ const pages = {
   }),
 
   // Coordinate input: a pad that reports where a tap landed relative to its
-  // own top-left corner, and where a swipe went down and lifted. The pager
-  // below it only turns on pointer drags. It doesn't move on a wheel event.
+  // own top-left corner, and where a swipe went down and lifted.
   '/pointer': () => ({
     title: 'Pointer',
     body: `<h1>Pointer</h1>
@@ -119,15 +118,6 @@ const pages = {
          <textarea aria-label="Edit label" readonly
            style="position: absolute; inset: 0; pointer-events: none; background: transparent;">Node</textarea>
        </div>
-       <div id="pager" role="region" aria-label="Photo pager"
-         style="width: 300px; margin-top: 24px; overflow: hidden; touch-action: none; user-select: none;">
-         <div id="pager-track" style="display: flex; width: 900px;">
-           <div style="width: 300px; height: 120px; background: #bfdbfe;">Photo 1</div>
-           <div style="width: 300px; height: 120px; background: #bbf7d0;">Photo 2</div>
-           <div style="width: 300px; height: 120px; background: #fde68a;">Photo 3</div>
-         </div>
-       </div>
-       <output aria-label="Pager state">page 1 of 3</output>
        <script>
          const pad = document.getElementById('pad');
          const node = document.getElementById('diagram-node');
@@ -158,30 +148,6 @@ const pages = {
          });
          pad.addEventListener('click', (event) => {
            if (!swiped) padState.textContent = 'tapped at ' + local(event);
-         });
-         const pager = document.getElementById('pager');
-         const track = document.getElementById('pager-track');
-         const pagerState = document.querySelector('output[aria-label="Pager state"]');
-         let page = 0;
-         let dragFrom = null;
-         const slide = (dx) => {
-           track.style.transform = 'translateX(' + (dx - page * 300) + 'px)';
-         };
-         pager.addEventListener('pointerdown', (event) => {
-           dragFrom = event.clientX;
-           pager.setPointerCapture(event.pointerId);
-         });
-         pager.addEventListener('pointermove', (event) => {
-           if (dragFrom !== null) slide(event.clientX - dragFrom);
-         });
-         pager.addEventListener('pointerup', (event) => {
-           if (dragFrom === null) return;
-           const dx = event.clientX - dragFrom;
-           dragFrom = null;
-           if (dx < -75) page = Math.min(page + 1, 2);
-           if (dx > 75) page = Math.max(page - 1, 0);
-           slide(0);
-           pagerState.textContent = 'page ' + (page + 1) + ' of 3';
          });
        </script>`,
   }),

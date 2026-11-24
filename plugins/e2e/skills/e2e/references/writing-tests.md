@@ -337,8 +337,8 @@ Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 `screen.swipe({ direction, momentum? })` swipes the viewport. Viewport
 points also take percentages from `'0%'` through `'100%'`, rounded to the
 nearest pixel: `{ x: '50%', y: '50%' }`. Points for `locator.swipe({ from,
-to })` take the same forms, measured from the node's top-left corner. Their
-percentages are of the node's size. Prefer a locator; a point moves with
+to })` take the same forms: pixels from the node's top-left corner, as in
+`tap({ position })`, and percentages of the box `boundingBox()` reports. Prefer a locator; a point moves with
 the layout.
 
 ### Reads

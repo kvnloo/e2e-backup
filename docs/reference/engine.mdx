@@ -486,7 +486,7 @@ engine.
 | --- | --- |
 | `screen`, `Locator`, `expect(locator)` | `locate` |
 | `screen` and `Locator` actions | `perform`, each only for a kind listed in `actions` |
-| `screen.swipe()`, `locator.swipe()` in a direction | `perform` with `swipe`, on the observation root for `screen` |
+| `screen.swipe()` | `perform` with `swipe` on the observation root |
 | `modifiers` on a tap (`row.click({ modifiers: ['Shift'] })`) | `tapModifiers: true`; the keys are held for the click |
 | `screen.tapAt`, `tap({ position })` | `performAt` with the `tap` pointer kind |
 | `screen.doubleTapAt` | `performAt` with the `doubleTap` pointer kind |

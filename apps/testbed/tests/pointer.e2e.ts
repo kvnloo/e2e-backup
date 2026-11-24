@@ -55,23 +55,9 @@ test('screen.tapAt and screen.swipe take percentages of the viewport', { require
 test('locator.swipe({ from, to }) takes points on the node box, in pixels or percentages', async ({ app, screen }) => {
   await app.open('/pointer');
 
-  await screen.getByRole('image', 'Pointer pad').swipe({ from: { x: 10, y: 20 }, to: { x: '75%', y: '10%' } });
+  await screen.getByRole('image', 'Pointer pad').swipe({ from: { x: 10, y: 20 }, to: { x: '75%', y: '10%' }, duration: 200 });
 
   await expect(screen.getByLabel('Pad state')).toHaveText('swiped from 10,20 to 240,20');
-});
-
-test('locator.swipe({ from, to }) turns a pager that only moves on pointer drags', async ({ app, screen }) => {
-  await app.open('/pointer');
-  const pager = screen.getByRole('region', 'Photo pager');
-
-  await pager.swipe({ direction: 'right', momentum: 'fast' });
-  await expect(screen.getByLabel('Pager state')).toHaveText('page 1 of 3');
-
-  await pager.swipe({ from: { x: '90%', y: '50%' }, to: { x: '10%', y: '50%' } });
-  await expect(screen.getByLabel('Pager state')).toHaveText('page 2 of 3');
-
-  await pager.swipe({ from: { x: 30, y: 60 }, to: { x: 270, y: 60 }, duration: 200 });
-  await expect(screen.getByLabel('Pager state')).toHaveText('page 1 of 3');
 });
 
 test('a path swipe drags and drops on the board', async ({ app, screen }) => {

@@ -586,7 +586,7 @@ const ref = await this.singleOf(await this.resolveOnce(expression, reads, missin
           ...(cause === undefined ? {} : { cause }),
         }),
     });
-    // `box` is set here, since pollReads only returns after `evaluate` answered true.
+    // pollReads returns only once `evaluate` answered true, which set `box`.
     const { rect, origin } = box!;
     const inPixels = 'target' in action ? { ...action, target: resolveBoxPoint(action.target, rect, origin) } : action;
     await this.dispatchAt(resolveBoxPoint(point, rect, origin), inPixels, deadline);
