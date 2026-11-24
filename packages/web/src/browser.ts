@@ -12,7 +12,7 @@
  * says which URLs a test may open.
  */
 
-import type { Download, Route } from 'playwright-core';
+import type { ConsoleMessage, Download, Route } from 'playwright-core';
 import type { ActionOptions, Expectable, JsonValue, Locator, Screen, TextMatch } from '@e2e-dev/core';
 import {
   ConfigurationError,
@@ -133,6 +133,22 @@ export interface WebResponse {
   json<T = unknown>(): Promise<T>;
   /** Waits for the body and reads it as text; rejects with `ACTION_FAILED` when the body could not be read. */
   text(): Promise<string>;
+}
+
+/** A console message from the page, as returned by `browser.consoleMessages`. */
+export interface WebConsoleMessage {
+  /** The message type, as reported by Playwright (`'log'`, `'info'`, `'warning'`, `'error'`, `'debug'`, etc.). */
+  readonly type: ReturnType<ConsoleMessage['type']>;
+  /** The message text. */
+  readonly text: string;
+}
+
+/** An uncaught error or an unhandled promise rejection from the page, as returned by `browser.pageErrors`. */
+export interface WebPageError {
+  /** The error message. */
+  readonly message: string;
+  /** The stack trace from the browser. It's empty when a stack isn't reported (such as for a thrown value that isn't an `Error`). */
+  readonly stack: string;
 }
 
 /**
@@ -300,6 +316,10 @@ export interface Browser extends Expectable<BrowserExpectation> {
     fn: string | ((arg: Arg) => T | Promise<T>),
     arg: Arg,
   ): Promise<T>;
+  /** Returns the console messages logged in the active tab since it opened (up to 200 of the latest). */
+  consoleMessages(): Promise<WebConsoleMessage[]>;
+  /** Returns the uncaught errors and unhandled rejections in the active tab since it opened (up to 200 of the latest). */
+  pageErrors(): Promise<WebPageError[]>;
   /**
    * Adds a script every document runs before the page's own, from the next
    * navigation on: JavaScript source, a `{ path }` relative to the project
@@ -676,6 +696,16 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       });
       return decodeEvaluation(report) as T;
     },
+    consoleMessages: () =>
+      surface.guard(context.operation(), 'consoleMessages', async () => {
+        const messages = await surface.requirePage().consoleMessages({ filter: 'all' });
+        return messages.map((message) => ({ type: message.type(), text: message.text() }));
+      }),
+    pageErrors: () =>
+      surface.guard(context.operation(), 'pageErrors', async () => {
+        const errors = await surface.requirePage().pageErrors({ filter: 'all' });
+        return errors.map((error) => ({ message: error.message, stack: error.stack ?? '' }));
+      }),
     async addInitScript(script: unknown, ...rest: unknown[]) {
       const source = await testInitScriptSource(script, rest.length === 0 ? undefined : { arg: rest[0] }, (file) => surface.projectPath(file));
       await surface.guard(context.operation(), 'addInitScript', () => surface.addInitScript(source));
@@ -979,6 +1009,8 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     title: action,
     waitForURL: { ...navigationCall, verifies: true, label: patternLabel },
     evaluate: action,
+    consoleMessages: action,
+    pageErrors: action,
     addInitScript: { ...action, label: (script) => initScriptLabel(script) },
     route: { ...action, label: patternLabel },
     unroute: { ...action, label: patternLabel },

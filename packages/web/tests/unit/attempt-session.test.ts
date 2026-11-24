@@ -54,6 +54,8 @@ function target(id: string, response?: Promise<{ targetId: string }>) {
     once: () => undefined,
     isClosed: () => false,
     goto: async () => null,
+    clearConsoleMessages: async () => undefined,
+    clearPageErrors: async () => undefined,
     close: vi.fn(async () => undefined),
   } as unknown as Page;
   return { page, send };

@@ -50,6 +50,24 @@ test.describe('browser fixture', { requires: ['browser'], tags: ['browser'] }, (
     const theme = (await browser.cookies()).find((cookie) => cookie.name === 'theme');
     expect(theme?.value).toBe('dark');
   });
+
+  test('console messages and page errors read back until a restart', async ({ app, browser }) => {
+    await browser.evaluate(() => {
+      console.error('broken', 42);
+      void Promise.reject(new Error('rejected'));
+      setTimeout(() => {
+        throw new Error('thrown');
+      });
+      return null;
+    });
+    await expect.poll(async () => (await browser.pageErrors()).map((error) => error.message).toSorted()).toEqual(['rejected', 'thrown']);
+    expect(await browser.consoleMessages()).toEqual([{ type: 'error', text: 'broken 42' }]);
+
+    await app.restart();
+
+    expect(await browser.consoleMessages()).toEqual([]);
+    expect(await browser.pageErrors()).toEqual([]);
+  });
 });
 
 test('emulated media reaches the page\'s own @media rules, from the first paint on', { requires: ['browser'], tags: ['browser'] }, async ({ app, screen, browser }) => {

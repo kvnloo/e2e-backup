@@ -629,6 +629,11 @@ the opener is gone. `tabs()`, `newTab()`, `tab.activate()`, and
 - `evaluate(fn | source, arg?)`: runs a function or source string in the
   page, JSON in and out, no closures; a throw in the page is
   `EVALUATE_FAILED`.
+- `consoleMessages()`, `pageErrors()`: the active tab's console messages
+  (`{ type, text }`) and its uncaught errors and unhandled rejections
+  (`{ message, stack }`) since it opened (up to 200 of the latest). The lists
+  aren't cleared on navigation. After `app.restart()`, they only have entries
+  from the new page. Wait for a late one with `expect.poll`.
 - `addInitScript(source | { path } | fn)`, `addInitScript(fn, arg)`: runs
   before the page's own scripts; call it before `app.open`. `arg` is JSON.
 - `route(pattern, handler)`, `unroute(pattern)`: intercept requests, newest
