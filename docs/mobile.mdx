@@ -421,8 +421,8 @@ test('the list and the detail split across the fold', async ({ agent, app, devic
 ### Record a transition
 
 [`app.startRecording()` and `app.stopRecording()`](/reference/app#startrecording)
-record one span of the screen as an `.mp4`. To get an element's frame in
-points, call its locator's `boundingBox()`.
+record one span of the screen as an `.mp4`. A locator's `boundingBox()`
+gives an element's frame in points.
 
 ```ts
 test('the sheet slides up', { video: 'off' }, async ({ app, screen }) => {
