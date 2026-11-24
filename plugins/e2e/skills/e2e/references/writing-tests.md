@@ -303,11 +303,12 @@ substring; a `RegExp` matches as written.
   `attachShadow`, not declarative closed roots. `browser.locator(css)`,
   `frameLocator`, and `filter({ hasText })` stop at a closed root; query the
   text inside or filter with `has`.
-- `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`
-  scrolls the container under the screen's center (`down`, 0.65 of it a
-  step by default) until the locator resolves visibly, else
-  `LOCATOR_NOT_FOUND`. On a locator it scrolls that node. On a device, after
-  a step, it drags a node near the container's edge to the middle.
+- With `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`,
+  the container under the screen's center scrolls (`down`, 0.65 of it a step
+  by default) until the locator resolves visibly, else it fails with
+  `LOCATOR_NOT_FOUND`. On a locator, that node scrolls instead. On a device,
+  a node near the container's edge is dragged to the middle after at least
+  one step.
 
 ### Actions
 
@@ -325,15 +326,16 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 on a device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, and
 `modifiers`.
 
-A locator swipe crosses the node's own box, and `screen.swipe` scrolls the
+A locator swipe crosses the node's box, and a `screen.swipe` scrolls the
 container under the screen's center:
 
-- `distance` is how far, as a share of that box: above 0 and at most 1,
-  `0.5` by default.
+- `distance` is how far the content scrolls, as a share of that box (above
+  0 and at most 1). It's `0.5` by default.
 - `speed` is how fast the finger moves: `'slow'` (1500 ms), `'normal'` (400
-  ms, the default), or `'fast'` (150 ms). The web wheel ignores it.
-- On a device, each drag starts a quarter in from the container's edge, and
-  the content coasts on after the finger lifts.
+  ms, the default), or `'fast'` (150 ms). It's ignored by the wheel on the
+  web.
+- On a device, each drag starts a quarter in from the container's edge. The
+  content keeps coasting after the finger lifts.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the

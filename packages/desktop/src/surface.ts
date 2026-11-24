@@ -1293,9 +1293,10 @@ export class DesktopSurface {
   }
 
   /**
-   * Scrolls by wheel notches, the unit agent-desktop takes. It doesn't report
-   * how far a notch moves, so ten notches stand for a `distance` of 1, and a
-   * swipe of the default 0.5 sends the five a plain swipe always sent.
+   * Scrolls by wheel notches, the unit agent-desktop takes. agent-desktop
+   * doesn't report how far a notch moves, so a `distance` of 1 is sent as ten
+   * notches. A swipe of the default 0.5 is sent as five notches, the same as a
+   * plain swipe before.
    */
   private async scroll(binding: NodeBinding, direction: string, distance: number, operation: OperationContext): Promise<void> {
     const amount = Math.max(1, Math.round(distance * 10));

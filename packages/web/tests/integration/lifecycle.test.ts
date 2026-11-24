@@ -768,7 +768,7 @@ describe('web engine lifecycle', () => {
       });
     });
 
-    it('swipes the scroll container under the viewport centre by a share of that container, inside a shadow root too', async () => {
+    it('swipes the scroll container under the viewport centre by a share of that container, in the document and inside a shadow root', async () => {
       await inAttempt('sc1', async () => {
         await engine.session!.open!(`${app.url}/`, operation('sc1'));
         const page = surfaceOf(engine)!.page();
@@ -784,7 +784,7 @@ describe('web engine lifecycle', () => {
         await engine.perform!(observation.root.ref, swipe, operation('sc1'));
         await expect.poll(offsets).toEqual([150, 0]);
 
-        // The same pane inside an open shadow root is found and measured too.
+        // The same pane is found and measured inside an open shadow root.
         await page.setContent(`<body style="margin: 0; height: 3000px"><div id="host"></div></body>`);
         await page.evaluate(() => {
           const root = document.querySelector('#host')?.attachShadow({ mode: 'open' });

@@ -1196,12 +1196,16 @@ honors in `actions` and `pointerActions`.
 
 The grammar is closed. Anything beyond it is an agent-side `defineTool`.
 
-A `swipe` scrolls `distance` of a scroll container's box along the swipe.
-On the root, that's the container under the viewport's center, or the
-whole viewport when there is none. On a node, it's the node's own box. Each drag takes `durationMs`. A platform that scrolls without a drag,
-such as a wheel, ignores it. `SCROLL_STEP` in `e2e/engine` is the step
-`scrollUntilVisible` and the agent's `scroll_to` take: 0.65 of the
-container over 800 ms.
+A `swipe` scrolls the content by `distance` of a box along the swipe:
+
+- On the root, the box is the scroll container under the viewport's
+  center, or the whole viewport when there isn't one.
+- On a node, the box is the node's box.
+
+Each drag takes `durationMs`. It's ignored on a platform that scrolls
+without a drag, such as a wheel. `SCROLL_STEP` in `e2e/engine` is the step
+used by `scrollUntilVisible` and the agent's `scroll_to` (0.65 of the
+container over 800 ms).
 
 #### Locator actions
 
@@ -1258,19 +1262,19 @@ export type LocatorAction =
 
 /**
  * A scroll gesture in a direction. `direction` is the way the content
- * scrolls: `down` reveals what is below.
+ * scrolls (`down` shows what is below).
  */
 export interface SwipeAction {
   readonly kind: 'swipe';
   readonly direction: ScrollDirection;
   /**
-   * How far the content scrolls, as a share along the swipe of the box
-   * swiped: the node, or on the root the scroll container under the
-   * viewport's center. Above 0 and at most 1. On a touch surface, a distance
-   * longer than one drag is split into several drags.
+   * How far the content scrolls, as a share of the swiped box along the
+   * swipe (above 0 and at most 1). The box is the node, or the scroll
+   * container under the viewport's center for the root. On a touch surface,
+   * a distance longer than one drag is split into several drags.
    */
   readonly distance: number;
-  /** How long each drag takes; a platform that scrolls without a drag (a wheel) ignores it. */
+  /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
 }
 

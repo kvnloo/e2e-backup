@@ -2,16 +2,16 @@ import type { ScrollDirection, SwipeAction } from '../engine/contract.ts';
 import type { SwipeSpeed } from '../types.ts';
 import { TestError } from './errors.ts';
 
-/** How long each drag takes for a `speed`: Maestro's swipe for `normal`, and Espresso's fast and slow swipes. */
+/** Drag durations for each `speed`. `normal` is Maestro's swipe duration, and `slow` and `fast` are Espresso's. */
 const SWIPE_DURATIONS: Readonly<Record<SwipeSpeed, number>> = { slow: 1500, normal: 400, fast: 150 };
 
-/** A plain swipe's gesture when a test names no `distance` or `speed`: half the scroll container, at `normal` speed. */
+/** The swipe used when a test doesn't set `distance` or `speed` (half the scroll container at `normal` speed). */
 export const SWIPE = { distance: 0.5, durationMs: SWIPE_DURATIONS.normal } as const;
 
 /**
- * The swipe action for `direction`, with a test's `distance` and `speed`
- * over `defaults`. A `distance` outside (0, 1] or an unknown `speed` is
- * INVALID_ARGUMENT.
+ * Builds the swipe action for `direction` from a test's `distance` and
+ * `speed`, with `defaults` for the ones it doesn't set. It throws
+ * INVALID_ARGUMENT for a `distance` outside (0, 1] or an unknown `speed`.
  */
 export function swipeAction(
   api: string,

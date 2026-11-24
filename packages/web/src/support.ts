@@ -455,10 +455,10 @@ export function staleOr(cause: unknown, operation: string): Error {
 }
 
 /**
- * Wheels at `point`, by `distance` of the scroll container under it: the
- * nearest element there that scrolls along the swipe's axis, or the
- * viewport when none does. The wheel scrolls that container, so the swipe
- * scrolls what a person's wheel over the point would.
+ * Wheels at `point` by `distance` of the scroll container under it. The
+ * container is the nearest element there that scrolls along the swipe's
+ * axis, or the viewport when none does. The wheel event lands on that
+ * container, so the swipe scrolls what a person's wheel over the point would.
  */
 export async function performPointSwipe(page: Page, point: ViewportPoint, direction: ScrollDirection, distance: number): Promise<void> {
   const extent = await page.locator(':root').evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
@@ -467,7 +467,7 @@ export async function performPointSwipe(page: Page, point: ViewportPoint, direct
   await wheelRendered(page, deltaX, deltaY);
 }
 
-/** A swipe on the screen: wheels at the viewport's center, see `performPointSwipe`. */
+/** Swipes the screen by wheeling at the viewport's center (see `performPointSwipe`). */
 export async function performViewportSwipe(page: Page, direction: ScrollDirection, distance: number): Promise<void> {
   const viewport = await currentViewport(page);
   await performPointSwipe(page, { x: viewport.width / 2, y: viewport.height / 2 }, direction, distance);
@@ -582,12 +582,14 @@ function wheelAim(element: Element): WheelAim {
 }
 
 /**
- * Page-side: the client size, along the swipe's axis, of the container a
- * wheel scrolls at `at`: the nearest element there, itself included, whose
- * content overflows along that axis and whose style lets it scroll. The
- * element at the point is found inside open shadow roots, and the walk up
- * crosses out of a shadow root to its host. With none, it is the viewport,
- * as it is for a pane inside an iframe.
+ * Returns the client size, along the swipe's axis, of the container a wheel
+ * at `at` scrolls. It runs in the page. The container is the nearest element
+ * at the point, that element included, whose content overflows along that
+ * axis and whose style lets it scroll.
+ *
+ * The element at the point is found inside open shadow roots. On the way up,
+ * the walk crosses from a shadow root to its host. The viewport's size is
+ * returned when no element scrolls, and for a pane inside an iframe.
  */
 function scrollExtent(_root: Element, { vertical, at }: { vertical: boolean; at: ViewportPoint }): number {
   let node = document.elementFromPoint(at.x, at.y);
@@ -596,7 +598,7 @@ function scrollExtent(_root: Element, { vertical, at }: { vertical: boolean; at:
     if (inner === null || inner === node) break;
     node = inner;
   }
-  // The document's own scroller is the viewport, whatever `body`'s style says.
+  // The document's scroller is the viewport, whatever `body`'s style says.
   while (node !== null && node !== document.body && node !== document.documentElement) {
     const overflow = getComputedStyle(node)[vertical ? 'overflowY' : 'overflowX'];
     const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;

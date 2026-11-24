@@ -14,12 +14,14 @@
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 /**
  * One step of a scroll that reads the screen between steps
- * (`scrollUntilVisible`, the agent's `scroll_to`): 0.65 of the scroll
- * container, the longest single drag, so 35% of the view before stays on
- * screen. The drag takes 800 ms because a faster one flings the list past that
- * 35%. On a 0.65 drag of the mobile benchmark's long list, a 600 ms drag
- * flung 0.34 of the list on an iOS 27 simulator and once past a whole view,
- * while 800 ms flung 0.22 there and 0.07 on an Android 16 emulator.
+ * (`scrollUntilVisible` and the agent's `scroll_to`). It's 0.65 of the
+ * scroll container, the longest single drag, so 35% of the view before stays
+ * on screen.
+ *
+ * The drag takes 800 ms because the list flings past that 35% after a faster
+ * one. On a 0.65 drag of the mobile benchmark's long list, a 600 ms drag
+ * flung 0.34 of the list on an iOS 27 simulator, and once past a whole view.
+ * An 800 ms drag flung 0.22 there and 0.07 on an Android 16 emulator.
  */
 export const SCROLL_STEP = { distance: 0.65, durationMs: 800 } as const;
 /** One option of a select: its label (a bare string too), its `value` attribute, or its zero-based index. */
@@ -317,19 +319,19 @@ export type LocatorAction =
 
 /**
  * A scroll gesture in a direction. `direction` is the way the content
- * scrolls: `down` reveals what is below.
+ * scrolls (`down` shows what is below).
  */
 export interface SwipeAction {
   readonly kind: 'swipe';
   readonly direction: ScrollDirection;
   /**
-   * How far the content scrolls, as a share along the swipe of the box
-   * swiped: the node, or on the root the scroll container under the
-   * viewport's center. Above 0 and at most 1. On a touch surface, a distance
-   * longer than one drag is split into several drags.
+   * How far the content scrolls, as a share of the swiped box along the
+   * swipe (above 0 and at most 1). The box is the node, or the scroll
+   * container under the viewport's center for the root. On a touch surface,
+   * a distance longer than one drag is split into several drags.
    */
   readonly distance: number;
-  /** How long each drag takes; a platform that scrolls without a drag (a wheel) ignores it. */
+  /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
 }
 

@@ -93,9 +93,10 @@ export interface MobileOptions {
   readonly snapshot?: 'full' | 'interactive' | undefined;
   /**
    * How long the UI must hold still after a tap, fill, or back before the
-   * agent observes again, in milliseconds; `false` skips the wait. A swipe
-   * doesn't wait here: the agent's look after a scroll waits for the screen
-   * to hold still. The wait keeps that observation off a transition frame; the runner's
+   * agent observes again, in milliseconds. Set it to `false` to skip the
+   * wait. A swipe doesn't wait here, since the agent waits for the screen to
+   * hold still before it looks after a scroll. The wait keeps that
+   * observation off a transition frame. The runner's
    * own polling (`expect`, actions waiting for their node) covers the rest,
    * so a short window suffices. Default 150.
    * Every frame of a running animation changes the tree, so a 150 ms

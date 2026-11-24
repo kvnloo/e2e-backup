@@ -166,13 +166,13 @@ const DRAG_START = 0.25;
 const DRAG_END = 0.1;
 
 /**
- * The drags that scroll `box`'s content `direction` by `distance` of the box,
- * as Appium's WebDriverAgent scrolls. Scrolling down reveals what is below, so
- * the finger travels up. Each drag starts a quarter in from the edge the
- * content comes from, centred on the other axis, so it starts on the content
- * and not on a footer or tab bar along that edge. It ends no closer than a
- * tenth to the far edge, so one drag moves 0.65 of the box at most. A longer
- * distance is split into equal drags from the same start.
+ * Returns the drags that scroll `box`'s content in `direction` by `distance`
+ * of the box, the way Appium's WebDriverAgent scrolls. Scrolling down shows
+ * what is below, so the finger travels up. Each drag starts a quarter in from
+ * the edge the content comes from, centred on the other axis, so it starts on
+ * the content instead of a footer or tab bar along that edge. It ends no
+ * closer than a tenth to the far edge, so one drag moves 0.65 of the box at
+ * most. A longer distance is split into equal drags from the same start.
  */
 export function swipeDrags(box: Rect, direction: ScrollDirection, distance: number): Drag[] {
   const vertical = direction === 'up' || direction === 'down';
@@ -188,12 +188,14 @@ export function swipeDrags(box: Rect, direction: ScrollDirection, distance: numb
 }
 
 /**
- * The drag that moves `rect` to the middle of `container`, as Maestro's
- * `centerElement` does: only when the node's centre is more than a fifth of
- * the container away from the middle, so a node in the outer part, where
- * a sticky header or footer can cover it, comes clear of it. It is vertical
- * only: a node in a vertical list often sits off the list's horizontal
- * middle, and a sideways drag on a row can set off the row's swipe action.
+ * Returns the drag that moves `rect` to the middle of `container`, the way
+ * Maestro's `centerElement` does. It returns undefined when the node's centre
+ * is within a fifth of the container from the middle. A node further out can
+ * be under a sticky header or footer, and the drag brings it clear.
+ *
+ * The drag is vertical only. A node in a vertical list often sits off the
+ * list's horizontal middle, and a sideways drag on a row can trigger the
+ * row's swipe action.
  */
 export function centringDrag(rect: Rect, container: Rect): Drag | undefined {
   const offset = rect.y + rect.height / 2 - (container.y + container.height / 2);

@@ -83,7 +83,7 @@ function* walk(root: SemanticNode): Generator<SemanticNode> {
   }
 }
 
-/** The drag a screen swipe down of half the 390 by 844 screen sends: from a quarter up from the bottom edge. */
+/** The drag sent for a screen swipe down of half the 390 by 844 screen. It starts a quarter up from the bottom edge. */
 const SCREEN_DOWN = { x: 195, y: 633, dx: 0, dy: -422, durationMs: 400 };
 
 /** The screen root of an observation, `perform(root, swipe)` being the viewport swipe. */
@@ -1536,8 +1536,8 @@ describe('perform', () => {
       // A node swipe drags from a quarter in from the edge the content comes from.
       ['interactions.pan', { x: 195, y: 620, dx: 0, dy: -200, durationMs: 400 }],
       // The root swipe is the viewport swipe. The node swipe may have changed
-      // the screen, so it reads the screen again for its containers. 0.8 of
-      // the screen is longer than one drag, so it is two.
+      // the screen, so the screen is read again for its containers. 0.8 of
+      // the screen is longer than one drag, so it's sent as two.
       ['capture.snapshot', { interactiveOnly: false }],
       ['interactions.pan', { x: 195, y: 211, dx: 0, dy: 337.6, durationMs: 150 }],
       ['interactions.pan', { x: 195, y: 211, dx: 0, dy: 337.6, durationMs: 150 }],
@@ -3834,7 +3834,7 @@ describe('deterministic actions', () => {
     }
   });
 
-  it('sends a screen swipe when its action budget can accommodate the full transition and the drag', async () => {
+  it('sends a screen swipe when the action budget has room for the full transition and the drag', async () => {
     const h = harness({ transition: 160 });
     await openAttempt(h);
     const screen = await screenRootOf(h);
@@ -4264,7 +4264,7 @@ describe('deterministic actions', () => {
       code: 'NOT_ACTIONABLE',
       message: ORIGIN_UNKNOWN_SWIPE,
     });
-    // Only the screen swipe went out.
+    // Only the screen swipe was sent.
     expect(h.fake.calls.filter((call) => call.method === 'interactions.pan').map((call) => call.args)).toEqual([SCREEN_DOWN]);
   });
 
@@ -4285,8 +4285,8 @@ describe('deterministic actions', () => {
   });
 
   describe('scroll containers', () => {
-    // A list from y 100 to 700 that agent-device marks a scroll container,
-    // and a footer outside it, as the mobile benchmark's sticky chrome draws.
+    // A list from y 100 to 700 that agent-device marks as a scroll container,
+    // and a footer outside it, like the mobile benchmark's sticky chrome.
     const LIST_SNAPSHOT = {
       ...SETTINGS_SNAPSHOT,
       nodes: [
@@ -4297,7 +4297,7 @@ describe('deterministic actions', () => {
         { ref: '@e5', index: 4, parentIndex: 0, depth: 1, type: 'button', label: 'Continue', rect: { x: 0, y: 760, width: 390, height: 60 } },
       ],
     };
-    /** The drag a swipe down of half the list sends: a quarter up from the list's bottom edge. */
+    /** The drag sent for a swipe down of half the list. It starts a quarter up from the list's bottom edge. */
     const LIST_DOWN = { x: 195, y: 550, dx: 0, dy: -300, durationMs: 400 };
 
     async function listHarness() {
@@ -4316,7 +4316,7 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([LIST_DOWN]);
     });
 
-    it('swipes a node across its own box, inside a scroll container or not', async () => {
+    it('swipes a node across its box, whether it is inside a scroll container or not', async () => {
       const h = await listHarness();
       const swipe = { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 } as const;
       await h.engine.perform!((await observed(h, 'Row 5')).ref, swipe, operation());
@@ -4340,10 +4340,10 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([{ x: 195, y: 700, dx: 0, dy: -200, durationMs: 400 }]);
     });
 
-    it('sends no drag of a split swipe when its budget cannot hold every drag', async () => {
+    it('does not send any drag of a split swipe when its budget does not have room for every drag', async () => {
       const h = await listHarness();
       const root = await screenRootOf(h);
-      // A distance of 1 is two drags of 400 ms, so 600 ms holds only one.
+      // A distance of 1 is two drags of 400 ms, so 600 ms has room for only one.
       await expect(
         h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 600 }),
       ).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });

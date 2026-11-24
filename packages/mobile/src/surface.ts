@@ -1450,8 +1450,8 @@ export class AgentDeviceSurface {
 
   /**
    * Sends `drags` one after another, each taking `durationMs`. The first one
-   * goes out only when the budget holds every drag, so a swipe is never cut
-   * off between two of its drags.
+   * is sent only when the budget has room for every drag, so a swipe never
+   * stops between two of its drags.
    */
   private async pan(client: AgentDeviceClient, drags: readonly Drag[], durationMs: number, input: InputBudget): Promise<void> {
     for (const [index, drag] of drags.entries()) {
@@ -1459,7 +1459,7 @@ export class AgentDeviceSurface {
     }
   }
 
-  /** Records that a test's gesture may leave the screen moving, so the next action on a control checks it stopped moving. */
+  /** Records that a test's gesture may leave the screen moving, so the next action on a control first checks that the control stopped moving. */
   private noteGesture(operation: OperationContext): void {
     if (operation.origin === 'test') this.skippedStabilizationAt = Date.now();
   }
@@ -1536,21 +1536,21 @@ export class AgentDeviceSurface {
     // acting, so its actions settle first.
     const deterministic = operation.origin === 'test';
     const settle = deterministic ? {} : this.settleOptions;
-    // The observation root is the screen: a swipe on it scrolls the scroll
-    // container under the screen's centre, or the whole screen when there is
-    // none, which is the one action a screen takes.
+    // The observation root is the screen, and a swipe is the only action it
+    // takes. It scrolls the scroll container under the screen's centre, or the
+    // whole screen when there isn't one.
     if (ref.id === ROOT_ID) {
       if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);
       const viewport = this.knownViewport;
-      if (viewport === undefined) throw notActionable('the screen size is not known yet, so a swipe has nothing to measure its distance by; observe the screen first');
+      if (viewport === undefined) throw notActionable('the screen size is not known yet, so the swipe distance cannot be measured. Observe the screen first.');
       if (deterministic) await this.waitOutTransition(operation, input);
       // The last action may have replaced the screen, so a capture from before
-      // it gives the wrong containers: read the screen again.
+      // it can have the wrong containers. In that case, the screen is read again.
       const latest = this.latestScreen;
       const before = latest === undefined || latest === this.screenBeforeAction ? this.project(await this.capture(operation.signal, false, input)) : latest;
       const centre = { x: viewport.width / 2, y: viewport.height / 2 };
-      // A capture that could not place its window on the screen gives boxes in
-      // another frame, so its containers are not trusted.
+      // The boxes in a capture that couldn't place its window on the screen are
+      // in another frame, so its containers aren't trusted.
       const box = (before === undefined || before.originUnknown ? undefined : scrollBoxAt(before.index, centre)) ?? { x: 0, y: 0, ...viewport };
       await this.command('swipe', (client) => this.pan(client, swipeDrags(box, action.direction, action.distance), action.durationMs, input), operation.signal);
       this.noteGesture(operation);
@@ -1624,8 +1624,8 @@ export class AgentDeviceSurface {
         case 'press':
           return this.pressKey(client, target, action.key, settle, input);
         case 'swipe': {
-          // The drag crosses the node's own box, as a person swipes a card or a
-          // row; on a scroll container, that scrolls it.
+          // The drag crosses the node's box, the way a person swipes a card or
+          // a row. When the node is a scroll container, the drag scrolls it.
           const box = target.node.rect;
           if (box === undefined) throw notActionable(`node ${target.id} has no bounds to swipe within`);
           if (target.originUnknown) {
@@ -1638,9 +1638,9 @@ export class AgentDeviceSurface {
           return undefined;
         }
         case 'scrollIntoView': {
-          // A device lists only what is on screen, so the node is in view
-          // already; a node near its container's edge is dragged to the
-          // middle, clear of a sticky header or footer that may cover it.
+          // Only what's on screen is listed on a device, so the node is already
+          // in view. A node near its container's edge is dragged to the middle,
+          // clear of a sticky header or footer that may cover it.
           const rect = target.node.rect;
           const drag = rect === undefined || target.container === undefined || target.originUnknown ? undefined : centringDrag(rect, target.container);
           if (drag === undefined) return undefined;

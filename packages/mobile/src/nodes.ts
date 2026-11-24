@@ -812,11 +812,11 @@ export function isWithin(entry: ProjectedNode, ancestor: ProjectedNode): boolean
 }
 
 /**
- * The box of the nearest scroll container from `entry` up, `entry` included:
- * a node agent-device marks `scroll-area` (an iOS `ScrollView`, an Android
- * `ScrollView`, which React Native's lists render as) or `collection` (an
- * iOS `CollectionView`, which SwiftUI lists render as). Undefined when no
- * container holds the node.
+ * Returns the box of the nearest scroll container from `entry` up, `entry`
+ * included. A scroll container is a node agent-device marks `scroll-area` (an
+ * iOS or Android `ScrollView`, which React Native renders its lists as) or
+ * `collection` (an iOS `CollectionView`, which SwiftUI renders lists as). It
+ * returns undefined when no container holds the node.
  */
 export function scrollBoxOf(entry: ProjectedNode | undefined): Rect | undefined {
   for (let current = entry; current !== undefined; current = current.parent) {
@@ -825,12 +825,12 @@ export function scrollBoxOf(entry: ProjectedNode | undefined): Rect | undefined 
   return undefined;
 }
 
-/** Whether agent-device marks the node a scroll container, and it has a box. */
+/** Checks whether agent-device marks the node as a scroll container with a box. */
 function scrolls(entry: ProjectedNode): entry is ProjectedNode & { readonly node: { readonly rect: Rect } } {
   return (entry.raw.kind === 'scroll-area' || entry.raw.kind === 'collection') && entry.node.rect !== undefined;
 }
 
-/** The box of the innermost scroll container under `point`, the smallest one that holds it. */
+/** Returns the box of the innermost scroll container under `point` (the smallest one that holds it). */
 export function scrollBoxAt(index: readonly ProjectedNode[], point: Point): Rect | undefined {
   let found: Rect | undefined;
   for (const entry of index) {

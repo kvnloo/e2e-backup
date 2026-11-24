@@ -111,7 +111,7 @@ test('shows the home screen', async ({ agent, app, screen }) => {
 | `.tap()`, `.tap({ x, y })`, `.longPress()`, `.multiTap(2)` | `.tap()`, `.tap({ position: { x, y } })`, `.longPress()`, `.doubleTap()` |
 | `.typeText(t)` | `.pressSequentially(t)` |
 | `.replaceText(t)`, `.clearText()`, `.tapReturnKey()` | `.fill(t)`, `.clear()`, `.press('Enter')` |
-| `.swipe('up', 'fast', 0.75)` | `.swipe({ direction: 'down', distance: 0.75, speed: 'fast' })`. Detox names the finger's direction, e2e the content's, and measures the offset against the screen, e2e against the scroll container |
+| `.swipe('up', 'fast', 0.75)` | `.swipe({ direction: 'down', distance: 0.75, speed: 'fast' })`. In Detox, the direction is the finger's and the offset is a share of the screen. In e2e, the direction is the content's and the distance is a share of the scroll container |
 | `list.scroll(200, 'down')` | `list.swipe({ direction: 'down' })`, with no offset |
 | `waitFor(el).toBeVisible().whileElement(list).scroll(...)` | `list.scrollUntilVisible(el)`, with `{ direction: 'up' }` when Detox scrolls up |
 

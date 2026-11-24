@@ -511,14 +511,14 @@ export interface PressSequentiallyOptions extends ActionOptions {
   delay?: number;
 }
 
-/** How fast a swipe's finger moves: each drag takes 1500 ms `slow`, 400 ms `normal`, or 150 ms `fast`. */
+/** How fast the finger moves in a swipe. Each drag takes 1500 ms for `slow`, 400 ms for `normal`, and 150 ms for `fast`. */
 export type SwipeSpeed = 'slow' | 'normal' | 'fast';
 
 /** A swipe in a direction. */
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the content scrolls, as a share along the swipe of the box swiped (the node, or on `screen` the scroll container under its center), above 0 and at most 1. Default `0.5`. */
+  /** How far the content scrolls, as a share of the swiped box along the swipe (above 0 and at most 1). The box is the node, or the scroll container under the screen's center for `screen`. Default `0.5`. */
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;
@@ -533,7 +533,7 @@ export interface ScrollUntilVisibleOptions {
   direction?: ScrollDirection;
   /** How far each step scrolls, as a share of the scroll container's box. Default `0.65`. */
   distance?: number;
-  /** How fast each step's finger moves. Default: 800 ms a step, slow enough that the list doesn't coast past the part of the last view left on screen. */
+  /** How fast the finger moves in each step. By default, each step takes 800 ms, slow enough that the list doesn't coast past the part of the last view left on screen. */
   speed?: SwipeSpeed;
   /** Milliseconds for the whole scroll. Default `30000`. */
   timeout?: number;
@@ -574,10 +574,10 @@ export interface Screen {
   /** Performs a viewport-level swipe: in a direction, or along a path from one point to another. */
   swipe(options: SwipeOptions | SwipePathOptions): Promise<void>;
   /**
-   * Scrolls until a locator resolves visibly or times out: the scroll
-   * container under the screen's center on `screen`, the node itself on a
-   * locator. Once the node is visible, an engine that can bring a node into
-   * view does, so the node isn't left at the container's edge.
+   * Scrolls until a locator resolves visibly or times out. On `screen`, the
+   * scroll container under the screen's center scrolls, and on a locator,
+   * the node scrolls. After at least one step, the found node is brought into
+   * view when the engine supports it, so it isn't left at the container's edge.
    */
   scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void>;
   /**

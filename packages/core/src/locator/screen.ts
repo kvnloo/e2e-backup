@@ -267,10 +267,10 @@ class ScreenImpl implements Screen {
     rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'distance', 'speed', 'timeout']);
     const step = swipeAction('scrollUntilVisible', options?.direction ?? 'down', options, SCROLL_STEP);
     const { engine } = this.context;
-    // On `screen` the scroll container under the screen's center scrolls; on
-    // a locator the node itself does, so a scroll container pages without the
-    // pointer having to hover it first. Every swipe is bounded by the
-    // scroll's own deadline, not the action timeout.
+    // On `screen`, the scroll container under the screen's center scrolls. On
+    // a locator, the node scrolls, so a scroll container pages without the
+    // pointer hovering it first. Every swipe is bounded by the scroll's
+    // deadline instead of the action timeout.
     const scope = this.scope;
     const swipeStep = (deadline: Deadline) =>
       scope === undefined
@@ -297,12 +297,12 @@ class ScreenImpl implements Screen {
         }
         sampled = true;
         if (isNodeVisible(node)) {
-          // A node visible before any step gets no gesture, as a list at its
-          // top could take one for a pull to refresh.
+          // A node that's visible before any step doesn't get a gesture, since
+          // a list at its top could take one as a pull to refresh.
           if (stepped && engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView' }, deadline);
           return;
         }
-        // A step whose drag can't finish before the deadline is not sent.
+        // A step isn't sent when its drag can't finish before the deadline.
         if (deadline.remaining() <= step.durationMs) throw notVisible();
         try {
           await swipeStep(deadline);

@@ -123,7 +123,7 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `inputText`, `eraseText`, `pressKey: Enter` after a `tapOn` | `.fill('text')`, `.clear()`, `.press('Enter')` on the field's locator |
 | `inputRandomEmail`, `inputRandomText`, `faker` | `unique()` around a value in `act` params, so the cache still replays; any npm faker for the rest |
 | `copyTextFrom`, `pasteText` | `await locator.textContent()`, then `.fill(text)` |
-| `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`. Maestro names the finger's direction, e2e the content's. Maestro's `scroll` moves 0.4 of the screen, and `distance: 0.4` matches it |
+| `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`. In Maestro, the direction is the finger's, and in e2e it's the content's. A Maestro `scroll` is 0.4 of the screen. Use `distance: 0.4` to match it |
 | `swipe: { start, end }`, `scrollUntilVisible` | `screen.swipe({ from, to })` in pixels or percentages, `screen.scrollUntilVisible(locator, { direction })` |
 
 </Accordion>
@@ -171,7 +171,7 @@ on purpose.
 | `inputText` and `pressKey: Enter` with no field, `eraseText: N`, `pressKey: backspace`, `tab` | `fill` or `press` on the field's locator; `fill` a shortened `inputValue()` to erase; tap the next field for Tab |
 | `addMedia` | On an iOS simulator, `xcrun simctl addmedia` before `app.open()`; Android is unchecked. See "Photos for a picker test" under [The device fixture](/mobile#the-device-fixture) |
 | `label` on a command | `-`. The call names each step |
-| `scrollUntilVisible: { centerElement, visibilityPercentage, speed }` | On a device, `scrollUntilVisible` always does what `centerElement: true` does: it drags a node more than a fifth of its list from the middle to the middle. Maestro does that only when asked. `visibilityPercentage` has no match, since it stops at the first match the platform shows. For `speed`, use `speed: 'slow'`, `'normal'`, or `'fast'` |
+| `scrollUntilVisible: { centerElement, visibilityPercentage, speed }` | On a device, a node more than a fifth of its list from the middle is dragged to the middle after at least one step, as with `centerElement: true`. In Maestro, that happens only when you set `centerElement`. `visibilityPercentage` doesn't have a match, since the scroll stops at the first match the platform shows. For `speed`, use `speed: 'slow'`, `'normal'`, or `'fast'` |
 | Device logs and crash reports beside a failure | `adb logcat` or `xcrun simctl spawn <udid> log stream`, collected in a fixture |
 | `maestro hierarchy` as a terminal command | A one-line test that calls `screen.debug()` |
 | `--device-locale` | `app.launchArguments: ['-AppleLanguages', '(de)', '-AppleLocale', 'de_DE']` on iOS, see [Run the app in another language](/mobile#run-the-app-in-another-language); on Android, set the device language before the run |

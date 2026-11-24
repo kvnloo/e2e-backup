@@ -411,7 +411,7 @@ describe('dispatchPointerAction', () => {
       dblclick: async (x: number, y: number) => { calls.push(`dblclick ${x},${y}`); },
       wheel: async (dx: number, dy: number) => { calls.push(`wheel ${dx},${dy}`); },
     };
-    // `scrollExtent` at the point finds the viewport: no container under it scrolls.
+    // `scrollExtent` returns the viewport's size here, since no container under the point scrolls.
     const root = { evaluate: async (_fn: unknown, along: { vertical: boolean }) => (along.vertical ? 600 : 800) };
     const page = { mouse, locator: () => root, evaluate: async () => { calls.push('frame'); }, viewportSize: () => ({ width: 800, height: 600 }) } as unknown as Page;
     return { page, calls };

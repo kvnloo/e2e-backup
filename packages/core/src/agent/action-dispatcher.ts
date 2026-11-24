@@ -61,11 +61,12 @@ const ASSERTION_ACTIONS = new Set<string>(Object.values(READ_ONLY_GRAMMAR).flat(
 const MAX_STALE_RELOCATIONS = 2;
 
 /**
- * How many pages a scroll to a text may turn. Each page turn is one
- * `scrollUntilVisible` step (`SCROLL_STEP`), 0.65 of the list. A windowed
- * table of five thousand short rows is about five hundred pages on a browser. The cap
- * bounds a text that never shows, the step's own clock bounds the time, and a
- * screen that stops moving ends the paging before either.
+ * How many pages a scroll to a text may turn. Each page is one
+ * `scrollUntilVisible` step (`SCROLL_STEP`, 0.65 of the list). A windowed
+ * table of five thousand short rows is about five hundred pages on a
+ * browser. The cap bounds a text that never shows, the step's own clock
+ * bounds the time, and a screen that stops moving ends the paging before
+ * either.
  */
 const MAX_SCROLL_UNTIL_SCREENS = 800;
 const MAX_SCROLL_UNTIL_TEXT_CHARS = 200;
@@ -613,11 +614,12 @@ export class ActionDispatcher {
         const found = observation.kind === 'semantic' ? nodeReading(observation, needle, scope) : undefined;
         if (found !== undefined) {
           // An engine that can bring a node in does, whatever the box says: a
-          // windowed list renders a row a little before it is visible, and a
-          // device drags a row near its list's edge to the middle. One that
-          // cannot takes one more page for a row still past the edge. A row
-          // in view before any page gets no gesture, as a list at its top
-          // could take one for a pull to refresh.
+          // windowed list renders a row a little before it is visible. On a
+          // device, a row near its list's edge is dragged to the middle. For
+          // an engine that can't, one more page is taken for a row still past
+          // the edge. A row that's in view before any page doesn't get a
+          // gesture, since a list at its top could take one as a pull to
+          // refresh.
           if (this.verbs.has('scrollTo') && (screens > 0 || !isInViewport(found.rect, observation.viewport))) {
             await this.session.perform(found.ref, { kind: 'scrollIntoView' }, this.accounting.actionOperation());
             return { name: 'scrollUntil', text, direction, screens, ...paged };

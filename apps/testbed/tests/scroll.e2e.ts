@@ -41,7 +41,7 @@ test.describe('scrolling', { requires: ['browser'], tags: ['scroll'] }, () => {
 
   test('a screen swipe scrolls the container under the screen centre, as a wheel there does', async ({ screen, browser }) => {
     const pane = screen.getByRole('status', 'Pane position');
-    // The pane is under the screen's centre, so it scrolls half its 200 px, and the page stays.
+    // The pane is under the screen's centre, so it scrolls half of its 200 px. The page doesn't scroll.
     await screen.swipe({ direction: 'down' });
     await expect(pane).toHaveText('100');
     await expect(screen.getByRole('status', 'Scroll position')).toHaveText('0');

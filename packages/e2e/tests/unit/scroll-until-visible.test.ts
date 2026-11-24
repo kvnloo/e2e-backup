@@ -1,11 +1,11 @@
 /**
  * `screen.scrollUntilVisible`: polls the target through the locator engine
- * and swipes the viewport between polls. What the engine sees is a step of
- * 0.65 of the scroll container over 800 ms in the requested direction,
- * addressed to the observation root, repeated until the target reads as
- * visible or the deadline passes, then the target brought into view when
- * the engine can. Every swipe is
- * bounded by that deadline. The target, like a `dragTo` target and a
+ * and swipes the viewport between polls. The engine gets a step of 0.65 of
+ * the scroll container over 800 ms in the requested direction, addressed to
+ * the observation root. The step repeats until the target reads as visible
+ * or the deadline passes. After at least one step, the target is brought
+ * into view when the engine can do it. Every swipe is bounded by that
+ * deadline. The target, like a `dragTo` target and a
  * `filter({ has })` locator, has to come from the same target's screen.
  */
 
@@ -37,7 +37,7 @@ interface Swipe {
   readonly durationMs: number;
 }
 
-/** The step a scroll takes when a test names no distance or speed. */
+/** The step used when a test doesn't set a distance or speed. */
 const STEP = { distance: 0.65, durationMs: 800 } as const;
 
 interface ScrollScript {
@@ -45,7 +45,7 @@ interface ScrollScript {
   readonly screens: readonly (readonly SemanticNode[])[];
   /** Whether the engine declares the swipe action; default true. */
   readonly swipeable?: boolean;
-  /** Whether the engine declares `scrollIntoView` too; default false. */
+  /** Set it when the engine should declare `scrollIntoView`. Default false. */
   readonly bringsIntoView?: boolean;
   /**
    * Every swipe hangs, then fails as an engine reporting a timeout does: `true`
@@ -121,7 +121,7 @@ describe('screen.scrollUntilVisible', () => {
   });
 
   it.each([
-    ['momentum, which distance and speed replaced', { momentum: 'fast' }],
+    ['momentum, replaced by distance and speed', { momentum: 'fast' }],
     ['a distance of 0', { distance: 0 }],
     ['a distance above 1', { distance: 1.5 }],
     ['a speed that is not a preset', { speed: 'warp' }],
@@ -133,14 +133,14 @@ describe('screen.scrollUntilVisible', () => {
     expect(swipes).toEqual([]);
   });
 
-  it('brings the target into view once it shows, when the engine can', async () => {
+  it('brings the target into view after a step, when the engine can', async () => {
     const { screen, swipes, broughtIntoView } = scrollScreen({ screens: [[], [TARGET]], bringsIntoView: true });
     await screen.scrollUntilVisible(screen.getByText('Accept'));
     expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...STEP }]);
     expect(broughtIntoView).toEqual(['target']);
   });
 
-  it('sends no gesture for a target visible on the first read', async () => {
+  it('does not send a gesture for a target that is visible on the first read', async () => {
     const { screen, swipes, broughtIntoView } = scrollScreen({ screens: [[TARGET]], bringsIntoView: true });
     await screen.scrollUntilVisible(screen.getByText('Accept'));
     expect(swipes).toEqual([]);
@@ -225,7 +225,7 @@ describe('screen.scrollUntilVisible', () => {
     });
   });
 
-  it('sends no step whose drag cannot finish before the deadline, and fails as LOCATOR_NOT_FOUND', async () => {
+  it('fails as LOCATOR_NOT_FOUND without sending a step whose drag cannot finish before the deadline', async () => {
     const { screen, swipes } = scrollScreen({ screens: [[], [TARGET]] });
     await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 500 })).rejects.toMatchObject({ code: 'LOCATOR_NOT_FOUND' });
     expect(swipes).toEqual([]);
