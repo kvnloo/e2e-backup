@@ -82,6 +82,31 @@
           "reason": "only a filtered test names the filter that left it out",
           "filter": "areas"
         }
+      },
+      {
+        "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "testId": "tests/example.e2e.ts::todo%20coverage",
+        "kind": "test",
+        "declarationIndex": 5,
+        "titlePath": [
+          "todo coverage"
+        ],
+        "file": "tests/example.e2e.ts",
+        "source": {
+          "file": "tests/example.e2e.ts",
+          "line": 25,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "selected": true,
+        "status": "skipped",
+        "attempts": [],
+        "skip": {
+          "cause": "todo",
+          "reason": "todo",
+          "filter": "areas"
+        }
       }
     ],
     "errors": [
