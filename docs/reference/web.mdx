@@ -248,6 +248,9 @@ What survives:
   read current geometry and focus with `browser.evaluate` before acting.
 - Code that uses `surfaceOf(engine)` must read its accessors again after
   recovery. Playwright objects it kept belong to the disconnected transport.
+- `browser.consoleMessages()` and `browser.pageErrors()` lose the entries
+  from earlier documents in the tab. Only the current document's entries
+  are kept, since only those are sent again by Chrome.
 
 A `browser` provider with `scope: 'attempt'` rides the same persistent
 context, with the same limits. The lease's `cdpEndpoint` provisions the
@@ -527,7 +530,7 @@ The [config](/reference/config) sets each member's budget:
 
 A `{ timeout }` option overrides the budget on `goto`, `reload`, `back`,
 `forward`, `waitForResponse`, `waitForPopup`, `waitForDownload`, and `waitForDownloads`, capped
-by the test deadline (`cleanupTimeout` in `afterEach`). `0` waits until it. `url`, `title`, `evaluate`, `consoleMessages`, `pageErrors`, `addInitScript`, `route`,
+by the test deadline (`cleanupTimeout` in `afterEach`); `0` waits until it. `url`, `title`, `evaluate`, `consoleMessages`, `pageErrors`, `addInitScript`, `route`,
 `unroute`, `unrouteAll`, `cookies`, `setCookies`, `clearCookies`, `setViewport`,
 `emulateMedia`, `onDialog`, `newTab`, the `BrowserTab` methods, `keyboard.*`, `mouse.*`, and `webmcp.*` take no override.
 
@@ -679,30 +682,44 @@ const title = await browser.evaluate<string>('document.title');
 #### `consoleMessages`
 
 Returns the console messages logged in the active tab since it opened,
-oldest first. Up to 200 of the latest messages are kept.
+oldest first. Only the latest are kept, 200 at most.
 
 ```ts
-await app.open('/');
+await app.open('/checkout');
+await screen.getByRole('button', 'Place order').tap();
+await expect(screen.getByText('Order placed')).toBeVisible();
 const errors = (await browser.consoleMessages()).filter((message) => message.type === 'error');
 expect(errors).toEqual([]);
 ```
 
 ```ts
 export interface WebConsoleMessage {
-  /** The message type, as reported by Playwright (`'log'`, `'info'`, `'warning'`, `'error'`, `'debug'`, etc.). */
+  /** One of Playwright's console message types, such as `'log'`, `'error'`, or `'warning'` (the type of `console.warn`). */
   readonly type: ReturnType<ConsoleMessage['type']>;
   /** The message text. */
   readonly text: string;
 }
 ```
 
-- Messages from the tab's frames and workers are included.
+- `type` is one of Playwright's console message types. `console.warn` has
+  the type `'warning'`.
+- Messages from the tab's frames and dedicated workers are included.
+  Messages from service workers aren't.
+- On Chromium, the list also has messages the browser writes, such as
+  `Failed to load resource` for a request that got a 404.
 - The list isn't cleared on navigation, so messages from earlier documents
   in the tab stay in it.
 - After `app.restart()`, the list only has messages from the new page.
 - Each tab has a separate list. To read another tab's list, activate it.
 - A message can show up in the list shortly after it's logged. To wait for
   one, use [`expect.poll`](/reference/expect#polling-a-value).
+
+<Note>
+On a [persistent browser](#recovering-a-cdp-transport), the lists of
+`consoleMessages` and `pageErrors` start empty when the attempt starts,
+even though the first tab opened earlier. After the CDP transport
+reconnects, they only have entries from the current document.
+</Note>
 
 | Throws | When |
 | --- | --- |
@@ -712,27 +729,28 @@ export interface WebConsoleMessage {
 
 #### `pageErrors`
 
-Returns the uncaught errors and unhandled promise rejections of the active
-tab since it opened, oldest first. Up to 200 of the latest errors are kept.
+Returns the uncaught errors and unhandled promise rejections in the active
+tab since it opened, oldest first. Only the latest are kept, 200 at most.
 
 ```ts
-await app.open('/');
-expect((await browser.pageErrors()).map((error) => error.message)).toEqual([]);
+await app.open('/checkout');
+await screen.getByRole('button', 'Place order').tap();
+await expect(screen.getByText('Order placed')).toBeVisible();
+expect(await browser.pageErrors()).toEqual([]);
 ```
 
 ```ts
 export interface WebPageError {
-  /** The error message. */
+  /** The error message, as the browser reports it. */
   readonly message: string;
-  /** The stack trace from the browser. It's empty when a stack isn't reported (such as for a thrown value that isn't an `Error`). */
+  /** The stack trace, as the browser reports it, or `''` when there isn't one. */
   readonly stack: string;
 }
 ```
 
-- For a thrown or rejected value that isn't an `Error`, `message` has the
-  value as text (`'7'` for `throw 7`) and `stack` is empty.
-- Frames, workers, navigation, `app.restart()`, and other tabs are handled
-  the same way as in [`consoleMessages`](#consolemessages).
+- Errors from the tab's frames are included.
+- Navigation, `app.restart()`, other tabs, and persistent browsers are
+  handled the same way as in [`consoleMessages`](#consolemessages).
 
 | Throws | When |
 | --- | --- |
@@ -1495,9 +1513,9 @@ export interface Browser extends Expectable<BrowserExpectation> {
     fn: string | ((arg: Arg) => T | Promise<T>),
     arg: Arg,
   ): Promise<T>;
-  /** Returns the console messages logged in the active tab since it opened (up to 200 of the latest). */
+  /** Returns the console messages logged in the active tab since it opened. Only the latest are kept, 200 at most. */
   consoleMessages(): Promise<WebConsoleMessage[]>;
-  /** Returns the uncaught errors and unhandled rejections in the active tab since it opened (up to 200 of the latest). */
+  /** Returns the uncaught errors and unhandled rejections in the active tab since it opened. Only the latest are kept, 200 at most. */
   pageErrors(): Promise<WebPageError[]>;
   /** Adds a script every document runs before the page's own, from the next navigation on. */
   addInitScript(script: string | { path: string } | (() => unknown)): Promise<void>;

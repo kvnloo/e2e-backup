@@ -631,9 +631,10 @@ the opener is gone. `tabs()`, `newTab()`, `tab.activate()`, and
   `EVALUATE_FAILED`.
 - `consoleMessages()`, `pageErrors()`: the active tab's console messages
   (`{ type, text }`) and its uncaught errors and unhandled rejections
-  (`{ message, stack }`) since it opened (up to 200 of the latest). The lists
-  aren't cleared on navigation. After `app.restart()`, they only have entries
-  from the new page. Wait for a late one with `expect.poll`.
+  (`{ message, stack }`) since it opened. Only the latest are kept, 200 at
+  most. The lists aren't cleared on navigation. After `app.restart()`, they
+  only have entries from the new page. Wait for the app's outcome before you
+  assert a list is empty, and use `expect.poll` to wait for a late entry.
 - `addInitScript(source | { path } | fn)`, `addInitScript(fn, arg)`: runs
   before the page's own scripts; call it before `app.open`. `arg` is JSON.
 - `route(pattern, handler)`, `unroute(pattern)`: intercept requests, newest

@@ -372,8 +372,51 @@ const CARET_CSP = `<!doctype html>
 <body><input id="plain" value="csp"></body>
 </html>`;
 
+/** A page that logs one message of each common console type. */
+const CONSOLE = `<!doctype html>
+<html>
+<head><title>Fixture Console</title></head>
+<body><script>console.log('ready'); console.warn('slow'); console.error('broken', 42);</script></body>
+</html>`;
+
+/** A page with one unhandled rejection and one error thrown from a timer. */
+const PAGE_ERRORS = `<!doctype html>
+<html>
+<head><title>Fixture Page Errors</title></head>
+<body><script>
+  Promise.reject(new Error('rejected'));
+  setTimeout(() => { throw new Error('thrown'); });
+</script></body>
+</html>`;
+
+/** A page that throws and rejects values that aren't errors. */
+const THROWN_VALUES = `<!doctype html>
+<html>
+<head><title>Fixture Thrown Values</title></head>
+<body><script>
+  Promise.reject('plain');
+  setTimeout(() => { throw 7; });
+</script></body>
+</html>`;
+
+/** A page whose iframe logs and throws, and whose dedicated worker logs. */
+const NESTED_CONSOLE = `<!doctype html>
+<html>
+<head><title>Fixture Nested Console</title></head>
+<body>
+<iframe srcdoc="<script>console.log('from frame'); setTimeout(() => { throw new Error('frame error'); });</script>"></iframe>
+<script>
+  new Worker(URL.createObjectURL(new Blob(["console.log('from worker')"], { type: 'text/javascript' })));
+</script>
+</body>
+</html>`;
+
 const PAGES: Readonly<Record<string, string>> = {
   '/': HOME,
+  '/console': CONSOLE,
+  '/page-errors': PAGE_ERRORS,
+  '/thrown-values': THROWN_VALUES,
+  '/nested-console': NESTED_CONSOLE,
   '/pointer': POINTER,
   '/closed-shadow': CLOSED_SHADOW,
   '/closed-form': CLOSED_FORM,

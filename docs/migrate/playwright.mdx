@@ -168,7 +168,7 @@ run only in a browser, so a test that uses it declares
 | `context.pages()`, `context.newPage()`, `page.bringToFront()` | `browser.tabs()`, `browser.newTab()`, `tab.activate()`; no `context.on('page')` event |
 | `page.evaluate(fn, arg)` | `browser.evaluate(fn, arg)`, JSON in and out |
 | `page.webmcp.tools()`, `page.webmcp.callTool(name, input)` | the same on `browser.webmcp`, with `web({ webmcp: true })` in place of the launch argument or preferences; the main frame only, see [WebMCP](/reference/web#webmcp) |
-| `page.consoleMessages()`, `page.pageErrors()`, `page.on('console')`, `page.on('pageerror')` | `browser.consoleMessages()` (`{ type, text }`) and `browser.pageErrors()` (`{ message, stack }`), with every entry since the tab opened (like Playwright's `{ filter: 'all' }`). Events aren't supported. |
+| `page.consoleMessages()`, `page.pageErrors()`, `page.on('console')`, `page.on('pageerror')` | `browser.consoleMessages()` and `browser.pageErrors()`, since the tab opened (like Playwright's `{ filter: 'all' }`). Only the latest are kept, 200 at most. Events aren't supported. See [`consoleMessages`](/reference/web#consolemessages) |
 | `page.addInitScript()`, `page.emulateMedia({ colorScheme, reducedMotion })` | `browser.addInitScript()` or `web({ initScripts })`; `browser.emulateMedia()` |
 | `context.addCookies()`, `cookies()`, `clearCookies()` | `browser.setCookies()`, `browser.cookies()`, `browser.clearCookies()` |
 
