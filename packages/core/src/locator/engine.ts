@@ -209,7 +209,7 @@ export class LocatorEngine {
    * declare `tapModifiers`, is `UNSUPPORTED_CAPABILITY`, a `press` key
    * outside the grammar is `INVALID_ARGUMENT`. Waiting for a node the engine
    * could never act on would report it as missing instead. A middle button
-   * on an engine without `tapButtons` is `UNSUPPORTED_CAPABILITY` too.
+   * on an engine without `tapButtons` is refused the same way.
    */
   private checkAction(action: LocatorAction): void {
     if (!this.session.actions.has(action.kind)) {
