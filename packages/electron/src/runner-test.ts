@@ -1,7 +1,7 @@
 /**
  * The test runner's `test`, which the main entry extends, loaded only when
  * `e2e` is installed. `e2e` is an optional peer: a program on
- * `@e2e-dev/core` alone imports `desktop` from this package too.
+ * `@e2e-dev/core` alone imports `electron` from this package too.
  */
 
 import { createRequire } from 'node:module';
