@@ -155,7 +155,7 @@ export function registerCacheCommand(program: Command): void {
   cacheSubcommand(
     'check',
     'find recordings that take a detour',
-    'Read every cached trace for a detour: a stretch that leaves a screen and comes back to it with nothing typed, chosen, or set on the way, as an agent does when it opens the wrong page and backs out. Exits 1 when any trace has one, so a pipeline can stop a recording with a wrong turn before it is committed.',
+    'Read every cached trace for a detour: a stretch that leaves a screen and comes back to it with nothing typed, chosen, or set on the way, as an agent does when it opens the wrong page and backs out. Exits 1 when the screens a trace recorded show one, so a pipeline can stop a recording with a wrong turn before it is committed. A trace recorded before actions kept their screens is read by its actions alone, and its detours are hints that fail nothing.',
   );
   cacheSubcommand('clear', 'delete every cached trace', 'Delete the cache files and the directory itself; files the runner never wrote are left alone.');
   cacheSubcommand('stats', 'print the entry count and size', 'Print the store directory, how many readable entries it holds, and how many bytes they take.');
@@ -352,9 +352,12 @@ function plain(text: string): string {
 }
 
 /**
- * Prints every entry with a detour, one line per detour, and exits 1 when
- * there is any: a recording that took a wrong turn replays it on every run,
- * and a pipeline that commits recordings is where to stop it.
+ * Prints every entry with a detour, one line per detour, and exits 1 when a
+ * recorded location shows one: a recording that took a wrong turn replays
+ * it on every run, and a pipeline that commits recordings is where to stop
+ * it. An entry recorded before actions kept their locations is read by its
+ * actions alone, which cannot tell a wrong turn from a step that asks to go
+ * back, so its detours are printed as hints and fail nothing.
  */
 function check(contents: CacheContents): number {
   const detoured = contents.entries
@@ -363,19 +366,24 @@ function check(contents: CacheContents): number {
   for (const entry of detoured) {
     const who = entry.testId === undefined ? '' : ` ${entry.testId}${entry.targetId === undefined ? '' : ` (${entry.targetId})`}`;
     for (const detour of entry.detours) {
-      process.stdout.write(`${entry.keyHash.slice(0, DIGEST_PREFIX_CHARS)}${plain(`${who}: ${describeDetour(detour)}`)}\n`);
+      const hint = detour.evidence === 'actions' ? ' (recorded without locations: a hint only)' : '';
+      process.stdout.write(`${entry.keyHash.slice(0, DIGEST_PREFIX_CHARS)}${plain(`${who}: ${describeDetour(detour)}`)}${hint}\n`);
     }
   }
   const total = contents.entries.length;
-  if (detoured.length === 0) {
-    process.stdout.write(`no detours in ${total} replay cache ${total === 1 ? 'entry' : 'entries'} in ${contents.directory}\n`);
-  } else {
-    process.stdout.write(
-      `${detoured.length} of ${total} replay cache ${total === 1 ? 'entry takes' : 'entries take'} a detour; e2e cache show <entry> prints its actions\n`,
-    );
+  const entries = (count: number) => `${count === 1 ? 'entry' : 'entries'}`;
+  const failing = detoured.filter((entry) => entry.detours.some((detour) => detour.evidence === 'locations')).length;
+  const hinted = detoured.length - failing;
+  process.stdout.write(
+    failing === 0
+      ? `no detours in ${total} replay cache ${entries(total)} in ${contents.directory}\n`
+      : `${failing} of ${total} replay cache ${total === 1 ? 'entry takes' : 'entries take'} a detour; e2e cache show <entry> prints its actions\n`,
+  );
+  if (hinted > 0) {
+    process.stdout.write(`${hinted} ${entries(hinted)} recorded without locations only ${hinted === 1 ? 'looks' : 'look'} like one; a run that records ${hinted === 1 ? 'it' : 'them'} again can tell\n`);
   }
   warnAboutSkipped(contents);
-  return detoured.length === 0 ? 0 : 1;
+  return failing === 0 ? 0 : 1;
 }
 
 /** Prints the store's size: where it is, how many entries, how many bytes. */
