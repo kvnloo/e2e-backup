@@ -7,7 +7,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileCacheStore, MAX_CACHE_WIRE_BYTES } from '@e2e-dev/core/lib/cache/store';
 import { main } from '../../src/cli/index.ts';
-import type { ActionTrace, TraceProvenance } from '@e2e-dev/core/lib/cache/trace';
+import { buildTraceEntry, type ActionTrace, type TraceProvenance } from '@e2e-dev/core/lib/cache/trace';
 
 let root: string;
 let stdoutSpy: ReturnType<typeof vi.spyOn>;
@@ -200,6 +200,20 @@ describe('e2e cache show', () => {
     expect(process.exitCode).toBe(0);
     expect(written(stdoutSpy)).toContain('summary    the copied recording');
     expect(written(stdoutSpy)).toContain(`entry      ${path.join(root, 'copied', `${'c'.repeat(64)}.json`)}`);
+  });
+
+  it('reads a recording copied under any name, and says why a file is no entry', async () => {
+    mkdirSync(path.join(root, 'saved'), { recursive: true });
+    const copied = path.join(root, 'saved', 'capture.json');
+    writeFileSync(copied, JSON.stringify(buildTraceEntry({ ...detouredTrace(), summary: 'the capture' })), 'utf8');
+    await invoke('cache', 'show', copied);
+    expect(process.exitCode).toBe(0);
+    expect(written(stdoutSpy)).toContain('summary    the capture');
+    const torn = path.join(root, 'saved', 'torn.json');
+    writeFileSync(torn, '{ not json', 'utf8');
+    await invoke('cache', 'show', torn);
+    expect(process.exitCode).toBe(2);
+    expect(written(stderrSpy)).toContain(`${torn}: not JSON, so not a replay cache entry`);
   });
 
   it('names the state and value a replay checks in the end state', async () => {
