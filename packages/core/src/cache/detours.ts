@@ -23,7 +23,7 @@
  */
 
 import { sameRoute } from './route.ts';
-import { isNodeAction, type ActionTrace, type RecordedAction } from './trace.ts';
+import type { ActionTrace, RecordedAction } from './trace.ts';
 
 /** One stretch of a recording that left a screen and came back to it with nothing changed on the way. */
 export interface TraceDetour {
@@ -81,10 +81,31 @@ const LOOKING_ACTIONS: ReadonlySet<RecordedAction['name']> = new Set<RecordedAct
 /** Verbs that leave a screen in the shape an entry without locations is read for. */
 const LEAVING_ACTIONS: ReadonlySet<RecordedAction['name']> = new Set<RecordedAction['name']>(['tap', 'doubleTap', 'navigate']);
 
-/** Whether an action may have changed what the app holds, so a return after it is not a detour. */
+/**
+ * Whether an action may have changed what the app holds, so a return after
+ * it is not a detour. A tap counts when it landed on a control that holds a
+ * state, by its target or, for a tap at a point, the node the point was in;
+ * hovering over or scrolling to such a control sets nothing.
+ */
 function changesState(action: RecordedAction): boolean {
   if (CHANGING_ACTIONS.has(action.name)) return true;
-  return isNodeAction(action) && action.target.role !== undefined && STATE_ROLES.has(action.target.role);
+  const role = tappedRole(action);
+  return role !== undefined && STATE_ROLES.has(role);
+}
+
+/** The role of the control a tap landed on, or undefined for an action that taps nothing. */
+function tappedRole(action: RecordedAction): string | undefined {
+  switch (action.name) {
+    case 'tap':
+    case 'doubleTap':
+    case 'longPress':
+    case 'secondaryTap':
+      return action.target.role;
+    case 'tapAt':
+      return action.within?.target.role;
+    default:
+      return undefined;
+  }
 }
 
 /**

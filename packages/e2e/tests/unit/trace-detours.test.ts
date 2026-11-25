@@ -60,6 +60,22 @@ describe('findDetours by recorded locations', () => {
     expect(findDetours(flow([tap('Display', '/settings'), tap('Dark mode', '/settings/display', 'switch'), back('/settings/display')], { endPath: '/settings' }))).toEqual([]);
   });
 
+  it('counts a tap at a point inside a switch as a change, and a hover over one as none', () => {
+    const toggled: RecordedAction = {
+      name: 'tapAt',
+      summary: 'tap the point (40, 80)',
+      point: { x: 40, y: 80 },
+      viewport: { width: 390, height: 844 },
+      within: { target: { role: 'switch', name: 'Dark mode' }, fx: 0.5, fy: 0.5 },
+      at: '/settings/display',
+    };
+    expect(findDetours(flow([tap('Display', '/settings'), toggled, back('/settings/display')], { endPath: '/settings' }))).toEqual([]);
+    const hovered: RecordedAction = { name: 'hover', summary: 'hover checkbox "Beta"', target: { role: 'checkbox', name: 'Beta' }, at: '/settings/labs' };
+    expect(findDetours(flow([tap('Labs', '/settings'), hovered, back('/settings/labs')], { endPath: '/settings' }))).toEqual([
+      { from: 0, to: 3, at: '/settings', via: '/settings/labs', evidence: 'locations' },
+    ]);
+  });
+
   it('is no detour for a flow that stays on one screen or only moves forward', () => {
     expect(findDetours(flow([tap('Open', '/'), tap('Close', '/'), tap('Open', '/')], { endPath: '/' }))).toEqual([]);
     expect(findDetours(flow([tap('Next', '/one'), tap('Next', '/two'), tap('Done', '/three')], { endPath: '/done' }))).toEqual([]);
