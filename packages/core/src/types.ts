@@ -426,9 +426,9 @@ export interface TextMatchOptions {
    * exactly-one rule is applied, so a visible node with a hidden twin (a
    * prerendered copy kept after navigation, a closed drawer) still resolves.
    * When false, every match is kept, hidden ones included. When omitted,
-   * the target's `locators.visible` is used. For `getByRole`, an omitted
-   * `visible` is `false`. Role queries skip nodes hidden from the
-   * accessibility tree whether `visible` is true or false.
+   * the target's `locators.visible` is used. For `getByRole`, the default is
+   * `false`, since role queries already skip nodes hidden from the
+   * accessibility tree.
    */
   visible?: boolean;
 }
@@ -1715,7 +1715,7 @@ export interface Target {
   video?: RecordingMode;
   /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`; `--fully-parallel` wins over it. */
   fullyParallel?: boolean;
-  /** Defaults for this target's screen queries. Setting `visible` here overrides the top-level value. */
+  /** Defaults for this target's screen queries. `visible` here overrides the top-level value. */
   locators?: LocatorsConfig;
 }
 

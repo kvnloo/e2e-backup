@@ -571,7 +571,7 @@ function firstText(node: ExecutorNode, skip: string): string | undefined {
  * A bare query kept to the nodes that render, the way a test steps past a
  * hidden twin (`visible: true`). Returns `undefined` when the expression
  * isn't a bare query, its code already has options, or `visible` is already
- * `true` from the target's `locators.visible`.
+ * `true` from `locators.visible`.
  */
 function visibleOnly(located: Located): Located | undefined {
   const { expression, code } = located;

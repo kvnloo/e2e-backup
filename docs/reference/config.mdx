@@ -307,8 +307,8 @@ An id is its factory called with no options. An unknown id is
 
 #### `locators`
 
-Defaults for screen queries. With `visible: true`, hidden nodes are skipped
-in `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
+Defaults for screen queries. Setting `visible: true` skips hidden nodes in
+`getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
 `getByTestId`, the same as passing `{ visible: true }` to each one.
 
 ```ts
@@ -1787,7 +1787,7 @@ export interface Target {
   video?: RecordingMode;
   /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`. */
   fullyParallel?: boolean;
-  /** Defaults for this target's screen queries. Setting `visible` here overrides the top-level value. */
+  /** Defaults for this target's screen queries. `visible` here overrides the top-level value. */
   locators?: LocatorsConfig;
 }
 ```

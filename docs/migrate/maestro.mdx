@@ -156,7 +156,7 @@ Calls on `device` run only on a device, so a test that uses it declares
   `LOCATOR_AMBIGUOUS`, so add `.first()` when the first match is what you mean.
 - Controls on screens mounted behind the current one stay in the tree, so
   text and test id queries can match them. Set
-  [`locators: { visible: true }`](/reference/config#locators) to skip those
+  [`locators: { visible: true }`](/reference/config#locators) to skip ones
   the device reports as hidden.
 - `isVisible()` replaces `optional` and `runFlow: { when }`. It reads the
   screen one time and doesn't wait. It fails on several matches, so add
