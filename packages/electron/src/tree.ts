@@ -403,6 +403,8 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
           break;
       }
     }
+    // A native field has a read-only state whatever Chromium reports for it (none for a select): its readonly attribute.
+    if (facts?.nodeName === 'INPUT' || facts?.nodeName === 'TEXTAREA' || facts?.nodeName === 'SELECT') draft.states['readonly'] = 'readonly' in attributes;
     const checkable = facts?.nodeName === 'INPUT' && ['checkbox', 'radio'].includes(attributes['type']?.toLowerCase() ?? '');
     if (facts?.nodeName === 'SELECT') {
       // A select's value is what its chosen option submits, as `select.value` reads it; its options name the labels.

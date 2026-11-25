@@ -47,8 +47,9 @@ test.describe('sign-in window', () => {
     const malformed = await screen.getByTestId('due').fill('next week', { timeout: 1000 }).then(() => undefined, (error: unknown) => error);
     expect(String(malformed)).toContain('does not take');
     await expect(screen.getByTestId('notes')).toHaveValue('Bring the badge');
-    // A select holds its options' text, so it is not empty.
+    // A select holds its options' text, so it is not empty, and with no readonly attribute it is editable.
     await expect(region).not.toBeEmpty();
+    await expect(region).toBeEditable();
   });
 
   test('refuses an option in a disabled group', async ({ screen }) => {
