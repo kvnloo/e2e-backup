@@ -97,6 +97,9 @@ export function web(options: WebOptions = {}): WebEngine<'web', 'attempt'> {
   if (options.credentialOrigins !== undefined) validateCredentialOrigins(options);
   if (options.testIdAttribute !== undefined) validateTestIdAttribute(options.testIdAttribute);
   if (options.chromiumSandbox !== undefined) validateChromiumSandbox(options.chromiumSandbox);
+  if (options.hasTouch !== undefined && typeof options.hasTouch !== 'boolean') {
+    throw new ConfigurationError('INVALID_CONFIG', `web({ hasTouch }) must be a boolean, got ${kindOf(options.hasTouch)}`);
+  }
   if (options.userAgent !== undefined) validateUserAgent(options.userAgent, options.headers);
   if (options.locale !== undefined) validateLocale(options.locale, options.headers);
   if (options.timezoneId !== undefined) validateTimezoneId(options.timezoneId);
@@ -110,7 +113,7 @@ export function web(options: WebOptions = {}): WebEngine<'web', 'attempt'> {
   // A per-attempt lease rides the same persistent context as `reconnectEndpoint`, with the same limits.
   const recoverable = reconnecting || provider?.scope === 'attempt';
   const mode = provider === undefined ? 'connect.reconnectEndpoint' : `browser provider "${provider.name}" with scope "attempt"`;
-  const creationOptions = CREATION_OPTION_KEYS.filter((key) => options[key] !== undefined);
+  const creationOptions = CREATION_OPTION_KEYS.filter((key) => options[key] !== undefined && options[key] !== false);
   if (recoverable && creationOptions.length > 0) {
     throw new ConfigurationError(
       'INVALID_CONFIG',
@@ -195,6 +198,7 @@ const WEB_OPTION_KEYS: readonly string[] = Object.keys({
   basicAuth: true,
   credentialOrigins: true,
   testIdAttribute: true,
+  hasTouch: true,
   userAgent: true,
   locale: true,
   timezoneId: true,
@@ -205,7 +209,7 @@ const WEB_OPTION_KEYS: readonly string[] = Object.keys({
 } satisfies Record<keyof WebOptions, true>);
 
 /** The options applied when the engine creates a browser context, which a persistent context never is. */
-const CREATION_OPTION_KEYS = ['headers', 'basicAuth', 'userAgent', 'locale', 'timezoneId', 'deviceScaleFactor'] as const satisfies readonly (keyof WebOptions)[];
+const CREATION_OPTION_KEYS = ['headers', 'basicAuth', 'hasTouch', 'userAgent', 'locale', 'timezoneId', 'deviceScaleFactor'] as const satisfies readonly (keyof WebOptions)[];
 
 /**
  * What a persistent context rules out, named with its cause: `what` replaces

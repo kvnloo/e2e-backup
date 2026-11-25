@@ -58,6 +58,7 @@ interface Rect {
 type Actionable = Pick<
   PwLocator,
   | 'click'
+  | 'tap'
   | 'dblclick'
   | 'fill'
   | 'press'
@@ -547,14 +548,15 @@ export async function performElementSwipe(
   direction: ScrollDirection,
   momentum: Momentum,
   timeout: number,
+  touch = false,
 ): Promise<void> {
   // A node the pointer already hovers takes the wheel where it is; one hit at
   // its centre takes it there, at the box that hit test read; otherwise hover
   // waits for it to be actionable, scrolls it into view, and reports whatever
   // intercepts the pointer.
   const aimed = await (target.kind === 'locator'
-    ? target.locator.evaluate(wheelAim, undefined, { timeout })
-    : target.element.evaluate(wheelAim));
+    ? target.locator.evaluate(wheelAim, touch, { timeout })
+    : target.element.evaluate(wheelAim, touch));
   if (aimed.aim === 'blocked') await asActionable(target).hover({ timeout });
   const box = aimed.aim === 'blocked' ? await targetBoundingBox(target, timeout) : aimed.box;
   if (box === null) {
@@ -598,13 +600,15 @@ type WheelAim =
  * Page-side: where a wheel reaches `element` in a top-level document, whose
  * box is the page's: at the pointer when it already hovers the element, at
  * its centre when the hit target there is the element or inside it, or
- * `blocked` when neither holds.
+ * `blocked` when neither holds. With `touch`, `:hover` is skipped. A touch
+ * tap leaves `:hover` on the element without moving the mouse that sends the
+ * wheel, so the wheel would miss.
  */
-function wheelAim(element: Element): WheelAim {
+function wheelAim(element: Element, touch: boolean): WheelAim {
   if (window !== window.top || element.getClientRects().length === 0) return { aim: 'blocked' };
   const rect = element.getBoundingClientRect();
   const box = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-  if (element.matches(':hover')) return { aim: 'pointer', box };
+  if (!touch && element.matches(':hover')) return { aim: 'pointer', box };
   const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
   return hit !== null && element.contains(hit) ? { aim: 'centre', box } : { aim: 'blocked' };
 }

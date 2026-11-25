@@ -144,7 +144,7 @@ export interface WebConnectOptions {
    * same browser after a transport drop. Called once before the next
    * operation, within its budget. The original browser and page must survive.
    * Dispatched operations are never retried. The host owns browser cleanup.
-   * Context replacement, headers, basicAuth, userAgent, locale, timezoneId, and deviceScaleFactor are unavailable in this mode.
+   * Context replacement, headers, basicAuth, hasTouch (when `true`), userAgent, locale, timezoneId, and deviceScaleFactor are unavailable in this mode.
    */
   readonly reconnectEndpoint?: CdpEndpointResolver;
 }
@@ -257,6 +257,22 @@ export interface WebOptions {
    */
   readonly testIdAttribute?: string;
   /**
+   * Set to `true` to emulate a touchscreen in every attempt's context, for an
+   * app with touch handlers. The context is created with Playwright's
+   * `hasTouch` option. Defaults to `false`.
+   *
+   * A single `tap()` on a node or at a point sends `touchstart` and
+   * `touchend` before the browser fires `click`. Unlike a mouse click, a
+   * touch tap doesn't wait for a navigation it starts. The mouse pointer
+   * stays where it was, so `screen.swipe({ direction })` and `browser.mouse`
+   * use the old position. `click()` stays a mouse click (as in Playwright).
+   * Every other action still uses the mouse.
+   *
+   * `hasTouch: true` throws `INVALID_CONFIG` on a persistent context
+   * (`connect.reconnectEndpoint`, or a `scope: 'attempt'` provider).
+   */
+  readonly hasTouch?: boolean;
+  /**
    * The `User-Agent` every attempt's context sends and `navigator.userAgent`
    * reports, as Playwright's own `userAgent` context option sets it: for an
    * app that switches into a test mode on a marker in the agent string.
@@ -348,6 +364,7 @@ export class PlaywrightSurface {
   private credentialScope: ReadonlySet<string> = new Set();
   private readonly basicAuth: WebBasicAuth | undefined;
   private readonly testIdAttribute: string;
+  private readonly hasTouch: boolean;
   private readonly userAgent: string | undefined;
   private readonly locale: string | undefined;
   private readonly timezoneId: string | undefined;
@@ -388,6 +405,7 @@ export class PlaywrightSurface {
     this.credentialOrigins = options.credentialOrigins;
     this.basicAuth = options.basicAuth;
     this.testIdAttribute = options.testIdAttribute ?? DEFAULT_TEST_ID_ATTRIBUTE;
+    this.hasTouch = options.hasTouch ?? false;
     this.userAgent = options.userAgent;
     this.locale = options.locale;
     this.timezoneId = options.timezoneId;
@@ -597,6 +615,7 @@ export class PlaywrightSurface {
         ...(this.deviceScaleFactor === undefined ? {} : { deviceScaleFactor: this.deviceScaleFactor }),
         acceptDownloads: true,
         ...(credentials === undefined ? {} : { httpCredentials: credentials }),
+        hasTouch: this.hasTouch,
         ...(this.userAgent === undefined ? {} : { userAgent: this.userAgent }),
         ...(this.locale === undefined ? {} : { locale: this.locale }),
         ...(this.timezoneId === undefined ? {} : { timezoneId: this.timezoneId }),
@@ -1191,7 +1210,7 @@ export class PlaywrightSurface {
         return refs.lookup(ref).then(async (target) => {
           currentOperation.signal.throwIfAborted();
           try {
-            await dispatchLocatorAction(target, action, currentOperation, (other) => refs.lookup(other));
+            await dispatchLocatorAction(target, action, currentOperation, (other) => refs.lookup(other), this.hasTouch);
           } catch (cause) {
             // The input went out and its own tab closed: closing was what it did.
             if (dispatchedInput(cause) && session.tabClosed(page)) return;
@@ -1207,7 +1226,7 @@ export class PlaywrightSurface {
   performAt(point: ViewportPoint, action: PointerAction, operation: OperationContext): Promise<void> {
     return this.acted(operation, this.guard(operation, `${action.kind} at point`, (currentOperation) => {
       this.requireSession().requireObservation();
-      return dispatchPointerAction(this.requirePage(), point, action, currentOperation.signal);
+      return dispatchPointerAction(this.requirePage(), point, action, currentOperation.signal, this.hasTouch);
     }, classifyInputError));
   }
 

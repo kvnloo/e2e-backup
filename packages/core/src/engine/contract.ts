@@ -315,6 +315,12 @@ export type LocatorAction =
        * refuses it for any other before dispatch.
        */
       readonly modifiers?: readonly KeyModifier[];
+      /**
+       * Set on a `tap` when the test called `click()` rather than `tap()`. An
+       * engine that emulates a touchscreen sends a mouse click for it instead
+       * of a touch. Any other engine reads it as a tap.
+       */
+      readonly click?: true;
     }
   | {
       /**
@@ -396,7 +402,15 @@ export const KNOWN_LOCATOR_ACTION_KINDS = [...LOCATOR_ACTION_KINDS, 'blur', 'set
  * before it drags.
  */
 export type PointerAction =
-  | { readonly kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'hover' }
+  | {
+      readonly kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'hover';
+      /**
+       * Set on a `tap` when the test called `click()` rather than `tap()`. An
+       * engine that emulates a touchscreen sends a mouse click for it instead
+       * of a touch. Any other engine reads it as a tap.
+       */
+      readonly click?: true;
+    }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'dragTo'; readonly target: ViewportPoint }
   | {

@@ -887,6 +887,11 @@ void screen.getByRole('button').doubleTap({ count: 3 });
 declare const multiTapAction: Extract<import('../../src/engine/index.ts').LocatorAction, { kind: 'multiTap' }>;
 void (multiTapAction.count satisfies number);
 void (multiTapAction.modifiers satisfies readonly KeyModifier[] | undefined);
+declare const tapAction: Extract<import('../../src/engine/index.ts').LocatorAction, { kind: 'tap' | 'doubleTap' | 'secondaryTap' }>;
+void (tapAction.click satisfies true | undefined);
+// @ts-expect-error the click flag is set or left out, never false.
+({ kind: 'tap', click: false }) satisfies import('../../src/engine/index.ts').LocatorAction;
+({ kind: 'tap', click: true }) satisfies import('../../src/engine/index.ts').PointerAction;
 // @ts-expect-error a point has both coordinates.
 void screen.tapAt({ x: 1 });
 // @ts-expect-error a path swipe names both ends.

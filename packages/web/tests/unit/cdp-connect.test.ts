@@ -34,7 +34,7 @@ describe('web({ connect })', () => {
     expect(engine.session?.restart).toBeTypeOf('function');
   });
 
-  it('rejects creation-time credentials, headers, user agent, locale, and time zone with persistent recovery', () => {
+  it('rejects options that require a new context with reconnectEndpoint', () => {
     const connect = { cdpEndpoint: () => 'ws://localhost:0', reconnectEndpoint: () => 'ws://localhost:0' };
     expect(() => web({ connect, headers: { 'x-preview': 'synthetic' } })).toThrow(/persistent context/);
     expect(() => web({ connect, basicAuth: { username: 'user', password: 'synthetic' } })).toThrow(/persistent context/);
@@ -42,6 +42,8 @@ describe('web({ connect })', () => {
     expect(() => web({ connect, locale: 'de-DE' })).toThrow(/persistent context; locale requires/);
     expect(() => web({ connect, timezoneId: 'Europe/Berlin' })).toThrow(/persistent context; timezoneId requires/);
     expect(() => web({ connect, deviceScaleFactor: 2 })).toThrow(/persistent context; deviceScaleFactor requires/);
+    expect(() => web({ connect, hasTouch: true })).toThrow(/persistent context; hasTouch requires/);
+    expect(() => web({ connect, hasTouch: false })).not.toThrow();
   });
 
   it('rejects connect with a non-chromium browser as INVALID_CONFIG', () => {

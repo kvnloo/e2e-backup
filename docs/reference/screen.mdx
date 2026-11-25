@@ -685,7 +685,7 @@ action takes only the options its signature names.
 ```ts
 /** Taps exactly one matching actionable node, `count` times in a row; with `position`, taps that point of its box once it is in view, with no other actionability check. */
 tap(options?: TapOptions): Promise<void>;
-/** Alias of tap. */
+/** Alias of tap. When an engine emulates a touchscreen, it stays a mouse click. */
 click(options?: TapOptions): Promise<void>;
 ```
 

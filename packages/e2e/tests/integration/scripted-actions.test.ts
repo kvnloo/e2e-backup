@@ -86,7 +86,7 @@ describe('scripted engine: actions and app hooks', () => {
     const fixtureOne = path.join(run.project.dir, 'fixtures', 'one.txt');
     expect(performs).toEqual([
       ['submit', { kind: 'tap' }],
-      ['submit', { kind: 'tap' }],
+      ['submit', { kind: 'tap', click: true }],
       ['submit', { kind: 'doubleTap' }],
       ['submit', { kind: 'doubleTap' }],
       ['submit', { kind: 'secondaryTap' }],

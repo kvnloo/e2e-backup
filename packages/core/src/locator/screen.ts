@@ -426,8 +426,9 @@ class LocatorImpl extends ScreenImpl implements Locator {
     rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'count']);
     const modifiers = requireModifiers(options?.modifiers, api);
     const count = requireTapCount(options?.count, api);
+    const click = api === 'click' ? { click: true as const } : {};
     if (options?.position === undefined) {
-      if (count === 1) return this.dispatchTap(api, { kind: 'tap', ...modifiers }, options?.timeout);
+      if (count === 1) return this.dispatchTap(api, { kind: 'tap', ...click, ...modifiers }, options?.timeout);
       if (count === 2) return this.dispatchTap(api, { kind: 'doubleTap', ...modifiers }, options?.timeout, count);
       return this.dispatchTap(api, { kind: 'multiTap', count, ...modifiers }, options?.timeout, count);
     }
@@ -442,7 +443,7 @@ class LocatorImpl extends ScreenImpl implements Locator {
       'locator',
       `locator.${api}`,
       `${this.label} at ${describePoint(position)}`,
-      () => this.context.engine.performWithin(this.expression, position, { kind: 'tap' }, options.timeout),
+      () => this.context.engine.performWithin(this.expression, position, { kind: 'tap', ...click }, options.timeout),
     );
   }
 

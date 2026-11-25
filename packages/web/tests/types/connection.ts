@@ -89,3 +89,6 @@ import type { BrowserLease, BrowserProvider, CdpTarget, WebConnectOptions, WebIn
 ({ chromiumSandbox: false }) satisfies WebOptions;
 // @ts-expect-error chromiumSandbox is a boolean.
 ({ chromiumSandbox: 'yes' }) satisfies WebOptions;
+({ hasTouch: true }) satisfies WebOptions;
+// @ts-expect-error hasTouch is a boolean.
+({ hasTouch: 'false' }) satisfies WebOptions;

@@ -1132,7 +1132,7 @@ test('shift-clicks', async ({ app, screen }) => {
 
       const declaring = await run(createFakeEngine({ tapModifiers: true }));
       expect(declaring.result.status).toBe('passed');
-      expect(declaring.performs).toEqual([{ kind: 'tap', modifiers: ['Shift'] }]);
+      expect(declaring.performs).toEqual([{ kind: 'tap', click: true, modifiers: ['Shift'] }]);
 
       const predating = await run(createFakeEngine());
       expect(predating.result.status).toBe('failed');

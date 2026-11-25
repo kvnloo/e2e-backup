@@ -57,6 +57,7 @@ web({ viewport: { width: 390, height: 844 }, locale: 'de-DE' });
 | [`basicAuth`](#basicauth) | `WebBasicAuth` | - |
 | [`credentialOrigins`](#credentialorigins) | `string[]` | - |
 | [`testIdAttribute`](#testidattribute) | `string` | `'data-testid'` |
+| [`hasTouch`](#hastouch) | `boolean` | `false` |
 | [`userAgent`](#useragent) | `string` | the browser's own |
 | [`locale`](#locale) | `string` | the browser's own |
 | [`timezoneId`](#timezoneid) | `string` | the machine's |
@@ -76,7 +77,7 @@ web({ viewport: { width: 390, height: 844 }, locale: 'de-DE' });
 | --- | --- |
 | `INVALID_CONFIG` | An option `web()` does not take (`url` or any other app key included), or an unknown key inside `connect` or `basicAuth`. The message names the nearest known key for a likely typo (`viewprt` is `viewport`), else every key. |
 | `INVALID_CONFIG` | A browser provider, `connect`, `headers`, or `basicAuth` on a target whose [`app.url` is a file](/reference/config#a-file-as-the-app). |
-| `INVALID_CONFIG` | `headers`, `basicAuth`, `userAgent`, `locale`, `timezoneId`, or `deviceScaleFactor` on a [persistent context](#recovering-a-cdp-transport) (`connect.reconnectEndpoint`, or a provider with `scope: 'attempt'`). |
+| `INVALID_CONFIG` | `headers`, `basicAuth`, `hasTouch: true`, `userAgent`, `locale`, `timezoneId`, or `deviceScaleFactor` on a [persistent context](#recovering-a-cdp-transport) (`connect.reconnectEndpoint`, or a provider with `scope: 'attempt'`). |
 
 #### `browser`
 
@@ -282,10 +283,10 @@ To reuse one sign-in across files, keep isolated contexts (no
 A saved session carries it, not a shared browser.
 
 <Note>
-A persistent context does not support `headers`, `basicAuth`, `userAgent`,
-`locale`, `timezoneId`, `deviceScaleFactor` (see [Options](#options)),
-`app.clearState`, or
-session state capture and restore. `app.clearState` fails with
+A persistent context does not support `headers`, `basicAuth`,
+`hasTouch: true`, `userAgent`, `locale`, `timezoneId`, `deviceScaleFactor`
+(see [Options](#options)), `app.clearState`, or session state capture and
+restore. `app.clearState` fails with
 `UNSUPPORTED_CAPABILITY`. `app.restart` remains available.
 </Note>
 
@@ -385,6 +386,34 @@ The attribute that carries an element's test id: what the `testId` query
 ```ts
 web({ testIdAttribute: 'data-test' }); // default: 'data-testid'
 ```
+
+#### `hasTouch`
+
+Touchscreen emulation in every attempt's context, for an app with touch
+handlers. The context is created with Playwright's `hasTouch` option.
+
+```ts
+web({ hasTouch: true }); // default: false
+```
+
+- A single `tap()` on a node, or a tap at a point (`screen.tapAt`,
+  `tap({ position })`), sends `touchstart` and `touchend`. The browser then
+  fires `click`, unless the page cancels the touch event.
+- Unlike a mouse click on a node, a touch tap doesn't wait for a navigation
+  it starts. To wait for the next page, use
+  [`toHaveURL`](/reference/expect#tohaveurl).
+- A touch tap leaves the mouse pointer at its last position (top-left until
+  a hover or mouse action moves it). `screen.swipe({ direction })` and
+  `browser.mouse` act there. To scroll the tapped element, swipe its locator.
+- `click()` stays a mouse click, as in Playwright. On a node, it waits for a
+  navigation it starts.
+- Every other action still uses the mouse: `tap({ count })` above 1,
+  `doubleTap`, `longPress`, `secondaryTap`, `check`, `uncheck`, `hover`,
+  `dragTo`, and `screen.swipe`.
+
+| Throws | When |
+| --- | --- |
+| `INVALID_CONFIG` | A value that is not a boolean. |
 
 #### `userAgent`
 
@@ -1442,6 +1471,22 @@ export interface WebOptions {
    * Defaults to `data-testid`.
    */
   readonly testIdAttribute?: string;
+  /**
+   * Set to `true` to emulate a touchscreen in every attempt's context, for an
+   * app with touch handlers. The context is created with Playwright's
+   * `hasTouch` option. Defaults to `false`.
+   *
+   * A single `tap()` on a node or at a point sends `touchstart` and
+   * `touchend` before the browser fires `click`. Unlike a mouse click, a
+   * touch tap doesn't wait for a navigation it starts. The mouse pointer
+   * stays where it was, so `screen.swipe({ direction })` and `browser.mouse`
+   * use the old position. `click()` stays a mouse click (as in Playwright).
+   * Every other action still uses the mouse.
+   *
+   * `hasTouch: true` throws `INVALID_CONFIG` on a persistent context
+   * (`connect.reconnectEndpoint`, or a `scope: 'attempt'` provider).
+   */
+  readonly hasTouch?: boolean;
   /**
    * The `User-Agent` every attempt's context sends and `navigator.userAgent`
    * reports, for an app that switches into a test mode on a marker in the

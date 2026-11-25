@@ -145,6 +145,18 @@ describe('engine protocol', () => {
     await remote.dispose!(cleanup);
   });
 
+  it("carries a tap's click flag over JSON-RPC for nodes and points", async () => {
+    const perform = vi.fn<NonNullable<Engine['perform']>>(async () => undefined);
+    const performAt = vi.fn<NonNullable<Engine['performAt']>>(async () => undefined);
+    const { remote } = overLoopback(toy({ actions: ['tap'], perform, pointerActions: ['tap'], performAt }));
+    await remote.init!(initInfo());
+    await remote.perform!({ id: 'root', revision: '1' }, { kind: 'tap', click: true }, operation());
+    await remote.performAt!({ x: 1, y: 2 }, { kind: 'tap', click: true }, operation());
+    expect(perform).toHaveBeenCalledWith(expect.anything(), { kind: 'tap', click: true }, expect.anything());
+    expect(performAt).toHaveBeenCalledWith({ x: 1, y: 2 }, { kind: 'tap', click: true }, expect.anything());
+    await remote.dispose!(cleanup);
+  });
+
   it('carries a snapshot with its pixels byte for byte', async () => {
     const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255, 7]);
     const { remote } = overLoopback(

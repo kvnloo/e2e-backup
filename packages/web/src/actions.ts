@@ -162,14 +162,15 @@ function controlPoint(label: HTMLLabelElement): { x: number; y: number } | null 
  * label when `pickStandIn` names one. The checks then run on the label, so
  * anything else on top, such as a modal, still fails NOT_ACTIONABLE. The
  * choice is read again until the control or a label renders, within the
- * deadline.
+ * deadline. A tap uses the touchscreen when `touch` is set.
  */
 async function clickControl(
   target: ActionTarget,
   verb: 'tap' | 'check' | 'uncheck',
-  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[] },
+  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; touch?: boolean },
 ): Promise<void> {
-  const { signal, ...click } = options;
+  const { signal, touch, ...click } = options;
+  const method = touch === true ? 'tap' : 'click';
   const deadline = new Deadline(options.timeout);
   const remaining = (): number => Math.max(1, deadline.remaining());
   let label: ElementHandle<HTMLLabelElement> | undefined;
@@ -200,17 +201,13 @@ async function clickControl(
       new EngineError('NOT_ACTIONABLE', `${verb} did not become actionable in time: ${UNRENDERED}`, { retryable: false }),
   });
   // The operation abandons this call when cancelled; a read still in flight then must not lead to a click.
-  if (label === undefined) {
-    signal.throwIfAborted();
-    await asActionable(target).click({ ...click, timeout: remaining() });
-    return;
-  }
   try {
-    const position = await label.evaluate(controlPoint);
+    const receiver = label ?? asActionable(target);
+    const position = label === undefined ? null : await label.evaluate(controlPoint);
     signal.throwIfAborted();
-    await label.click({ ...click, timeout: remaining(), ...(position === null ? {} : { position }) });
+    await receiver[method]({ ...click, timeout: remaining(), ...(position === null ? {} : { position }) });
   } finally {
-    void label.dispose().catch(() => undefined);
+    void label?.dispose().catch(() => undefined);
   }
 }
 
@@ -278,19 +275,21 @@ function isFileInput(element: ElementHandle<Element>): Promise<boolean> {
 /**
  * Dispatches one deterministic locator action onto a Playwright target with the
  * platform's own actionability checks. `lookup` resolves the second ref of a
- * drag; everything else needs only the target.
+ * drag; everything else needs only the target. A tap uses the touchscreen
+ * when `touch` is set, unless the test called `click()`.
  */
 export async function dispatchLocatorAction(
   target: ActionTarget,
   action: LocatorAction,
   operation: ConnectionBudget,
   lookup: (ref: NodeRef) => Promise<ActionTarget>,
+  touch = false,
 ): Promise<void> {
   const timeout = operation.timeoutMs;
   const locator = asActionable(target);
   switch (action.kind) {
     case 'tap':
-      await clickControl(target, 'tap', { timeout, signal: operation.signal, ...heldKeys(action) });
+      await clickControl(target, 'tap', { timeout, signal: operation.signal, touch: touch && action.click !== true, ...heldKeys(action) });
       return;
     case 'doubleTap':
       await locator.dblclick({ timeout, ...heldKeys(action) });
@@ -392,7 +391,7 @@ export async function dispatchLocatorAction(
     case 'swipe':
       // The agent's node scroll and `screen` swipes both arrive here: a wheel
       // gesture over the node, sized by its own box.
-      await performElementSwipe(target, action.direction, action.momentum ?? 'none', timeout);
+      await performElementSwipe(target, action.direction, action.momentum ?? 'none', timeout, touch);
       return;
   }
 }
@@ -401,18 +400,22 @@ export async function dispatchLocatorAction(
  * Dispatches one pointer action at a viewport point with nothing resolved
  * behind it: no actionability wait, because there is no element to wait on,
  * and the page decides what the gesture lands on, as it does for a person.
+ * A tap uses the touchscreen when `touch` is set, unless the test called
+ * `click()`.
  */
 export async function dispatchPointerAction(
   page: Page,
   at: ViewportPoint,
   action: PointerAction,
   signal?: AbortSignal,
+  touch = false,
 ): Promise<void> {
   const { mouse } = page;
   const point = nearestPixel(at);
   switch (action.kind) {
     case 'tap':
-      await mouse.click(point.x, point.y);
+      if (touch && action.click !== true) await page.touchscreen.tap(point.x, point.y);
+      else await mouse.click(point.x, point.y);
       return;
     case 'doubleTap':
       await mouse.dblclick(point.x, point.y);

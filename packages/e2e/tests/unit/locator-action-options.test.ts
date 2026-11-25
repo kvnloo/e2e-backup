@@ -110,7 +110,11 @@ describe('locator action options', () => {
     ] as const)('%s hands the held keys to an engine that declares tapModifiers', async (verb, call) => {
       const { screen, steps, received } = modifierScreen(true);
       await call(screen.getByLabel('Agree'));
-      expect(received).toEqual([{ kind: verb === 'click' ? 'tap' : verb === 'dblclick' ? 'doubleTap' : verb, modifiers: ['Shift'] }]);
+      expect(received).toEqual([{
+        kind: verb === 'click' ? 'tap' : verb === 'dblclick' ? 'doubleTap' : verb,
+        modifiers: ['Shift'],
+        ...(verb === 'click' ? { click: true } : {}),
+      }]);
       expect(steps.all()).toEqual([
         expect.objectContaining({ api: `locator.${verb}`, label: 'getByLabel("Agree") with Shift', status: 'passed' }),
       ]);
@@ -190,7 +194,7 @@ describe('locator action options', () => {
       const { screen, steps, received } = countScreen();
       await screen.getByLabel('Agree').tap({ count: 1 });
       await screen.getByLabel('Agree').click({ count: 1 });
-      expect(received).toEqual([{ kind: 'tap' }, { kind: 'tap' }]);
+      expect(received).toEqual([{ kind: 'tap' }, { kind: 'tap', click: true }]);
       expect(steps.all().map((step) => step.label)).toEqual(['getByLabel("Agree")', 'getByLabel("Agree")']);
     });
 

@@ -593,7 +593,7 @@ export interface Screen {
 export interface Locator extends Omit<Screen, 'tree' | 'debug' | 'pause'> {
   /** Taps exactly one matching actionable node, `count` times in a row; with `position`, taps that point of its box once it is in view, with no other actionability check. */
   tap(options?: TapOptions): Promise<void>;
-  /** Alias of tap. */
+  /** Alias of tap. When an engine emulates a touchscreen, it stays a mouse click. */
   click(options?: TapOptions): Promise<void>;
   /** Double-taps exactly one matching actionable node. */
   doubleTap(options?: ClickOptions): Promise<void>;
