@@ -499,6 +499,8 @@ export interface BoundDevice {
   readonly session: string;
   readonly deviceId: string;
   readonly deviceName: string;
+  /** Set for a physical device, as agent-device's boot reports it. */
+  readonly physical: boolean;
 }
 
 export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform> {
@@ -690,7 +692,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
         ? undefined
         : { provider, lease, runId: info.runId, targetName: info.targetName, env: info.env };
     const booted = await this.command('boot', (client) => client.devices.boot(bootRequest(this.selection())), info.signal);
-    this.bound = { session, deviceId: booted.id, deviceName: booted.device };
+    this.bound = { session, deviceId: booted.id, deviceName: booted.device, physical: booted.kind === 'device' };
     // Nothing is installed here: a device provider that installed the build
     // from `appPath` says so on the binding, and otherwise the suite installs
     // it where it wants to, with `device.installApp()`.
@@ -983,6 +985,12 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    * from the link. A provider's device is refused, since its driver can open
    * the link in the running app. So is a target with launch arguments or
    * permissions, since neither can ride a launch from a link.
+   *
+   * On iOS, only a custom-scheme link on a simulator launches the app. With
+   * an http(s) link, agent-device launches the app and then opens the URL.
+   * On a physical iPhone, its XCTest backend stops the app and can't launch
+   * it with a URL, and boot doesn't say which backend drives the device, so
+   * every physical iPhone is refused.
    */
   async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget, relaunch = false): Promise<void> {
     const target = app ?? this.pinnedApp;
@@ -995,6 +1003,12 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       const permissions = configuredPermissions(this.app);
       if (launchArguments !== undefined || permissions === 'all' || Object.keys(permissions ?? {}).length > 0) {
         throw unsupported("app.open(path, { relaunch: true }) launches the app from the link, and that launch can't pass the target's `app.launchArguments` or `app.permissions`: remove them from the target to use it");
+      }
+      if (this.options.platform === 'ios' && this.bound?.physical === true) {
+        throw unsupported("app.open(path, { relaunch: true }) isn't supported on a physical iPhone: agent-device's XCTest backend stops the app and then can't launch it with a URL, and the engine can't tell which backend drives the device. Run the test on an iOS simulator or an Android device instead");
+      }
+      if (this.options.platform === 'ios' && (url.protocol === 'http:' || url.protocol === 'https:')) {
+        throw unsupported("app.open(path, { relaunch: true }) on an iOS simulator takes a custom-scheme link only: with an http(s) link, agent-device launches the app first and then opens the URL in it. Set app.linkBase to the app's custom scheme, or open the http(s) link in the running app with device.openLink(url)");
       }
     }
     if (target === undefined && this.options.platform === 'ios') {

@@ -73,8 +73,7 @@ schemes included.
 With `relaunch: true`, the app is started fresh before the path is opened:
 
 - On a device with `app.linkBase`, the pinned app is stopped if it's running,
-  then launched from the link. It's refused on a target with a device
-  provider, launch arguments, or permissions
+  then launched from the link. It isn't supported on every device target
   ([mobile](/reference/mobile#the-app-under-test)).
 - On a web target, the open tabs are closed and a new one is opened in the
   same browser context, as in [`restart`](#restart). Then the path is opened

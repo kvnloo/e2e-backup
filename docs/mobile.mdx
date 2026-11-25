@@ -274,14 +274,20 @@ running, then launched from the link:
 await app.open('/orders/42', { relaunch: true });
 ```
 
-On an iOS simulator, only a custom-scheme link arrives as the app's launch
-URL. With an `http(s)` link, the app is launched first and the link is
-opened in it. Before the app starts, iOS can ask "Open in ...?" for a
+Before the app starts, the iOS simulator can ask "Open in ...?" for a
 custom-scheme link. Accept it with `device.alert('accept')`.
 
-The call is refused on a target with a device provider, launch arguments,
-or permissions ([reference](/reference/mobile#the-app-under-test)). It works
-on a web target too, where a fresh tab is opened at the path
+When the app can't start from the link, the call fails with
+`UNSUPPORTED_CAPABILITY` instead:
+
+- An `http(s)` link on an iOS simulator, since agent-device launches the app
+  first and then opens the URL in it. Use a custom scheme in `app.linkBase`.
+- A physical iPhone, since agent-device's XCTest backend can't launch the
+  app with a URL, and the engine can't tell which backend drives the device.
+- A target with a device provider, launch arguments, or permissions.
+
+See the [reference](/reference/mobile#the-app-under-test). The call works on
+a web target too, where a fresh tab is opened at the path
 ([`app.open`](/reference/app#open)).
 
 `device.setNetwork('offline')` and `device.setAirplaneMode(true)` work on

@@ -3412,6 +3412,34 @@ describe('device fixture', () => {
     ]);
   });
 
+  it('refuses to relaunch from an http(s) link on an iOS simulator, before any device command, and relaunches from one on Android', async () => {
+    const ios = harness({ bundleId: 'dev.e2e.benchmark' });
+    await openAttempt(ios);
+    const before = ios.fake.calls.length;
+    await expect(ios.engine.session!.openLink!('https://shop.example.com/orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('custom-scheme link only'),
+    });
+    expect(ios.fake.calls.slice(before)).toEqual([]);
+
+    const android = harness({ platform: 'android', bundleId: 'dev.e2e.benchmark' });
+    await openAttempt(android);
+    await android.engine.session!.openLink!('https://shop.example.com/orders/42', operation(), { relaunch: true });
+    expect(android.fake.lastArgs('apps.open')).toEqual({ platform: 'android', app: 'dev.e2e.benchmark', url: 'https://shop.example.com/orders/42', relaunch: true });
+  });
+
+  it('refuses to relaunch from a link on a physical iPhone, before any device command', async () => {
+    const h = harness({ bundleId: 'dev.e2e.benchmark' });
+    h.fake.respond('devices.boot', () => ({ platform: 'ios', target: 'mobile', device: 'iPhone', id: '00008110-0001', kind: 'device', booted: true }));
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await expect(h.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('physical iPhone'),
+    });
+    expect(h.fake.calls.slice(before)).toEqual([]);
+  });
+
   it('refuses to relaunch from a link on a target with launch arguments or permissions, before any device command', async () => {
     for (const options of [{ launchArguments: ['-e2e', 'YES'] }, { permissions: { camera: 'grant' as const } }, { allPermissions: true as const }]) {
       const h = harness({ bundleId: 'dev.e2e.benchmark', ...options });
