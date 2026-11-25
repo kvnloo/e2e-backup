@@ -462,6 +462,39 @@ export class ElectronSurface {
     }
   }
 
+  /**
+   * Whether the element with keyboard focus takes typed text. Page script
+   * stops at the host of a closed shadow root; the DevTools protocol reaches
+   * into one, so the walk goes on inside until it finds the focused element.
+   */
+  private async focusedTakesText(window: AppWindow): Promise<boolean> {
+    const session = await this.session(window.page);
+    const executionContextId = await this.world(window.page);
+    const group = objectGroup();
+    try {
+      const { result: document } = await session.send('Runtime.evaluate', { expression: 'document', contextId: executionContextId, objectGroup: group });
+      if (document.objectId === undefined) return false;
+      const { result: first } = await session.send('Runtime.callFunctionOn', { objectId: document.objectId, functionDeclaration: ACTIVE_UNDER, objectGroup: group });
+      if (first.objectId === undefined) return false;
+      let active = first.objectId;
+      for (;;) {
+        const { node } = await session.send('DOM.describeNode', { objectId: active, depth: 1, pierce: true });
+        const closed = node.shadowRoots?.find((root) => root.shadowRootType === 'closed');
+        if (closed === undefined) break;
+        const { object: root } = await session.send('DOM.resolveNode', { backendNodeId: closed.backendNodeId, executionContextId, objectGroup: group });
+        if (root.objectId === undefined) break;
+        const { result: inner } = await session.send('Runtime.callFunctionOn', { objectId: root.objectId, functionDeclaration: ACTIVE_UNDER, objectGroup: group });
+        // Nothing focused inside: the host itself has focus.
+        if (inner.objectId === undefined) break;
+        active = inner.objectId;
+      }
+      const { result } = await session.send('Runtime.callFunctionOn', { objectId: active, functionDeclaration: TAKES_TEXT, returnByValue: true });
+      return result.value === true;
+    } finally {
+      await session.send('Runtime.releaseObjectGroup', { objectGroup: group }).catch(() => undefined);
+    }
+  }
+
   /** Evaluates an expression in the window's isolated world. */
   private async evaluateIn<T>(window: AppWindow, expression: string): Promise<T> {
     const session = await this.session(window.page);
@@ -943,7 +976,7 @@ export class ElectronSurface {
     const { keyboard } = window.page;
     const open = inputGate(operation, 'keyboard.type');
     await this.bounded(operation, 'keyboard.type', true, async () => {
-      const editable = await this.evaluateIn<boolean>(window, FOCUSED_EDITABLE);
+      const editable = await this.focusedTakesText(window);
       if (!editable) throw notActionable('nothing that takes text has keyboard focus; tap the field first');
       if (options.replace) {
         open();
@@ -1301,16 +1334,22 @@ const CHECK_FILE_INPUT = `function () { ${ELEMENT}
   return { ok: true };
 }`;
 
-const FOCUSED_EDITABLE = `(() => {
-  let active = document.activeElement;
+/** The focused element under `this`, a document or shadow root, through every open shadow root; it stops at a closed root's host. */
+const ACTIVE_UNDER = `function () {
+  let active = this.activeElement;
   while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
-  if (!active) return false;
+  return active;
+}`;
+
+/** Whether `this`, the focused element, takes typed text. */
+const TAKES_TEXT = `function () {
+  const active = this;
   if (active.tagName === 'IFRAME' || active.tagName === 'WEBVIEW') return true;
   if (active.isContentEditable) return true;
   if (active.tagName === 'TEXTAREA') return !active.readOnly && !active.disabled;
   if (active.tagName === 'INPUT') return ${TEXT_INPUT_TYPES}.includes((active.getAttribute('type') || '').toLowerCase()) && !active.readOnly && !active.disabled;
   return false;
-})()`;
+}`;
 
 const QUERY_ALL = `function (selector) {
   const found = [];

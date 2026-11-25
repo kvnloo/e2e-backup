@@ -307,6 +307,15 @@ test.describe('windows', () => {
     expect(String(missing)).toContain('no window matches title Preferences; open: "Sign In", "Settings"');
     expect(await electron.evaluate(() => (globalThis as unknown as { testbedState: { settingsOpened: number } }).testbedState.settingsOpened)).toBe(1);
   });
+
+  test('types into a field inside a closed shadow root', async ({ app, screen, electron }) => {
+    await app.open();
+    await screen.getByRole('button', 'Open settings').tap();
+    await electron.useWindow({ title: 'Settings' });
+    const note = screen.getByRole('textbox', 'Vault note');
+    await note.pressSequentially('kept');
+    await expect(note).toHaveValue('kept');
+  });
 });
 
 /** A decoded capture: its width, its pixels rows top to bottom, and how many bytes each takes (3 for RGB, 4 for RGBA). */
