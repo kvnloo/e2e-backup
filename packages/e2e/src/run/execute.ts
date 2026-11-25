@@ -1078,14 +1078,17 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
               implicatesUnconfirmed: failure === undefined || implicatesUnconfirmed,
             },
       );
-      // A secret a later step resolved may be in an earlier step's detour,
-      // which names locations (`settledDetour`).
-      const ledger = openSession === null ? processSecrets : sessionLedger(openSession, this.config.allSecrets);
       for (const step of record.steps) {
         const write = writes.get(step.index);
         if (step.cache !== undefined && write !== undefined) step.cache.write = write;
-        if (step.cache?.detour !== undefined) step.cache.detour = settledDetour(step.cache.detour, ledger);
       }
+    }
+    // A secret a later step resolved may be in an earlier step's detour,
+    // which names locations (`settledDetour`), the detour of a step another
+    // session ran included, whatever this attempt's own cache. Masked with
+    // every value the process has learned, which keeps a closed session's.
+    for (const step of record.steps) {
+      if (step.cache?.detour !== undefined) step.cache.detour = settledDetour(step.cache.detour, processSecrets);
     }
     return record;
   }
