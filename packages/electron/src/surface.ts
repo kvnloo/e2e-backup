@@ -707,7 +707,8 @@ export class ElectronSurface {
             return;
           }
           case 'focus':
-            await commit(() => this.callOn(window, backendNodeId, FOCUS));
+            // pressSequentially focuses, then types into whatever holds focus: the node must be the one that does.
+            if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
             return;
           case 'blur':
             await commit(() => this.callOn(window, backendNodeId, BLUR));

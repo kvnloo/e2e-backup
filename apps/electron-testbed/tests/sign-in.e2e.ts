@@ -64,6 +64,8 @@ test.describe('sign-in window', () => {
   test('refuses to type into a field that hands focus on to another', async ({ screen }) => {
     const refused = await screen.getByTestId('handoff').fill('typed', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
     expect(String(refused)).toContain('did not keep keyboard focus');
+    const typed = await screen.getByTestId('handoff').pressSequentially('typed', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(typed)).toContain('did not keep keyboard focus');
     await expect(screen.getByTestId('username')).toHaveValue('');
   });
 
