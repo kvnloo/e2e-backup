@@ -2073,7 +2073,7 @@ describe('Android density', () => {
     expect(at(140)).toEqual([255, 255, 255]);
   });
 
-  it('reads the density again before each test point action, so the next point uses the new density', async () => {
+  it('reads the density again before each test point action so the next point uses the new density', async () => {
     const h = harness({ platform: 'android' }, false);
     await openAttempt(h);
     const screen = (pixelDensity: number) => ({
