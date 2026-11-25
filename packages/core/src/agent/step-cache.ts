@@ -23,6 +23,7 @@ import { expandTrace, templateParams, templatesCollide, templateTrace, type Para
 import { targetLabel, type ActionTrace, type DerivedReason, type RecordedModel, type TraceEntry, type TraceTargetDescriptor } from '../cache/trace.ts';
 import { readTraceEntry } from '../cache/trace-read.ts';
 import { sleep } from '../internal/time.ts';
+import { processSecrets } from '../run/secrecy.ts';
 import type { StepCacheInfo } from '../run/steps.ts';
 import type { JsonValue } from '../types.ts';
 import type { RecordableAction } from './actions.ts';
@@ -665,7 +666,8 @@ export class StepTraceSession {
     const detours = findDetours(trace);
     const located = trace.actions.some((action) => action.at !== undefined);
     const staged = located ? { ...templated, detours: detours.map(({ from, to }) => ({ from, to })) } : templated;
-    this.cache.staged.push({ kind: 'write', keyHash: this.keyHash, trace: staged, stepIndex: this.options.stepIndex, redact: this.options.redact });
+    // Settled with every value the process has learned by then, a closed session's included (`processSecrets`).
+    this.cache.staged.push({ kind: 'write', keyHash: this.keyHash, trace: staged, stepIndex: this.options.stepIndex, redact: processSecrets.redact });
     // The report names the detours of the recording it stages, and none when that has none.
     if (this.info !== undefined) {
       const { detour: _replayed, ...info } = this.info;

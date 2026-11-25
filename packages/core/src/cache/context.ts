@@ -49,9 +49,10 @@ export type StagedTrace = {
       readonly kind: 'write';
       readonly trace: ActionTrace;
       /**
-       * The run's live redactor. A secret a later step resolves may already
-       * be in an action's location, so settlement masks the locations again
-       * before the write.
+       * A live redactor that knows every value the process learns. A secret
+       * a later step, or another session, resolves may already be in an
+       * action's location, so settlement masks the locations again before
+       * the write.
        */
       readonly redact?: (text: string) => string;
     }
