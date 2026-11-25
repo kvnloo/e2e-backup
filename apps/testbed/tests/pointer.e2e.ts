@@ -52,6 +52,14 @@ test('screen.tapAt and screen.swipe take percentages of the viewport', { platfor
   await expect(screen.getByLabel('Pad state')).toHaveText(`swiped from ${onPad(100, 200)} to ${onPad(300, 200)}`);
 });
 
+test('locator.swipe({ from, to }) takes points on the node box, in pixels or percentages', async ({ app, screen }) => {
+  await app.open('/pointer');
+
+  await screen.getByRole('image', 'Pointer pad').swipe({ from: { x: 10, y: 20 }, to: { x: '75%', y: '10%' }, duration: 200 });
+
+  await expect(screen.getByLabel('Pad state')).toHaveText('swiped from 10,20 to 240,20');
+});
+
 test('a path swipe drags and drops on the board', async ({ app, screen }) => {
   await app.open('/board');
 

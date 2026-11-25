@@ -86,6 +86,19 @@ function resolveCoordinate(value: ScreenCoordinate, size: number): number {
   return clamp(Math.round((Number.parseFloat(value) / 100) * size), 0, Math.max(0, size - 1));
 }
 
+/**
+ * Resolves a point on a node to viewport pixels. A pixel coordinate is an
+ * offset from `origin`, the corner `tap({ position })` uses. A percentage is
+ * a share of the visible `box` from its top-left corner, kept on its last pixel.
+ */
+export function resolveBoxPoint(point: ScreenPoint, box: Box, origin: ViewportPoint): ViewportPoint {
+  const share = resolveScreenPoint(point, box);
+  return {
+    x: typeof point.x === 'number' ? origin.x + point.x : box.x + share.x,
+    y: typeof point.y === 'number' ? origin.y + point.y : box.y + share.y,
+  };
+}
+
 /** True when the point lies inside the box: on its top and left edges, short of its bottom and right ones. */
 export function containsPoint(box: Box, point: ViewportPoint): boolean {
   return point.x >= box.x && point.x < box.x + box.width && point.y >= box.y && point.y < box.y + box.height;

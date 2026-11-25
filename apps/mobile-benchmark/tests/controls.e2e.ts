@@ -392,6 +392,24 @@ test.describe('control inventory', () => {
       .toBe(true);
   });
 
+  // Percentages of the pad work the same on both platforms. The path runs
+  // right to left, since the screen is popped on a left-to-right fling. A
+  // fling lifts a little short of `to`, so the test checks the direction, and
+  // a start within a point of the pad's middle row (40 of its 80 points).
+  test('a locator swipe drags between points of the node', async ({ screen }) => {
+    await showSection(screen, 'Gestures');
+    const swipeStatus = screen.getByTestId('swipe-status');
+
+    await screen.getByTestId('swipe-pad').swipe({ from: { x: '80%', y: '50%' }, to: { x: '20%', y: '50%' } });
+
+    await expect
+      .poll(async () => {
+        const match = /^swipe: (\d+),(\d+) to (-?\d+),\d+$/.exec((await swipeStatus.textContent()) ?? '');
+        return match !== null && Number(match[3]) < Number(match[1]) && Math.abs(Number(match[2]) - 40) <= 1;
+      })
+      .toBe(true);
+  });
+
   test('an ambiguous locator fails at once', async ({ screen }) => {
     await showSection(screen, 'Gestures');
     const ambiguous = await rejection(screen.getByTestId('fruit-row').tap());

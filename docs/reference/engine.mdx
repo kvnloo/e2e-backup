@@ -571,7 +571,7 @@ engine.
 | `modifiers` on a tap (`row.click({ modifiers: ['Shift'] })`) | `tapModifiers: true`; the keys are held for the click |
 | `screen.tapAt`, `tap({ position })` | `performAt` with the `tap` pointer kind |
 | `screen.doubleTapAt` | `performAt` with the `doubleTap` pointer kind |
-| `screen.swipe({ from, to })` | `performAt` with the `swipeTo` pointer kind |
+| `screen.swipe({ from, to })`, `locator.swipe({ from, to })` | `performAt` with the `swipeTo` pointer kind |
 | `locator.pressSequentially` | the `focus` action and `keyboard`; the harness composes `focus` then `keyboard.type` |
 | `test.setup` sessions, the `session:` option | `state` |
 | `app.screenshot()`, assertion evidence, the failure screenshot | `artifacts` |

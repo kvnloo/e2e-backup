@@ -906,8 +906,8 @@ void screen.tapAt({ x: '50', y: 1 });
 void screen.getByRole('image').tap({ position: { x: '50%', y: 0 } });
 // @ts-expect-error the executor's point verbs aim at screenshot pixels, never percentages.
 void executorContext.actions.tapAt({ x: '50%', y: 0 });
-// @ts-expect-error a locator swipe is directional; the path form is screen.swipe.
-void screen.getByRole('image').swipe({ from: point, to: point });
+// A locator swipe can be a path on its node's box, in pixels or percentages.
+void screen.getByRole('list').swipe({ from: { x: '90%', y: '50%' }, to: { x: 10, y: '50%' }, duration: 300, timeout: 1_000 });
 // @ts-expect-error a directional swipe takes no duration.
 void screen.swipe({ direction: 'up', duration: 300 });
 // @ts-expect-error a surface without a url has no base URL; a test must handle undefined
