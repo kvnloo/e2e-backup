@@ -52,6 +52,44 @@ export function resolveExpression(
 }
 
 /**
+ * The platform-native selectors a `selector` expression anywhere in
+ * `expression` names, each once, in the order `resolveExpression` meets them.
+ * The `selector` option answers synchronously, so an engine whose selector
+ * language sits across a protocol (a browser's DevTools, a device daemon)
+ * queries these first and answers from what it read. A `frame` expression's
+ * selector is not among them: `resolveExpression` refuses a frame.
+ */
+export function expressionSelectors(expression: LocatorExpression): readonly string[] {
+  const found = new Set<string>();
+  const walk = (node: LocatorExpression): void => {
+    switch (node.kind) {
+      case 'selector':
+        found.add(node.selector);
+        return;
+      case 'query':
+        if (node.scope !== undefined) walk(node.scope);
+        return;
+      case 'filter':
+        walk(node.source);
+        if (node.has !== undefined) walk(node.has);
+        if (node.hasNot !== undefined) walk(node.hasNot);
+        return;
+      case 'index':
+        walk(node.source);
+        return;
+      case 'frame':
+        return;
+      case 'union':
+        walk(node.left);
+        walk(node.right);
+        return;
+    }
+  };
+  walk(expression);
+  return [...found];
+}
+
+/**
  * Every node of a tree in document (DFS pre-order) order, with the index
  * range of each node's subtree: `all[enter]` is the node itself and
  * `all[start .. end)` its descendants (`start` is `enter + 1`), so

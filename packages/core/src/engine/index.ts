@@ -40,7 +40,7 @@ export { rejectUnknownKeys, rejectUnknownOptions } from '../internal/options.ts'
 export { appleUserDefaults, checkLaunchArguments } from '../internal/launch-arguments.ts';
 export { validateJsonValue, type JsonValueRules } from '../internal/json-value.ts';
 export { describePattern, matchesText, toTextPattern } from '../internal/text.ts';
-export { resolveExpression, type ResolveExpressionOptions } from './resolve.ts';
+export { expressionSelectors, resolveExpression, type ResolveExpressionOptions } from './resolve.ts';
 export type { TextMatch } from '../types.ts';
 export { raceAbort } from './timing.ts';
 export { isProviderRecording, stopProviderRecording } from './recording.ts';

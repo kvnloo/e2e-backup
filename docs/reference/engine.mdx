@@ -1780,7 +1780,7 @@ reproduces these semantics; import them instead of carrying a copy.
 | Export | Returns |
 | --- | --- |
 | [`matchesText`, `toTextPattern`, `describePattern`](#text-patterns) | `boolean`, `TextPattern`, `string` |
-| [`resolveExpression`](#resolveexpression) | `SemanticNode[]` |
+| [`resolveExpression`, `expressionSelectors`](#resolveexpression) | `SemanticNode[]`, `readonly string[]` |
 | [`urlMatches`](#urlmatches) | `boolean` |
 | [`siteOf`, `sameSite`](#site-helpers) | `string`, `boolean` |
 | [`isRefusedLinkScheme`](#isrefusedlinkscheme) | `boolean` |
@@ -1826,6 +1826,8 @@ export function resolveExpression(
   nodes: readonly SemanticNode[],
   options?: ResolveExpressionOptions,
 ): SemanticNode[];
+
+export function expressionSelectors(expression: LocatorExpression): readonly string[];
 ```
 
 ```ts
@@ -1839,7 +1841,11 @@ async locate(expression) {
   a descendant's text.
 - An engine whose tree is the whole truth (a device) calls it; a browser
   engine reproduces it.
-- A `selector` expression needs the `selector` option.
+- A `selector` expression needs the `selector` option, which answers
+  synchronously. An engine whose selector language is asynchronous (a
+  DevTools query, a device daemon) queries every selector
+  `expressionSelectors(expression)` returns first, then answers from those
+  results.
 - A `frame` expression is `FRAME_NOT_FOUND`.
 - A `union` expression matches either branch in document order, without duplicate nodes.
 

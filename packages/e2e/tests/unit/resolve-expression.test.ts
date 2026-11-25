@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  expressionSelectors,
   resolveExpression,
   type LocatorExpression,
   type SemanticNode,
@@ -259,5 +260,24 @@ describe('resolveExpression', () => {
     expect(() => ids({ kind: 'frame', selector: 'iframe', source: query('role', 'button') })).toThrowError(
       expect.objectContaining({ code: 'FRAME_NOT_FOUND', retryable: false }),
     );
+  });
+});
+
+describe('expressionSelectors', () => {
+  it('lists every selector an expression names, once, in the order the resolve meets them', () => {
+    const expression: LocatorExpression = {
+      kind: 'union',
+      left: {
+        kind: 'index',
+        source: { kind: 'filter', source: { kind: 'query', query: { kind: 'role', value: { kind: 'string', value: 'button', exact: true } }, scope: { kind: 'selector', selector: '#form' } }, has: { kind: 'selector', selector: '.icon' }, hasNot: { kind: 'selector', selector: '#form' } },
+        index: 'first',
+      },
+      right: { kind: 'selector', selector: 'button.primary' },
+    };
+    expect(expressionSelectors(expression)).toEqual(['#form', '.icon', 'button.primary']);
+  });
+
+  it('leaves out a frame, which the resolve refuses', () => {
+    expect(expressionSelectors({ kind: 'frame', selector: 'iframe', source: { kind: 'selector', selector: 'button' } })).toEqual([]);
   });
 });
