@@ -216,6 +216,13 @@ describe('e2e cache show', () => {
     expect(written(stderrSpy)).toContain(`${torn}: not JSON, so not a replay cache entry`);
   });
 
+  it('says how many times a folded scroll replays', async () => {
+    const recorded = detouredTrace();
+    await seed([{ keyHash: 'c'.repeat(64), trace: { ...recorded, actions: recorded.actions.map((action) => (action.name === 'scroll' ? { ...action, times: 5 } : action)) } }]);
+    await invoke('cache', 'show', 'c'.repeat(12));
+    expect(written(stdoutSpy)).toContain('scroll down (5 times) (detour)');
+  });
+
   it('names the state and value a replay checks in the end state', async () => {
     await seed([{
       keyHash: 'c'.repeat(64),
