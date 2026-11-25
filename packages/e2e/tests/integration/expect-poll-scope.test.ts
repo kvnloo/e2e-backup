@@ -331,7 +331,7 @@ test.setup('a cut save leaves the declared session missing', { sessions: ['cut']
 });
 `;
 
-const NOT_AWAITED = /returned before expect\.poll\(\.\.\.\)\.toBe\(\.\.\.\) finished; put `await` in front of every expect\.poll matcher and toPass call$/;
+const NOT_AWAITED = /returned before expect\.poll\(\.\.\.\)\.toBe\(\.\.\.\) finished; put `await` in front of every expect\.poll, resolves, rejects, and toPass matcher$/;
 
 describe('expect.poll not awaited, in a run', () => {
   let outcome: RunOutcome;
