@@ -753,11 +753,11 @@ export class ElectronSurface {
             return;
           }
           case 'press': {
-            const parsed = parseKey(action.key);
-            if (parsed === undefined) throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(action.key)} is not a key of the contract grammar`, { retryable: false });
+            // A key the keyboard cannot send is refused before focus moves.
+            const key = playwrightKey(action.key);
             await this.waitReady(window, backendNodeId, operation, CHECK_CONNECTED, deadline);
             if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
-            await commit(() => keyboard.press(playwrightKey(action.key)));
+            await commit(() => keyboard.press(key));
             return;
           }
           case 'selectOption': {
@@ -921,7 +921,8 @@ export class ElectronSurface {
 
   async pressKey(key: string, operation: OperationContext): Promise<void> {
     const window = this.requireWindow();
-    await this.bounded(operation, 'keyboard.press', true, () => window.page.keyboard.press(playwrightKey(key)));
+    const sent = playwrightKey(key);
+    await this.bounded(operation, 'keyboard.press', true, () => window.page.keyboard.press(sent));
     await this.settle(operation);
   }
 
@@ -1044,8 +1045,19 @@ function describeMatcher(which: WindowMatcher): string {
   return [which.title === undefined ? '' : `title ${String(which.title)}`, which.url === undefined ? '' : `url ${String(which.url)}`].filter(Boolean).join(' and ') || 'any window';
 }
 
-/** The contract's key grammar in Playwright's spelling: the same names, `Space` as the space character. */
+/**
+ * A key of the contract grammar in Playwright's spelling: the same names, and
+ * `Space` as the space character. Playwright's keyboard knows the named keys
+ * and the printable ASCII characters; any other character (`é`, `ß`) is
+ * `UNSUPPORTED_CAPABILITY`, as the contract asks of a key a surface cannot
+ * deliver.
+ */
 function playwrightKey(key: string): string {
+  const parsed = parseKey(key);
+  if (parsed === undefined) throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(key)} is not a key of the contract grammar`, { retryable: false });
+  if (parsed.key.kind === 'char' && !/^[\x20-\x7e]$/.test(parsed.key.char)) {
+    throw new EngineError('UNSUPPORTED_CAPABILITY', `the keyboard cannot press ${JSON.stringify(parsed.key.char)}: only named keys and printable ASCII characters have a key; type other text with fill or pressSequentially`, { retryable: false });
+  }
   return key === 'Space' ? ' ' : key.replace(/\+Space$/, '+ ');
 }
 

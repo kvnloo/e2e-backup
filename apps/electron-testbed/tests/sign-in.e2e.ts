@@ -107,6 +107,13 @@ test.describe('sign-in window', () => {
     expect((await laggy.inputValue()).length).toBeLessThan(8);
   });
 
+  test('refuses a key the keyboard has no key for, before focus moves', async ({ screen }) => {
+    const refused = await screen.getByTestId('username').press('é').then(() => undefined, (error: unknown) => error);
+    expect(refused).toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    await screen.getByTestId('username').press('$');
+    await expect(screen.getByTestId('username')).toHaveValue('$');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });
