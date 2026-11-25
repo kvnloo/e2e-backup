@@ -465,7 +465,7 @@ them to finish.
 | `validateApp` | Requires `app.bundleId` or `app.appPath` and refuses `app.url` for now, with a note on reaching this machine from the platform's device. |
 | `session` | `back`, `restart`, `reset`, and `openLink`, behind `app.open(path)` on a target with `app.linkBase`. No `open`: `app.open()` with no path is served with `restart`, the fresh launch of the pinned app; the agent's `navigate` verb is unavailable, and `device.openLink(url)` opens a deep link or web link. |
 | `artifacts` | Redacted screenshots under `screenshots/NNN-<label>.png`; a screenshot that cannot be redacted fails instead of being written. Video, when the attempt's [video mode](/reference/config#video) records, as `video/video.mp4`, or a device provider's own recording. |
-| `location` | `<bundle id> / <screen title>`, the replay cache's anchor. The title is the navigation bar's on iOS and the toolbar's on Android. |
+| `location` | `<bundle id> / <screen title>`, the replay cache's anchor. The title is the navigation bar's on iOS and the toolbar's on Android. A screen with no such bar, such as a React Native screen on Android, whose header is a plain view, reports `<bundle id>` alone. |
 | `state` | Not declared. `test.setup` and `session:` are unavailable. |
 
 ### Device
@@ -1410,7 +1410,9 @@ the recording stopped.
 The replay cache anchors on the [`location`](#capabilities) a device reports,
 `<bundle id> / <screen title>`. A step recorded on
 `com.apple.Preferences / General` replays only when Settings is on General
-again.
+again. A screen with no navigation bar or toolbar has no title, so every
+such screen of the app reads as one: a replay can't tell them apart, and a
+[detour](/cache#find-detours-in-a-recording) between them isn't found.
 
 ```ts
 await app.open();

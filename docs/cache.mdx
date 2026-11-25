@@ -462,7 +462,9 @@ agent takes the same wrong turn, name the destination in the instruction.
   id and token as `:id`, so the magic link or callback code an action ran
   on isn't stored with it.
 - On a device, the address is the screen title. Two screens with the same
-  title count as one.
+  title count as one. On Android, a screen with no toolbar (a React Native
+  header, for example) reports only the app, so a detour between such
+  screens isn't found.
 - An action taken on the same look as the one before it records no screen
   (`-` in `e2e cache show`). Repeated scrolls are one action, so a route the
   page moves to while it scrolls doesn't count.
