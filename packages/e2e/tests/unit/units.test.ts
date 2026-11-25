@@ -59,6 +59,7 @@ const target: ResolvedTarget = {
   video: { mode: 'off', source: 'default' },
   fullyParallel: false,
   fixtureScopes: new Map(),
+  locators: { visible: false },
 };
 
 function makeTest(

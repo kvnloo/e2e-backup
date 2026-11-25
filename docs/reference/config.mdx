@@ -52,6 +52,7 @@ export default {
 | [`artifacts`](#artifacts) | `ArtifactsConfig` | local only |
 | [`trace`](#trace) | `RecordingMode` | `'retain-on-failure'` |
 | [`video`](#video) | `RecordingMode` | `'off'` |
+| [`locators`](#locators) | `LocatorsConfig` | `{ visible: false }` |
 | [`agents`](#agents) | `Record<string, AgentConfig>` | `default`, no model |
 | [`filters`](#filters) | `TestFilter[]` | - |
 | [`cache`](#cache) | `CacheMode \| CacheConfig` | `'read-write'`, `'read-only'` in CI |
@@ -304,6 +305,29 @@ reporters: ['list', 'junit'], // default: ['list']
 An id is its factory called with no options. An unknown id is
 `INVALID_CONFIG`, and so are two of `list`, `dot`, and `line` together. See [Reporters](/reference/reporters).
 
+#### `locators`
+
+Defaults for screen queries. With `visible: true`, hidden nodes are skipped
+by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
+`getByTestId`, as if `{ visible: true }` were passed to each query.
+`getByRole` skips nodes hidden from the accessibility tree and doesn't use
+this default. Pass `{ visible: true }` to a role query that must also skip a
+node that doesn't render.
+
+```ts
+locators: { visible: true }, // default: { visible: false }
+```
+
+- A `locators.visible` set on a target is used in place of the config's for
+  that target. Without one, the config's value is used.
+- A `visible` passed to a query takes precedence over both, so hidden
+  matches are kept with `screen.getByText('Saved', { visible: false })`.
+- The same default is used by `run_code`, `locate`, and the test lines of an
+  [`e2e mcp`](/reference/mcp) session.
+- A value that isn't a plain object or a `visible` that isn't a boolean is
+  `INVALID_CONFIG`.
+- See [Hidden duplicates](/reference/screen#hidden-duplicates).
+
 ### targets
 
 A target is one named surface tests run on: the app under test and the
@@ -326,6 +350,7 @@ targets: [
 | [`trace`](#trace) | `RecordingMode` | the config's `trace` |
 | [`video`](#video) | `RecordingMode` | the config's `video` |
 | [`fullyParallel`](#fullyparallel) | `boolean` | the config's |
+| [`locators`](#locators) | `LocatorsConfig` | the config's `locators` |
 
 - `{ engine: web(), app: { url } }` is a complete target.
 - A test whose `platforms` leaves out the target's platform is skipped for
@@ -1720,6 +1745,8 @@ export interface E2EConfig {
   trace?: RecordingMode;
   /** Which attempts record a video; default `off`. */
   video?: RecordingMode;
+  /** Defaults for screen queries on every target. A target's `locators.visible` takes precedence over it. */
+  locators?: LocatorsConfig;
   /** The results directory, relative to the project root; default `.e2e`. */
   output?: string;
   /** Output renderers and reporter objects; default `['list']`. */
@@ -1759,6 +1786,22 @@ export interface Target {
   video?: RecordingMode;
   /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`. */
   fullyParallel?: boolean;
+  /** Defaults for this target's screen queries. A `visible` set here takes precedence over the config's. */
+  locators?: LocatorsConfig;
+}
+```
+
+### `LocatorsConfig`
+
+```ts
+/** Defaults for screen queries. An option passed to a query takes precedence. */
+export interface LocatorsConfig {
+  /**
+   * The default `visible` option of every query except `getByRole`. An
+   * omitted target value inherits the project value, which defaults to
+   * `false`. Set it to true when most queries need `{ visible: true }`.
+   */
+  visible?: boolean;
 }
 ```
 

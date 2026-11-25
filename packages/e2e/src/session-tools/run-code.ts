@@ -18,6 +18,7 @@ import { Script } from 'node:vm';
 import type { ToolExecutionOptions, ToolSet } from 'ai';
 import { z } from 'zod';
 import type { StepExecutorContext } from '@e2e-dev/core/lib/agent/executor';
+import type { ResolvedTarget } from '@e2e-dev/core/lib/config/targets';
 import type { ScreenPresenter } from '@e2e-dev/core/lib/agent/screen-update';
 import { asEngineError, classifyError, codedMessage, isE2EError, TestError } from '@e2e-dev/core/lib/internal/errors';
 import { cancelledError, withAbort, withTimeout } from '@e2e-dev/core/lib/internal/time';
@@ -62,6 +63,8 @@ interface RunCodeOptions extends RunCodeSession {
   readonly record?: ((passed: readonly string[]) => void) | undefined;
   /** Told the code a call failed with, for the session's count of failures by code. */
   readonly onFailed?: ((code: string) => void) | undefined;
+  /** The target's query defaults, used by the session's screen as in a test. */
+  readonly locators: ResolvedTarget['locators'];
 }
 
 interface RunCodeArgs {
@@ -225,7 +228,7 @@ async function runCode(options: RunCodeOptions, args: RunCodeArgs, signal: Abort
  * attempt's own whose lines wait `timeout` by default, and `expect`,
  * `credentials`, and `secrets` as a test imports them.
  */
-function objects(options: RunCodeSession, attempt: RunCodeAttempt, timeout: number | undefined, recorder: Recorder, soft: SoftFailures): Record<string, unknown> {
+function objects(options: RunCodeOptions, attempt: RunCodeAttempt, timeout: number | undefined, recorder: Recorder, soft: SoftFailures): Record<string, unknown> {
   // The call's own timeout is the default it asked for; without one a line waits as the config says, or the tool's default when that is shorter.
   const wait = (configured: number): number => timeout ?? Math.min(configured, RUN_CODE_TIMEOUT_MS);
   const runtime = attempt.agentRuntime;
@@ -242,6 +245,7 @@ function objects(options: RunCodeSession, attempt: RunCodeAttempt, timeout: numb
       artifacts: runtime.artifacts,
       redaction: { redact: runtime.redact, redactCut: runtime.redactCut },
       appOrigin: runtime.app.base?.origin,
+      locators: options.locators,
     }),
   );
   // The session's own config, not the registry the process holds: with several sessions open that is the newest one's.

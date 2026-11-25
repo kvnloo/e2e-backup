@@ -181,6 +181,7 @@ or `E2E_USER_ADMIN_PASSWORD` first, or defer to fill time with
 | `artifacts` | none | `{ store }`: artifacts go to the host `ArtifactStore` (`{ put(artifact), putLink?(link) }`); `putLink` gets provider-hosted video links (never a passed `retain-on-failure` attempt's). Failure screenshots are always captured when the engine can. |
 | `trace` | `'retain-on-failure'` | Tests that keep a trace page (`<output>/results/<test>/trace.md`): `'off'`, `'on'` (every test), `'retain-on-failure'` (failed, timed-out, flaky), `'on-first-retry'`, `'on-all-retries'`; precedence as `video`. Works on every engine. |
 | `video` | `'off'` | Attempts that record, same modes; `'retain-on-failure'` records all, keeps those that did not pass. Precedence: the test's `video`, `--video [mode]`, the target's (`{ engine, video }`), the config's. |
+| `locators` | `{ visible: false }` | With `{ visible: true }`, hidden nodes are skipped by every query except `getByRole`, as if `{ visible: true }` were passed to each one. Precedence: the query's `visible`, the target's `locators.visible`, the config's. |
 | `projectId` | the package name | Report and cache identity. |
 
 - `tests` discovery enters only directories a glob can match; symlinks are

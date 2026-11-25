@@ -73,6 +73,8 @@ async function harness(options: {
   readonly actions?: Partial<ExecutorActions>;
   readonly tree?: boolean;
   readonly testRan?: string;
+  /** The target's `locators.visible` (false if unset). */
+  readonly visible?: boolean;
 }): Promise<Harness> {
   const root: Fake = { id: 'root', role: 'document', name: 'Page', y: 0, children: options.screen };
   const base = fakeExecutorContext({ secrets: [{ name: 'admin.password', purpose: 'password' }, { name: 'apiKey', purpose: 'generic-secret' }] }).context;
@@ -102,7 +104,7 @@ async function harness(options: {
   for (const node of Object.values(options.matches).flat()) index(node);
   let resolves = 0;
   const lines = new SessionTestLines({
-    query: locateQuery,
+    query: (args) => locateQuery(args, options.visible ?? false),
     resolve: async (expression: LocatorExpression): Promise<readonly NodeRef[]> => {
       resolves += 1;
       return (options.matches[describeExpression(expression)] ?? []).map((node) => ({ id: `located-${node.id}`, revision: 'l1' }));
@@ -245,6 +247,17 @@ describe('SessionTestLines', () => {
       matches: { 'getByText("Sale")': [hidden, sale], 'getByText("Sale", visible: true)': [sale] },
     });
     expect(noteOf(await session.run('tap', { target: 'n6' }))).toBe('Test line: await screen.getByText("Sale", { visible: true }).tap();');
+  });
+
+  it("counts only the nodes that render under the target's visible default, and doesn't write an option for it", async () => {
+    const hidden: Fake = { id: 'n5', text: 'Sale', y: 500 };
+    const sale: Fake = { id: 'n6', text: 'Sale', y: 120 };
+    const unique = await harness({ visible: true, screen: [hidden, sale], matches: { 'getByText("Sale", visible: true)': [sale] } });
+    expect(noteOf(await unique.run('tap', { target: 'n6' }))).toBe('Test line: await screen.getByText("Sale").tap();');
+
+    const later: Fake = { id: 'n7', text: 'Sale', y: 160 };
+    const twins = await harness({ visible: true, screen: [sale, later], matches: { 'getByText("Sale", visible: true)': [sale, later] } });
+    expect(noteOf(await twins.run('tap', { target: 'n7' }))).toContain('await screen.getByText("Sale").nth(1).tap(); // 2 of 2 matches');
   });
 
   it('scopes a control repeated per row under the row it sits in', async () => {

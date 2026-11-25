@@ -248,6 +248,9 @@ Returns how many nodes match a semantic locator, which ones, and the
 | `exact` | Exact matching; `false` for substring, case-insensitive. |
 
 - Zero or several matches name the error a test would get.
+- The target's [`locators.visible`](/reference/config#locators) is used, as
+  in a test. When it's true, only nodes that render are counted for `text`,
+  `label`, `placeholder`, and `testId`.
 - A `name` matches the accessible name only. `observe` shows a `status`,
   `alert`, or `listitem` by its text, so one of those with a name that
   matches nothing also points at `getByRole(role).filter({ hasText })` and
@@ -282,6 +285,8 @@ Test lines: 2, 1 read not listed.
   and fails as it does in a test, and a function you pass, such as a
   `browser.route` handler, is called like a test's.
 - `return` a JSON value to get it back. `console.log` lines come back too.
+- Queries on `screen` use the target's
+  [`locators.visible`](/reference/config#locators), as in a test.
 - A line that fails throws the error a test gets, with its `code`. Uncaught,
   it stops the code and the result is an error result. The app stays where
   the passing lines left it.
@@ -356,6 +361,9 @@ Test line: await screen.getByRole("button", "Sign in").tap();
   (`.nth(1)`, with a comment saying so). A position is used only when the
   live twins are the ones the observation listed, each in place or all
   moved together.
+- `{ visible: true }` is left out of generated text, label, placeholder, and
+  test ID lines when the target's
+  [`locators.visible`](/reference/config#locators) is true.
 - A control with no name, label, placeholder, text, or test id is found by
   its role: alone when it is the only one (`getByRole("spinbutton")`, with
   a comment), else narrowed like twins.

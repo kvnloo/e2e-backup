@@ -1358,6 +1358,42 @@ describe('resolveConfig', () => {
     });
   });
 
+  describe('locators', () => {
+    const visibleOf = (raw: Partial<E2EConfig>) => resolve(raw).targets.map((target) => target.locators.visible);
+
+    it('keeps hidden matches unless visible is true in the config or on a target', () => {
+      expect(visibleOf({})).toEqual([false]);
+      expect(visibleOf({ locators: {} })).toEqual([false]);
+      expect(visibleOf({ locators: { visible: true } })).toEqual([true]);
+      expect(visibleOf({ targets: [{ ...WEB, locators: { visible: true } }] })).toEqual([true]);
+    });
+
+    it("uses a target's visible over the config's", () => {
+      const targets = [
+        { name: 'inherits', platform: 'web' },
+        { name: 'own', platform: 'web', locators: { visible: false } },
+        { name: 'empty', platform: 'web', locators: {} },
+      ];
+      expect(visibleOf({ targets, locators: { visible: true } })).toEqual([true, false, true]);
+    });
+
+    it('keeps the digest without the key, and changes it when a target sets visible: true', () => {
+      const plain = resolve({}).configDigest;
+      expect(resolve({ targets: [{ ...WEB, locators: { visible: false } }] }).configDigest).toBe(plain);
+      expect(resolve({ targets: [{ ...WEB, locators: { visible: true } }] }).configDigest).not.toBe(plain);
+    });
+
+    it.each([
+      [{ locators: true }, 'locators must be a plain object, got true'],
+      [{ locators: { visible: 'yes' } }, 'locators.visible must be a boolean, got "yes"'],
+      [{ locators: { visble: true } }, 'locators has unknown key "visble"; did you mean "visible"?'],
+      [{ targets: [{ ...WEB, locators: { visible: 1 } }] }, 'target "web" locators.visible must be a boolean, got 1'],
+      [{ targets: [{ ...WEB, locators: [] }] }, 'target "web" locators must be a plain object, got an array'],
+    ])('refuses %j as INVALID_CONFIG', (raw, message) => {
+      expect(() => resolve(invalid(raw))).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG', message }));
+    });
+  });
+
   describe('output', () => {
     /** The message `resolve` throws for `raw` and `cli`. */
     const refusal = (raw: Partial<E2EConfig>, cli: { output?: string } = {}): string => {

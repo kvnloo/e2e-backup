@@ -253,7 +253,9 @@ screen.getByTestId(/total-budgeted$/);
 Every query accepts `visible: true`, which drops nodes the platform reports
 as hidden before the exactly-one rule runs. Frameworks often keep a hidden
 copy of content in the document, such as a closed drawer or an inactive tab
-panel, and without `visible` both copies match.
+panel. With the default config, a text or test ID query matches both copies.
+Set `visible: true` on the query or in
+[`locators`](/reference/config#locators) to skip the hidden copy.
 
 ```ts
 await browser.reload();
@@ -262,6 +264,10 @@ await expect(screen.getByText('No memories yet', { visible: true })).toBeVisible
 await screen.getByPlaceholder('Search memory...', { visible: true }).fill('launch');
 await screen.getByTestId('memory-list', { visible: true }).getByRole('listitem').first().tap();
 ```
+
+`getByRole` skips nodes hidden from the accessibility tree and doesn't use
+the `locators` default. Pass `{ visible: true }` to a role query that must
+also skip a node that doesn't render.
 
 `visible` uses the same visibility check as `toBeVisible()`, `isVisible()`,
 and `waitFor()`: what renders, as Playwright reads it.
@@ -1404,7 +1410,8 @@ export interface TextMatchOptions {
    * When true, nodes the platform reports as hidden are excluded before the
    * exactly-one rule is applied, so a visible node with a hidden twin (a
    * prerendered copy kept after navigation, a closed drawer) still resolves.
-   * Omitted or false keeps every match, hidden ones included.
+   * When false, every match is kept, hidden ones included. When omitted,
+   * the target's `locators.visible` is used, except by `getByRole`.
    */
   visible?: boolean;
 }

@@ -75,6 +75,7 @@ function makeTarget(name: string, index: number, engine?: EngineHandle): Resolve
     video: { mode: 'off', source: 'default' },
     fullyParallel: false,
     fixtureScopes: new Map(),
+    locators: { visible: false },
   };
 }
 

@@ -237,6 +237,9 @@ customExecutorObservation.keyboardVisible satisfies boolean | undefined;
 ({ targets, toPass: { timeout: 200, interval: 10 } }) satisfies E2EConfig;
 ({ targets, cache: { mode: 'read-only', store: remoteStore, dir: 'shared-cache' } }) satisfies E2EConfig;
 ({ targets: [{ platform: 'ios' }] }) satisfies E2EConfig;
+({ targets: [{ platform: 'ios', locators: { visible: false } }], locators: { visible: true } }) satisfies E2EConfig;
+// @ts-expect-error visible is the only locators key
+({ targets, locators: { exact: false } }) satisfies E2EConfig;
 // @ts-expect-error specVersion is gone; the runner version is the format version
 ({ targets, specVersion: '0.1' }) satisfies E2EConfig;
 // A target inherits its platform from the engine; the resolver rejects one with neither.

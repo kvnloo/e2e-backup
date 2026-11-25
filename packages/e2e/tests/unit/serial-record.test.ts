@@ -82,6 +82,7 @@ function makeTarget(name: string, index: number): ResolvedTarget {
     video: { mode: 'off', source: 'default' },
     fullyParallel: false,
     fixtureScopes: new Map(),
+    locators: { visible: false },
   };
 }
 

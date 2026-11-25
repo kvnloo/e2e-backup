@@ -24,6 +24,7 @@ import { projectTree, redactNode, type NodeRedaction } from '@e2e-dev/core/lib/a
 import { GRAMMAR_TOOL_NAMES } from '@e2e-dev/core/lib/agent/action-names';
 import { grammarTools } from '@e2e-dev/core/lib/agent/primitives';
 import type { ScreenPresenter } from '@e2e-dev/core/lib/agent/screen-update';
+import type { ResolvedTarget } from '@e2e-dev/core/lib/config/targets';
 import type { LocatorExpression, SemanticNode, TargetSession } from '@e2e-dev/core/lib/engine/surface';
 import { ConfigurationError } from '@e2e-dev/core/lib/internal/errors';
 import { relativeToProjectRoot } from '@e2e-dev/core/lib/internal/paths';
@@ -84,13 +85,16 @@ export interface CatalogOptions {
   readonly onRunCodeFailed?: ((code: string) => void) | undefined;
   /** The attempt's fixtures and what guards them, for `run_code`; without them the catalog has no `run_code`. */
   readonly runCode?: RunCodeSession | undefined;
+  /** The target's query defaults, used by `locate`, test lines, and `run_code` as in a test. */
+  readonly locators: ResolvedTarget['locators'];
 }
 
 /** Builds the session's catalog from the step context and the target. */
 export function createSessionCatalog(options: CatalogOptions): SessionCatalog {
   const { screen, locator, attemptDir } = options;
+  const query = (args: LocateArgs): LocateQuery => locateQuery(args, options.locators.visible);
   const lines = new SessionTestLines({
-    query: locateQuery,
+    query,
     resolve: (expression) => locator.resolveNow(expression),
     read: (ref) => options.session.read(ref, locator.operation()),
     redact: options.redaction.redact,
@@ -111,8 +115,8 @@ export function createSessionCatalog(options: CatalogOptions): SessionCatalog {
   const builtIn: ToolSet = {
     observe: fullObserveTool(context, screen),
     ...lines.wrap(verbs),
-    locate: locateTool(locator, options.session, options.redaction),
-    ...(options.runCode === undefined ? {} : { run_code: runCodeTool({ ...options.runCode, context, screen, record: (passed) => lines.ran(passed), onFailed: options.onRunCodeFailed }) }),
+    locate: locateTool(locator, options.session, options.redaction, options.locators.visible),
+    ...(options.runCode === undefined ? {} : { run_code: runCodeTool({ ...options.runCode, locators: options.locators, context, screen, record: (passed) => lines.ran(passed), onFailed: options.onRunCodeFailed }) }),
     test_lines: lines.tool(),
     ...recording,
   };
@@ -180,7 +184,7 @@ function fullObserveTool(context: Pick<StepExecutorContext, 'observe'>, screen: 
 }
 
 /** The session's `locate`: a semantic locator tried against the live screen, with the verdict a test would get. */
-function locateTool(locator: CatalogOptions['locator'], session: Pick<TargetSession, 'read'>, redaction: NodeRedaction): ToolSet[string] {
+function locateTool(locator: CatalogOptions['locator'], session: Pick<TargetSession, 'read'>, redaction: NodeRedaction, visible: boolean): ToolSet[string] {
   return {
     description:
       'Try a semantic locator against the live screen before writing it into a test: screen.getByRole(role, name), getByText, getByLabel, getByPlaceholder, or getByTestId. Returns how many nodes match and which, plus the test code to use. Exactly one of role, text, label, placeholder, or testId; name narrows a role query. Matching is exact unless exact is false.',
@@ -194,7 +198,7 @@ function locateTool(locator: CatalogOptions['locator'], session: Pick<TargetSess
       exact: z.boolean().optional().describe('false for substring, case-insensitive matching'),
     }).strict(),
     execute: async (args: LocateArgs) => {
-      const query = locateQuery(args);
+      const query = locateQuery(args, visible);
       const refs = await locator.resolveNow(query.expression);
       const read: SemanticNode[] = [];
       for (const ref of refs.slice(0, MAX_LOCATE_NODES)) {
@@ -222,8 +226,12 @@ export interface LocateQuery {
   readonly notFound: string;
 }
 
-/** Builds the expression and the matching `screen.*` call from the tool arguments. */
-export function locateQuery(args: LocateArgs): LocateQuery {
+/**
+ * Builds the expression and the matching `screen.*` call from the tool
+ * arguments. `visible` is the target's `locators.visible`. It's left out of
+ * the call, since in a test it comes from the config.
+ */
+export function locateQuery(args: LocateArgs, visible = false): LocateQuery {
   const exact = args.exact !== false;
   const { role, name, text, label, placeholder, testId } = args;
   const given = [role, text, label, placeholder, testId].filter((value) => value !== undefined).length;
@@ -240,11 +248,11 @@ export function locateQuery(args: LocateArgs): LocateQuery {
     };
   }
   if (name !== undefined) throw new ConfigurationError('INVALID_ARGUMENT', 'name only narrows a role query');
-  if (testId !== undefined) return { expression: testIdQuery(testId, undefined, undefined), code: `screen.getByTestId(${JSON.stringify(testId)})`, notFound };
+  if (testId !== undefined) return { expression: testIdQuery(testId, undefined, undefined, visible), code: `screen.getByTestId(${JSON.stringify(testId)})`, notFound };
   const options = exact ? '' : `, { exact: false }`;
-  if (text !== undefined) return { expression: textQuery('text', text, { exact }, undefined), code: `screen.getByText(${JSON.stringify(text)}${options})`, notFound };
-  if (label !== undefined) return { expression: textQuery('label', label, { exact }, undefined), code: `screen.getByLabel(${JSON.stringify(label)}${options})`, notFound };
-  return { expression: textQuery('placeholder', placeholder!, { exact }, undefined), code: `screen.getByPlaceholder(${JSON.stringify(placeholder)}${options})`, notFound };
+  if (text !== undefined) return { expression: textQuery('text', text, { exact }, undefined, visible), code: `screen.getByText(${JSON.stringify(text)}${options})`, notFound };
+  if (label !== undefined) return { expression: textQuery('label', label, { exact }, undefined, visible), code: `screen.getByLabel(${JSON.stringify(label)}${options})`, notFound };
+  return { expression: textQuery('placeholder', placeholder!, { exact }, undefined, visible), code: `screen.getByPlaceholder(${JSON.stringify(placeholder)}${options})`, notFound };
 }
 
 /**

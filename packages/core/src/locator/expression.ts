@@ -32,14 +32,14 @@ export function roleQuery(
       : {}),
     ...(Object.keys(states).length > 0 ? { states } : {}),
     ...(options?.level === undefined ? {} : { level: options.level }),
-    ...visibility(options),
+    ...visibility(options, false),
   };
   return scoped({ kind: 'query', query }, scope);
 }
 
-/** The `visible` predicate is only meaningful when set; false is the default and is dropped. */
-function visibility(options: { visible?: boolean } | undefined): { visible: true } | Record<never, never> {
-  return options?.visible === true ? { visible: true } : {};
+/** The `visible` predicate, from the option or else `defaultVisible`. A false one is dropped. */
+function visibility(options: { visible?: boolean } | undefined, defaultVisible: boolean): { visible: true } | Record<never, never> {
+  return (options?.visible ?? defaultVisible) ? { visible: true } : {};
 }
 
 /** Builds a text-family query expression (label, placeholder, text, displayValue). */
@@ -48,6 +48,7 @@ export function textQuery(
   text: TextMatch,
   options: TextMatchOptions | undefined,
   scope: LocatorExpression | undefined,
+  defaultVisible = false,
 ): LocatorExpression {
   return scoped(
     {
@@ -55,7 +56,7 @@ export function textQuery(
       query: {
         kind,
         value: toTextPattern(text, { exact: options?.exact ?? true }),
-        ...visibility(options),
+        ...visibility(options, defaultVisible),
       },
     },
     scope,
@@ -67,6 +68,7 @@ export function testIdQuery(
   id: TextMatch,
   options: { visible?: boolean } | undefined,
   scope: LocatorExpression | undefined,
+  defaultVisible = false,
 ): LocatorExpression {
   return scoped(
     {
@@ -74,7 +76,7 @@ export function testIdQuery(
       query: {
         kind: 'testId',
         value: toTextPattern(id, { exact: true }),
-        ...visibility(options),
+        ...visibility(options, defaultVisible),
       },
     },
     scope,
