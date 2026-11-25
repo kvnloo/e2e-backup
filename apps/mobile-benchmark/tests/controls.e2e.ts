@@ -347,10 +347,16 @@ test.describe('control inventory', () => {
     const pad = screen.getByLabel('Tap pad');
     const box = await pad.boundingBox();
     if (box === null) throw new Error('pad has no box');
-    // On Android, the pad is laid out in whole physical pixels (630 by 263
-    // at density 2.625), so its dp size is within half a dp of 240 by 100.
-    expect(box.width).toBeCloseTo(240, 0);
-    expect(box.height).toBeCloseTo(100, 0);
+    if (platform === 'android') {
+      // The engine rounds the viewport to whole dp (1080 px at density 2.625
+      // is 411 dp), so a box is within 0.2% of its dp size: the 240 by 100
+      // dp pad reads 239.75 by 100.16.
+      expect(box.width).toBeCloseTo(240, 0);
+      expect(box.height).toBeCloseTo(100, 0);
+    } else {
+      expect(box.width).toBe(240);
+      expect(box.height).toBe(100);
+    }
 
     await screen.tapAt({ x: box.x + 40, y: box.y + 30 });
     await expect(screen.getByTestId('pad-status')).toHaveText('pad: 40,30');
@@ -368,8 +374,8 @@ test.describe('control inventory', () => {
     // gesture, wherever it starts), so the path runs right to left. The
     // finger goes down exactly at `from`; agent-device swipes as a fling that
     // lifts about 10 pt short of `to` (111 for 100 here), hence the tolerance.
-    // On the tested Android emulators, the swipe sometimes ended at x=84 for a
-    // target of x=100.
+    // On Android the fling can run past `to` (84 for 100 on API 36 emulators
+    // at 420 and 480 dpi), so the tolerance there is 20.
     await screen.swipe({
       from: { x: swipeBox.x + 300, y: swipeBox.y + 40 },
       to: { x: swipeBox.x + 100, y: swipeBox.y + 40 },

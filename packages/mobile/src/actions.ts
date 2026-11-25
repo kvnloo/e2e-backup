@@ -51,8 +51,9 @@ export const DEVICE_ACTIONS: readonly LocatorActionKind[] = [
 export const DEVICE_POINTER_ACTIONS: readonly PointerActionKind[] = ['tap', 'doubleTap', 'longPress', 'swipeTo'];
 
 /**
- * Issues one pointer action at a screen point in logical pixels. `settle` is
- * the device's quiet-wait options, spread onto the interaction as the node
+ * Issues one pointer action at a screen point in logical pixels.
+ * `toDevice` converts a point to the coordinates agent-device takes (see
+ * `AgentDeviceSurface.toDevicePoint`). `settle` is the device's quiet-wait options, spread onto the interaction as the node
  * actions do; `stabilization` is the post-gesture option a swipe carries.
  * A double tap is two presses (`count: 2`), as it is on a node:
  * agent-device's own double-tap gesture reaches a React Native `Pressable`
@@ -68,8 +69,9 @@ export function pointerInteraction(
   settle: Record<string, unknown>,
   stabilization: Record<string, unknown>,
   input: InputBudget,
+  toDevice: (point: ViewportPoint) => ViewportPoint,
 ): Promise<unknown> {
-  const at = { x: point.x, y: point.y };
+  const at = toDevice(point);
   switch (action.kind) {
     case 'tap':
       return input.press(client, { ...at, ...settle });
@@ -81,7 +83,7 @@ export function pointerInteraction(
         action.durationMs ?? DEFAULT_LONG_PRESS_MS,
       );
     case 'swipeTo': {
-      const to = { x: action.target.x, y: action.target.y };
+      const to = toDevice(action.target);
       const durationMs = action.durationMs;
       if (durationMs !== undefined) {
         return input.send(() => client.interactions.pan({

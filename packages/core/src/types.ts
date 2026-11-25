@@ -458,14 +458,15 @@ export interface ActionOptions {
 }
 
 /**
- * A point in CSS pixels on the web, points on iOS, and dp on Android. For `tap({ position })` the origin is the node's own
+ * A point in the viewport's unit: CSS pixels on the web, points on iOS,
+ * dp on Android. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
  * also a `ScreenPoint`, whose origin is the viewport's top-left corner, the
  * space `boundingBox()` reports in.
  */
 export type Point = ViewportPoint;
 
-/** CSS pixels on the web, points on iOS, and dp on Android, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. */
+/** A number in the viewport's unit (see `Point`), or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. */
 export type ScreenCoordinate = number | `${number}%`;
 
 /** A viewport point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. */

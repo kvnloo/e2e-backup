@@ -407,12 +407,12 @@ await screen.tapAt({ x: map.x + 360, y: map.y + 70 });
 await screen.tapAt({ x: '50%', y: '50%' });
 ```
 
-- Each coordinate is CSS pixels on the web, points on iOS, and dp on
-  Android, the space `boundingBox()` reports in, or a percentage of the
-  viewport from `'0%'` through `'100%'`, rounded to the
-  nearest pixel (`'100%'` is the last one). They may mix: `{ x: '50%', y: 120 }`.
+- Each coordinate is a number in the unit [`boundingBox()`](#boundingbox)
+  reports in, or a percentage of the viewport from `'0%'` through `'100%'`,
+  rounded to a whole unit (`'100%'` is the last one). They may mix: `{ x: '50%', y: 120 }`.
 - A percentage reads the screen once for its size.
 - Nothing is resolved or waited for; the page decides what the tap lands on.
+  On Android, the screen is read first for its pixel scale.
 - Uses `config.actionTimeout`.
 - Prefer a locator when the tree lists the control, since a point moves with
   the layout. For a point inside a node, `tap({ position })` reads the node's
@@ -422,6 +422,7 @@ await screen.tapAt({ x: '50%', y: '50%' });
 | --- | --- |
 | `INVALID_ARGUMENT` | A negative or non-finite coordinate, or a string that is not a percentage from `'0%'` through `'100%'`. |
 | `UNSUPPORTED_CAPABILITY` | The engine does not list `tap` in its pointer actions. |
+| `ACTION_FAILED` | On Android, the screen couldn't be read for its pixel scale before the action timed out. No input is sent. |
 
 <Note>
 `tapAt` is not scoped: on a locator it still taps a viewport point.
@@ -707,7 +708,7 @@ The options are [`TapOptions`](#types):
   engines both do.
 - `modifiers`: the browser engine holds them.
 - `position`: an offset from the node's top-left corner, inside its border,
-  in CSS pixels on the web, points on iOS, and dp on Android. The engine
+  in the unit [`boundingBox()`](#boundingbox) reports in. The engine
   scrolls the node into view when it lists
   `scrollIntoView`. Then it reads the node's box and dispatches the pointer at
   the point. No node is behind the gesture, so the platform's other
@@ -1180,6 +1181,8 @@ const map = (await screen.getByRole('image', 'Map').boundingBox())!;
 ```
 
 The box is in CSS pixels on the web, points on iOS, and dp on Android.
+On Android the viewport is rounded to whole dp, so a box can differ from
+the layout's dp value by up to 0.2%. Compare it with `toBeCloseTo`.
 It is `null` for a node that lays out no box
 (`display: none` on it or an ancestor). A `visibility: hidden` node keeps
 its box.
@@ -1473,14 +1476,15 @@ export interface SwipePathOptions {
 }
 
 /**
- * A point in CSS pixels on the web, points on iOS, and dp on Android. For `tap({ position })` the origin is the node's own
+ * A point in the viewport's unit: CSS pixels on the web, points on iOS,
+ * dp on Android. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
  * also a `ScreenPoint`, whose origin is the viewport's top-left corner, the
  * space `boundingBox()` reports in.
  */
 export type Point = ViewportPoint; // { x: number; y: number }
 
-/** CSS pixels on the web, points on iOS, and dp on Android, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. */
+/** A number in the viewport's unit (see `Point`), or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. */
 export type ScreenCoordinate = number | `${number}%`;
 
 /** A viewport point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. */

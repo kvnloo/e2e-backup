@@ -19,16 +19,18 @@ import { pressRemote, REMOTE_KEYS } from './remote.ts';
 import type { AgentDeviceSurface, FoldPose } from './surface.ts';
 
 /**
+ * How long the agent's `swipe` tool waits for the Android screen's pixel
+ * scale. It matches the 15 s bound core puts on a targeted agent action. A
+ * tool's `execute` gets no operation context, so `actionTimeout` doesn't
+ * lower it, but the step's abort signal can end it sooner.
+ */
+const TARGETED_ACTION_MS = 15_000;
+
+/**
  * Types a tool the way the SDK's `tool()` does, without importing it: `ai`
  * is an optional peer dependency, and this module loads with the project's
  * config, so it must not need the package at run time.
  */
-/**
- * The budget for reading the screen's pixel scale before the agent's swipe,
- * the bound of a targeted agent action (`actionTimeout` caps it lower).
- */
-const TARGETED_ACTION_MS = 15_000;
-
 function deviceTool<INPUT>(definition: Tool<INPUT, string>): Tool<INPUT, string> {
   return definition;
 }
