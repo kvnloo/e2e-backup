@@ -97,6 +97,36 @@ describe('TraceRecorder', () => {
     expect(readTraceEntry(JSON.parse(JSON.stringify(buildTraceEntry(trace!))))).toBeDefined();
   });
 
+  it('keeps where each action ran, redacted, and reads it back', () => {
+    const recorder = makeRecorder({ secrets: new Map([['token', 's3cr3t-token']]) });
+    recorder.record({ name: 'tap', node: upgradeButton }, '/settings');
+    recorder.record({ name: 'back' });
+    recorder.record({ name: 'tap', node: upgradeButton }, '/reset?code=s3cr3t-token');
+    const trace = recorder.finalize(conclusion);
+    expect(trace?.truncated).toBeUndefined();
+    expect(trace?.actions.map((action) => action.at)).toEqual(['/settings', undefined, '/reset?code=<secret:token>']);
+    const read = readTraceEntry(JSON.parse(JSON.stringify(buildTraceEntry(trace!))));
+    expect(read?.payload.actions.map((action) => action.at)).toEqual(['/settings', undefined, '/reset?code=<secret:token>']);
+  });
+
+  it('leaves out a location too long to keep whole, and replays without it', () => {
+    const recorder = makeRecorder();
+    recorder.record({ name: 'tap', node: upgradeButton }, `/${'a'.repeat(MAX_TRACE_INPUT_CHARS)}`);
+    const trace = recorder.finalize(conclusion);
+    expect(trace?.truncated).toBeUndefined();
+    expect(trace?.actions[0]?.at).toBeUndefined();
+  });
+
+  it('reads an entry whose action location is malformed, without the location', () => {
+    const recorder = makeRecorder();
+    recorder.record({ name: 'tap', node: upgradeButton });
+    const document = JSON.parse(JSON.stringify(buildTraceEntry(recorder.finalize(conclusion)!)));
+    document.payload.actions[0].at = 42;
+    const read = readTraceEntry(document);
+    expect(read).toBeDefined();
+    expect(read?.payload.actions[0]).not.toHaveProperty('at');
+  });
+
   it('records a secret fill by name only, with page strings redacted', () => {
     const secrets = new Map([['member-password', 'hunter2']]);
     const recorder = makeRecorder({ secrets });

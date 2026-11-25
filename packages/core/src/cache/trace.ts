@@ -185,6 +185,15 @@ export type TraceAnchorState = (typeof TRACE_ANCHOR_STATES)[number];
 interface ActionBase {
   /** One-line prose summary — the only view a mid-step hand-off notice shows. */
   readonly summary: string;
+  /**
+   * Where the action ran: the location of the screen the step had last
+   * looked at, spelled like `startPath`. Absent when the step had not looked
+   * again since its previous action, so a stale location is never kept, and
+   * on entries recorded before it was added. Provenance only, never replay
+   * input: it is what tells a flow that left a screen and came back
+   * (`cache/detours.ts`).
+   */
+  readonly at?: string;
 }
 
 /** The verbs that act on one node and carry no input: tap and its variants, hover, scroll into view. */
@@ -561,7 +570,16 @@ function mapPointEnd<E extends TracePointEnd>(end: E, map: TraceTextMap): E | un
   return target === undefined ? undefined : { ...end, within: { ...end.within, target } };
 }
 
+/** `mapActionBody`, then the location the action ran at, which a `unique()` value can be spelled in like any path. */
 function mapActionText(action: RecordedAction, map: TraceTextMap): RecordedAction | undefined {
+  const mapped = mapActionBody(action, map);
+  if (mapped === undefined || action.at === undefined) return mapped;
+  const at = map(action.at);
+  if (at === undefined) return undefined;
+  return at === action.at ? mapped : { ...mapped, at };
+}
+
+function mapActionBody(action: RecordedAction, map: TraceTextMap): RecordedAction | undefined {
   const summary = map(action.summary);
   if (summary === undefined) return undefined;
   const withSummary = <A extends RecordedAction>(next: A): A => (summary === next.summary ? next : { ...next, summary });
@@ -639,8 +657,8 @@ function mapActionText(action: RecordedAction, map: TraceTextMap): RecordedActio
 
 /**
  * Applies `map` to every recorded string a screen value can appear in: typed
- * and selected values, navigated URLs, both location paths, target and
- * anchor text, and the prose summaries. Keys (`press`), secret names,
+ * and selected values, navigated URLs, the start, end, and per-action
+ * locations, target and anchor text, and the prose summaries. Keys (`press`), secret names,
  * executor identity, and provenance are vocabulary and are left alone. The
  * one list of text-bearing fields lives here, beside the union it walks;
  * `undefined` from `map` makes the whole result `undefined`.

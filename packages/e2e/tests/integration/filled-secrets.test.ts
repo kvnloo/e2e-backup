@@ -157,6 +157,7 @@ describe('filled secrets', () => {
         summary: expect.stringContaining('member.password'),
         target: expect.objectContaining({ role: 'textbox', name: 'Password' }),
         secret: 'member.password',
+        at: expect.any(String),
       },
       expect.objectContaining({ name: 'tap', target: expect.objectContaining({ role: 'button', name: 'Increment' }) }),
     ]);

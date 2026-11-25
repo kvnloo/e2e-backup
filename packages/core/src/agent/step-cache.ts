@@ -221,9 +221,9 @@ export class StepTraceSession {
     return this.prefix;
   }
 
-  /** Records one committed grammar action into the step trace. */
-  record(action: RecordableAction): void {
-    this.recorder?.record(action);
+  /** Records one committed grammar action into the step trace, with the location it ran at when known. */
+  record(action: RecordableAction, at?: string): void {
+    this.recorder?.record(action, at);
     this.countAfterEndMismatch();
   }
 

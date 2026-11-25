@@ -78,9 +78,16 @@ export class TraceRecorder {
     return this.lastActionAt;
   }
 
-  /** Records one committed grammar action. */
-  record(action: RecordableAction): void {
-    this.push(this.toRecorded(action, describeAction(action, { redact: this.redact, redactCut: this.redactCut })));
+  /**
+   * Records one committed grammar action, and where it ran when the caller
+   * knows (`RecordedAction.at`). The location is provenance, not replay
+   * input, so one the entry cannot keep whole is left out rather than
+   * poisoning the trace.
+   */
+  record(action: RecordableAction, at?: string): void {
+    const recorded = this.toRecorded(action, describeAction(action, { redact: this.redact, redactCut: this.redactCut }));
+    const location = at === undefined || at === '' ? undefined : this.redact(at);
+    this.push(location === undefined || location.length > MAX_TRACE_INPUT_CHARS ? recorded : { ...recorded, at: location });
     this.lastActionAt = Date.now();
   }
 
