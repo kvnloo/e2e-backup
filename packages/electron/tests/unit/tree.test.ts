@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolveExpression, type SemanticNode } from '@e2e-dev/core/engine';
 import { describe, expect, it } from 'vitest';
-import { projectTree, type AXNode, type ProjectionMode, type SnapshotDocument } from '../../src/tree.ts';
+import { projectTree, unmaskableCount, type AXNode, type ProjectionMode, type SnapshotDocument } from '../../src/tree.ts';
 
 /**
  * One read of the testbed's sign-in window, captured from Electron 45 with
@@ -51,8 +51,8 @@ describe('projectTree', () => {
     expect(root.rect).toEqual({ x: 0, y: 0, width: 640, height: 688 });
   });
 
-  it('reports a password field as secure, with no value and no text, and counts it for masking', () => {
-    const { root, secureCount } = project('node');
+  it('reports a password field as secure, with no value and no text', () => {
+    const { root } = project('node');
     const password = find(root, (node) => node.testId === 'password');
     expect(password.states?.secure).toBe(true);
     expect(password.value).toBeUndefined();
@@ -61,7 +61,6 @@ describe('projectTree', () => {
     expect(password.inputPurpose).toBe('password');
     expect(JSON.stringify(root)).not.toContain('hunter2');
     expect(JSON.stringify(root)).not.toContain('•');
-    expect(secureCount).toBe(1);
   });
 
   it('reads a text field value from the DOM and a select from its chosen option', () => {
@@ -137,5 +136,50 @@ describe('projectTree', () => {
     expect(capped.truncated).toBe(true);
     expect(all(capped.root).length).toBeLessThanOrEqual(11);
     expect(project('tree').truncated).toBe(false);
+  });
+});
+
+describe('unmaskableCount', () => {
+  // strings: 0 '#document', 1 'BODY', 2 'DIV', 3 'INPUT', 4 'type', 5 'password', 6 'closed', 7 'open', 8 'IFRAME', 9 'text'
+  const strings = ['#document', 'BODY', 'DIV', 'INPUT', 'type', 'password', 'closed', 'open', 'IFRAME', 'text'];
+
+  /** A document of `#document > BODY > DIV(host) > child`, the child inside a shadow root of the given type, laid out or not. */
+  function documentWith(child: { name: number; attributes?: number[]; shadow?: number; rendered?: boolean; nested?: number }): SnapshotDocument {
+    const names = [0, 1, 2, child.name];
+    const parents = [-1, 0, 1, 2];
+    const shadow = { index: [] as number[], value: [] as number[] };
+    if (child.nested === undefined) {
+      if (child.shadow !== undefined) {
+        shadow.index.push(3);
+        shadow.value.push(child.shadow);
+      }
+    } else {
+      // The child sits in a shadow root of its own (`nested`), under a host that is itself inside a `shadow` root.
+      names.splice(3, 0, 2);
+      parents.push(3);
+      shadow.index.push(3, 4);
+      shadow.value.push(child.shadow!, child.nested);
+    }
+    const last = names.length - 1;
+    return {
+      nodes: { nodeName: names, parentIndex: parents, attributes: names.map((_, at) => (at === last ? (child.attributes ?? []) : [])), shadowRootType: shadow },
+      layout: { nodeIndex: child.rendered === false ? [0, 1, 2] : names.map((_, at) => at), bounds: [] },
+    };
+  }
+
+  it('counts a rendered password field or nested document inside a closed shadow root', () => {
+    expect(unmaskableCount(documentWith({ name: 3, attributes: [4, 5], shadow: 6 }), strings)).toBe(1);
+    expect(unmaskableCount(documentWith({ name: 8, shadow: 6 }), strings)).toBe(1);
+  });
+
+  it('counts one inside an open shadow root that a closed one holds', () => {
+    expect(unmaskableCount(documentWith({ name: 3, attributes: [4, 5], shadow: 6, nested: 7 }), strings)).toBe(1);
+  });
+
+  it('leaves out what a selector reaches, what is not rendered, and what holds no secret', () => {
+    expect(unmaskableCount(documentWith({ name: 3, attributes: [4, 5], shadow: 7 }), strings)).toBe(0);
+    expect(unmaskableCount(documentWith({ name: 3, attributes: [4, 5] }), strings)).toBe(0);
+    expect(unmaskableCount(documentWith({ name: 3, attributes: [4, 5], shadow: 6, rendered: false }), strings)).toBe(0);
+    expect(unmaskableCount(documentWith({ name: 3, attributes: [4, 9], shadow: 6 }), strings)).toBe(0);
   });
 });

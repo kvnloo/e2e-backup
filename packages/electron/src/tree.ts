@@ -44,6 +44,9 @@ export interface SnapshotDocument {
     readonly nodeName?: readonly number[];
     readonly attributes?: readonly (readonly number[])[];
     readonly inputValue?: RareStrings;
+    readonly parentIndex?: readonly number[];
+    /** For every node inside a shadow root, that root's type: `open`, `closed`, or `user-agent`. */
+    readonly shadowRootType?: RareStrings;
   };
   readonly layout: {
     readonly nodeIndex: readonly number[];
@@ -89,8 +92,6 @@ export interface Projection {
   readonly root: SemanticNode;
   /** Nodes were left out: past the node cap, or a nested document the read does not enter. */
   readonly truncated: boolean;
-  /** How many secure fields the tree holds: what a screenshot must mask. */
-  readonly secureCount: number;
 }
 
 /** Attributes an observation keeps, beside every `aria-*` one: what a model reads a control by. */
@@ -234,7 +235,6 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
   const maxNodes = options.maxNodes ?? DEFAULT_MAX_NODES;
   let kept = 0;
   let truncated = false;
-  let secureCount = 0;
 
   const rectOf = (facts: DomFacts | undefined): Draft['rect'] => {
     const box = facts?.bounds;
@@ -284,10 +284,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     if (testId !== undefined) draft.testId = testId;
     const attributes = facts?.attributes ?? {};
     const secure = facts?.nodeName === 'INPUT' && attributes['type']?.toLowerCase() === 'password';
-    if (secure) {
-      draft.states['secure'] = true;
-      secureCount += 1;
-    }
+    if (secure) draft.states['secure'] = true;
     const autocomplete = attributes['autocomplete']?.toLowerCase();
     if (secure || autocomplete === 'current-password' || autocomplete === 'new-password') draft.inputPurpose = 'password';
     else if (autocomplete === 'username') draft.inputPurpose = 'username';
@@ -352,7 +349,49 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     rect: { x: 0, y: 0, width: geometry.width, height: geometry.height },
     ...(children.length === 0 ? {} : { children: children.map(finish) }),
   };
-  return { root, truncated, secureCount };
+  return { root, truncated };
+}
+
+/** Elements a screenshot paints over: a secure field's value, or a nested document the engine does not read. */
+const MASKED_TAGS = new Set(['IFRAME', 'FRAME', 'WEBVIEW']);
+
+/**
+ * How many rendered elements a screenshot must paint over and a selector
+ * cannot reach: password inputs and nested documents inside a closed shadow
+ * root, at any depth. Read from the DOM snapshot, which enters every shadow
+ * root, so it holds whatever the accessibility tree leaves out (`aria-hidden`,
+ * the node cap). Every other such element in the document, open shadow roots
+ * included, a selector mask covers.
+ */
+export function unmaskableCount(document: SnapshotDocument, strings: readonly string[]): number {
+  const names = document.nodes.nodeName ?? [];
+  const parents = document.nodes.parentIndex ?? [];
+  const attributes = document.nodes.attributes ?? [];
+  const closed = new Set<number>();
+  const rare = document.nodes.shadowRootType;
+  rare?.index.forEach((node, at) => {
+    if (strings[rare.value[at]!] === 'closed') closed.add(node);
+  });
+  if (closed.size === 0) return 0;
+  const rendered = new Set(document.layout.nodeIndex);
+  let count = 0;
+  names.forEach((nameIndex, node) => {
+    if (!rendered.has(node)) return;
+    const name = strings[nameIndex] ?? '';
+    const pairs = attributes[node] ?? [];
+    let password = false;
+    for (let at = 0; at + 1 < pairs.length; at += 2) {
+      if ((strings[pairs[at]!] ?? '').toLowerCase() === 'type' && (strings[pairs[at + 1]!] ?? '').toLowerCase() === 'password') password = true;
+    }
+    if (!(name === 'INPUT' && password) && !MASKED_TAGS.has(name)) return;
+    for (let at: number | undefined = node; at !== undefined && at >= 0; at = parents[at]) {
+      if (closed.has(at)) {
+        count += 1;
+        return;
+      }
+    }
+  });
+  return count;
 }
 
 /** A draft as a contract node, empty fields left out. */

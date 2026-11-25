@@ -115,7 +115,7 @@ The `electron` fixture has these methods:
 | Uploads | `setInputFiles` takes file paths. In-memory files are not supported |
 | Not supported | Video recording, `browser`-only APIs (routes, downloads, cookies), session save and restore, `toBeInViewport`, and computed-style checks |
 | Workers | No limit. An app that holds a single-instance lock can run one test at a time: set `workers: 1` |
-| Secrets | A password field shows no value. Screenshots paint every password field and nested document black. A password field no mask reaches, such as one in a closed shadow root, withholds the agent's screenshot, and `app.screenshot()` fails with `POLICY_DENIED` |
+| Secrets | A password field shows no value. Screenshots paint every password field and nested document black. A password field or nested document inside a closed shadow root is out of every mask's reach: the agent gets no screenshot, and `app.screenshot()` fails with `POLICY_DENIED` |
 
 <Warning>
   An Electron app loads its own pages, often `file:` ones, and has no

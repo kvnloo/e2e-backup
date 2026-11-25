@@ -40,7 +40,7 @@ import {
 } from '@e2e-dev/core/engine';
 import { describeExecutable, ensureElectronBinary, resolveExecutable } from './executable.ts';
 import type { ResolvedElectronOptions } from './options.ts';
-import { projectTree, type AXNode, type ProjectionMode, type SnapshotDocument, type WindowGeometry } from './tree.ts';
+import { projectTree, unmaskableCount, type AXNode, type ProjectionMode, type SnapshotDocument, type WindowGeometry } from './tree.ts';
 
 /** The observation root's id: one surface, one root, whichever window it reads. */
 const ROOT_ID = 'window';
@@ -49,8 +49,7 @@ const ROOT_ID = 'window';
 const WORLD_NAME = '__e2e_electron__';
 
 /** Everything that can hold a secure value or show another document in a screenshot: masked, or the capture is not taken. */
-const PASSWORD_SELECTOR = 'input[type=password i]';
-const MASKED_SELECTOR = `${PASSWORD_SELECTOR}, iframe, frame, webview`;
+const MASKED_SELECTOR = 'input[type=password i], iframe, frame, webview';
 
 /** How long a long press holds by default. */
 const LONG_PRESS_MS = 800;
@@ -455,7 +454,7 @@ export class ElectronSurface {
     };
   }
 
-  private project(raw: RawRead, mode: ProjectionMode, keep?: ReadonlySet<number>): { readonly snapshot: EngineSnapshot; readonly secureCount: number } {
+  private project(raw: RawRead, mode: ProjectionMode, keep?: ReadonlySet<number>): EngineSnapshot {
     const { serial } = raw.window;
     const projection = projectTree(raw.ax, raw.document, raw.strings, raw.geometry, {
       mode,
@@ -468,14 +467,11 @@ export class ElectronSurface {
     const open = this.openWindows();
     const active = open.indexOf(raw.window);
     return {
-      snapshot: {
-        location: raw.url,
-        root: projection.root,
-        viewport: { width: raw.geometry.width, height: raw.geometry.height },
-        ...(projection.truncated ? { truncated: true } : {}),
-        ...(open.length > 1 && active >= 0 ? { tabs: { count: open.length, active } } : {}),
-      },
-      secureCount: projection.secureCount,
+      location: raw.url,
+      root: projection.root,
+      viewport: { width: raw.geometry.width, height: raw.geometry.height },
+      ...(projection.truncated ? { truncated: true } : {}),
+      ...(open.length > 1 && active >= 0 ? { tabs: { count: open.length, active } } : {}),
     };
   }
 
@@ -486,12 +482,13 @@ export class ElectronSurface {
     if (window === undefined) return { root: { ref: { id: ROOT_ID, revision: '' }, role: 'document' }, viewport: { width: 0, height: 0 } };
     return await this.bounded(operation, 'observe', false, async () => {
       const raw = await this.read(window);
-      const { snapshot, secureCount } = this.project(raw, 'tree');
+      const snapshot = this.project(raw, 'tree');
       if (options?.pixels !== true) return snapshot;
-      const masks = await this.masks(window);
-      // A secure field the masks cannot reach (inside a closed shadow root) would show: the pixels are withheld, and the count says so.
-      if (masks.passwords < secureCount) return { ...snapshot, maskedRegionCount: masks.passwords };
-      return { ...snapshot, pixels: await this.capture(window, masks.locator), maskedRegionCount: masks.count };
+      const masks = window.page.locator(MASKED_SELECTOR);
+      const masked = await masks.count();
+      // A secure field or nested document in a closed shadow root is out of every selector's reach: the pixels are withheld, and the count says so.
+      if (unmaskableCount(raw.document, raw.strings) > 0) return { ...snapshot, maskedRegionCount: masked };
+      return { ...snapshot, pixels: await this.capture(window, masks), maskedRegionCount: masked };
     });
   }
 
@@ -503,7 +500,7 @@ export class ElectronSurface {
       const sink = this.attempt?.screen;
       if (sink !== undefined) {
         try {
-          sink(this.project(raw, 'tree').snapshot);
+          sink(this.project(raw, 'tree'));
         } catch {
           // The trace is evidence; a sink that throws never fails the step.
         }
@@ -513,7 +510,7 @@ export class ElectronSurface {
       const selected = new Map<string, ReadonlySet<number>>();
       for (const selector of expressionSelectors(expression)) selected.set(selector, await this.querySelectorAll(window, selector));
       const keep = new Set([...selected.values()].flatMap((ids) => [...ids]));
-      const { root } = this.project(raw, 'node', keep).snapshot;
+      const { root } = this.project(raw, 'node', keep);
       const idOf = (backendNodeId: number): string => `${window.serial}.${backendNodeId}`;
       return resolveExpression(expression, [root], {
         selector: (selector, candidates) => {
@@ -906,18 +903,6 @@ export class ElectronSurface {
 
   // --- pixels ---
 
-  /**
-   * What a screenshot paints over: every password input, in the document and
-   * in its open shadow roots, and every nested document, which the tree does
-   * not read and so cannot vouch for. `passwords` is how many secure fields
-   * the masks reach, to hold against the tree's count.
-   */
-  private async masks(window: AppWindow): Promise<{ readonly locator: Locator; readonly count: number; readonly passwords: number }> {
-    const locator = window.page.locator(MASKED_SELECTOR);
-    const [count, passwords] = await Promise.all([locator.count(), window.page.locator(PASSWORD_SELECTOR).count()]);
-    return { locator, count, passwords };
-  }
-
   /** A CSS-scale screenshot of the window with the masks painted over. */
   private async capture(window: AppWindow, masks: Locator): Promise<ObservationPixels> {
     const data = new Uint8Array(await window.page.screenshot({ scale: 'css', mask: [masks], maskColor: '#000000', caret: 'hide' }));
@@ -935,13 +920,13 @@ export class ElectronSurface {
       const name = `${String(this.artifactCounter).padStart(3, '0')}${label === undefined || fileLabel(label) === '' ? '' : `-${fileLabel(label)}`}.png`;
       const relative = path.posix.join('screenshots', name);
       const absolute = path.join(attempt.artifactsDir, relative);
-      const { secureCount } = this.project(await this.read(window), 'tree');
-      const masks = await this.masks(window);
-      if (masks.passwords < secureCount) {
-        throw new ConfigurationError('POLICY_DENIED', `the window shows ${secureCount} secure fields and only ${masks.passwords} can be painted over (one sits in a closed shadow root), so the screenshot is withheld`);
+      const raw = await this.read(window);
+      const unmaskable = unmaskableCount(raw.document, raw.strings);
+      if (unmaskable > 0) {
+        throw new ConfigurationError('POLICY_DENIED', `the window shows ${unmaskable} password field${unmaskable === 1 ? '' : 's'} or nested document${unmaskable === 1 ? '' : 's'} inside a closed shadow root, which no mask reaches, so the screenshot is withheld`);
       }
       mkdirSync(path.dirname(absolute), { recursive: true });
-      await window.page.screenshot({ path: absolute, mask: [masks.locator], maskColor: '#000000', caret: 'hide' });
+      await window.page.screenshot({ path: absolute, mask: [window.page.locator(MASKED_SELECTOR)], maskColor: '#000000', caret: 'hide' });
       return relative;
     });
   }

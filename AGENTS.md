@@ -158,8 +158,9 @@ suites that consume the built packages the way a user would.
   `Accessibility.getFullAXTree` and one `DOMSnapshot` on backend node ids
   (`src/tree.ts`, pure, tested on a captured read); actions run in an
   isolated world and send trusted input. Windows are the tabs. Screenshots
-  mask password fields and nested documents, and are withheld when the tree
-  lists a secure field no mask reaches.
+  mask password fields and nested documents, and are withheld when the DOM
+  snapshot finds one inside a closed shadow root, which no mask reaches
+  (`unmaskableCount`, independent of the accessibility tree).
 - `packages/core/src/engine/protocol/` - the engine protocol: the engine
   contract as LSP-style JSON-RPC (`connectEngine` client, `serveEngine`
   server, spawn/socket/loopback transports), so an engine can run in
