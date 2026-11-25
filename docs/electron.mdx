@@ -102,7 +102,7 @@ The `electron` fixture has these methods:
 | --- | --- |
 | `evaluate(fn, arg?)` | Runs `fn` in the main process with the `electron` module and returns its serializable result. `fn` is sent as text, so pass values as `arg` |
 | `windows()` | Lists the open windows, in the order they opened, with their title and URL |
-| `useWindow(which)` | Makes `screen` read a window: an index, or `{ title, url }` with a string or a RegExp. It waits for the window to open |
+| `useWindow(which, { timeout }?)` | Makes `screen` read a window: an index, or `{ title, url }` with a string or a RegExp. It waits for the window to open, up to `timeout` or the action timeout |
 | `locator(selector)` | A locator for a CSS selector in the window's document |
 
 ## What differs from the web

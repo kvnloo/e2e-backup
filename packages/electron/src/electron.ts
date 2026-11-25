@@ -4,7 +4,7 @@
  * `electron.<method>` step bounded by the action timeout.
  */
 
-import { ConfigurationError, type EngineFixtureContext, type Locator } from '@e2e-dev/core/engine';
+import { ConfigurationError, stepTimeout, type EngineFixtureContext, type Locator } from '@e2e-dev/core/engine';
 import type { ElectronSurface, ElectronWindow, WindowMatcher } from './surface.ts';
 
 /**
@@ -30,9 +30,10 @@ export interface Electron {
   /**
    * Reads and acts in another window from now on: the window at a position,
    * or the first whose title or URL matches (a string exactly, or a RegExp).
-   * Waits for such a window to open, up to the action timeout.
+   * Waits for such a window to open, up to `timeout` milliseconds or else
+   * the action timeout.
    */
-  useWindow(which: WindowMatcher): Promise<ElectronWindow>;
+  useWindow(which: WindowMatcher, options?: { readonly timeout?: number }): Promise<ElectronWindow>;
   /**
    * A locator for a CSS selector in the window `screen` reads, for an element
    * no role, label, text, or test id names. It matches in the window's
@@ -50,8 +51,8 @@ export function createElectronFixture(surface: ElectronSurface, context: EngineF
     async windows() {
       return await surface.windows();
     },
-    async useWindow(which) {
-      return await surface.useWindow(which, context.operation());
+    async useWindow(which, options) {
+      return await surface.useWindow(which, context.operation(stepTimeout(options?.timeout, 'electron.useWindow')));
     },
     locator(selector) {
       if (typeof selector !== 'string' || selector.trim() === '') throw new ConfigurationError('INVALID_ARGUMENT', 'electron.locator() takes a CSS selector string');
@@ -61,6 +62,6 @@ export function createElectronFixture(surface: ElectronSurface, context: EngineF
   return context.fixture('electron', electron, {
     evaluate: { kind: 'resource' },
     windows: { kind: 'resource' },
-    useWindow: { kind: 'resource', label: (which) => (typeof which === 'number' ? String(which) : JSON.stringify({ ...which, title: which.title?.toString(), url: which.url?.toString() })) },
+    useWindow: { kind: 'resource', timeout: (_which, options) => options?.timeout, label: (which) => (typeof which === 'number' ? String(which) : JSON.stringify({ ...which, title: which.title?.toString(), url: which.url?.toString() })) },
   });
 }
