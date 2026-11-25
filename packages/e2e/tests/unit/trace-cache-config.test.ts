@@ -374,13 +374,19 @@ describe('settleStagedTraces', () => {
     expect(readTraceEntry(JSON.parse(stored))?.payload.actions[0]?.at).toBe('/invite?code=<secret:token>');
   });
 
-  it('keeps an entry whose flow differs from the new recording only in where each action ran', async () => {
+  it('keeps an entry whose flow differs from the new recording only in where each action ran and what control a point was on', async () => {
     const store = memoryStore();
-    const located = (at: string): ActionTrace => ({ ...trace('same flow'), actions: [{ name: 'tap', summary: 'tap button "X"', target: { role: 'button', name: 'X' }, at }] });
-    const stored = JSON.stringify(buildTraceEntry(located('/requests/1001')));
+    const located = (at: string, controlRole: string): ActionTrace => ({
+      ...trace('same flow'),
+      actions: [
+        { name: 'tap', summary: 'tap button "X"', target: { role: 'button', name: 'X' }, at },
+        { name: 'tapAt', summary: 'tap the point (5, 5)', point: { x: 5, y: 5 }, viewport: { width: 100, height: 100 }, controlRole },
+      ],
+    });
+    const stored = JSON.stringify(buildTraceEntry(located('/requests/1001', 'button')));
     store.entries.set(KEY_A, stored);
     const context = contextWith(store);
-    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: located('/requests/1002'), stepIndex: 1 });
+    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: located('/requests/1002', 'switch'), stepIndex: 1 });
     const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
     expect(writes.get(1)).toBe('kept');
     expect(store.entries.get(KEY_A)).toBe(stored);

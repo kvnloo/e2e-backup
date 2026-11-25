@@ -128,8 +128,9 @@ export type CacheWrite = 'saved' | 'kept' | 'unconfirmed' | 'evicted' | 'no-chan
  * runs live each time (it types a value read off the screen) would otherwise
  * rewrite an entry a committed cache directory carries. A replay stops at a
  * gap whatever its rule, which only names the hand-off in the report. Where
- * each action ran (`at`) is provenance too, and a page between the start and
- * the end may carry a fresh id on every run.
+ * each action ran (`at`) and the control a point tap was on (`controlRole`)
+ * are provenance too, and a page between the start and the end may carry a
+ * fresh id on every run.
  */
 async function holdsSameFlow(store: CacheStore, keyHash: string, trace: ActionTrace): Promise<boolean> {
   const existing = await store.read(keyHash);
@@ -148,6 +149,10 @@ function flowOf(trace: ActionTrace): string {
     ...flow,
     actions: actions.map((recorded) => {
       const { at: _at, ...action } = recorded;
+      if (action.name === 'tapAt' || action.name === 'hoverAt') {
+        const { controlRole: _controlRole, ...point } = action;
+        return point;
+      }
       if (action.name !== 'tool') return action;
       const { derived: _derived, ...gap } = action;
       return gap;
