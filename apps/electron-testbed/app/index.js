@@ -88,6 +88,10 @@ document.getElementById('archive-link').addEventListener('click', (event) => {
   document.querySelector('[data-testid="link-result"]').textContent = 'Archive opened';
 });
 
+document.querySelector('[data-testid="attachment"]').addEventListener('change', (event) => {
+  document.querySelector('[data-testid="attachment-name"]').textContent = Array.from(event.target.files, (file) => file.name).join(', ');
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');

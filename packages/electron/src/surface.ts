@@ -7,13 +7,14 @@
  * contract of `@e2e-dev/core/engine`.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron, type CDPSession, type ElectronApplication, type Locator, type Page } from 'playwright-core';
 import {
   ConfigurationError,
   EngineError,
+  TestError,
   expressionSelectors,
   parseKey,
   raceAbort,
@@ -147,8 +148,8 @@ const CLOSED = /Target (page, context or browser )?(has been )?closed|Target clo
  * is `ACTION_MAY_HAVE_COMMITTED`, never something the harness retries.
  */
 function translate(cause: unknown, label: string, committed: boolean): Error {
-  // A refusal by policy (a screenshot it cannot mask) is the harness's to report as it is.
-  if (cause instanceof ConfigurationError) return cause;
+  // A refusal by policy (a screenshot it cannot mask) or of the test's own input is the harness's to report as it is.
+  if (cause instanceof ConfigurationError || cause instanceof TestError) return cause;
   if (cause instanceof EngineError) {
     if (committed && (cause.code === 'OPERATION_TIMEOUT' || cause.retryable)) {
       return new EngineError('ACTION_MAY_HAVE_COMMITTED', `${label}: ${cause.message}; its input may have reached the app`, { retryable: false, cause });
@@ -780,9 +781,13 @@ export class ElectronSurface {
         case 'setInputFiles':
         case 'setInputFilePayloads': {
           if (action.kind === 'setInputFilePayloads') throw new EngineError('UNSUPPORTED_CAPABILITY', 'in-memory files are not supported; pass file paths', { retryable: false });
+          const files = action.paths.map((file) => path.resolve(this.projectRoot, file));
+          // The DevTools call takes a path that names nothing and attaches nothing, reporting success.
+          const missing = files.find((file) => !existsSync(file));
+          if (missing !== undefined) throw new TestError('INVALID_ARGUMENT', `setInputFiles: no file at ${missing}`);
           await this.waitReady(window, backendNodeId, operation, CHECK_FILE_INPUT, deadline);
           const session = await this.session(window.page);
-          await commit(() => session.send('DOM.setFileInputFiles', { files: action.paths.map((file) => path.resolve(this.projectRoot, file)), backendNodeId }));
+          await commit(() => session.send('DOM.setFileInputFiles', { files, backendNodeId }));
           return;
         }
         case 'dragTo': {

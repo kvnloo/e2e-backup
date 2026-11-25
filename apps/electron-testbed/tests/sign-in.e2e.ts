@@ -152,6 +152,14 @@ test.describe('sign-in window', () => {
     await expect(rich).toHaveText('Rewritten');
   });
 
+  test('attaches a file by path and refuses a path that names nothing', async ({ screen }) => {
+    const attachment = screen.getByTestId('attachment');
+    await attachment.setInputFiles('app/settings.html');
+    await expect(screen.getByTestId('attachment-name')).toHaveText('settings.html');
+    const missing = await attachment.setInputFiles('app/no-such-file.txt').then(() => undefined, (error: unknown) => error);
+    expect(missing).toMatchObject({ code: 'INVALID_ARGUMENT' });
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });
