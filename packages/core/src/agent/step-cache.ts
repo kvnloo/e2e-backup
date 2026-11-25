@@ -228,8 +228,8 @@ export class StepTraceSession {
   }
 
   /** Records a fill whose value was this run's data as a replay-ending gap, with the rule that said so. */
-  recordDerivedGap(reason: DerivedReason): void {
-    this.recorder?.recordDerivedGap(reason);
+  recordDerivedGap(reason: DerivedReason, at?: string): void {
+    this.recorder?.recordDerivedGap(reason, at);
   }
 
   /** How many actions the step's recording holds, gaps included; undefined when this step records nothing. */

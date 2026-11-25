@@ -164,7 +164,8 @@ describe('trace cache: a one-time code typed one digit per box', () => {
     // purpose makes each fill this run's data.
     expect(actions).toHaveLength(6);
     for (const action of actions) {
-      expect(action).toEqual({ name: 'tool', summary: 'tool type (run-time value)', derived: 'minted-token' });
+      // A gap also keeps where it ran when the step had looked again (`at`), which is provenance.
+      expect(action).toMatchObject({ name: 'tool', summary: 'tool type (run-time value)', derived: 'minted-token' });
     }
 
     const second = await runExisting(project, options());
@@ -222,7 +223,7 @@ describe('trace cache: a one-time code typed into each focused box', () => {
     const gaps = actions.filter((action) => action.name === 'tool');
     expect(gaps).toHaveLength(6);
     for (const gap of gaps) {
-      expect(gap).toEqual({ name: 'tool', summary: 'tool type (run-time value)', derived: 'minted-token' });
+      expect(gap).toMatchObject({ name: 'tool', summary: 'tool type (run-time value)', derived: 'minted-token' });
     }
 
     const second = await runExisting(marked, options());
@@ -282,7 +283,7 @@ describe('trace cache: a code typed across boxes that declare no purpose', () =>
     const first = await runExisting(project, options(executor));
     expect(first.exitCode).toBe(0);
     // No piece is a word of "Your code is ...": the pieces typed in a row join into it.
-    expect(readEntries(project)[0]!.entry.payload.actions).toEqual([gap]);
+    expect(readEntries(project)[0]!.entry.payload.actions).toMatchObject([gap]);
 
     const second = await runExisting(project, options(executor));
     expect(second.exitCode).toBe(0);
@@ -311,7 +312,7 @@ describe('trace cache: a code typed across boxes that declare no purpose', () =>
     const project = projectFor(suiteOn('/one-time-code-plain?label=1&code=482613'));
     const first = await runExisting(project, options(codeExecutor));
     expect(first.exitCode).toBe(0);
-    expect(readEntries(project)[0]!.entry.payload.actions).toEqual([gap]);
+    expect(readEntries(project)[0]!.entry.payload.actions).toMatchObject([gap]);
 
     const second = await runExisting(project, options(codeExecutor));
     expect(second.exitCode).toBe(0);
