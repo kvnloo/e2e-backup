@@ -236,7 +236,9 @@ export class TraceRecorder {
     };
     const requireTarget = (): TraceTargetDescriptor => require(target);
     if (isNodeAction(action)) {
-      const recorded: RecordedAction = { name: action.name, summary, target: requireTarget() };
+      const role = action.control?.role;
+      const controlRole = role === undefined || role === action.node.role ? undefined : role;
+      const recorded: RecordedAction = { name: action.name, summary, target: requireTarget(), ...(controlRole === undefined ? {} : { controlRole }) };
       // A tap with held keys replays with them, so the trace keeps them.
       if ('modifiers' in action && action.modifiers !== undefined) return { ...recorded, modifiers: [...action.modifiers] };
       return recorded;

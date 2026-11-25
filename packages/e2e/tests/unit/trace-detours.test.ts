@@ -72,6 +72,9 @@ describe('findDetours by recorded locations', () => {
       at: '/settings/display',
     };
     expect(findDetours(flow([tap('Display', '/settings'), toggled, back('/settings/display')], { endPath: '/settings' }))).toEqual([]);
+    // A node tap on the icon inside the switch sets the switch too.
+    const iconTap: RecordedAction = { ...tap('Moon', '/settings/display', 'img'), controlRole: 'switch' } as RecordedAction;
+    expect(findDetours(flow([tap('Display', '/settings'), iconTap, back('/settings/display')], { endPath: '/settings' }))).toEqual([]);
     // The icon inside the switch held the point; the switch is the control it set.
     const onIcon: RecordedAction = { ...toggled, within: { target: { role: 'img', name: 'Moon' }, fx: 0.5, fy: 0.5 }, controlRole: 'switch' } as RecordedAction;
     expect(findDetours(flow([tap('Display', '/settings'), onIcon, back('/settings/display')], { endPath: '/settings' }))).toEqual([]);

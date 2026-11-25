@@ -150,9 +150,9 @@ function flowOf(trace: ActionTrace): string {
     ...flow,
     actions: actions.map((recorded) => {
       const { at: _at, ...action } = recorded;
-      if (action.name === 'tapAt' || action.name === 'hoverAt') {
-        const { controlRole: _controlRole, ...point } = action;
-        return point;
+      if ('controlRole' in action) {
+        const { controlRole: _controlRole, ...tap } = action;
+        return tap;
       }
       if (action.name !== 'tool') return action;
       const { derived: _derived, ...gap } = action;
