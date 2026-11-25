@@ -44,6 +44,9 @@ document.querySelector('[data-testid="handoff"]').addEventListener('focus', () =
   document.querySelector('[data-testid="username"]').focus();
 });
 
+// A field that swallows every key press, as a masked input that handles keys itself does.
+document.querySelector('[data-testid="invite"]').addEventListener('keydown', (event) => event.preventDefault());
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');

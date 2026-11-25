@@ -695,7 +695,8 @@ export class ElectronSurface {
             await this.waitReady(window, backendNodeId, operation, CHECK_EDITABLE, deadline);
             // The app's focus handler can hand focus on; text goes only to the node that still holds it.
             if (!(await commit(this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
-            if (value === '') await keyboard.press('Delete');
+            // Both edit the selection as typing would, with input events and no key events, as fill promises.
+            if (value === '') await this.callOn(window, backendNodeId, DELETE_SELECTION);
             else await keyboard.insertText(value);
             return;
           }
@@ -1062,6 +1063,10 @@ const SELECT_CONTENTS = `function () { ${ELEMENT}
   selection.removeAllRanges();
   selection.addRange(range);
   return true;
+}`;
+
+const DELETE_SELECTION = `function () { ${ELEMENT}
+  element.ownerDocument.execCommand('delete');
 }`;
 
 const READ_CHECKED = `function () { ${ELEMENT}

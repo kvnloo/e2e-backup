@@ -46,6 +46,17 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('username')).toHaveValue('');
   });
 
+  test('fills and clears a field that swallows key presses, since fill sends none', async ({ screen }) => {
+    const invite = screen.getByTestId('invite');
+    await invite.fill('ABC-123');
+    await expect(invite).toHaveValue('ABC-123');
+    await invite.fill('');
+    await expect(invite).toHaveValue('');
+    await invite.fill('XYZ');
+    await invite.clear();
+    await expect(invite).toHaveValue('');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });
