@@ -315,9 +315,9 @@ export class AttemptSession {
    * recording would show behind the test's. The tab is navigated to
    * `about:blank` first, so its document runs the context's init scripts
    * as a new tab's does. Before that navigation, its console messages and
-   * page errors are cleared, because a tab's earlier ones are replayed to
-   * every new CDP client in Chrome. Clearing them afterward would drop the
-   * init scripts' entries from `about:blank`. Every later page is a new tab.
+   * page errors are cleared because Chrome replays earlier ones to every new
+   * CDP client. Clearing them after would drop the init scripts' entries from
+   * `about:blank`. Every later page is a new tab.
    */
   private async nextPage(context: BrowserContext): Promise<Page> {
     const first = this.firstPage;

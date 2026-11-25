@@ -53,8 +53,8 @@ test.describe('browser fixture', { platforms: ['web'], tags: ['browser'] }, () =
 
   test('console messages and page errors read back and clear on restart', async ({ app, browser }) => {
     // FIXME: the playground doesn't serve /favicon.ico, so headed Chromium and
-    // hosted Chrome log a 404. Headless runs don't, so that message is left
-    // out to keep the lists the same in every mode.
+    // hosted Chrome log a 404. Headless runs don't, so that message is
+    // filtered out to keep the lists the same in every mode.
     const logged = async () => (await browser.consoleMessages()).filter((message) => !message.text.startsWith('Failed to load resource'));
 
     await browser.evaluate(() => {

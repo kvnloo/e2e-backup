@@ -267,9 +267,8 @@ What survives:
   read current geometry and focus with `browser.evaluate` before acting.
 - Code that uses `surfaceOf(engine)` must read its accessors again after
   recovery. Playwright objects it kept belong to the disconnected transport.
-- Only entries from the current document are returned by
-  `browser.consoleMessages()` and `browser.pageErrors()`. Earlier entries
-  aren't sent again by Chrome.
+- `browser.consoleMessages()` and `browser.pageErrors()` only have entries
+  from the current document. Chrome doesn't send earlier ones again.
 
 A `browser` provider with `scope: 'attempt'` rides the same persistent
 context, with the same limits. The lease's `cdpEndpoint` provisions the
@@ -733,9 +732,9 @@ export interface WebConsoleMessage {
    * `console.warn`). Most values are Playwright's console message types. The
    * rest are browser-specific:
    *
-   * - `'verbose'`: the level of messages from Chromium, not from the page
-   * - `'countReset'`, `'timeLog'`, and `'timeStamp'`: from Firefox
-   * - `'image'` and `''`: from WebKit
+   * - `'verbose'` from browser messages in Chromium
+   * - `'countReset'`, `'timeLog'`, and `'timeStamp'` from Firefox
+   * - `'image'` and `''` from WebKit
    */
   readonly type:
     | 'log' | 'debug' | 'info' | 'error' | 'warning' | 'verbose'
@@ -750,10 +749,10 @@ export interface WebConsoleMessage {
 
 - Messages from the tab's frames and dedicated workers are included.
   Messages from service workers aren't.
-- Messages the browser writes are included, such as Chromium's
-  `Failed to load resource` for a request that got a 404. Headed Chromium
-  and hosted Chrome request `/favicon.ico` and log a 404 if the app doesn't
-  have one. Headless runs don't request it.
+- Browser messages are included, such as Chromium's
+  `Failed to load resource` on a 404. If the app doesn't have a favicon,
+  headed Chromium and hosted Chrome request `/favicon.ico` and log a 404.
+  Headless runs don't.
 - The list isn't cleared on navigation, so messages from earlier documents
   in the tab stay in it.
 - After `app.restart()`, the list only has messages from the new page.
@@ -772,7 +771,7 @@ reconnect, the lists only have entries from the current document.
 | Throws | When |
 | --- | --- |
 | `APP_NOT_OPEN` | No page is open yet. |
-| `ACTION_FAILED` | The call timed out after [`actionTimeout`](/reference/config#actiontimeout). |
+| `ACTION_FAILED` | Timed out after [`actionTimeout`](/reference/config#actiontimeout). |
 | `ENGINE_FAILURE` | The browser connection was lost. |
 
 #### `pageErrors`
@@ -810,7 +809,7 @@ export interface WebPageError {
 | Throws | When |
 | --- | --- |
 | `APP_NOT_OPEN` | No page is open yet. |
-| `ACTION_FAILED` | The call timed out after [`actionTimeout`](/reference/config#actiontimeout). |
+| `ACTION_FAILED` | Timed out after [`actionTimeout`](/reference/config#actiontimeout). |
 | `ENGINE_FAILURE` | The browser connection was lost. |
 
 #### `route`
