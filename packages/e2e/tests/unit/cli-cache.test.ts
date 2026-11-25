@@ -1,4 +1,4 @@
-/** `e2e cache ls`, `clear`, and `stats` over a real store directory. */
+/** `e2e cache ls`, `show`, `check`, `clear`, and `stats` over a real store directory. */
 
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -74,7 +74,7 @@ afterEach(() => {
 });
 
 describe('e2e cache ls', () => {
-  it('prints the provenance, age, and action count of every entry', async () => {
+  it('prints the entry, provenance, age, and action count of every entry', async () => {
     await seed([
       {
         keyHash: 'a'.repeat(64),
@@ -88,10 +88,10 @@ describe('e2e cache ls', () => {
     await invoke('cache', 'ls');
     const lines = written(stdoutSpy).trimEnd().split('\n');
     expect(process.exitCode).toBe(0);
-    expect(lines[0]).toMatch(/^TEST +TARGET +INSTRUCTION +AGE +ACTIONS$/);
+    expect(lines[0]).toMatch(/^ENTRY +TEST +TARGET +INSTRUCTION +AGE +ACTIONS$/);
     // Sorted by test, so billing precedes signup whatever the file order was.
-    expect(lines[1]).toMatch(/^tests\/billing\.e2e\.ts::upgrades +safari +eeeeeeeeeeee +<1m +1$/);
-    expect(lines[2]).toMatch(/^tests\/signup\.e2e\.ts::signs up +web +dddddddddddd +<1m +3$/);
+    expect(lines[1]).toMatch(/^bbbbbbbbbbbb +tests\/billing\.e2e\.ts::upgrades +safari +eeeeeeeeeeee +<1m +1$/);
+    expect(lines[2]).toMatch(/^aaaaaaaaaaaa +tests\/signup\.e2e\.ts::signs up +web +dddddddddddd +<1m +3$/);
   });
 
   it('marks a recording the action cap cut short', async () => {
@@ -114,11 +114,11 @@ describe('e2e cache ls', () => {
     const lines = written(stdoutSpy).trimEnd().split('\n');
     expect(process.exitCode).toBe(0);
     expect(lines).toHaveLength(3);
-    expect(lines.find((line) => line.startsWith(asciiId))).toBe(
-      `${asciiId}${' '.repeat(asciiPadding)}web     dddddddddddd  <1m  1`,
+    expect(lines.find((line) => line.includes(asciiId))).toBe(
+      `aaaaaaaaaaaa  ${asciiId}${' '.repeat(asciiPadding)}web     dddddddddddd  <1m  1`,
     );
-    expect(lines.find((line) => line.startsWith(testId))).toBe(
-      `${testId}${' '.repeat(padding)}web     eeeeeeeeeeee  <1m  1`,
+    expect(lines.find((line) => line.includes(testId))).toBe(
+      `bbbbbbbbbbbb  ${testId}${' '.repeat(padding)}web     eeeeeeeeeeee  <1m  1`,
     );
   });
 
@@ -134,6 +134,125 @@ describe('e2e cache ls', () => {
     await invoke('cache', 'ls');
     expect(written(stdoutSpy)).toContain('no replay cache entries in');
     expect(written(stderrSpy)).toContain('are not readable trace-1 entries');
+  });
+});
+
+/** The wrong-page flow: Settings, a page backed out of, then the right one. */
+function detouredTrace(): ActionTrace {
+  return {
+    actions: [
+      { name: 'tap', summary: 'tap button "Notifications"', target: { role: 'button', name: 'Notifications' }, at: 'com.example / Settings' },
+      { name: 'scroll', summary: 'scroll down', direction: 'down', at: 'com.example / Notifications' },
+      { name: 'back', summary: 'go back', at: 'com.example / Notifications' },
+      { name: 'tap', summary: 'tap button "Privacy"', target: { role: 'button', name: 'Privacy' }, at: 'com.example / Settings' },
+    ],
+    executor: { name: 'example-agent' },
+    recordedFor: { testId: 'tests/settings.e2e.ts::opens privacy', targetId: 'ios', instructionDigest: 'f'.repeat(64) },
+    summary: 'privacy settings are open',
+    startPath: 'com.example / Settings',
+    endPath: 'com.example / Privacy',
+    endAnchors: [{ role: 'heading', name: 'Privacy' }],
+  };
+}
+
+const DETOUR_LINE = 'actions 1-3 left com.example / Settings for com.example / Notifications and came back with nothing changed';
+
+describe('e2e cache ls: detours', () => {
+  it('marks an entry whose flow takes a detour', async () => {
+    await seed([{ keyHash: 'c'.repeat(64), trace: detouredTrace() }]);
+    await invoke('cache', 'ls');
+    expect(written(stdoutSpy).trimEnd().split('\n')[1]).toMatch(/ 4 \(detour\)$/);
+  });
+});
+
+describe('e2e cache show', () => {
+  it('prints the entry action by action, with where each ran and the detour marked', async () => {
+    await seed([{ keyHash: 'c'.repeat(64), trace: detouredTrace() }]);
+    await invoke('cache', 'show', 'cccccc');
+    expect(process.exitCode).toBe(0);
+    const output = written(stdoutSpy);
+    expect(output).toContain(`entry      ${path.join(root, CACHE_DIR, `${'c'.repeat(64)}.json`)}`);
+    expect(output).toContain('test       tests/settings.e2e.ts::opens privacy');
+    expect(output).toContain('ends on    com.example / Privacy');
+    const rows = output.split('\n').filter((line) => /^\d /.test(line));
+    expect(rows).toEqual([
+      '1  com.example / Settings       tap button "Notifications" (detour)',
+      '2  com.example / Notifications  scroll down (detour)',
+      '3  com.example / Notifications  go back (detour)',
+      '4  com.example / Settings       tap button "Privacy"',
+    ]);
+    expect(output).toContain('end state: shows heading "Privacy"');
+    expect(output).toContain(`detour: ${DETOUR_LINE}`);
+  });
+
+  it('takes the path of the entry file too', async () => {
+    await seed([{ keyHash: 'c'.repeat(64), trace: detouredTrace() }]);
+    await invoke('cache', 'show', path.join(CACHE_DIR, `${'c'.repeat(64)}.json`));
+    expect(process.exitCode).toBe(0);
+    expect(written(stdoutSpy)).toContain('tests/settings.e2e.ts::opens privacy');
+  });
+
+  it('strips terminal controls the recorded text carries', async () => {
+    const recorded = detouredTrace();
+    await seed([{ keyHash: 'c'.repeat(64), trace: { ...recorded, summary: 'done\u001b[2J\u0007' } }]);
+    await invoke('cache', 'show', 'c'.repeat(12));
+    expect(String(stdoutSpy.mock.calls.map((call: readonly unknown[]) => String(call[0])).join(''))).not.toContain('\u001b[2J');
+  });
+
+  it('fails with exit 2 when no entry, or more than one, matches', async () => {
+    await seed([
+      { keyHash: `ab${'0'.repeat(62)}`, trace: trace(undefined, 1) },
+      { keyHash: `ab${'1'.repeat(62)}`, trace: trace(undefined, 1) },
+    ]);
+    await invoke('cache', 'show', 'ab');
+    expect(process.exitCode).toBe(2);
+    expect(written(stderrSpy)).toContain('ab matches 2 entries');
+    stderrSpy.mockClear();
+    await invoke('cache', 'show', 'ff');
+    expect(process.exitCode).toBe(2);
+    expect(written(stderrSpy)).toContain('no replay cache entry ff');
+  });
+});
+
+describe('e2e cache check', () => {
+  it('names every detour and exits 1', async () => {
+    await seed([
+      { keyHash: 'c'.repeat(64), trace: detouredTrace() },
+      { keyHash: 'a'.repeat(64), trace: trace({ testId: 'tests/a.e2e.ts::a', targetId: 'web', instructionDigest: 'd'.repeat(64) }, 2) },
+    ]);
+    await invoke('cache', 'check');
+    expect(process.exitCode).toBe(1);
+    const lines = written(stdoutSpy).trimEnd().split('\n');
+    expect(lines).toEqual([
+      `cccccccccccc tests/settings.e2e.ts::opens privacy (ios): ${DETOUR_LINE}`,
+      '1 of 2 replay cache entries take a detour; e2e cache show <entry> prints its actions',
+    ]);
+  });
+
+  it('reads an entry recorded before locations by its actions alone', async () => {
+    const legacy: ActionTrace = {
+      ...trace(undefined, 0),
+      actions: [
+        { name: 'tap', summary: 'tap button "Help"', target: { role: 'button', name: 'Help' } },
+        { name: 'back', summary: 'go back' },
+        { name: 'tap', summary: 'tap button "Save"', target: { role: 'button', name: 'Save' } },
+      ],
+    };
+    await seed([{ keyHash: 'e'.repeat(64), trace: legacy }]);
+    await invoke('cache', 'check');
+    expect(process.exitCode).toBe(1);
+    expect(written(stdoutSpy)).toContain('eeeeeeeeeeee: actions 1-2 left a screen, only looked around, and went back');
+  });
+
+  it('exits 0 when no entry takes a detour, and on an empty store', async () => {
+    await invoke('cache', 'check');
+    expect(process.exitCode).toBe(0);
+    expect(written(stdoutSpy)).toContain('no detours in 0 replay cache entries');
+    stdoutSpy.mockClear();
+    await seed([{ keyHash: 'a'.repeat(64), trace: trace(undefined, 3) }]);
+    await invoke('cache', 'check');
+    expect(process.exitCode).toBe(0);
+    expect(written(stdoutSpy)).toContain('no detours in 1 replay cache entry');
   });
 });
 

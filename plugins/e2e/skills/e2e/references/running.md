@@ -19,7 +19,7 @@ npx e2e doctor [--check-model]     # can a run start: config, engine setup, mode
 npx e2e init [directory] [--yes]   # scaffold a project, refresh the agent skill
 npx e2e guide [topic]              # print this skill; topics: setup, writing-tests, agent,
                                    # running, explore, debugging, mcp, bug-bash
-npx e2e cache ls|clear|stats       # inspect or empty the replay cache
+npx e2e cache <command>            # ls, show, check, clear, stats: the replay cache
 npx e2e login|logout|models [provider]  # e2e/oauth subscription logins: openai,
                                    # github-copilot, opencode-console, spacexsi
 npx e2e mcp [--target <name>]      # MCP server for a coding agent (topic mcp)
@@ -129,7 +129,9 @@ its own tools.
 
 | Command | Prints |
 | --- | --- |
-| `e2e cache ls` | One row per entry: test, target, instruction digest, age, action count. |
+| `e2e cache ls` | One row per entry: entry digest, test, target, instruction digest, age, action count (`(detour)` marks one that takes a detour). |
+| `e2e cache show <entry>` | One entry by digest prefix or file path: each action with the screen it ran on, the end state, and its detours. |
+| `e2e cache check` | Every entry whose flow leaves a screen and comes back with nothing changed; exits 1 when there is one. |
 | `e2e cache stats` | Directory, entry count, total size. |
 | `e2e cache clear` | Deletes the entries and the directory; files the runner never wrote stay. |
 

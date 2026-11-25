@@ -1212,11 +1212,13 @@ With `--json`, it prints the `doctor-1` report to stdout: `{ "schemaVersion": "d
 
 Inspects or clears the replay cache. Each subcommand loads the discovered
 config or `--config <path>`, reads the directory a run would, and exits 0 on
-an empty store.
+an empty store. `check` exits 1 when an entry takes a detour.
 
 <CodeGroup>
 ```bash npm
 npx e2e cache ls
+npx e2e cache show 4f1c0a9d3b62
+npx e2e cache check
 npx e2e cache stats
 npx e2e cache clear
 npx e2e cache ls --config packages/web/e2e.config.ts
@@ -1224,6 +1226,8 @@ npx e2e cache ls --config packages/web/e2e.config.ts
 
 ```bash pnpm
 pnpm exec e2e cache ls
+pnpm exec e2e cache show 4f1c0a9d3b62
+pnpm exec e2e cache check
 pnpm exec e2e cache stats
 pnpm exec e2e cache clear
 pnpm exec e2e cache ls --config packages/web/e2e.config.ts
@@ -1231,6 +1235,8 @@ pnpm exec e2e cache ls --config packages/web/e2e.config.ts
 
 ```bash bun
 bunx e2e cache ls
+bunx e2e cache show 4f1c0a9d3b62
+bunx e2e cache check
 bunx e2e cache stats
 bunx e2e cache clear
 bunx e2e cache ls --config packages/web/e2e.config.ts
@@ -1239,7 +1245,9 @@ bunx e2e cache ls --config packages/web/e2e.config.ts
 
 | Command | Prints |
 | --- | --- |
-| `e2e cache ls` | One row per entry: the test and target it was recorded for, the first 12 characters of its instruction digest, its age, and how many actions a replay would run (`(truncated)` when recording hit the action cap). Rows are grouped by test, then target, oldest first. |
+| `e2e cache ls` | One row per entry: the first 12 characters of its entry digest, the test and target it was recorded for, the first 12 characters of its instruction digest, its age, and how many actions a replay would run (`(truncated)` when recording hit the action cap, `(detour)` when it takes a [detour](/cache#find-detours-in-a-recording)). Rows are grouped by test, then target, oldest first. |
+| `e2e cache show <entry>` | One entry: what it was recorded for, where it starts and ends, each action with the screen it ran on, the end state a replay checks, and its detours. `<entry>` is the entry digest, as many leading characters as tell it apart, or the path of its file. No match, or more than one, exits 2. |
+| `e2e cache check` | One line per detour, naming the entry, its test, and the actions, then a count. Exits 1 when any entry takes a detour. |
 | `e2e cache stats` | The store directory, the number of readable entries, their total size, and the number of unreadable files when there are any. |
 | `e2e cache clear` | Deletes every cache file, then the directory when nothing else is left in it, and reports how many files went. |
 
@@ -1249,9 +1257,15 @@ bunx e2e cache ls --config packages/web/e2e.config.ts
 | `--cache-dir <dir>` | The store directory. Default: `E2E_CACHE_DIR`, else `cache.dir`, else `.e2e/cache/`. |
 
 ```text
-TEST                             TARGET  INSTRUCTION   AGE  ACTIONS
-tests/billing.e2e.ts::upgrades   web     4f1c0a9d3b62  2h   4
-tests/signup.e2e.ts::signs%20up  web     9ab7715ce004  3d   7 (truncated)
+ENTRY         TEST                             TARGET  INSTRUCTION   AGE  ACTIONS
+4f1c0a9d3b62  tests/billing.e2e.ts::upgrades   web     d81e04a7c935  2h   4 (detour)
+9ab7715ce004  tests/signup.e2e.ts::signs%20up  web     27c3f0be61a4  3d   7 (truncated)
+```
+
+```text
+$ npx e2e cache check
+4f1c0a9d3b62 tests/billing.e2e.ts::upgrades (web): actions 1-3 left /billing for /billing/invoices and came back with nothing changed
+1 of 2 replay cache entries take a detour; e2e cache show <entry> prints its actions
 ```
 
 - An entry recorded before entries carried provenance prints `-` in those
