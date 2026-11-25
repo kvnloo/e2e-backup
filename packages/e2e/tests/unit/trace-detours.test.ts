@@ -100,6 +100,13 @@ describe('findDetours by recorded locations', () => {
     ]);
   });
 
+  it('names the screen the leaving action stood on, as a stored span does', () => {
+    const trip = flow([tap('Top', '/a'), tap('Leave', '/a#top'), back('/b'), tap('Stay', '/a')], { endPath: '/a' });
+    const fresh = findDetours(trip);
+    expect(fresh).toEqual([{ from: 1, to: 3, at: '/a#top', via: '/b', evidence: 'locations' }]);
+    expect(findDetours({ ...trip, detours: fresh.map(({ from, to }) => ({ from, to })) })).toEqual(fresh);
+  });
+
   it('starts at the action that left, not at the looking around before it', () => {
     const detours = findDetours(flow([scroll('/home'), tap('Reports', '/home'), back('/reports'), tap('Billing', '/home')], { endPath: '/billing' }));
     expect(detours).toEqual([{ from: 1, to: 3, at: '/home', via: '/reports', evidence: 'locations' }]);
