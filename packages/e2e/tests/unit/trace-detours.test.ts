@@ -1,7 +1,9 @@
 /** Detours in a recorded flow: a screen left and come back to with nothing typed, chosen, or set on the way. */
 
 import { describe, expect, it } from 'vitest';
-import { describeDetour, findDetours } from '@e2e-dev/core/lib/cache/detours';
+import { describeDetour, findDetours, settledDetour } from '@e2e-dev/core/lib/cache/detours';
+import { SecretLedger } from '@e2e-dev/core/lib/internal/redact';
+import { bound } from '@e2e-dev/core/lib/internal/text';
 import type { ActionTrace, RecordedAction } from '@e2e-dev/core/lib/cache/trace';
 
 function tap(name: string, at?: string, role = 'button'): RecordedAction {
@@ -158,5 +160,28 @@ describe('findDetours on an entry recorded without locations', () => {
 
   it('reads locations once any action has one, never mixing in the action shape', () => {
     expect(findDetours(flow([tap('Help', '/settings'), back()], { endPath: '/help' }))).toEqual([]);
+  });
+});
+
+describe('settledDetour', () => {
+  const ledger = () => {
+    const known = new SecretLedger();
+    known.register('token', 'tok-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
+    return known;
+  };
+
+  it('masks a secret the report bound cut through, ending at the ellipsis', () => {
+    const text = bound(`actions 1-2 left / for /${'a'.repeat(560)}?t=tok-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 and came back with nothing typed, chosen, or set`, 600);
+    expect(text).toContain('tok-ABCDEFGH…');
+    const settled = settledDetour(text, ledger());
+    expect(settled).not.toContain('tok-ABC');
+    expect(settled.length).toBeLessThanOrEqual(600);
+  });
+
+  it('masks a whole secret and keeps the text within the report bound', () => {
+    const settled = settledDetour(`actions 1-2 left / for /x?t=tok-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 and came back with nothing typed, chosen, or set`, ledger());
+    expect(settled).toBe('actions 1-2 left / for /x?t=<secret:token> and came back with nothing typed, chosen, or set');
+    const long = settledDetour(`${'x'.repeat(590)}tok-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`.slice(0, 600), { redact: (text) => text.replaceAll('x', 'xx'), redactCut: (text) => text });
+    expect(long.length).toBe(600);
   });
 });
