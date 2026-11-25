@@ -44,6 +44,10 @@ export interface SnapshotDocument {
     readonly nodeName?: readonly number[];
     readonly attributes?: readonly (readonly number[])[];
     readonly inputValue?: RareStrings;
+    readonly nodeType?: readonly number[];
+    readonly nodeValue?: readonly number[];
+    /** The option elements that are selected. */
+    readonly optionSelected?: { readonly index: readonly number[] };
     readonly parentIndex?: readonly number[];
     /** For every node inside a shadow root, that root's type: `open`, `closed`, or `user-agent`. */
     readonly shadowRootType?: RareStrings;
@@ -133,8 +137,38 @@ interface DomFacts {
   readonly nodeName: string;
   readonly attributes: Readonly<Record<string, string>>;
   readonly inputValue?: string;
+  /** A select's value: what its first selected option submits. */
+  readonly selectValue?: string;
   /** Device-pixel document bounds. */
   readonly bounds?: readonly number[];
+}
+
+/**
+ * Each select's value, by node index: what its first selected option submits,
+ * the option's `value` attribute or else its text, as `HTMLSelectElement.value`
+ * reads it.
+ */
+function selectedValues(document: SnapshotDocument, strings: readonly string[], attributesOf: (index: number) => Record<string, string>): Map<number, string> {
+  const values = new Map<number, string>();
+  const selected = document.nodes.optionSelected?.index ?? [];
+  if (selected.length === 0) return values;
+  const names = document.nodes.nodeName ?? [];
+  const parents = document.nodes.parentIndex ?? [];
+  const types = document.nodes.nodeType ?? [];
+  const nodeValues = document.nodes.nodeValue ?? [];
+  const texts = new Map<number, string>();
+  types.forEach((type, index) => {
+    if (type !== 3) return;
+    const parent = parents[index] ?? -1;
+    texts.set(parent, (texts.get(parent) ?? '') + (strings[nodeValues[index]!] ?? ''));
+  });
+  for (const option of selected.toSorted((a, b) => a - b)) {
+    let select = parents[option] ?? -1;
+    while (select >= 0 && strings[names[select]!] !== 'SELECT') select = parents[select] ?? -1;
+    if (select < 0 || values.has(select)) continue;
+    values.set(select, attributesOf(option)['value'] ?? collapse(texts.get(option) ?? ''));
+  }
+  return values;
 }
 
 /** Indexes the snapshot by backend DOM node id. */
@@ -150,16 +184,22 @@ function indexSnapshot(document: SnapshotDocument, strings: readonly string[]): 
   document.layout.nodeIndex.forEach((node, at) => {
     if (!bounds.has(node)) bounds.set(node, document.layout.bounds[at]!);
   });
-  ids.forEach((backendNodeId, index) => {
+  const attributesOf = (index: number): Record<string, string> => {
     const pairs = attributes[index] ?? [];
     const record: Record<string, string> = {};
     for (let at = 0; at + 1 < pairs.length; at += 2) record[(strings[pairs[at]!] ?? '').toLowerCase()] = strings[pairs[at + 1]!] ?? '';
+    return record;
+  };
+  const selectValues = selectedValues(document, strings, attributesOf);
+  ids.forEach((backendNodeId, index) => {
     const input = inputValues.get(index);
+    const selected = selectValues.get(index);
     const box = bounds.get(index);
     facts.set(backendNodeId, {
       nodeName: strings[names[index]!] ?? '',
-      attributes: record,
+      attributes: attributesOf(index),
       ...(input === undefined ? {} : { inputValue: strings[input] ?? '' }),
+      ...(selected === undefined ? {} : { selectValue: selected }),
       ...(box === undefined ? {} : { bounds: box }),
     });
   });
@@ -308,10 +348,15 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
           break;
       }
     }
-    if (!secure && VALUE_ROLES.has(role)) {
-      const typed = facts?.inputValue;
-      // A text field's typed value is the input's own; a select's is the label of its chosen option, as Chromium names it.
-      draft.value = bound(typed ?? stringOf(node.value) ?? '', OBSERVED_TEXT_LIMIT, mode);
+    const checkable = facts?.nodeName === 'INPUT' && ['checkbox', 'radio'].includes(attributes['type']?.toLowerCase() ?? '');
+    if (facts?.nodeName === 'SELECT') {
+      // A select's value is what its chosen option submits, as `select.value` reads it; its options name the labels.
+      draft.value = bound(facts.selectValue ?? '', OBSERVED_TEXT_LIMIT, mode);
+    } else if (checkable) {
+      // A checkbox or radio submits its value attribute, `on` without one, whatever its state; an observation leaves that token out.
+      if (mode === 'node') draft.value = attributes['value'] ?? 'on';
+    } else if (!secure && VALUE_ROLES.has(role)) {
+      draft.value = bound(facts?.inputValue ?? stringOf(node.value) ?? '', OBSERVED_TEXT_LIMIT, mode);
     }
     const shown: Record<string, string> = {};
     for (const [key, value] of Object.entries(attributes)) {

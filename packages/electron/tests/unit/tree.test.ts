@@ -70,6 +70,11 @@ describe('projectTree', () => {
     expect(find(root, (node) => node.testId === 'plan')).toMatchObject({ role: 'combobox', name: 'Plan', value: 'Pro' });
   });
 
+  it('reads a checkbox value for a locator only, as the value attribute or on', () => {
+    expect(find(project('node').root, (node) => node.role === 'checkbox').value).toBe('on');
+    expect(find(project('tree').root, (node) => node.role === 'checkbox').value).toBeUndefined();
+  });
+
   it('maps boxes from device pixels in the document to CSS pixels in the viewport', () => {
     const { root } = project('tree');
     const add = find(root, (node) => node.role === 'button' && node.name === 'Add one');

@@ -32,6 +32,14 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('status')).toHaveText('Password is required');
   });
 
+  test('reads what a control submits: a select its option value, a checkbox on', async ({ screen }) => {
+    const region = screen.getByTestId('region');
+    await expect(region).toHaveValue('eu-1');
+    await region.selectOption('America');
+    await expect(region).toHaveValue('us-1');
+    expect(await screen.getByRole('checkbox', 'Remember me').inputValue()).toBe('on');
+  });
+
   test('refuses an option in a disabled group', async ({ screen }) => {
     const refused = await screen.getByRole('combobox', 'Plan').selectOption('Legacy', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
     expect(String(refused)).toContain('is disabled');
