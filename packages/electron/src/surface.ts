@@ -245,9 +245,16 @@ export class ElectronSurface {
     this.shown = undefined;
     if (app === undefined) return;
     const child = app.process();
+    let timer: NodeJS.Timeout | undefined;
     const closed = app.close().then(() => true, () => false);
-    const timedOut = sleep(Math.max(1, Math.min(budget.timeoutMs, 10_000))).then(() => false);
-    if (!(await Promise.race([closed, timedOut]))) child.kill('SIGKILL');
+    const timedOut = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), Math.max(1, Math.min(budget.timeoutMs, 10_000)));
+    });
+    try {
+      if (!(await Promise.race([closed, timedOut]))) child.kill('SIGKILL');
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** `app.open()` and `app.restart()`: quits the app if it runs and launches it again on the attempt's app data. */
