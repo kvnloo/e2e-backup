@@ -106,6 +106,10 @@ test.describe('sign-in window', () => {
     await counter.getByRole('button', 'Add one').dblclick();
     await expect(screen.getByTestId('count')).toHaveText('3');
     await expect(electron.locator('#increment')).toHaveText('Add one');
+    // Each run of text is found on its own, as on the web, and the line reads as all of them.
+    await expect(screen.getByText('$10')).toBeVisible();
+    await expect(screen.getByText('Price')).toHaveCount(1);
+    await expect(screen.getByTestId('price')).toHaveText('Price $10');
     // A label wrapping a field is a container Chromium's tree leaves out; a selector still reaches it.
     await expect(electron.locator('#sign-in > label').first()).toHaveText('Username');
     await expect(electron.locator('#sign-in > label')).toHaveCount(4);

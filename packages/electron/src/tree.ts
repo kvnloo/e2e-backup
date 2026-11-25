@@ -408,7 +408,8 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       const text = textOf(draft, mode === 'node');
       if (text !== '') draft.text = bound(text, OBSERVED_TEXT_LIMIT, mode);
     }
-    if (onlyText) draft.children = [];
+    // A locator keeps several runs as nodes, so an exact text query finds each one (`<span>Price</span> <span>$10</span>`).
+    if (onlyText && (mode === 'tree' || draft.children.length === 1)) draft.children = [];
     // What toBeEmpty reads, on a locator's read only and never on a secure field: a field by its value, anything else
     // by its text content, as the web engine reads it (a select's option text counts, and so does hidden text).
     if (mode === 'node' && !secure) {
