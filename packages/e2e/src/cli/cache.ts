@@ -81,9 +81,12 @@ const DIGEST_PREFIX_CHARS = 12;
  * not a failure.
  */
 async function cache(command: CacheCommand | { readonly show: string }, options: CacheOptions = {}): Promise<number> {
+  // A path names its own file, wherever it is: a copied recording or another
+  // package's cache is read from its directory, not looked up in this one.
+  const shownPath = typeof command === 'object' && path.basename(command.show) !== command.show ? command.show : undefined;
   let directory: string;
   try {
-    directory = await resolveCacheDirectory(options);
+    directory = shownPath === undefined ? await resolveCacheDirectory(options) : path.resolve(options.cwd ?? process.cwd(), path.dirname(shownPath));
   } catch (cause) {
     process.stderr.write(`${redactError(errorMessage(cause))}\n`);
     return 2;
