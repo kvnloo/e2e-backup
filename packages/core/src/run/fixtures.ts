@@ -666,9 +666,11 @@ export function createApp(
         return;
       }
       if (openPath !== undefined) {
+        // Only an engine that opens links (a device) can take a path as one; any other launches its app and nothing more.
+        const linkAdvice = target.engine?.session?.openLink === undefined ? '' : '; declare app.linkBase to open a path as a link in it, or open one through device.openLink';
         throw new ConfigurationError(
           'APP_URL_REQUIRED',
-          `app.open("${openPath}") needs an app URL and target "${target.name}" has none: on a device app.open() launches the pinned app; declare app.linkBase to open a path as a link in it, or open one through device.openLink`,
+          `app.open("${openPath}") needs an app URL and target "${target.name}" has none: without one, app.open() launches the pinned app and takes no path${linkAdvice}`,
         );
       }
       if (target.engine?.session?.restart === undefined) {
