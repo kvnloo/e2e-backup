@@ -81,6 +81,11 @@ describe('findDetours by recorded locations', () => {
     expect(findDetours(flow([tap('Next', '/one'), tap('Next', '/two'), tap('Done', '/three')], { endPath: '/done' }))).toEqual([]);
   });
 
+  it('starts at the action that left, not at the looking around before it', () => {
+    const detours = findDetours(flow([scroll('/home'), tap('Reports', '/home'), back('/reports'), tap('Billing', '/home')], { endPath: '/billing' }));
+    expect(detours).toEqual([{ from: 1, to: 3, at: '/home', via: '/reports', evidence: 'locations' }]);
+  });
+
   it('compares routes, so a record id in the path is the same screen', () => {
     const detours = findDetours(flow([tap('Order', '/orders/123'), back('/invoices'), tap('Ship', '/orders/123')], { endPath: '/orders/123' }));
     expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/123', via: '/invoices', evidence: 'locations' }]);
