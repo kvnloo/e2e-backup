@@ -1357,8 +1357,9 @@ aborts if starting or stopping takes too long. See
 `e2e run` and `e2e explore` start services in key order before any app
 commands. They stop services in reverse order after the app commands stop. If
 a service fails to start, any services already started are stopped. `e2e mcp`
-and `openHost` don't start services and fail with `INVALID_CONFIG` when the
-config defines services.
+starts services with the first session on a config file. It stops them when
+the last session on that file closes. `openHost` starts them when the host
+opens and stops them in `host.close()`.
 
 All workers share one instance of each service. Tests read the values through
 the [`services` fixture](/reference/test#services). An [`env`
@@ -1368,7 +1369,6 @@ See [Services](/services) for a full example.
 | Throws | When |
 | --- | --- |
 | `INVALID_CONFIG` | At config load, `services` isn't a plain object, an entry isn't a plain object with a `start` function, or an entry has an unknown key. |
-| `INVALID_CONFIG` | `open_session` in `e2e mcp`, or `openHost`, is called with a config that defines services. |
 | `SERVICE_START_FAILED` | `start` throws, finishes without yielding, isn't an async generator, or doesn't yield within 60 seconds. |
 | `INVALID_SERVICE_VALUE` | The yielded value isn't a plain object, contains a value that can't be copied, like a custom class instance, or contains a function inside a map or a set. See [What a service can yield](/services#what-a-service-can-yield). |
 | `SERVICE_STOP_FAILED` | The code after `yield` throws, yields a second time, or doesn't finish within 10 seconds. |

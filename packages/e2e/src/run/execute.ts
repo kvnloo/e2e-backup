@@ -778,6 +778,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
           this.options.headed,
           video !== undefined,
           this.options.events?.onNotice,
+          this.services,
         );
         heldTools = tools;
         const screens = {

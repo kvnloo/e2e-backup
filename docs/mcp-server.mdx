@@ -85,8 +85,9 @@ project dependencies and start the MCP client in the project directory so
 </Tabs>
 
 A session starts the target's app command, if it has one, and names it
-with its URL and port. The config reads the server's environment, not the
-agent's shell.
+with its URL and port. The first session on a config file starts its
+[services](/services), and the last one to close stops them. The config
+reads the server's environment, not the agent's shell.
 
 ## Try it without a config
 

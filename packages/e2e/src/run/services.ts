@@ -3,9 +3,9 @@
  * generator runs up to `yield` before app commands start and resumes after
  * they stop.
  *
- * Workers receive a copy of the yielded values. Each yielded function becomes
- * an async function that sends calls to the runner process, where the real
- * function runs and returns the result.
+ * Workers and sessions receive a copy of the yielded values. Each yielded
+ * function becomes an async function that sends calls to the process that
+ * started the service, where the real function runs and returns the result.
  */
 
 import { deserialize, serialize } from 'node:v8';
@@ -531,6 +531,7 @@ function errorReply(thrown: unknown): ServiceReply {
           Object.entries({ ...thrown, name: thrown.name, stack: thrown.stack }).filter(([, value]) => {
             try {
               serialize(value);
+
               return true;
             } catch {
               return false;

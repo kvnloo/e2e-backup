@@ -6,6 +6,8 @@ description: Start dependencies like an email API before your app runs and use t
 A service is a dependency your app needs, like an email API, an OAuth
 provider, or a database. When you run `e2e run` or `e2e explore`, each
 service starts before the app commands and stops at the end of the run.
+Services also start in
+[`e2e mcp` and `openHost`](#services-in-e2e-mcp-and-openhost).
 
 ## Define a service
 
@@ -168,9 +170,17 @@ return value can use any of those data types. They can't contain functions.
 
 | Code | When |
 | --- | --- |
-| [`SERVICE_START_FAILED`](/reference/errors#runner-codes) | `start` throws, finishes without yielding, isn't an async generator, or doesn't yield within 60 seconds. Any services that already started are stopped, and the run fails. |
+| [`SERVICE_START_FAILED`](/reference/errors#runner-codes) | `start` throws, finishes without yielding, isn't an async generator, or doesn't yield within 60 seconds. Any services that already started are stopped, and the run fails. In `e2e mcp`, `open_session` fails instead. `openHost()` rejects with this error. |
 | [`INVALID_SERVICE_VALUE`](/reference/errors#runner-codes) | The yielded value isn't a plain object, or it contains a value that can't be copied. The error message names the service and the path to the value. |
-| [`SERVICE_STOP_FAILED`](/reference/errors#runner-codes) | The code after `yield` throws, yields a second time, or doesn't finish within 10 seconds. The run fails with a cleanup error. |
+| [`SERVICE_STOP_FAILED`](/reference/errors#runner-codes) | The code after `yield` throws, yields a second time, or doesn't finish within 10 seconds. The run fails with a cleanup error. In `e2e mcp`, the last session's close summary includes it as a cleanup line. `openHost` returns it from `host.close()`. |
+
+## Services in e2e mcp and openHost
+
+`e2e mcp` starts a config file's services when the first session on it opens
+and stops them when the last one closes. All sessions on that file share them.
+
+[`openHost`](/reference/runner#openhost) starts the services when the host
+opens. `host.close()` stops them after the app processes stop.
 
 ## Run a local API emulator
 

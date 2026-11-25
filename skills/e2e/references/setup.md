@@ -386,9 +386,9 @@ export default defineConfig({
   already running.
 - During `e2e run` and `e2e explore`, services start in key order before app
   commands and stop in reverse order afterward.
-- Run tests on configs with services using `e2e run`. `e2e mcp` and `openHost`
-  don't start services and fail with `INVALID_CONFIG` if the config defines
-  any.
+- `e2e mcp` starts services with the first session on a config file. It stops
+  them when the last session on that file closes. `openHost` starts them when
+  the host opens and stops them in `host.close()`.
 
 Tests read service values through the `services` fixture. Every yielded
 function becomes async and runs in the runner process, so call it with

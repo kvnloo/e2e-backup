@@ -28,8 +28,9 @@ export interface WorkerFixtures {
   readonly platform: string;
   /**
    * Values yielded by the config's `services`, keyed by name. Each worker
-   * receives a copy of the data, and each function becomes an async function
-   * called in the runner process.
+   * and each `e2e mcp` or `openHost` session receives a copy of the data, and
+   * each function becomes an async function called in the process that
+   * started the services.
    */
   readonly services: Readonly<Record<string, unknown>>;
 }
@@ -159,9 +160,10 @@ export type PickEach<Worker, Names extends PropertyKey> = Worker extends unknown
 export type ConfigFixtures<Config, Half extends FixtureScope, Handle = ConfigEngines<Config>> = unknown extends Config
   ? {}
   : Handle extends EngineHandle<infer Fixtures, infer Platform, infer Isolation>
-    ? { readonly platform: Platform } & (Half extends 'worker' ? { readonly services: ConfigServices<Config> } : {}) & (Half extends ([Isolation] extends ['worker'] ? FixtureScope : 'test')
-      ? Pick<TestFixtures, 'app' | 'screen'> & Fixtures
-      : {}) & { readonly [Name in Exclude<ConfigFixtureNames<ConfigEngines<Config>>, keyof Fixtures>]?: undefined }
+    ? { readonly platform: Platform }
+      & (Half extends 'worker' ? { readonly services: ConfigServices<Config> } : {})
+      & (Half extends ([Isolation] extends ['worker'] ? FixtureScope : 'test') ? Pick<TestFixtures, 'app' | 'screen'> & Fixtures : {})
+      & { readonly [Name in Exclude<ConfigFixtureNames<ConfigEngines<Config>>, keyof Fixtures>]?: undefined }
     : never;
 
 /**

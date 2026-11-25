@@ -251,9 +251,9 @@ export interface E2EConfig<Services = Readonly<Record<string, unknown>>> extends
    * Dependencies of the app under test, keyed by name and defined with
    * `defineService`. `e2e run` and `e2e explore` start them in key order
    * before the app commands, share one instance of each across all workers,
-   * and stop them in reverse order after the app commands. Tests read their values through
-   * the `services` fixture, and an `app.command.env` function receives them
-   * through its argument.
+   * and stop them in reverse order after the app commands. Tests read their
+   * values through the `services` fixture, and an `app.command.env` function
+   * receives them through its argument.
    */
   services?: ServiceMap;
 }

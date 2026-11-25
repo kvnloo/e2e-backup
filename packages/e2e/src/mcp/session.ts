@@ -18,7 +18,7 @@ import { openInteractiveStep, type InteractiveStep } from '../agent/interactive-
 import { ScreenPresenter } from '@e2e-dev/core/lib/agent/screen-update';
 import type { ResolvedConfig, ResolvedTarget } from '@e2e-dev/core/lib/config/resolve';
 import { launchesPinnedApp } from '@e2e-dev/core/lib/config/targets';
-import { classifyError, ConfigurationError, errorMessage, InfrastructureError, type SerializedError } from '@e2e-dev/core/lib/internal/errors';
+import { classifyError, ConfigurationError, errorMessage, InfrastructureError, serializeError, type SerializedError } from '@e2e-dev/core/lib/internal/errors';
 import { abortError, cancelledError } from '@e2e-dev/core/lib/internal/time';
 import { LocatorEngine } from '@e2e-dev/core/lib/locator/engine';
 import { allocateTargetPorts } from '../run/app-ports.ts';
@@ -28,6 +28,7 @@ import { SharedAppProcesses } from '@e2e-dev/core/lib/run/process-pool';
 import { outputLayout } from '@e2e-dev/core/lib/run/output';
 import { processSecrets, registerStaticSecrets } from '@e2e-dev/core/lib/run/secrecy';
 import { openStandaloneAttempt, type OneShotAttempt } from '../run/standalone-kinds.ts';
+import { copyServiceValues, NO_SERVICES, startServices, type RunServices } from '../run/services.ts';
 import type { ResolvedRunConfig } from '../config/resolve-run.ts';
 import type { StandaloneAttempt } from '@e2e-dev/core/lib/run/standalone-attempt';
 import { selectStandaloneTest, testLocation } from '../run/standalone-test.ts';
@@ -50,6 +51,12 @@ const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 /** How long the attempt outlives its step, so a step that hit the TTL is still closed in order. */
 const CLOSE_GRACE_MS = 60 * 1000;
+/**
+ * The `force` signal passed to services started by `e2e mcp`. It never aborts.
+ * The server handles one Ctrl+C or SIGTERM and stops every session. A second
+ * signal ends the process, so there's no later signal to pass on.
+ */
+const NEVER = new AbortController().signal;
 const SESSION_INSTRUCTION = 'Interactive session: a coding agent drives the app over MCP.';
 /** Where an agent reads how to write a test, said in the server's instructions and every session's opening. */
 export const READ_WRITING_GUIDE = 'Before you write or edit a test, read the writing-tests guide: the resource e2e://guide/writing-tests, or npx e2e guide writing-tests in a shell.';
@@ -69,6 +76,8 @@ interface LiveSession {
   readonly recorder: SessionRecorder | undefined;
   /** Cancels the attempt wherever it is. */
   readonly abort: AbortController;
+  /** The session's hold on its config's services, released after the attempt closes. */
+  readonly services: RunServices;
   idleTimer: NodeJS.Timeout | undefined;
   actions: number;
   readonly usage: SessionUsage;
@@ -147,6 +156,12 @@ export class SessionHost {
   private readonly sessions: SessionRegistry<Session>;
   /** Sessions on one app command share its process: the last one to close stops it. */
   private readonly apps = new SharedAppProcesses();
+  /**
+   * Sessions on the same config file share its services, keyed by the file's
+   * absolute path. The first session starts them, and the last one to close
+   * stops them.
+   */
+  private readonly services = new SharedAppProcesses<RunServices>();
   /** Aborts every open still running once the server shuts down, so none leaves a process behind. */
   private readonly shutdown = new AbortController();
 
@@ -219,9 +234,12 @@ export class SessionHost {
     }
 
     if (live.idleTimer !== undefined) clearTimeout(live.idleTimer);
-    const { value, cleanupErrors } = await this.closeAttempt(live.attempt, live.abort, async () => {
+
+    const { value, cleanupErrors } = await this.closeAttempt(live.attempt, live.services, live.abort, async () => {
       await live.step.end({ status: 'passed', summary: `session closed: ${reason}` });
+
       const outcome = await live.step.done;
+
       // The recorder runs this after a start or stop still in flight, even one the step's deadline abandoned.
       const saved = await live.recorder?.saveOnClose().catch((cause: unknown) =>
         `The running recording could not be saved: ${errorMessage(cause)}`,
@@ -229,6 +247,7 @@ export class SessionHost {
 
       return { outcome, saved };
     }).finally(() => this.options.onSessionEnd?.(live.usage.closed(endedBy)));
+
     const lines = [`Session ${live.id} closed (${reason}); ${live.actions} tool calls ran.`];
     if (value.saved !== undefined) lines.push(value.saved);
     if (value.outcome.error !== undefined) lines.push(`The session step ended with: ${errorMessage(value.outcome.error)}`);
@@ -243,11 +262,14 @@ export class SessionHost {
 
   /**
    * Runs `settle` (ending the step, saving a recording), then closes the
-   * attempt and cancels whatever still runs in it, whether or not `settle`
-   * failed: an engine or app process left behind would block the next session.
+   * attempt, releases its hold on `services`, and cancels anything still
+   * running in it, whether or not `settle` failed. An engine, app process, or
+   * service left behind would block the next session. Services are released
+   * after the attempt, so they stop after the app processes that use them.
    */
   private async closeAttempt<T>(
     attempt: StandaloneAttempt | undefined,
+    services: RunServices,
     abort: AbortController,
     settle: () => Promise<T>,
   ): Promise<{ readonly value: T; readonly cleanupErrors: readonly SerializedError[] }> {
@@ -255,9 +277,19 @@ export class SessionHost {
       (value) => ({ value }),
       (cause: unknown) => ({ cause }),
     );
-    const cleanupErrors = attempt === undefined ? [] : await attempt.close();
+
+    const cleanupErrors = attempt === undefined ? [] : [...await attempt.close()];
+
+    await services.stop((cause) => {
+      cleanupErrors.push(serializeError(classifyError(cause), { phase: 'cleanup', redact: processSecrets.redact }));
+    });
+
     abort.abort();
-    if ('cause' in settled) throw settled.cause;
+
+    if ('cause' in settled) {
+      throw settled.cause;
+    }
+
     return { value: settled.value, cleanupErrors };
   }
 
@@ -405,13 +437,6 @@ export class SessionHost {
       registerStaticSecrets(fresh.allSecrets);
       return fresh;
     });
-
-    if (loaded.services.length > 0) {
-      const names = loaded.services.map(([name]) => name).join(', ');
-
-      throw new ConfigurationError('INVALID_CONFIG', `e2e mcp doesn't start services, and this config declares services (${names}). Run these tests with e2e run instead.`);
-    }
-
     // A session is its own run: a URL declared with port 0 gets a port here,
     // for the opened target alone, so another target's URL cannot fail the open.
     // An engine session has one target, whatever `--target` names in a config.
@@ -435,8 +460,26 @@ export class SessionHost {
     if (opening.aborted) cancel();
     else opening.addEventListener('abort', cancel, { once: true });
     let attemptToClose: OneShotAttempt | undefined;
+    let services: RunServices = NO_SERVICES;
     let step: InteractiveStep | undefined;
+
     try {
+      // Start or join the services before the app command runs, since its
+      // `env` function reads them. Editing the config while its services are
+      // running keeps the services that the first session started.
+      if ('file' in source && config.services.length > 0) {
+        services = await this.services.acquire(
+          source.file,
+          (scope) =>
+            startServices(config.services, scope, NEVER, {
+              starting: () => undefined,
+              ready: (name, durationMs) => this.log('info', `service "${name}" started in ${durationMs} ms`),
+              stopFailed: (cause) => this.log('warning', `cleanup after a failed start: ${errorMessage(cause)}`),
+            }),
+          abort.signal,
+        );
+      }
+
       const attempt = await openStandaloneAttempt({
         // A session records video only between start_recording and
         // stop_recording: the configured video mode is for runs, and would
@@ -448,6 +491,7 @@ export class SessionHost {
         signal: abort.signal,
         timeoutMs: ttlMs + CLOSE_GRACE_MS,
         processes: this.apps,
+        services: copyServiceValues(services.wire, services.call),
         notice: (scope, message) => this.log('info', `${scope}: ${message}`),
         ...(test === undefined ? {} : { test, agent: test.pair.agent }),
       });
@@ -509,6 +553,7 @@ export class SessionHost {
         catalog,
         recorder,
         abort,
+        services,
         idleTimer: undefined,
         actions: 0,
         usage,
@@ -527,9 +572,11 @@ export class SessionHost {
       return text;
     } catch (cause) {
       opening.removeEventListener('abort', cancel);
-      await this.closeAttempt(attemptToClose, abort, async () => {
+
+      await this.closeAttempt(attemptToClose, services, abort, async () => {
         await step?.end({ status: 'failed', summary: 'opening the session failed' });
       }).catch(() => undefined);
+
       throw cause;
     }
   }
@@ -624,7 +671,7 @@ export class SessionHost {
       ...(outcome === undefined ? [] : [outcome, '']),
       `Session ${live.id} open on target "${live.target.name}" (platform ${live.target.platform}, engine ${engine === undefined ? 'none' : `${engine.name} ${engine.version}`}), ${live.headed ? 'headed' : 'headless'}; ${live.origin}`,
     ];
-    lines.push(...appLines(live.target, outcome !== undefined));
+    lines.push(...appLines(live.target, outcome !== undefined, Object.keys(live.attempt.fixtures.services)));
     lines.push(...sessionSecretLines(config));
     lines.push(
       `Pass session "${live.id}" to every tools, call, and close_session; with several sessions open, a call without it fails.`,

@@ -54,6 +54,7 @@ export class HeldTestTools {
     private readonly headed: boolean,
     private readonly runRecordsVideo: boolean,
     private readonly notice: ((message: string) => void) | undefined,
+    private readonly services: Readonly<Record<string, unknown>>,
   ) {}
 
   /** The ID of the attempt running in this worker. */
@@ -474,7 +475,7 @@ export class HeldTestTools {
         }
       },
       runCode: {
-        // A held test's attempt builds `app` alone, so the code gets no engine fixture to call.
+        // A held test's attempt only builds `app` and `services`, so the code doesn't get an engine fixture.
         engineFixtures: [],
         attempt: (requestSignal) => {
           const statementBudget = new AttemptBudget(requestSignal ?? signal, new Deadline(Number.POSITIVE_INFINITY));
@@ -495,6 +496,7 @@ export class HeldTestTools {
                 session,
                 artifacts,
               }, locator),
+              services: this.services,
             },
           };
         },
