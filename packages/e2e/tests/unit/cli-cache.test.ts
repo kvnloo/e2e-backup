@@ -346,6 +346,16 @@ describe('e2e cache clear', () => {
     expect(written(stdoutSpy)).toContain('cleared 2 file(s)');
   });
 
+  it('names a file it left alone without the terminal controls its name carries', async () => {
+    const directory = path.join(root, CACHE_DIR);
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(path.join(directory, 'notes\u001b[2J.md'), 'keep me', 'utf8');
+    await invoke('cache', 'check');
+    const raw = stderrSpy.mock.calls.map((call: readonly unknown[]) => String(call[0])).join('');
+    expect(raw).not.toContain('\u001b[2J');
+    expect(raw).toContain('notes');
+  });
+
   it('leaves files the runner never wrote, and says so', async () => {
     const directory = path.join(root, CACHE_DIR);
     mkdirSync(directory, { recursive: true });
