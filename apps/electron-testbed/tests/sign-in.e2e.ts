@@ -114,6 +114,16 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('username')).toHaveValue('$');
   });
 
+  test('waits for enabled the way the tree reports it', async ({ screen }) => {
+    const locked = screen.getByRole('button', 'Locked action');
+    await expect(locked).toBeDisabled();
+    const refused = await locked.tap({ timeout: 1000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(refused)).toContain('it is disabled');
+    // A disabled fieldset disables its form controls, not a link inside it.
+    await screen.getByRole('link', 'Open archive').tap();
+    await expect(screen.getByTestId('link-result')).toHaveText('Archive opened');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });

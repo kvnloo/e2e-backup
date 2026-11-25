@@ -77,6 +77,14 @@ document.querySelector('[data-testid="laggy"]').addEventListener('keydown', () =
   }
 });
 
+document.getElementById('locked').addEventListener('click', () => {
+  document.querySelector('[data-testid="link-result"]').textContent = 'Locked action ran';
+});
+document.getElementById('archive-link').addEventListener('click', (event) => {
+  event.preventDefault();
+  document.querySelector('[data-testid="link-result"]').textContent = 'Archive opened';
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');

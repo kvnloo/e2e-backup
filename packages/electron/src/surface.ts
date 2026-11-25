@@ -1107,8 +1107,10 @@ const CHECK_CONNECTED = `function () { ${ELEMENT}
 const CHECK_ENABLED = `function (enabled) { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
   if (enabled) {
-    const control = element.closest('button, input, select, textarea, fieldset, [aria-disabled]');
-    if (control && (control.matches(':disabled') || control.getAttribute('aria-disabled') === 'true')) return { ok: false, reason: 'it is disabled' };
+    // The nearest form control's :disabled (a disabled fieldset disables its controls, not a link in it), and
+    // aria-disabled anywhere above, as Chromium's tree reports the node disabled.
+    const control = element.closest('button, input, select, textarea, option, optgroup');
+    if ((control && control.matches(':disabled')) || element.closest('[aria-disabled="true"]')) return { ok: false, reason: 'it is disabled' };
   }
   const style = getComputedStyle(element);
   if (style.visibility !== 'visible') return { ok: false, reason: 'it is not visible' };
