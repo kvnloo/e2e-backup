@@ -220,14 +220,13 @@ test('app.open with relaunch opens the path on a fresh page that keeps persisted
     localStorage.setItem('stored', 'kept');
   });
   await app.open('/records/42');
-  const sameTab = await browser.evaluate(() => sessionStorage.getItem('page'));
-  if (sameTab !== 'first') throw new Error('sessionStorage after app.open ' + sameTab);
+  expect(await browser.evaluate(() => sessionStorage.getItem('page'))).toBe('first');
   await app.open('/records/43', { relaunch: true });
   await expect(screen.getByRole('heading', { name: 'Record 43' })).toBeVisible();
-  const page = await browser.evaluate(() => sessionStorage.getItem('page'));
-  if (page !== null) throw new Error('sessionStorage after a relaunch ' + page);
-  const stored = await browser.evaluate(() => localStorage.getItem('stored'));
-  if (stored !== 'kept') throw new Error('localStorage after a relaunch ' + stored);
+  expect(await browser.evaluate(() => ({
+    page: sessionStorage.getItem('page'),
+    stored: localStorage.getItem('stored'),
+  }))).toEqual({ page: null, stored: 'kept' });
 });
 
 test('evaluate keeps a nested named binding the loader compiled', async ({ app, browser }) => {

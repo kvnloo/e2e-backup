@@ -423,6 +423,27 @@
     {
       "if": {
         "properties": {
+          "linkRelaunch": {
+            "const": true
+          }
+        },
+        "required": [
+          "linkRelaunch"
+        ]
+      },
+      "then": {
+        "properties": {
+          "methods": {
+            "contains": {
+              "const": "session/openLink"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "selectsDevice": {
             "const": true
           }

@@ -596,6 +596,7 @@ describe('engine protocol', () => {
       { ...base, methods: ['engine/observe'], actions: ['blur'] },
       { ...base, methods: ['engine/viewportIntersection'] },
       { ...base, methods: ['engine/observe'], tapModifiers: true },
+      { ...base, methods: ['engine/observe'], linkRelaunch: true },
       { ...base, methods: ['engine/observe'], selectsDevice: true },
       // The client serves prepare for finish alone, which would drop the device it never forwards.
       { ...base, methods: ['lifecycle/finish'], selectsDevice: true },

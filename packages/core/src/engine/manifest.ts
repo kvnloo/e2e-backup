@@ -302,7 +302,12 @@ export function defineEngine<
       throw invalid(name, 'declares tapModifiers without perform: modifiers ride the tap actions perform receives');
     }
   }
-  if (spec.linkRelaunch !== undefined && typeof spec.linkRelaunch !== 'boolean') throw invalid(name, 'linkRelaunch must be a boolean');
+  if (spec.linkRelaunch !== undefined) {
+    if (typeof spec.linkRelaunch !== 'boolean') throw invalid(name, 'linkRelaunch must be a boolean');
+    if (spec.linkRelaunch && spec.session?.openLink === undefined) {
+      throw invalid(name, 'declares linkRelaunch without session.openLink: openLink receives { relaunch: true }');
+    }
+  }
   if (spec.selectsDevice !== undefined) {
     if (typeof spec.selectsDevice !== 'boolean') throw invalid(name, 'selectsDevice must be a boolean');
     if (spec.selectsDevice && spec.prepare === undefined) throw invalid(name, 'declares selectsDevice without prepare: prepare binds the device --device names');

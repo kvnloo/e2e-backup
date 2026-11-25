@@ -61,7 +61,7 @@ describe.each(schemas)('%s schema', (name) => {
       expect(validate.errors).toEqual([expect.objectContaining({ instancePath: '/actions', keyword: 'uniqueItems' })]);
     });
 
-    it('rejects the invalid fixture for viewportIntersection without engine/observe and for a non-boolean fileApps', () => {
+    it('rejects the invalid fixture for viewportIntersection without engine/observe, a non-boolean fileApps, and linkRelaunch without session/openLink', () => {
       expect(validate(readJson('fixtures', 'engine-manifest-v1.invalid.json'))).toBe(false);
       expect(validate.errors).toEqual(
         expect.arrayContaining([
@@ -74,6 +74,13 @@ describe.each(schemas)('%s schema', (name) => {
     it('rejects a method listed twice', () => {
       const manifest = readJson('fixtures', 'engine-manifest-v1.valid.json') as { methods: string[] };
       manifest.methods.push('lifecycle/doctor');
+      expect(validate(manifest)).toBe(false);
+    });
+
+    it('rejects linkRelaunch without session/openLink', () => {
+      const manifest = readJson('fixtures', 'engine-manifest-v1.valid.json') as { methods: string[]; linkRelaunch: boolean };
+      expect(manifest.linkRelaunch).toBe(true);
+      manifest.methods = manifest.methods.filter((method) => method !== 'session/openLink');
       expect(validate(manifest)).toBe(false);
     });
 

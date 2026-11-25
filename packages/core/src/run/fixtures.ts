@@ -644,7 +644,8 @@ export function createApp(
       }
       const deadline = new Deadline(lifecycleMs());
       if (relaunch) await engine.session.app.restart(engine.operation(deadline.remaining()));
-      await openAt(resolved, deadline.remaining());
+      // A file app's file may have become a directory during the restart, so it's checked again, as in `steer`.
+      await openAt(relaunch ? resolveNavigationUrl(resolved, target.app.base).url : resolved, deadline.remaining());
     });
 
   /**
@@ -673,9 +674,9 @@ export function createApp(
    * is refused unless `linkRelaunch` is declared on the engine. Otherwise the
    * link would be opened in the running app by an older engine.
    *
-   * A relaunch also refuses a link whose scheme differs from `app.linkBase`:
-   * the pinned app is stopped first, and on iOS the OS routes a custom
-   * scheme to whichever app owns it, which can be another app.
+   * With relaunch, a link whose scheme differs from `app.linkBase` is refused.
+   * The pinned app is stopped first, and iOS routes a custom scheme to the
+   * app that owns it, so the link could start another app.
    */
   const launchPinnedApp = (openPath: string | undefined, relaunch: boolean): Promise<void> =>
     steps.run('app', 'app.open', openPath ?? '', async () => {

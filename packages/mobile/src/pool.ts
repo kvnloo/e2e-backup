@@ -247,20 +247,13 @@ export class DevicePool {
   }
 
   /**
-   * Whether `e2e run --device` can name the device: a local pool can bind
-   * any device by name or id, and a provider's leases have none to name.
+   * Whether the engine drives the device itself, rather than a provider's
+   * lease. `e2e run --device` can name only a local device, since a
+   * provider's leases have none to name. A link relaunches only a local app:
+   * a provider's driver can launch the app first and then hand it the link
+   * (Revyl's does).
    */
-  get selectsDevice(): boolean {
-    return !(this.source instanceof LeasedDevices);
-  }
-
-  /**
-   * Whether `app.open(path, { relaunch: true })` can launch the app from the
-   * link: only on a device the engine drives itself. A provider's driver can
-   * launch the app first and then hand it the link (Revyl's does), so a
-   * provider's leases don't relaunch from a link.
-   */
-  get linkRelaunch(): boolean {
+  get isLocal(): boolean {
     return !(this.source instanceof LeasedDevices);
   }
 

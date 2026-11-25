@@ -980,14 +980,22 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    * the OS told it; the next snapshot names the foreground app either way.
    *
    * With `relaunch`, the app is stopped first if it's running, then launched
-   * from the link. The target's launch arguments and permissions can't ride
-   * a launch from a link, so a target that sets them is refused.
+   * from the link. A provider's device is refused, since its driver can open
+   * the link in the running app. So is a target with launch arguments or
+   * permissions, since neither can ride a launch from a link.
    */
   async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget, relaunch = false): Promise<void> {
     const target = app ?? this.pinnedApp;
-    if (relaunch && target === undefined) throw unsupported(`relaunching the app from a link needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
-    if (relaunch && (launchArgumentList(this.options.platform, this.app.launchArgumentValues ?? this.app.launchArguments) !== undefined || Object.keys(this.app.permissions ?? {}).length > 0)) {
-      throw unsupported("relaunching the app from a link doesn't pass the target's `app.launchArguments` or `app.permissions`, so a target that sets them can't relaunch from a link");
+    if (relaunch) {
+      if (!this.pool.isLocal) {
+        throw unsupported("app.open(path, { relaunch: true }) can't launch the app from a link on a device provider's device, since the provider's driver can open the link in the running app");
+      }
+      if (target === undefined) throw unsupported(`relaunching the app from a link needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
+      const launchArguments = launchArgumentList(this.options.platform, this.app.launchArgumentValues ?? this.app.launchArguments);
+      const permissions = configuredPermissions(this.app);
+      if (launchArguments !== undefined || permissions === 'all' || Object.keys(permissions ?? {}).length > 0) {
+        throw unsupported("app.open(path, { relaunch: true }) launches the app from the link, and that launch can't pass the target's `app.launchArguments` or `app.permissions`: remove them from the target to use it");
+      }
     }
     if (target === undefined && this.options.platform === 'ios') {
       throw new TestError(

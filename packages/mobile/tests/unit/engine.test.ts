@@ -3413,7 +3413,7 @@ describe('device fixture', () => {
   });
 
   it('refuses to relaunch from a link on a target with launch arguments or permissions, before any device command', async () => {
-    for (const options of [{ launchArguments: ['-e2e', 'YES'] }, { permissions: { camera: 'grant' as const } }]) {
+    for (const options of [{ launchArguments: ['-e2e', 'YES'] }, { permissions: { camera: 'grant' as const } }, { allPermissions: true as const }]) {
       const h = harness({ bundleId: 'dev.e2e.benchmark', ...options });
       await openAttempt(h);
       const before = h.fake.calls.length;

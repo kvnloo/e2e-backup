@@ -694,8 +694,9 @@ export interface App {
   /**
    * Opens the app: the declared URL, a path relative to it, or any absolute
    * http(s) URL. On a device target, which has no URL, it launches the pinned
-   * app fresh and takes no path. With `relaunch`, the app starts fresh before
-   * the path opens.
+   * app fresh. A path opens as a link in it when the target declares
+   * `app.linkBase`. With `relaunch`, the app is started fresh before the path
+   * is opened.
    */
   open(path?: string, options?: AppOpenOptions): Promise<void>;
   /**

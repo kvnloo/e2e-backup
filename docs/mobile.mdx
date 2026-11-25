@@ -265,20 +265,24 @@ await device.openLink('myapp://orders/42');
 await expect(screen.getByText('Order #42')).toBeVisible();
 ```
 
-To start the app from a link, declare
-[`app.linkBase`](/reference/config#linkbase) on the target and call
-`app.open` with `relaunch: true`. If the app is running, it's stopped first,
-then launched from the link:
+`device.openLink` opens the link in the running app. To start the app from
+a link, declare [`app.linkBase`](/reference/config#linkbase) on the target
+and call `app.open` with `relaunch: true`. The app is stopped if it's
+running, then launched from the link:
 
 ```ts
 await app.open('/orders/42', { relaunch: true });
 ```
 
-On an iOS simulator, only a custom-scheme link is passed as the launch URL.
-An `http(s)` link is opened after the app has launched.
+On an iOS simulator, only a custom-scheme link arrives as the app's launch
+URL. With an `http(s)` link, the app is launched first and the link is
+opened in it. Before the app starts, iOS can ask "Open in ...?" for a
+custom-scheme link. Accept it with `device.alert('accept')`.
 
-You can share this test with a web target. There, the open tabs are closed
-and a new one is opened before the path is opened.
+The call is refused on a target with a device provider, launch arguments,
+or permissions ([reference](/reference/mobile#the-app-under-test)). It works
+on a web target too, where a fresh tab is opened at the path
+([`app.open`](/reference/app#open)).
 
 `device.setNetwork('offline')` and `device.setAirplaneMode(true)` work on
 Android only. An iOS simulator shares the Mac's network, and simctl can only

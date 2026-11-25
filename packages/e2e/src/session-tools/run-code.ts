@@ -106,7 +106,7 @@ const RUN_CODE_API: readonly string[] = [
   "screen: getByRole(role, name?), getByLabel(text), getByText(text), getByPlaceholder(text), getByTestId(id), getByDisplayValue(value), each returning a locator; scrollUntilVisible(locator), swipe({ direction: 'down' }), tapAt({ x, y }), tree().",
   "locator: the same getBy* queries, filter({ has: locator }), or(locator), first(), last(), nth(i); actions tap(), click(), doubleTap(), longPress(), fill(text), pressSequentially(text), clear(), press(key), check(), uncheck(), selectOption(value), hover(), dragTo(locator), scrollIntoView(), swipe({ direction: 'down' }), scrollUntilVisible(locator), waitFor(), screenshot(label?); reads textContent(), allTextContents(), count(), inputValue(), getAttribute(name), isVisible(), isHidden(), isEnabled(), isDisabled(), isChecked(), boundingBox().",
   'expect(locator): toBeVisible, toBeHidden, toBeEnabled, toBeDisabled, toBeEditable, toBeChecked, toHaveText, toContainText, toHaveValue, toHaveAttribute, toHaveCount, toHaveAccessibleName, toHaveRole, with .not. expect(value): toBe, toEqual, toContain, toMatch, toHaveLength, toBeGreaterThan, toBeLessThan, toBeTruthy.',
-  'app: open(path?), restart(), clearState(), back().',
+  'app: open(path?, { relaunch?: boolean }?), restart(), clearState(), back().',
   "Secrets: fill(credentials.user('name').password) and fill(secrets.get('name')) fill a configured value; credentials.user('name').username is the username. The names are the ones open_session lists.",
 ];
 

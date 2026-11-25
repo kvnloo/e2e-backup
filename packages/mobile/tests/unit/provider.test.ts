@@ -79,9 +79,18 @@ describe('device provider', () => {
     expect(harness({ device: provider().impl }).engine.selectsDevice).toBeUndefined();
   });
 
-  it('declares no linkRelaunch, so app.open(path, { relaunch: true }) is refused before a provider driver opens the link in a running app', () => {
-    expect(harness({ device: provider().impl }).engine.linkRelaunch).toBeUndefined();
-    expect(harness().engine.linkRelaunch).toBe(true);
+  it("refuses a relaunch from a link on a provider's device before any device command, since its driver can open the link in the running app", async () => {
+    const h = harness({ device: provider({ installedApp: 'com.example.app' }).impl, appPath: 'build/App.app' }, false);
+    await h.prepare(prepareInfo({}, 1));
+    await boot(h, 'ios', 0);
+    await h.engine.startAttempt!({ attemptId: 'a1', artifactsDir: '', signal: new AbortController().signal, resolveSecret: noSecrets, ...ignoreTrace });
+    const before = h.fake.calls.length;
+    const operation = { signal: new AbortController().signal, timeoutMs: 30_000, runId: 'run-1', attemptId: 'a1', origin: 'test' as const };
+    await expect(h.engine.session!.openLink!('e2e-benchmark://orders/42', operation, { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining("device provider's device"),
+    });
+    expect(h.fake.calls.slice(before)).toEqual([]);
   });
 
   it('leases one device per slot at prepare, warms each through its own daemon, and hands the bindings to the workers', async () => {

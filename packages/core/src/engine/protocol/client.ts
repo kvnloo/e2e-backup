@@ -240,7 +240,7 @@ class EngineClient {
         actions: manifest.actions,
         pointerActions: manifest.pointerActions,
         tapModifiers: manifest.tapModifiers,
-        // The server's flag describes its own openLink, not one this process answers instead.
+        // When this process answers openLink, the server's flag doesn't describe that hook, so it's dropped.
         linkRelaunch: this.#options.session?.openLink === undefined ? manifest.linkRelaunch : undefined,
         selectsDevice: manifest.selectsDevice,
         grantsAllPermissions: manifest.grantsAllPermissions,

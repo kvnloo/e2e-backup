@@ -244,16 +244,19 @@ label. `browser` (`Browser`): browser targets, import `test` from `@e2e-dev/web`
   port and no trailing slash (`${app.baseUrl}/api/users`); `undefined` when
   the target declares no `app.url`. `string` with `test` from `@e2e-dev/web`.
 - `open(path?, options?)`:
-  - `open()` opens the target's `app.url`. On a device it relaunches the
-    pinned app.
-  - `open(path)` opens a relative path or an absolute http(s) URL. On a
-    device, a path opens as a link in the pinned app only when the target
-    declares `app.linkBase`.
+  - `open()` opens the target's `app.url`. On a device it launches the
+    pinned app fresh.
+  - `open(path)` on the web takes a relative path or an absolute http(s)
+    URL. On a device with `app.linkBase`, it takes a relative path or an
+    absolute app link such as `shopapp://orders/42`, and the link opens in
+    the running app.
   - `open(path, { relaunch: true })` starts the app fresh first. On a device
     with `app.linkBase`, the app is stopped if it's running, then launched
-    from the link. In a browser, the open tabs are closed and a new one is
-    opened, as in `restart()`, then the path is opened instead of the base
-    URL.
+    from the link. It's refused (`UNSUPPORTED_CAPABILITY`) on a device
+    provider's device or on a target with `app.launchArguments` or
+    `app.permissions`. In a browser, the open tabs are closed and a new one
+    is opened, as in `restart()`. Then the path is opened instead of the
+    base URL.
 - `back()`: one history step back.
 - `restart()`: recreates the context keeping persisted state (a restored
   session included), then reopens the base URL.

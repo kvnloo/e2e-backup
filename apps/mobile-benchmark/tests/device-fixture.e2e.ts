@@ -5,9 +5,27 @@
  * and `foregroundApp` says which app is in front.
  */
 
+import type { Device } from '@e2e-dev/mobile';
+import type { Screen } from 'e2e';
 import { BUILDS, expect, openScenario, test } from './fixtures.ts';
 
 const APP_ID = 'dev.e2e.benchmark';
+
+/**
+ * Waits for Login Form after a relaunch from its link, accepting the iOS
+ * simulator's "Open in “e2e Benchmark”?" prompt, which belongs to the system
+ * and not to the app's tree.
+ */
+async function expectLoginForm({ device, platform, screen }: { device: Device; platform: string; screen: Screen }): Promise<void> {
+  const email = screen.getByTestId('email-input');
+  await expect
+    .poll(async () => {
+      if (await email.isVisible()) return true;
+      if (platform === 'ios') await device.alert('accept').catch(() => undefined);
+      return false;
+    }, { timeout: 15_000 })
+    .toBe(true);
+}
 
 /** An app id no device has. */
 const MISSING_ID = 'dev.e2e.benchmark.missing';
@@ -131,22 +149,19 @@ test.describe('device fixture', () => {
   // `app.open` with `relaunch` stops the running app, so the link starts it
   // fresh with Login Form over the home list. A link opened in the running
   // app would stack Login Form over Control Inventory instead, so back shows
-  // which one happened. With the app stopped, the iOS simulator asks
-  // "Open in “e2e Benchmark”?" from the home screen, outside the app's tree,
-  // so the system alert is answered instead of a button on the screen.
+  // which one happened.
   test('app.open with relaunch starts the app from the link', async ({ app, device, platform, screen }) => {
     await app.open('/login-form', { relaunch: true });
-    const email = screen.getByTestId('email-input');
-    await expect
-      .poll(async () => {
-        if (await email.isVisible()) return true;
-        if (platform === 'ios') await device.alert('accept').catch(() => undefined);
-        return false;
-      }, { timeout: 15_000 })
-      .toBe(true);
+    await expectLoginForm({ device, platform, screen });
     await app.back();
     await expect(screen.getByLabel('Control Inventory. ', { exact: false })).toBeVisible();
     await expect(screen.getByTestId('inventory-header')).toBeHidden();
+  });
+
+  test('app.open with relaunch starts a stopped app from the link', async ({ app, device, platform, screen }) => {
+    await device.closeApp();
+    await app.open('/login-form', { relaunch: true });
+    await expectLoginForm({ device, platform, screen });
   });
 
   test('isAppInstalled finds the app under test and no app that is absent', async ({ device }) => {

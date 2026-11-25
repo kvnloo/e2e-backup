@@ -7,7 +7,6 @@
 import { join } from 'node:path';
 import type { DeviceLease, DeviceReleaseContext, DeviceRequest } from '@e2e-dev/mobile';
 import type { AgentDeviceLeaseOptions, AgentDeviceLeaseRequest } from '@e2e-dev/mobile/lease';
-import { mobile } from '@e2e-dev/mobile/engine';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { revyl, type RevylOptions } from '../../src/index.ts';
 
@@ -62,10 +61,6 @@ describe('revyl()', () => {
     const provider = revyl(options);
     expect(provider.name).toBe('revyl');
     expect(mocks.leases).toHaveBeenCalledWith({ provider: 'revyl', label: 'Revyl' });
-  });
-
-  it('gives a mobile engine no linkRelaunch, since Revyl launches the app before it opens a link', () => {
-    expect(mobile({ platform: 'android', device: revyl(options) }).linkRelaunch).toBeUndefined();
   });
 
   it("checks the plugin against the engine's agent-device before anything starts", async () => {

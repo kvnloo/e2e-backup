@@ -54,6 +54,9 @@ export function checkManifest(manifest: EngineManifest): EngineManifest {
     seen.add(method);
   }
   // The client serves `prepare` for `lifecycle/finish` alone, so the hook defineEngine requires is there either way.
+  if (manifest.linkRelaunch === true && !seen.has('session/openLink')) {
+    throw invalid('manifest.linkRelaunch needs session/openLink: openLink receives { relaunch: true }');
+  }
   if (manifest.selectsDevice === true && !seen.has('lifecycle/prepare')) {
     throw invalid('manifest.selectsDevice needs lifecycle/prepare: prepare binds the device --device names');
   }

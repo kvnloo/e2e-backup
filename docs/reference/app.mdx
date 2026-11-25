@@ -73,8 +73,8 @@ schemes included.
 With `relaunch: true`, the app is started fresh before the path is opened:
 
 - On a device with `app.linkBase`, the pinned app is stopped if it's running,
-  then launched from the link. If the app isn't running, there's no error.
-  The launch is limited on some targets
+  then launched from the link. It's refused on a target with a device
+  provider, launch arguments, or permissions
   ([mobile](/reference/mobile#the-app-under-test)).
 - On a web target, the open tabs are closed and a new one is opened in the
   same browser context, as in [`restart`](#restart). Then the path is opened
@@ -90,8 +90,8 @@ await app.open('/orders/42', { relaunch: true }); // default: false
 | `POLICY_DENIED` | A URL whose scheme is not `http:` or `https:`. `about:blank` is allowed. On a target whose [`app.url` is a file](/reference/config#a-file-as-the-app), a `file:` URL outside that file's directory, or of a directory. On a device with `app.linkBase`, a link whose scheme is `file:`, `data:`, `javascript:`, `view-source:`, `blob:`, or `filesystem:`. |
 | `APP_UNREACHABLE` | The app URL could not be reached. |
 | `ACTION_FAILED` | The operation failed or timed out. |
-| `INVALID_ARGUMENT` | `options` is not a plain object or has a key other than `relaunch`, or `relaunch` is not a boolean. With `relaunch` on a device, a link whose scheme differs from `app.linkBase`. |
-| `UNSUPPORTED_CAPABILITY` | No `session.open` on a target with a URL, or no `session.restart` on one without. With `relaunch`, no `session.restart` or `session.open` on a target with a URL, or no `linkRelaunch` on a device with `app.linkBase`. On a device with no `app.bundleId`, also the target's build not installed yet ([mobile](/reference/mobile#the-app-under-test)). |
+| `INVALID_ARGUMENT` | `options` is not a plain object or has a key other than `relaunch`, or `relaunch` is not a boolean. With `relaunch` on a device, an otherwise allowed link whose scheme differs from `app.linkBase`. |
+| `UNSUPPORTED_CAPABILITY` | No `session.open` on a target with a URL, or no `session.restart` on one without. With `relaunch`, also no `session.restart` on a target with a URL, or no `linkRelaunch` on a device with `app.linkBase`, or a `mobile()` target that refuses it ([mobile](/reference/mobile#the-app-under-test)). On a device with no `app.bundleId`, also the target's build not installed yet ([mobile](/reference/mobile#the-app-under-test)). |
 
 ### `restart`
 
@@ -232,9 +232,9 @@ export interface App {
   /**
    * Opens the app: the declared URL, a path relative to it, or any absolute
    * http(s) URL. On a device target, which has no URL, it launches the pinned
-   * app fresh; a path opens as a link in it when the target declares
-   * `app.linkBase`. With `relaunch`, the app starts fresh before the path
-   * opens.
+   * app fresh. A path opens as a link in it when the target declares
+   * `app.linkBase`. With `relaunch`, the app is started fresh before the path
+   * is opened.
    */
   open(path?: string, options?: AppOpenOptions): Promise<void>;
   /**

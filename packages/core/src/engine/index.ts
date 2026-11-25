@@ -378,7 +378,7 @@ export interface VideoLink {
 
 /** Options for `EngineSession.openLink`. */
 export interface OpenLinkOptions {
-  /** Set to launch the pinned app from the link. The app is stopped first if it's running. */
+  /** When true, the pinned app has to be stopped if it's running, then launched from the link. */
   readonly relaunch?: boolean;
 }
 
@@ -406,7 +406,8 @@ export interface EngineSession {
    * would: `app.open(path)` on a target that declares `app.linkBase` lands
    * here with the link joined and its scheme checked. A device engine's hook;
    * a target whose engine lacks it cannot declare `linkBase`. `options` is
-   * `{ relaunch: true }` only when `linkRelaunch` is declared on the engine.
+   * `{ relaunch: true }` for `app.open(path, { relaunch: true })`, which
+   * reaches only an engine that declares `linkRelaunch`.
    */
   openLink?(url: string, context: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once in the surface's history. */
@@ -841,10 +842,10 @@ export interface Engine {
    * `relaunch`, the pinned app is stopped if it's running, then launched from
    * the link.
    *
-   * On a target with `app.linkBase`, without it,
-   * `app.open(path, { relaunch: true })` fails with
-   * `UNSUPPORTED_CAPABILITY` before the engine is called, so the link is never
-   * opened in the running app by an engine that predates the field.
+   * Without `linkRelaunch`, `app.open(path, { relaunch: true })` on a target
+   * with `app.linkBase` fails with `UNSUPPORTED_CAPABILITY` before the engine
+   * is called, so an engine that predates the field never opens the link in
+   * the running app.
    */
   readonly linkRelaunch?: boolean;
   /**
