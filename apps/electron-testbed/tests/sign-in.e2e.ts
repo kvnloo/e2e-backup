@@ -21,6 +21,11 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('status')).toHaveText('Signed in as ada on Team, remembered (main process saw 7 characters)');
     const signIns = await electron.evaluate(() => (globalThis as unknown as { testbedState: { signIns: unknown[] } }).testbedState.signIns);
     expect(signIns).toEqual([{ username: 'ada', plan: 'Team', remember: true }]);
+    // The function's own error is the test's, whatever it says.
+    const thrown = await electron.evaluate(() => {
+      throw new Error('the dialog has been closed by the user');
+    }).then(() => undefined, (error: unknown) => error);
+    expect(thrown).toMatchObject({ code: 'EVALUATE_FAILED' });
   });
 
   test('reads controls by test id and placeholder, and refuses an empty password', async ({ screen }) => {

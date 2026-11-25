@@ -1001,7 +1001,12 @@ export class ElectronSurface {
   async evaluate<R, A>(fn: (electron: any, arg: A) => R | Promise<R>, arg: A, operation: OperationContext): Promise<R> {
     const app = this.app;
     if (app === undefined) throw new EngineError('INVALID_STATE', 'the app is not running: open it with app.open()', { retryable: false });
-    return await this.bounded(operation, 'electron.evaluate', true, () => app.evaluate(fn as never, arg) as Promise<R>);
+    // A failure is the function's own unless the app quit under it: its message is the test's, never read for a pattern.
+    const run = (app.evaluate(fn as never, arg) as Promise<R>).catch((cause: unknown) => {
+      if (this.app !== app) throw new EngineError('INVALID_STATE', 'the app quit while electron.evaluate ran', { retryable: false, cause });
+      throw new TestError('EVALUATE_FAILED', `electron.evaluate: ${cause instanceof Error ? cause.message.split('\n')[0] : String(cause)}`, { cause });
+    });
+    return await this.bounded(operation, 'electron.evaluate', true, () => run);
   }
 
   // --- pixels ---
