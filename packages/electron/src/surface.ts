@@ -602,8 +602,12 @@ export class ElectronSurface {
     return { window, backendNodeId: Number(match[2]) };
   }
 
-  /** Runs `work` within the operation's budget and signal, failures translated. */
-  private async bounded<T>(operation: OperationContext, label: string, committed: boolean, work: () => Promise<T>): Promise<T> {
+  /**
+   * Runs `work` within the operation's budget and signal, failures translated.
+   * `committed` says whether input may have reached the app, read when the
+   * failure is: an action that sends input part-way passes a getter.
+   */
+  private async bounded<T>(operation: OperationContext, label: string, committed: boolean | (() => boolean), work: () => Promise<T>): Promise<T> {
     let timer: NodeJS.Timeout | undefined;
     try {
       return await raceAbort(
@@ -618,7 +622,7 @@ export class ElectronSurface {
         label,
       );
     } catch (cause) {
-      throw translate(cause, label, committed);
+      throw translate(cause, label, typeof committed === 'boolean' ? committed : committed());
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
@@ -690,133 +694,129 @@ export class ElectronSurface {
       return send();
     };
     const label = action.kind;
-    try {
-      await this.bounded(operation, label, false, async () => {
-        switch (action.kind) {
-          case 'tap':
-          case 'doubleTap':
-          case 'secondaryTap':
-          case 'multiTap': {
-            const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            const clickCount = action.kind === 'doubleTap' ? 2 : action.kind === 'multiTap' ? action.count : 1;
-            const modifiers = (action.modifiers ?? []).map(modifierKey);
-            await commit(() => this.withModifiers(window, modifiers, () => mouse.click(point.x, point.y, { clickCount, button: action.kind === 'secondaryTap' ? 'right' : 'left' })));
-            return;
-          }
-          case 'hover': {
-            const point = await this.actionablePoint(window, backendNodeId, operation, false, deadline);
-            await commit(() => mouse.move(point.x, point.y));
-            return;
-          }
-          case 'longPress': {
-            const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            await commit(() => mouse.move(point.x, point.y));
-            await commit(() => mouse.down());
-            await sleep(action.durationMs ?? LONG_PRESS_MS, operation.signal);
-            await mouse.up();
-            return;
-          }
-          case 'focus':
-            // pressSequentially focuses, then types into whatever holds focus: the node must be the one that does.
-            if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
-            return;
-          case 'blur':
-            await commit(() => this.callOn(window, backendNodeId, BLUR));
-            return;
-          case 'scrollIntoView': {
-            const session = await this.session(window.page);
-            await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId }).catch(() => this.callOn(window, backendNodeId, SCROLL_INTO_VIEW));
-            return;
-          }
-          case 'fill':
-          case 'clear': {
-            const value = action.kind === 'fill' ? action.value : '';
-            await this.waitReady(window, backendNodeId, operation, CHECK_EDITABLE, deadline);
-            // A date, time, color, or range input takes no typed text: its value is set, as Playwright's fill does.
-            const set = await commit(() => this.callOn<Readiness | null>(window, backendNodeId, SET_VALUE, [value]));
-            if (set !== null) {
-              if (!set.ok) throw notActionable(set.reason);
-              return;
-            }
-            // The app's focus handler can hand focus on; text goes only to the node that still holds it.
-            if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
-            // Both edit the selection as typing would, with input events and no key events, as fill promises.
-            if (value === '') await commit(() => this.callOn(window, backendNodeId, DELETE_SELECTION));
-            else await commit(() => keyboard.insertText(value));
-            return;
-          }
-          case 'check':
-          case 'uncheck': {
-            const want = action.kind === 'check';
-            const now = await this.callOn<boolean | null>(window, backendNodeId, READ_CHECKED);
-            if (now === null) throw new EngineError('UNSUPPORTED_CAPABILITY', `node ${backendNodeId} has no checked state to ${action.kind}`, { retryable: false });
-            if (now === want) return;
-            const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            await commit(() => mouse.click(point.x, point.y));
-            if ((await this.callOn<boolean | null>(window, backendNodeId, READ_CHECKED)) !== want) {
-              throw notActionable(`clicking node ${backendNodeId} did not ${action.kind} it`);
-            }
-            return;
-          }
-          case 'press': {
-            // A key the keyboard cannot send is refused before focus moves.
-            const key = playwrightKey(action.key);
-            await this.waitReady(window, backendNodeId, operation, CHECK_CONNECTED, deadline);
-            if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
-            await commit(() => keyboard.press(key));
-            return;
-          }
-          case 'selectOption': {
-            await this.waitReady(window, backendNodeId, operation, CHECK_SELECT, deadline);
-            const option = typeof action.value === 'string' ? { label: action.value } : action.value;
-            const outcome = await commit(() => this.callOn<Readiness>(window, backendNodeId, SELECT_OPTION, [option]));
-            if (!outcome.ok) throw notActionable(outcome.reason);
-            return;
-          }
-          case 'setInputFiles':
-          case 'setInputFilePayloads': {
-            if (action.kind === 'setInputFilePayloads') throw new EngineError('UNSUPPORTED_CAPABILITY', 'in-memory files are not supported; pass file paths', { retryable: false });
-            await this.waitReady(window, backendNodeId, operation, CHECK_FILE_INPUT, deadline);
-            const session = await this.session(window.page);
-            await commit(() => session.send('DOM.setFileInputFiles', { files: action.paths.map((file) => path.resolve(this.projectRoot, file)), backendNodeId }));
-            return;
-          }
-          case 'dragTo': {
-            const target = this.bind(action.target);
-            // The source is pressed where it is now; only then does the target scroll into view, under the held pointer.
-            const from = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            await commit(() => mouse.move(from.x, from.y));
-            await commit(() => mouse.down());
-            try {
-              const session = await this.session(window.page);
-              await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: target.backendNodeId }).catch(() => undefined);
-              const { quads } = await session.send('DOM.getContentQuads', { backendNodeId: target.backendNodeId });
-              const quad = quads.find((candidate) => area(candidate) > 0);
-              if (quad === undefined) throw notActionable('the drop target has no box on screen');
-              const to = whole(centre(quad));
-              // An intermediate move, so drag handlers see motion before the drop.
-              await commit(() => mouse.move(Math.round((from.x + to.x) / 2), Math.round((from.y + to.y) / 2)));
-              await commit(() => mouse.move(to.x, to.y));
-            } finally {
-              await mouse.up();
-            }
-            return;
-          }
-          case 'swipe': {
-            const point = await this.actionablePoint(window, backendNodeId, operation, false, deadline);
-            const session = await this.session(window.page);
-            const { quads } = await session.send('DOM.getContentQuads', { backendNodeId });
-            const quad = quads.find((candidate) => area(candidate) > 0)!;
-            const box = boxOf(quad);
-            await commit(() => mouse.move(point.x, point.y));
-            await commit(() => this.wheel(window, action.direction, action.momentum ?? 'none', box));
-            return;
-          }
+    await this.bounded(operation, label, () => committed, async () => {
+      switch (action.kind) {
+        case 'tap':
+        case 'doubleTap':
+        case 'secondaryTap':
+        case 'multiTap': {
+          const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
+          const clickCount = action.kind === 'doubleTap' ? 2 : action.kind === 'multiTap' ? action.count : 1;
+          const modifiers = (action.modifiers ?? []).map(modifierKey);
+          await commit(() => this.withModifiers(window, modifiers, () => mouse.click(point.x, point.y, { clickCount, button: action.kind === 'secondaryTap' ? 'right' : 'left' })));
+          return;
         }
-      });
-    } catch (cause) {
-      throw translate(cause, label, committed);
-    }
+        case 'hover': {
+          const point = await this.actionablePoint(window, backendNodeId, operation, false, deadline);
+          await commit(() => mouse.move(point.x, point.y));
+          return;
+        }
+        case 'longPress': {
+          const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
+          await commit(() => mouse.move(point.x, point.y));
+          await commit(() => mouse.down());
+          await sleep(action.durationMs ?? LONG_PRESS_MS, operation.signal);
+          await mouse.up();
+          return;
+        }
+        case 'focus':
+          // pressSequentially focuses, then types into whatever holds focus: the node must be the one that does.
+          if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
+          return;
+        case 'blur':
+          await commit(() => this.callOn(window, backendNodeId, BLUR));
+          return;
+        case 'scrollIntoView': {
+          const session = await this.session(window.page);
+          await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId }).catch(() => this.callOn(window, backendNodeId, SCROLL_INTO_VIEW));
+          return;
+        }
+        case 'fill':
+        case 'clear': {
+          const value = action.kind === 'fill' ? action.value : '';
+          await this.waitReady(window, backendNodeId, operation, CHECK_EDITABLE, deadline);
+          // A date, time, color, or range input takes no typed text: its value is set, as Playwright's fill does.
+          const set = await commit(() => this.callOn<Readiness | null>(window, backendNodeId, SET_VALUE, [value]));
+          if (set !== null) {
+            if (!set.ok) throw notActionable(set.reason);
+            return;
+          }
+          // The app's focus handler can hand focus on; text goes only to the node that still holds it.
+          if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
+          // Both edit the selection as typing would, with input events and no key events, as fill promises.
+          if (value === '') await commit(() => this.callOn(window, backendNodeId, DELETE_SELECTION));
+          else await commit(() => keyboard.insertText(value));
+          return;
+        }
+        case 'check':
+        case 'uncheck': {
+          const want = action.kind === 'check';
+          const now = await this.callOn<boolean | null>(window, backendNodeId, READ_CHECKED);
+          if (now === null) throw new EngineError('UNSUPPORTED_CAPABILITY', `node ${backendNodeId} has no checked state to ${action.kind}`, { retryable: false });
+          if (now === want) return;
+          const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
+          await commit(() => mouse.click(point.x, point.y));
+          if ((await this.callOn<boolean | null>(window, backendNodeId, READ_CHECKED)) !== want) {
+            throw notActionable(`clicking node ${backendNodeId} did not ${action.kind} it`);
+          }
+          return;
+        }
+        case 'press': {
+          // A key the keyboard cannot send is refused before focus moves.
+          const key = playwrightKey(action.key);
+          await this.waitReady(window, backendNodeId, operation, CHECK_CONNECTED, deadline);
+          if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
+          await commit(() => keyboard.press(key));
+          return;
+        }
+        case 'selectOption': {
+          await this.waitReady(window, backendNodeId, operation, CHECK_SELECT, deadline);
+          const option = typeof action.value === 'string' ? { label: action.value } : action.value;
+          const outcome = await commit(() => this.callOn<Readiness>(window, backendNodeId, SELECT_OPTION, [option]));
+          if (!outcome.ok) throw notActionable(outcome.reason);
+          return;
+        }
+        case 'setInputFiles':
+        case 'setInputFilePayloads': {
+          if (action.kind === 'setInputFilePayloads') throw new EngineError('UNSUPPORTED_CAPABILITY', 'in-memory files are not supported; pass file paths', { retryable: false });
+          await this.waitReady(window, backendNodeId, operation, CHECK_FILE_INPUT, deadline);
+          const session = await this.session(window.page);
+          await commit(() => session.send('DOM.setFileInputFiles', { files: action.paths.map((file) => path.resolve(this.projectRoot, file)), backendNodeId }));
+          return;
+        }
+        case 'dragTo': {
+          const target = this.bind(action.target);
+          // The source is pressed where it is now; only then does the target scroll into view, under the held pointer.
+          const from = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
+          await commit(() => mouse.move(from.x, from.y));
+          await commit(() => mouse.down());
+          try {
+            const session = await this.session(window.page);
+            await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: target.backendNodeId }).catch(() => undefined);
+            const { quads } = await session.send('DOM.getContentQuads', { backendNodeId: target.backendNodeId });
+            const quad = quads.find((candidate) => area(candidate) > 0);
+            if (quad === undefined) throw notActionable('the drop target has no box on screen');
+            const to = whole(centre(quad));
+            // An intermediate move, so drag handlers see motion before the drop.
+            await commit(() => mouse.move(Math.round((from.x + to.x) / 2), Math.round((from.y + to.y) / 2)));
+            await commit(() => mouse.move(to.x, to.y));
+          } finally {
+            await mouse.up();
+          }
+          return;
+        }
+        case 'swipe': {
+          const point = await this.actionablePoint(window, backendNodeId, operation, false, deadline);
+          const session = await this.session(window.page);
+          const { quads } = await session.send('DOM.getContentQuads', { backendNodeId });
+          const quad = quads.find((candidate) => area(candidate) > 0)!;
+          const box = boxOf(quad);
+          await commit(() => mouse.move(point.x, point.y));
+          await commit(() => this.wheel(window, action.direction, action.momentum ?? 'none', box));
+          return;
+        }
+      }
+    });
     await this.settle(operation);
   }
 
