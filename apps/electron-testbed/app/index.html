@@ -41,7 +41,11 @@
         <li class="row" id="row-second" data-testid="row">Second row</li>
       </ul>
       <input type="password" id="stashed-key" value="stashed-secret" hidden />
-      <div aria-disabled="true"><button type="button" id="locked">Locked action</button></div>
+      <div aria-disabled="true">
+        <button type="button" id="locked">Locked action</button>
+        <input aria-label="Locked field" data-testid="locked-field" />
+        <button type="button" id="unlocked" aria-disabled="false">Unlocked action</button>
+      </div>
       <fieldset disabled><legend>Archived</legend><a href="#archive" id="archive-link">Open archive</a></fieldset>
       <output data-testid="link-result"></output>
     </section>

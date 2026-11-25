@@ -80,6 +80,9 @@ document.querySelector('[data-testid="laggy"]').addEventListener('keydown', () =
 document.getElementById('locked').addEventListener('click', () => {
   document.querySelector('[data-testid="link-result"]').textContent = 'Locked action ran';
 });
+document.getElementById('unlocked').addEventListener('click', () => {
+  document.querySelector('[data-testid="link-result"]').textContent = 'Unlocked action ran';
+});
 document.getElementById('archive-link').addEventListener('click', (event) => {
   event.preventDefault();
   document.querySelector('[data-testid="link-result"]').textContent = 'Archive opened';

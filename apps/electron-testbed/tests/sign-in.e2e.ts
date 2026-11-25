@@ -124,6 +124,13 @@ test.describe('sign-in window', () => {
     await expect(locked).toBeDisabled();
     const refused = await locked.tap({ timeout: 1000 }).then(() => undefined, (error: unknown) => error);
     expect(String(refused)).toContain('it is disabled');
+    const field = screen.getByTestId('locked-field');
+    const notFilled = await field.fill('typed', { timeout: 1000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(notFilled)).toContain('it is disabled');
+    await expect(field).toHaveValue('');
+    // A nearer aria-disabled="false" enables a control again.
+    await screen.getByRole('button', 'Unlocked action').tap();
+    await expect(screen.getByTestId('link-result')).toHaveText('Unlocked action ran');
     // A disabled fieldset disables its form controls, not a link inside it.
     await screen.getByRole('link', 'Open archive').tap();
     await expect(screen.getByTestId('link-result')).toHaveText('Archive opened');

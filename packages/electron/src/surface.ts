@@ -1108,6 +1108,19 @@ function area(quad: readonly number[]): number {
 
 const ELEMENT = 'const element = this.nodeType === 1 ? this : this.parentElement;';
 
+/**
+ * Whether the element is disabled, as Chromium's tree and Playwright read it:
+ * its nearest form control's :disabled (a disabled fieldset disables its
+ * controls, not a link in it), or the nearest aria-disabled attribute above it
+ * saying true (a nearer aria-disabled="false" enables it again).
+ */
+const IS_DISABLED = `(() => {
+  const control = element.closest('button, input, select, textarea, option, optgroup');
+  if (control && control.matches(':disabled')) return true;
+  const marked = element.closest('[aria-disabled]');
+  return !!marked && marked.getAttribute('aria-disabled').toLowerCase() === 'true';
+})()`;
+
 const CHECK_CONNECTED = `function () { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
   return { ok: true };
@@ -1115,12 +1128,7 @@ const CHECK_CONNECTED = `function () { ${ELEMENT}
 
 const CHECK_ENABLED = `function (enabled) { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
-  if (enabled) {
-    // The nearest form control's :disabled (a disabled fieldset disables its controls, not a link in it), and
-    // aria-disabled anywhere above, as Chromium's tree reports the node disabled.
-    const control = element.closest('button, input, select, textarea, option, optgroup');
-    if ((control && control.matches(':disabled')) || element.closest('[aria-disabled="true"]')) return { ok: false, reason: 'it is disabled' };
-  }
+  if (enabled && ${IS_DISABLED}) return { ok: false, reason: 'it is disabled' };
   const style = getComputedStyle(element);
   if (style.visibility !== 'visible') return { ok: false, reason: 'it is not visible' };
   return { ok: true };
@@ -1166,7 +1174,7 @@ const CHECK_EDITABLE = `function () { ${ELEMENT}
   const type = (element.getAttribute('type') || '').toLowerCase();
   const field = tag === 'TEXTAREA' || (tag === 'INPUT' && (${TEXT_INPUT_TYPES}.includes(type) || ${SET_VALUE_TYPES}.includes(type)));
   if (!field && !element.isContentEditable) return { ok: false, reason: 'it is not a text field' };
-  if (element.matches(':disabled')) return { ok: false, reason: 'it is disabled' };
+  if (${IS_DISABLED}) return { ok: false, reason: 'it is disabled' };
   if (field && element.readOnly) return { ok: false, reason: 'it is read-only' };
   return { ok: true };
 }`;
@@ -1213,7 +1221,7 @@ const READ_CHECKED = `function () { ${ELEMENT}
 const CHECK_SELECT = `function () { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
   if (element.tagName !== 'SELECT') return { ok: false, reason: 'it is not a <select>' };
-  if (element.matches(':disabled')) return { ok: false, reason: 'it is disabled' };
+  if (${IS_DISABLED}) return { ok: false, reason: 'it is disabled' };
   return { ok: true };
 }`;
 
@@ -1234,7 +1242,7 @@ const SELECT_OPTION = `function (wanted) { ${ELEMENT}
 const CHECK_FILE_INPUT = `function () { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
   if (element.tagName !== 'INPUT' || element.type !== 'file') return { ok: false, reason: 'it is not a file input' };
-  if (element.matches(':disabled')) return { ok: false, reason: 'it is disabled' };
+  if (${IS_DISABLED}) return { ok: false, reason: 'it is disabled' };
   return { ok: true };
 }`;
 
