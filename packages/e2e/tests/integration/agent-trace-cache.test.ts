@@ -1053,3 +1053,78 @@ describe('trace cache: a navigate on the app replays where the app runs now', ()
     expect(step.cache).toMatchObject({ mode: 'self-finalized', replayedActions: 1, totalActions: 1 });
   }, 240_000);
 });
+
+const DETOUR_SUITE = `import { test, expect } from 'e2e';
+
+test('increments after a wrong turn', async ({ app, agent, screen }) => {
+  await app.open();
+  await agent.act('increment the counter');
+  await expect(screen.getByRole('status')).toHaveText('1');
+});
+`;
+
+/** Opens About by mistake, goes back, then taps Increment: the wrong turn an agent takes before the right one. */
+function wrongTurnExecutor(record: ExecutorRecord): StepExecutor {
+  return {
+    name: 'wrong-turn-executor',
+    version: 'test',
+    async runStep(context: StepExecutorContext) {
+      record.calls += 1;
+      let observation = await context.observe();
+      await context.actions.tap({ id: nodeIdFor(observation.text, /link "About"/) });
+      await context.observe();
+      await context.actions.back();
+      observation = await context.observe();
+      await context.actions.tap({ id: nodeIdFor(observation.text, /button "Increment"/) });
+      return { status: 'passed' as const, summary: 'the counter shows 1' };
+    },
+  };
+}
+
+describe('trace cache: a recording that leaves a screen and comes back', () => {
+  let app: FixtureApp;
+  let project: FixtureProject;
+
+  beforeAll(async () => {
+    app = await startFixtureApp();
+    project = createProject({ 'tests/detour.e2e.ts': DETOUR_SUITE });
+  }, 60_000);
+
+  afterAll(async () => {
+    project?.cleanup();
+    await app?.close();
+  });
+
+  const options = (record: ExecutorRecord) => ({
+    appUrl: app.url,
+    config: {
+      tests: 'tests/**/*.e2e.ts',
+      agents: { default: { executor: wrongTurnExecutor(record) } },
+      cache: 'read-write' as const,
+    },
+  });
+  const detour = 'actions 1-2 left / for /about and came back with nothing changed';
+
+  it('records where each action ran and reports the detour when it records and when it replays', async () => {
+    const recording: ExecutorRecord = { calls: 0, prefixes: [] };
+    const first = await runExisting(project, options(recording));
+    expect(first.exitCode).toBe(0);
+    assertValidReport(first.report);
+    const { entry } = readOnlyEntry(project);
+    expect(entry.payload.actions.map((action) => [action.name, action.at])).toEqual([
+      ['tap', '/'],
+      ['back', '/about'],
+      ['tap', '/'],
+    ]);
+    const recorded = resultByTitle(first, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(recorded.cache).toMatchObject({ mode: 'missed', reason: 'no-entry', detour, write: 'saved' });
+
+    const replay: ExecutorRecord = { calls: 0, prefixes: [] };
+    const second = await runExisting(project, options(replay));
+    expect(second.exitCode).toBe(0);
+    expect(replay.calls).toBe(0);
+    assertValidReport(second.report);
+    const replayed = resultByTitle(second, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(replayed.cache).toMatchObject({ mode: 'self-finalized', detour });
+  }, 240_000);
+});

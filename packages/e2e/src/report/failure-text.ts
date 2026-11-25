@@ -421,6 +421,7 @@ function cacheLine(cache: StepCacheRecord, cacheDir: string | undefined): string
     `cache: ${how}`,
     ...(cache.recordedBy === undefined ? [] : [`recorded with ${code(modelLabel({ provider: cache.recordedBy.provider, id: cache.recordedBy.model }), MAX_DETAIL_CHARS)}`]),
     ...(cache.detail === undefined ? [] : [cell(cache.detail, MAX_DETAIL_CHARS)]),
+    ...(cache.detour === undefined ? [] : [`detour: ${cell(cache.detour, MAX_DETAIL_CHARS)}`]),
     ...(cache.write === undefined ? [] : [CACHE_WRITE_TEXT[cache.write]]),
     ...(cache.notRecorded === 'param-collision' ? ['nothing recorded: a unique() value collides with another param'] : []),
   ];

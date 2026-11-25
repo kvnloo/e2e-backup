@@ -215,6 +215,9 @@ const CACHE_LABEL: Record<CacheMode, string> = {
   missed: 'live',
 };
 
+const DETOUR_HINT =
+  'The recording leaves a screen and comes back to it with nothing changed on the way. It still replays; check that it is not a wrong turn the agent took.';
+
 const CACHE_HINT: Record<CacheMode, string> = {
   'self-finalized': 'Replayed the actions recorded in an earlier run, with no model call.',
   'agent-concluded': 'Replayed the recorded actions, then the agent called the model to finish the step.',
@@ -256,6 +259,7 @@ function StepRow({
     error !== undefined ||
     step.model !== undefined ||
     step.cache?.detail !== undefined ||
+    step.cache?.detour !== undefined ||
     (step.turns?.length ?? 0) > 0 ||
     (step.screen?.changes.length ?? 0) > 0 ||
     actions.length > 0 ||
@@ -284,6 +288,11 @@ function StepRow({
         {step.cache === undefined ? null : (
           <Tag tone={step.cache.mode === 'missed' ? undefined : 'mint'} hint={CACHE_HINT[step.cache.mode]}>
             {CACHE_LABEL[step.cache.mode]}
+          </Tag>
+        )}
+        {step.cache?.detour === undefined ? null : (
+          <Tag tone="flaky" hint={DETOUR_HINT}>
+            detour
           </Tag>
         )}
         {step.model === undefined ? null : (
@@ -336,6 +345,11 @@ function StepRow({
               <p className="type-code-s text-shade-300">
                 {step.cache.replayedActions}/{step.cache.totalActions} actions replayed{step.cache.reason === undefined ? '' : ` · ${step.cache.reason}`} · {step.cache.detail}
               </p>
+            </Detail>
+          )}
+          {step.cache?.detour === undefined ? null : (
+            <Detail label="detour">
+              <p className="type-code-s text-shade-300">{step.cache.detour}</p>
             </Detail>
           )}
           {step.turns === undefined || step.turns.length === 0 ? null : (

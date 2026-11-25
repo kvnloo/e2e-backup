@@ -21,7 +21,9 @@ run summary counts the outcomes:
 
 `not saved` counts the steps of passing and flaky tests whose
 [`step.cache.write`](#when-a-recording-is-written) is `unconfirmed`,
-`no-change`, or `not-written` in the attempt that passed.
+`no-change`, or `not-written` in the attempt that passed. `detoured`
+counts the steps in that attempt whose recording takes a
+[detour](#find-detours-in-a-recording).
 
 ## When a recording is written
 
@@ -309,8 +311,8 @@ no field declares a purpose, as no field does on iOS and Android.
 ## What a recording holds
 
 Each entry is a JSON file under `.e2e/cache/`, named by a hash of its key.
-It holds actions, target descriptions, typed text, a step summary, and the
-end checks: the route and up to eight controls that appeared and eight that
+It holds actions, the screen each ran on, target descriptions, typed text,
+a step summary, and the end checks: the route and up to eight controls that appeared and eight that
 went away. Entries hold no prompts, conversations, screenshots, observed
 trees, or secret values. A secret fill stores only the secret's name.
 
@@ -429,6 +431,39 @@ CI over `cache.strict` in the config. To fix a stale entry:
    off if the config sets it.
 2. Commit the changed entry. A custom `cache.store` gets the new entry from
    that run instead.
+
+## Find detours in a recording
+
+A detour is a part of a recording that leaves a screen and comes back to it
+with nothing typed, chosen, or set on the way. An agent that opens the wrong
+page and backs out records one, and every replay repeats it. The step still
+passes.
+
+A step whose recording has a detour reports it in `step.cache.detour`, on
+its [trace page](/debugging#traces), and in the HTML report. The run summary
+counts it as `detoured`:
+
+```text
+cache: replayed all 4 recorded actions, no model call; detour: actions 1-3 left /settings for /settings/notifications and came back with nothing changed
+```
+
+To remove a detour, delete the entry file and run the test again in
+`read-write` mode. If the agent takes the same wrong turn, name the
+destination in the instruction.
+
+<Accordion title="What counts as a detour">
+- Each action records the screen it ran on: its route, as in
+  [What counts as the same route](#how-a-replay-works), or the screen title
+  on a device. Two screens with the same route or title count as one.
+- A typed value, a secret fill, a select, a check, an upload, a drag, a key
+  press, a project tool, or a tap on a checkbox, switch, radio, option,
+  slider, or spin button ends a detour. Going back after one of these is
+  ordinary navigation.
+- An entry recorded by an earlier version has no screens. There, only a tap
+  or a navigate, then scrolls or hovers, then `back`, counts.
+- An instruction that asks to look at a page and return records one on
+  purpose.
+</Accordion>
 
 ## Inspect the cache
 

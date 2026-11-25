@@ -143,6 +143,21 @@ describe('the steps on a trace page', () => {
     expect(stepLines(page!.text, 2)).toEqual(['expect gave up after 50 reads in 5.0s: text "$10" (1 match) x50']);
   });
 
+  it('name the detour a replayed recording takes', async () => {
+    const detour = 'actions 1-3 left /settings for /settings/notifications and came back with nothing changed';
+    const step = reportStep({
+      index: 0,
+      kind: 'agent',
+      api: 'agent.act',
+      label: 'open privacy settings',
+      cache: { mode: 'self-finalized', replayedActions: 4, totalActions: 4, entry: ENTRY, detour, write: 'kept' },
+    });
+    const [page] = await pagesOf(reportResult({ id: 'd'.repeat(12), titlePath: ['detours'], status: 'passed', attempts: [reportAttempt({ status: 'passed', steps: [step] })] }));
+    expect(stepLines(page!.text, 1)[0]).toBe(
+      `cache: replayed all 4 recorded actions, no model call; detour: ${detour}; recording kept (\`.e2e/cache/${ENTRY}.json\`)`,
+    );
+  });
+
   it('leave out a poll that passed on its first read, and name a failed action with its code', async () => {
     const step = reportStep({
       index: 0,

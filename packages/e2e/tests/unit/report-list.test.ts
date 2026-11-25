@@ -825,6 +825,14 @@ describe('ListReporter', () => {
       ])).toBe('      Cache  4 missed · 3 not saved');
     });
 
+    it('counts the steps whose recording takes a detour, from the attempt that passed', () => {
+      const detoured = { ...cacheStep('detoured', 'saved'), cache: { mode: 'missed', reason: 'no-entry', write: 'saved', detour: 'actions 1-2 left / for /about and came back with nothing changed' } } as unknown as AttemptRecord['steps'][number];
+      expect(cacheRow([
+        plan([{ file: 'tests/a.e2e.ts', tests: 1 }]),
+        finished(result({ status: 'passed', file: 'tests/a.e2e.ts', attempts: [attempt({ steps: [detoured, cacheStep('plain', 'saved')] })] })),
+      ])).toBe('      Cache  2 missed · 1 detoured');
+    });
+
     it('counts not saved from the attempt that decided a passing result only', () => {
       expect(cacheRow([
         plan([{ file: 'tests/a.e2e.ts', tests: 2 }]),
