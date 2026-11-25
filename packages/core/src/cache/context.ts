@@ -45,7 +45,16 @@ export type StagedTrace = {
   /** Index of the step in the attempt's step timeline. */
   readonly stepIndex: number;
 } & (
-  | { readonly kind: 'write'; readonly trace: ActionTrace }
+  | {
+      readonly kind: 'write';
+      readonly trace: ActionTrace;
+      /**
+       * The run's live redactor. A secret a later step resolves may already
+       * be in an action's location, so settlement masks the locations again
+       * before the write.
+       */
+      readonly redact?: (text: string) => string;
+    }
   | { readonly kind: 'keep'; readonly recordedFor: TraceProvenance }
   /** What the step decided itself when it concluded: it evicted its entry, or had nothing to record. */
   | { readonly kind: 'decided'; readonly outcome: 'evicted' | 'no-change' }
@@ -125,6 +134,11 @@ export type CacheWrite = 'saved' | 'kept' | 'unconfirmed' | 'evicted' | 'no-chan
 async function holdsSameFlow(store: CacheStore, keyHash: string, trace: ActionTrace): Promise<boolean> {
   const existing = await store.read(keyHash);
   return existing.status === 'hit' && flowOf(existing.entry.payload) === flowOf(trace);
+}
+
+/** `trace` with every action's location redacted again, by the ledger as it is now. */
+function redactLocations(trace: ActionTrace, redact: (text: string) => string): ActionTrace {
+  return { ...trace, actions: trace.actions.map((action) => (action.at === undefined ? action : { ...action, at: redact(action.at) })) };
 }
 
 /** The part of a trace that decides what a replay does, as canonical JSON. */
@@ -234,11 +248,12 @@ export async function settleStagedTraces(context: AgentCacheContext, settlement:
         await completeProvenance(context.store, entry.keyHash, entry.recordedFor);
         continue;
       }
-      if (await holdsSameFlow(context.store, entry.keyHash, entry.trace)) {
+      const trace = entry.redact === undefined ? entry.trace : redactLocations(entry.trace, entry.redact);
+      if (await holdsSameFlow(context.store, entry.keyHash, trace)) {
         outcomes.set(entry.stepIndex, 'kept');
         continue;
       }
-      const written = await context.store.write(entry.keyHash, entry.trace);
+      const written = await context.store.write(entry.keyHash, trace);
       outcomes.set(entry.stepIndex, written === undefined ? 'not-written' : 'saved');
     } catch {
       // The cache is disposable; a failed flush is a slower next run only.
