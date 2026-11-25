@@ -1181,6 +1181,50 @@ describe('trace cache: a detour to the same path on another origin', () => {
   }, 240_000);
 });
 
+/** Opens About through a link that carries a sign-in token, goes back, then taps Increment. */
+function tokenLinkExecutor(appUrl: string): StepExecutor {
+  return {
+    name: 'token-link-executor',
+    version: 'test',
+    async runStep(context: StepExecutorContext) {
+      await context.observe();
+      await context.actions.navigate(`${appUrl}/about?token=Zx8aQ2pLmN4tR7vW`);
+      await context.observe();
+      await context.actions.back();
+      const observation = await context.observe();
+      await context.actions.tap({ id: nodeIdFor(observation.text, /button "Increment"/) });
+      return { status: 'passed' as const, summary: 'the counter shows 1' };
+    },
+  };
+}
+
+describe('trace cache: a detour through a page whose address carries a token', () => {
+  let app: FixtureApp;
+  let project: FixtureProject;
+
+  beforeAll(async () => {
+    app = await startFixtureApp();
+    project = createProject({ 'tests/detour.e2e.ts': DETOUR_SUITE });
+  }, 60_000);
+
+  afterAll(async () => {
+    project?.cleanup();
+    await app?.close();
+  });
+
+  it('stores and reports the page as its route, the token as :id', async () => {
+    const outcome = await runExisting(project, {
+      appUrl: app.url,
+      config: { tests: 'tests/**/*.e2e.ts', agents: { default: { executor: tokenLinkExecutor(app.url) } }, cache: 'read-write' as const },
+    });
+    expect(outcome.exitCode).toBe(0);
+    const { entry } = readOnlyEntry(project);
+    expect(entry.payload.actions.map((action) => action.at)).toEqual(['/', '/about?token=:id', '/']);
+    const step = resultByTitle(outcome, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(step.cache?.detour).toBe('actions 1-2 left / for /about?token=:id and came back with nothing typed, chosen, or set');
+  }, 240_000);
+});
+
 /** Takes the wrong turn on a step it runs from the top; after a hand-off, only taps Increment, as an agent finishing the step would. */
 function resumingExecutor(record: ExecutorRecord): StepExecutor {
   const fromTop = wrongTurnExecutor(record);
@@ -1282,6 +1326,13 @@ describe('trace cache: a replay that hands off after a detour', () => {
       replayedActions: 2,
       detour: 'actions 1-2 left / for /about and came back with nothing typed, chosen, or set',
     });
+    // A stored location reads a record id as :id, so a trip the prefix shows counts only inside a span the recording run found.
+    rewriteOnlyEntry(project, (payload) => ({ ...payload, detours: [] }));
+    const unfound = await runExisting(project, options({ calls: 0, prefixes: [] }, 'read-only'));
+    expect(unfound.exitCode).toBe(0);
+    const again = resultByTitle(unfound, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(again.cache).toMatchObject({ mode: 'agent-concluded', replayedActions: 2 });
+    expect(again.cache?.detour).toBeUndefined();
   }, 240_000);
 });
 

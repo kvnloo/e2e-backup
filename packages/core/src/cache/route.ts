@@ -200,6 +200,22 @@ export function addressKey(location: string): string {
   return routeIdentity(routeOf(location, false));
 }
 
+/**
+ * A location as a recording keeps it: spelled as its route, each segment
+ * and query value the app minted per record as `:id`, so a token, a code,
+ * or a record id a URL carried mid-flow (a magic link, an OAuth callback)
+ * is never written to an entry or a report. A device screen title, or any
+ * other location that is not a web address, is kept as it is.
+ */
+export function routeLocation(location: string): string {
+  const route = routeOf(location);
+  if (route.kind === 'opaque') return route.location;
+  const spell = (text: string) => (text === PARAM ? text : encodeURIComponent(text));
+  const path = `/${route.segments.map(spell).join('/')}`;
+  const query = route.query.map(([key, value]) => `${spell(key)}=${spell(value)}`).join('&');
+  return `${route.origin ?? ''}${path}${query === '' ? '' : `?${query}`}`;
+}
+
 /** A route's parts as one comparable string, a slash inside a segment kept inside it. */
 function routeIdentity(route: Route): string {
   return JSON.stringify(route.kind === 'opaque' ? [route.location] : [route.origin ?? null, route.segments, route.query]);

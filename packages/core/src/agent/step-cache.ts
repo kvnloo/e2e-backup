@@ -16,7 +16,7 @@ import { deltaEvidenced, deltaMismatch, describeDelta, type DeltaMismatch } from
 import type { AgentCacheContext, ClaimedKey } from '../cache/context.ts';
 import { decideTraceReplay, opensWithNavigate, type TraceReplayMissReason } from '../cache/decide.ts';
 import { describeDetour, findDetours, type TraceDetour } from '../cache/detours.ts';
-import { sameRoute } from '../cache/route.ts';
+import { routeLocation, sameRoute } from '../cache/route.ts';
 import { keyContextChanges, type CacheAgentIdentity } from '../cache/identity.ts';
 import { recordedProvenance, TraceRecorder } from '../cache/recorder.ts';
 import { expandTrace, templateParams, templatesCollide, templateTrace, type ParamTemplate } from '../cache/template.ts';
@@ -658,11 +658,14 @@ export class StepTraceSession {
       if (this.info !== undefined) this.info = { ...this.info, notRecorded: 'param-collision' };
       return 'skipped';
     }
-    const templated = templateTrace(trace, this.options.templates);
+    // Each action's location is kept as its route, a minted value as `:id`:
+    // a token or code a URL carried mid-flow never reaches the entry.
+    const templated = templateTrace(withRouteLocations(trace), this.options.templates);
     if (templated === undefined) return 'skipped';
-    // The detours are found here, on the locations this run saw, and kept in
-    // the entry: once `unique()` values are placeholders, a stored location
-    // no longer compares the way this run's did.
+    // The detours are found here, on the addresses this run saw, and kept in
+    // the entry: a stored location reads `:id` for each record id and a
+    // placeholder for each `unique()` value, so it no longer tells two
+    // records apart the way this run's did.
     const detours = findDetours(trace);
     const located = trace.actions.some((action) => action.at !== undefined);
     const staged = located ? { ...templated, detours: detours.map(({ from, to }) => ({ from, to })) } : templated;
@@ -682,20 +685,23 @@ export class StepTraceSession {
    * or undefined when it has none; with `executed`, those of the actions a
    * replay that handed off ran, read as a flow of their own that ends where
    * the next recorded action stood, so a trip the replay completed is not
-   * merged with one it never reached. Joined with commas: the report line
-   * separates its own parts with semicolons (`cacheLine`).
+   * merged with one it never reached. A stored location reads `:id` for a
+   * record id, so two records' pages read alike there: a trip the prefix
+   * shows counts only inside a span the recording run found.
+   * Joined with commas: the report line separates its own parts with
+   * semicolons (`cacheLine`).
    */
   private detourOf(trace: ActionTrace, executed = trace.actions.length): string | undefined {
+    if (executed >= trace.actions.length) return this.describeDetours(findDetours(trace));
     const next = trace.actions[executed]?.at;
-    const ran =
-      executed >= trace.actions.length
-        ? trace
-        : {
-            actions: trace.actions.slice(0, executed),
-            ...(trace.startPath === undefined ? {} : { startPath: trace.startPath }),
-            ...(next === undefined ? {} : { endPath: next }),
-          };
-    return this.describeDetours(findDetours(ran));
+    const ran = {
+      actions: trace.actions.slice(0, executed),
+      ...(trace.startPath === undefined ? {} : { startPath: trace.startPath }),
+      ...(next === undefined ? {} : { endPath: next }),
+    };
+    const found = findDetours(ran);
+    const spans = trace.detours;
+    return this.describeDetours(spans === undefined ? found : found.filter(({ from, to }) => spans.some((span) => span.from <= from && to <= span.to)));
   }
 
   /** Detours as the report names them, or undefined for none. */
@@ -855,4 +861,16 @@ export function recordedVerdictOf(summary: string): string {
   if (!summary.startsWith(REPLAY_NOTICE_START)) return summary;
   const at = summary.indexOf(RECORDED_VERDICT_SEPARATOR);
   return at === -1 ? summary : summary.slice(at + RECORDED_VERDICT_SEPARATOR.length);
+}
+
+/** The trace with each action's location spelled as its route (`routeLocation`). */
+function withRouteLocations(trace: ActionTrace): ActionTrace {
+  return {
+    ...trace,
+    actions: trace.actions.map((action) => {
+      if (action.at === undefined) return action;
+      const at = routeLocation(action.at);
+      return at === action.at ? action : { ...action, at };
+    }),
+  };
 }
