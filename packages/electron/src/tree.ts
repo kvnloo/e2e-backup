@@ -88,7 +88,7 @@ export interface ProjectionOptions {
   readonly title?: string;
   /** Backend ids of elements a locator's CSS selector matched: kept as nodes even where the tree would leave them out. */
   readonly keep?: ReadonlySet<number>;
-  /** The most nodes one projection keeps; the rest are left out and the tree marked truncated. */
+  /** The most nodes one projection keeps; the rest are left out and the tree marked truncated. Default 5000 for `tree`, none for `node`. */
   readonly maxNodes?: number;
 }
 
@@ -272,7 +272,8 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
   const { mode, testIdAttribute } = options;
   const byId = new Map(axNodes.map((node) => [node.nodeId, node]));
   const dom = indexSnapshot(document, strings);
-  const maxNodes = options.maxNodes ?? DEFAULT_MAX_NODES;
+  // The cap bounds what a model reads; a locator reads every node, or it would miss a match past the cap.
+  const maxNodes = options.maxNodes ?? (mode === 'tree' ? DEFAULT_MAX_NODES : Number.POSITIVE_INFINITY);
   let kept = 0;
   let truncated = false;
 

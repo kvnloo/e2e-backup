@@ -136,6 +136,23 @@ describe('projectTree', () => {
     expect(kept.children?.map((child) => child.testId ?? child.text)).toEqual(['Username', 'username']);
   });
 
+  it('caps an observation and never a locator read', () => {
+    const buttons = Array.from({ length: 6000 }, (_, at) => at + 2);
+    const ax: AXNode[] = [
+      { nodeId: '1', ignored: false, role: { value: 'RootWebArea' }, childIds: buttons.map(String), backendDOMNodeId: 1 },
+      ...buttons.map((id) => ({ nodeId: String(id), ignored: false, role: { value: 'button' }, name: { value: `Button ${id}` }, parentId: '1', backendDOMNodeId: id })),
+    ];
+    const empty: SnapshotDocument = { nodes: {}, layout: { nodeIndex: [], bounds: [] } };
+    const geometry = { scale: 1, scrollX: 0, scrollY: 0, width: 640, height: 480 };
+    const options = { testIdAttribute: 'data-testid', idOf: (id: number) => `1.${id}`, rootId: 'window' };
+    const observed = projectTree(ax, empty, [], geometry, { ...options, mode: 'tree' });
+    expect(observed.truncated).toBe(true);
+    expect(observed.root.children).toHaveLength(5000);
+    const located = projectTree(ax, empty, [], geometry, { ...options, mode: 'node' });
+    expect(located.truncated).toBe(false);
+    expect(located.root.children).toHaveLength(6000);
+  });
+
   it('stops at the node cap and says the tree is incomplete', () => {
     const capped = project('tree', { maxNodes: 10 });
     expect(capped.truncated).toBe(true);
