@@ -687,9 +687,14 @@ export class ElectronSurface {
       const window = this.requireWindow();
       if (action.kind === 'scrollIntoView') return;
       if (action.kind !== 'swipe') throw notActionable(`the window takes swipe and scrollIntoView only, not ${action.kind}; act on a node`);
-      await this.bounded(operation, 'swipe', true, async () => {
+      const open = inputGate(operation, 'swipe');
+      let committed = false;
+      await this.bounded(operation, 'swipe', () => committed, async () => {
         const size = await this.evaluateIn<{ width: number; height: number }>(window, '({ width: innerWidth, height: innerHeight })');
+        open();
+        committed = true;
         await window.page.mouse.move(Math.round(size.width / 2), Math.round(size.height / 2));
+        open();
         await this.wheel(window, action.direction, action.momentum ?? 'none', size);
       });
       await this.settle(operation);
@@ -918,8 +923,10 @@ export class ElectronSurface {
           await this.drag(window, at, whole(action.target), open, action.durationMs ?? 300, operation.signal);
           return;
         case 'swipe': {
+          open();
           await mouse.move(at.x, at.y);
           const size = await this.evaluateIn<{ width: number; height: number }>(window, '({ width: innerWidth, height: innerHeight })');
+          open();
           await this.wheel(window, action.direction, action.momentum ?? 'none', size);
           return;
         }
