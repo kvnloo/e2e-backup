@@ -200,6 +200,8 @@ export interface TargetSession {
   readonly tapModifiers: boolean;
   /** Whether the engine implements `viewportIntersection`, so `toBeInViewport` can refuse before it waits for a match. */
   readonly measuresViewport: boolean;
+  /** `true` when the engine declared `tapButtons`, so `button` is allowed on the tap action. */
+  readonly tapButtons: boolean;
   /** Captures one atomic agent observation; the harness redacts it downstream. */
   observe(operation: OperationContext, options?: EngineObserveOptions): Promise<Observation>;
   /** Resolves immediately; the runner owns query polling and strictness. */

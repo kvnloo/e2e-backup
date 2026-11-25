@@ -830,6 +830,16 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
+   * Set when `button` on the `tap` action is honored by `perform`, for
+   * middle clicks. Without it, `tap({ button: 'middle' })` fails with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left or right
+   * tap doesn't need it.
+   *
+   * The button is never sent to an engine written before this field, so a
+   * middle click can't turn into a primary click there.
+   */
+  readonly tapButtons?: boolean;
+  /**
    * `prepare` binds the target to the device `EnginePrepareInfo.device`
    * names, for `e2e run --device`, over the device the engine was configured
    * with. Without it the runner refuses the flag for the target before

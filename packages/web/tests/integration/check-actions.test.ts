@@ -4,7 +4,8 @@
  * observation. A control the app replaces or navigates away from once it is
  * picked took the click, so the action is done; a control the click never
  * reached stays a stale node, one that commits its state after a timer is
- * waited for, and one the click never changes fails at the deadline.
+ * waited for, and one the click never changes fails at the deadline. A
+ * middle tap and a secondary tap press the mouse button they name.
  */
 
 import { createServer, type Server } from 'node:http';
@@ -494,5 +495,32 @@ describe('an action cancelled while its stand-in read is in flight', () => {
       ).rejects.toThrow('cancelled');
       expect(await page.isChecked(selector)).toBe(false);
     }
+  });
+});
+
+/** A link that writes the type, button, and held keys of each click it gets into the paragraph below it. */
+const PRESSED_LINK = `<a href="/next" id="next">Next</a><p id="pressed"></p>
+<script>
+  const pressed = (event) => {
+    event.preventDefault();
+    document.getElementById('pressed').textContent = [event.type, event.button, event.shiftKey && 'shift', event.altKey && 'alt']
+      .filter((part) => part !== false)
+      .join(' ');
+  };
+  document.getElementById('next').addEventListener('auxclick', (event) => event.button === 1 && pressed(event));
+  document.getElementById('next').addEventListener('contextmenu', pressed);
+</script>`;
+
+describe.each(KINDS)('a mouse button, through the %s target', (kind) => {
+  it('fires auxclick with button 1 for a middle tap, holding its modifiers', async () => {
+    await page.setContent(PRESSED_LINK);
+    expect(await perform(await targetOf(kind, '#next'), { kind: 'tap', button: 'middle', modifiers: ['Shift'] })).toBeUndefined();
+    expect(await page.textContent('#pressed')).toBe('auxclick 1 shift');
+  });
+
+  it('fires contextmenu with button 2 for a secondary tap, holding its modifiers', async () => {
+    await page.setContent(PRESSED_LINK);
+    expect(await perform(await targetOf(kind, '#next'), { kind: 'secondaryTap', modifiers: ['Alt'] })).toBeUndefined();
+    expect(await page.textContent('#pressed')).toBe('contextmenu 2 alt');
   });
 });

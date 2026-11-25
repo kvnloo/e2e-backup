@@ -503,6 +503,13 @@ export interface TapOptions extends ClickOptions {
    * `UNSUPPORTED_CAPABILITY`. A count above 1 is not combined with `position`.
    */
   count?: number;
+  /**
+   * The mouse button to click with: `left` (default), `middle`, or `right`.
+   * A right tap is a `secondaryTap`. A middle tap needs an engine that
+   * declares `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise. Neither can be
+   * combined with `position` or a `count` above 1 yet.
+   */
+  button?: 'left' | 'middle' | 'right';
 }
 
 /** `longPress` options: the hold time in milliseconds, 100 through 10000, default the engine's own. */

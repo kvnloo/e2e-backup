@@ -304,6 +304,7 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
   const performAtRaw = guard('point actions', engine?.performAt);
   const pointerActions: ReadonlySet<PointerActionKind> = new Set(engine?.pointerActions ?? []);
   const tapModifiers = engine?.tapModifiers === true;
+  const tapButtons = engine?.tapButtons === true;
 
   const app: SessionApp = {
     open: guard('navigation', engine?.session?.open),
@@ -346,6 +347,7 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
     pointerActions,
     tapModifiers,
     measuresViewport: engine?.viewportIntersection !== undefined,
+    tapButtons,
     app,
     artifacts,
     appLog: createAppLogRoute(),

@@ -694,10 +694,15 @@ await screen.getByRole('button', 'Save').tap({ timeout: 10_000 });
 await screen.getByRole('image', 'Seat map').tap({ position: { x: 120, y: 48 } });
 await row.click({ modifiers: ['Shift'] });
 await screen.getByText('Shipping address').tap({ count: 3 });
+await screen.getByRole('link', 'Docs').click({ button: 'middle' });
 ```
 
 The options are [`TapOptions`](#types):
 
+- `button`: the mouse button for the click, `left` (default), `middle`, or
+  `right`. A right tap is a [`secondaryTap`](#secondarytap). On Chromium, a
+  tab opened by a middle click on a link isn't listed by `tabs()` or seen by
+  `waitForPopup` (see [Tabs](/reference/web#tabs)).
 - `count`: how many taps in a row, a positive safe integer, default 1. In a
   browser the clicks arrive as one multi-click, so a triple click selects a
   paragraph. On a device they are `count` presses at the `doubleTap` cadence.
@@ -714,8 +719,11 @@ The options are [`TapOptions`](#types):
 | Throws | When |
 | --- | --- |
 | `INVALID_ARGUMENT` | An unknown or repeated modifier, `modifiers` beside `position`, a `count` that is not a positive safe integer, or a `count` above 1 beside `position`. |
+| `INVALID_ARGUMENT` | A `button` other than `left`, `middle`, or `right`, or a middle or right `button` beside `position` or a `count` above 1. |
 | `UNSUPPORTED_CAPABILITY` | `modifiers` on an engine that does not declare `tapModifiers`, the mobile engine among them; thrown before it acts. |
 | `UNSUPPORTED_CAPABILITY` | A `count` of 3 or more on an engine without the `multiTap` action, or above the engine's limit (200 on the mobile engine); thrown before it acts. |
+| `UNSUPPORTED_CAPABILITY` | A middle `button` on an engine without `tapButtons` (such as the mobile engine). Thrown before any action. |
+| `UNSUPPORTED_CAPABILITY` | A right `button` on an engine that doesn't list `secondaryTap`, as with `secondaryTap()`. |
 | `UNSUPPORTED_CAPABILITY` | `position` on an engine without the `tap` pointer action. |
 | `ACTION_FAILED` | `position` on a node the browser engine cannot bring into view; its scroll waits for visibility. Other engines fail as they report it. |
 | `LOCATOR_NOT_FOUND` | `position` on a node that resolves but never shows a visible box within the timeout. |
@@ -1519,6 +1527,13 @@ export interface TapOptions extends ClickOptions {
    * `UNSUPPORTED_CAPABILITY`. A count above 1 is not combined with `position`.
    */
   count?: number;
+  /**
+   * The mouse button to click with: `left` (default), `middle`, or `right`.
+   * A right tap is a `secondaryTap`. A middle tap needs an engine that
+   * declares `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise. Neither can be
+   * combined with `position` or a `count` above 1 yet.
+   */
+  button?: 'left' | 'middle' | 'right';
 }
 
 /** One option of a select: its label (a bare string too), its `value` attribute, or its zero-based index. */

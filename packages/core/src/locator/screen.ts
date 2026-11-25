@@ -420,14 +420,26 @@ class LocatorImpl extends ScreenImpl implements Locator {
    * `count` taps of the node: the platform's own, or, with a position, the
    * pointer dispatched at that offset of the node's box. Two taps are the
    * `doubleTap` kind, so `tap({ count: 2 })` is `doubleTap()` on every
-   * engine; three or more are `multiTap`.
+   * engine; three or more are `multiTap`. A left click is sent without
+   * `button`, so it works on an engine without `tapButtons`. A right click
+   * is the `secondaryTap` kind.
    */
   private tapWith(api: 'tap' | 'click', options: TapOptions | undefined): Promise<void> {
-    rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'count']);
+    rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'count', 'button']);
     const modifiers = requireModifiers(options?.modifiers, api);
     const count = requireTapCount(options?.count, api);
+    const button = options?.button === 'left' ? undefined : options?.button;
+    if (button !== undefined && button !== 'middle' && button !== 'right') {
+      throw new TestError('INVALID_ARGUMENT', `${api}() button ${describeValue(button)} is not one of left, middle, right`);
+    }
+    if (button !== undefined && count !== 1) {
+      throw new TestError('INVALID_ARGUMENT', `${api}() does not take count with the ${button} button yet; drop one of them`);
+    }
     if (options?.position === undefined) {
-      if (count === 1) return this.dispatchTap(api, { kind: 'tap', ...modifiers }, options?.timeout);
+      if (button === 'right') return this.dispatchTap(api, { kind: 'secondaryTap', ...modifiers }, options?.timeout);
+      if (count === 1) {
+        return this.dispatchTap(api, { kind: 'tap', ...modifiers, ...(button === undefined ? {} : { button }) }, options?.timeout);
+      }
       if (count === 2) return this.dispatchTap(api, { kind: 'doubleTap', ...modifiers }, options?.timeout, count);
       return this.dispatchTap(api, { kind: 'multiTap', count, ...modifiers }, options?.timeout, count);
     }
@@ -436,6 +448,9 @@ class LocatorImpl extends ScreenImpl implements Locator {
     }
     if (modifiers.modifiers !== undefined) {
       throw new TestError('INVALID_ARGUMENT', `${api}() does not take modifiers with a position yet; drop one of them`);
+    }
+    if (button !== undefined) {
+      throw new TestError('INVALID_ARGUMENT', `${api}() does not take the ${button} button with a position yet; drop one of them`);
     }
     const position = requirePoint(options.position, `${api} position`);
     return this.context.steps.run(
@@ -470,12 +485,19 @@ class LocatorImpl extends ScreenImpl implements Locator {
 
   /**
    * One tap-family action as a step labelled after the node, then the
-   * `count` the caller asked for when it names one, then the keys held.
+   * `count` the caller asked for when it names one, then the mouse button
+   * and the keys held.
    */
   private dispatchTap(api: string, action: TapAction, timeout: number | undefined, count?: number): Promise<void> {
     const times = count === undefined ? '' : ` ${count} times`;
-    const held = action.modifiers === undefined ? '' : ` with ${action.modifiers.join('+')}`;
-    return this.context.steps.run('locator', `locator.${api}`, `${this.label}${times}${held}`, () =>
+    const rightTap = action.kind === 'secondaryTap' && api !== 'secondaryTap';
+    const button = rightTap ? 'right' : 'button' in action ? action.button : undefined;
+    const held = [
+      ...(button === undefined ? [] : [`the ${button} button`]),
+      ...(action.modifiers === undefined ? [] : [action.modifiers.join('+')]),
+    ];
+    const label = `${this.label}${times}${held.length === 0 ? '' : ` with ${held.join(' and ')}`}`;
+    return this.context.steps.run('locator', `locator.${api}`, label, () =>
       this.context.engine.perform(this.expression, action, timeout),
     );
   }

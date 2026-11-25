@@ -877,6 +877,12 @@ void screen.getByRole('row').secondaryTap({ modifiers: ['Alt'] });
 void screen.getByRole('row').dblclick({ modifiers: ['Shift'], timeout: 1_000 });
 // @ts-expect-error modifiers are the key grammar's modifier names
 void screen.getByRole('row').doubleTap({ modifiers: ['Hyper'] });
+void screen.getByRole('link').tap({ button: 'middle', modifiers: ['Shift'] });
+void screen.getByRole('link').click({ button: 'right' });
+// @ts-expect-error a button is left, middle, or right
+void screen.getByRole('link').tap({ button: 'back' });
+// @ts-expect-error only tap and click take a button
+void screen.getByRole('link').doubleTap({ button: 'middle' });
 void screen.getByRole('image').click({ position: point });
 void screen.getByRole('button').tap({ count: 3, timeout: 1_000 });
 void screen.getByRole('button').click({ count: 3, modifiers: ['Shift'] });

@@ -308,7 +308,18 @@ export interface ObservationPixels {
  */
 export type LocatorAction =
   | {
-      readonly kind: 'tap' | 'doubleTap' | 'secondaryTap';
+      readonly kind: 'tap';
+      /** Keys held for the click, as on the `doubleTap` and `secondaryTap` kinds. */
+      readonly modifiers?: readonly KeyModifier[];
+      /**
+       * The middle mouse button, set for a middle click. It's sent only to
+       * an engine that declares `tapButtons`. For any other engine, it's
+       * refused before dispatch.
+       */
+      readonly button?: 'middle';
+    }
+  | {
+      readonly kind: 'doubleTap' | 'secondaryTap';
       /**
        * Keys held for the click, as a Shift-click extends a selection. Only
        * an engine that declares `tapModifiers` receives it; the harness

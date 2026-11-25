@@ -136,7 +136,7 @@ rules:
 | `viewportIntersection` | Declared without `locate`. |
 | `perform`, `actions` | One without the other. An `actions` list that is empty, repeats a kind, or names one outside `KNOWN_LOCATOR_ACTION_KINDS`. |
 | `performAt`, `pointerActions` | One without the other. A `pointerActions` list that is empty, repeats a kind, or names one outside `POINTER_ACTION_KINDS`. |
-| `tapModifiers` | Not a boolean, or `true` without `perform`. |
+| `tapModifiers`, `tapButtons` | Not a boolean, or `true` without `perform`. |
 | `selectsDevice` | Not a boolean, or `true` without `prepare`. |
 | `grantsAllPermissions` | Not a boolean. |
 | `launchArgumentValues` | Not a boolean. |
@@ -172,6 +172,7 @@ The body of one target. Every member but `name`, `version`, and
 | [`locate`](#capabilities) | method |
 | [`performAt`, `pointerActions`](#pointer-actions) | method, kinds |
 | [`tapModifiers`](#capabilities) | `boolean` |
+| [`tapButtons`](#capabilities) | `boolean` |
 | [`selectsDevice`](#capabilities) | `boolean` |
 | [`grantsAllPermissions`](#capabilities) | `boolean` |
 | [`launchArgumentValues`](#engineappinfo) | `boolean` |
@@ -279,6 +280,13 @@ export interface Engine {
    * reaches the engine.
    */
   readonly tapModifiers?: boolean;
+  /**
+   * Set when `button` on the `tap` action is honored by `perform`, for
+   * middle clicks. Without it, `tap({ button: 'middle' })` fails with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left or right
+   * tap doesn't need it.
+   */
+  readonly tapButtons?: boolean;
   /**
    * `prepare` binds the target to the device `EnginePrepareInfo.device`
    * names, for `e2e run --device`. Without it the runner refuses the flag
@@ -454,6 +462,7 @@ member. Two gaps end differently:
 | `locate` | `location` | `observe` | `screen`, `Locator`, `expect(locator)`. |
 | `viewportIntersection` | `viewport-intersection` | `locate` | `expect(locator).toBeInViewport()`. |
 | `tapModifiers: true` | - | `perform` | `modifiers` on `tap`, `doubleTap`, `multiTap`, and `secondaryTap`. |
+| `tapButtons: true` | - | `perform` | A middle `button` on `tap`. |
 | `selectsDevice: true` | - | `prepare` | `e2e run --device`, the device `prepare` binds. |
 | `grantsAllPermissions: true` | - | - | `app.permissions: 'all'`, which the engine receives as `EngineAppInfo.allPermissions`. Without it, config load refuses `'all'`, so an engine released before it never receives the string. |
 | `launchArgumentValues: true` | - | - | The object form of `app.launchArguments`, in `EngineAppInfo.launchArgumentValues`. |
@@ -561,7 +570,7 @@ An undeclared verb is absent from the toolset.
 The test-facing APIs each engine member backs. A `screen` or `Locator`
 method for an undeclared kind, or a call with `modifiers` and no
 `tapModifiers`, fails with `UNSUPPORTED_CAPABILITY` before it reaches the
-engine.
+engine. Without `tapButtons`, `tap({ button: 'middle' })` fails the same way.
 
 | API | Needs |
 | --- | --- |
@@ -569,6 +578,7 @@ engine.
 | `screen` and `Locator` actions | `perform`, each only for a kind listed in `actions` |
 | `screen.swipe()` | `perform` with `swipe` on the observation root |
 | `modifiers` on a tap (`row.click({ modifiers: ['Shift'] })`) | `tapModifiers: true`; the keys are held for the click |
+| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true` for `middle`. A `right` tap is sent as `secondaryTap`, and a `left` tap without `button`. |
 | `screen.tapAt`, `tap({ position })` | `performAt` with the `tap` pointer kind |
 | `screen.doubleTapAt` | `performAt` with the `doubleTap` pointer kind |
 | `screen.swipe({ from, to })` | `performAt` with the `swipeTo` pointer kind |
@@ -1254,7 +1264,7 @@ honors in `actions` and `pointerActions`.
 
 | Kind | Fields | `actions` | `pointerActions` |
 | --- | --- | --- | --- |
-| `tap` | `modifiers?` on a node | yes | yes |
+| `tap` | `modifiers?` and `button?` on a node | yes | yes |
 | `doubleTap` | `modifiers?` on a node | yes | yes |
 | `multiTap` | `count` (3 or more), `modifiers?`; `tap({ count })` | yes | - |
 | `secondaryTap` | `modifiers?` on a node | yes | yes |
@@ -1303,7 +1313,14 @@ async perform(ref, action, context) {
  */
 export type LocatorAction =
   | {
-      readonly kind: 'tap' | 'doubleTap' | 'secondaryTap';
+      readonly kind: 'tap';
+      /** Keys held for the click, as on the `doubleTap` and `secondaryTap` kinds. */
+      readonly modifiers?: readonly KeyModifier[];
+      /** The middle mouse button, set for a middle click. It's sent only to an engine that declares `tapButtons`. For any other engine, it's refused before dispatch. */
+      readonly button?: 'middle';
+    }
+  | {
+      readonly kind: 'doubleTap' | 'secondaryTap';
       /** Keys held for the click; only an engine that declares `tapModifiers` receives it. */
       readonly modifiers?: readonly KeyModifier[];
     }

@@ -332,7 +332,8 @@ substring; a `RegExp` matches as written.
 
 Each action resolves one node, waits up to `config.actionTimeout` (30 s, or
 `{ timeout }`) for it to be actionable, and does one thing: `tap()` (alias
-`click()`; `{ count: 3 }` taps three times in a row, a triple click in a
+`click()`; `{ button: 'middle' }` or `{ button: 'right' }` picks the mouse
+button, but not with a `count` above 1; `{ count: 3 }` taps three times in a row, a triple click in a
 browser; `count` is a positive safe integer, `2` is `doubleTap()`, 3 or more
 need the engine's `multiTap` (browser and mobile have it; mobile refuses more
 than 200), and a count above 1 doesn't combine with `position`),
@@ -347,7 +348,7 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 (paths relative to the project root, or `{ name, mimeType, buffer: Buffer }` payloads, singly or as an array; `[]` clears; a missing path, or one under a directory the runner cannot search, is `INVALID_ARGUMENT`), `dragTo(locator)`, `scrollIntoView()`,
 `swipe({ direction, momentum? })`. Web only, `UNSUPPORTED_CAPABILITY` on a
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
-and `modifiers`.
+`modifiers`, and a middle or right `button`.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the
@@ -355,8 +356,8 @@ field and types one character per `delay`, plain string only (a `Secret` is
 `INVALID_ARGUMENT` and goes through `fill`).
 
 Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
-{ x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` it is
-`INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
+{ x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` or a
+middle or right `button` it is `INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
 `screen.swipe({ from, to, duration? })` swipes along a path (on iOS an
 untimed one must stay above the open soft keyboard; pass `duration` to drag
@@ -653,7 +654,8 @@ the active tab stays where it was. `waitForPopup(() => trigger)` makes the
 tab the trigger opens active and resolves with it. When the active tab
 closes, its opener is active again, or the tab active most recently when
 the opener is gone. `tabs()`, `newTab()`, `tab.activate()`, and
-`tab.close()` move between tabs.
+`tab.close()` move between tabs. On Chromium, a tab opened by a middle click
+on a link isn't listed by `tabs()` or seen by `waitForPopup`.
 
 - `goto(url, { waitUntil?, timeout? })`, `reload({ timeout? })`,
   `back({ timeout? })`, `forward({ timeout? })`: navigation on the test

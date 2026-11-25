@@ -92,6 +92,16 @@ describe('defineEngine', () => {
     }))).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
+  it('carries tapButtons onto the handle only with perform, and only as a boolean', () => {
+    const perform = async () => undefined;
+    expect(defineEngine(observingEngine({ actions: ['tap'], perform, tapButtons: true })).tapButtons).toBe(true);
+    expect(defineEngine(observingEngine({ actions: ['tap'], perform, tapButtons: false })).tapButtons).toBeUndefined();
+    expect(() => defineEngine(observingEngine({ tapButtons: true }))).toThrow(/tapButtons without perform/);
+    expect(() => defineEngine(observingEngine({ actions: ['tap'], perform, tapButtons: 'yes' as never }))).toThrow(
+      /tapButtons must be a boolean/,
+    );
+  });
+
   it('closes the action list: known kinds, each once, at least one', () => {
     const withActions = (actions: unknown) =>
       defineEngine(observingEngine({ actions: actions as never, perform: async () => undefined }));

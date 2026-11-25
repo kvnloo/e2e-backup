@@ -119,7 +119,8 @@ run only in a browser, so a test that uses it declares
 | Playwright | e2e |
 | --- | --- |
 | `click()`, `dblclick()` | `tap()`, `doubleTap()`; `click()` and `dblclick()` are aliases |
-| `click({ button: 'right' })`, `click({ delay })` | `secondaryTap()`, `longPress({ duration })` |
+| `click({ button: 'right' })`, `click({ button: 'middle' })` | the same |
+| `click({ delay })` | `longPress({ duration })` |
 | `click({ position })`, `click({ modifiers })`, `click({ clickCount: 3 })` | `tap({ position })`, `tap({ modifiers })`, `tap({ count: 3 })` |
 | `fill()`, `pressSequentially()`, `clear()`, `focus()`, `blur()`, `hover()`, `check()`, `uncheck()`, `dragTo()`, `setInputFiles(path)`, `selectOption({ label })` or `{ value }` | the same, without `force`, `trial`, or `position` |
 | `setInputFiles({ name, mimeType, buffer })` | Web only. Pass a plain object with only `name`, `mimeType`, and `buffer`. |
