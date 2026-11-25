@@ -616,9 +616,13 @@ export class ElectronSurface {
           return { quads: [] as number[][] };
         });
         const quad = quads.find((candidate) => area(candidate) > 0);
+        // A node wider or taller than the window is clicked in the middle of the part the window shows.
+        const { cssVisualViewport: viewport } = await session.send('Page.getLayoutMetrics');
+        const shown = quad === undefined ? undefined : clip(boxOf(quad), viewport.clientWidth, viewport.clientHeight);
         if (quad === undefined) reason = 'it has no box on screen (hidden, or empty)';
+        else if (shown === undefined) reason = 'it is outside the window';
         else {
-          const point = whole(centre(quad));
+          const point = whole({ x: shown.x + shown.width / 2, y: shown.y + shown.height / 2 });
           const hit = await this.callOn<Readiness>(window, backendNodeId, HIT_TEST, [point.x, point.y]);
           if (hit.ok) return point;
           reason = hit.reason;
@@ -983,10 +987,29 @@ function centre(quad: readonly number[]): ViewportPoint {
   return { x: (quad[0]! + quad[2]! + quad[4]! + quad[6]!) / 4, y: (quad[1]! + quad[3]! + quad[5]! + quad[7]!) / 4 };
 }
 
-function boxOf(quad: readonly number[]): { readonly width: number; readonly height: number } {
+/** A box in viewport CSS pixels. */
+interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function boxOf(quad: readonly number[]): Box {
   const xs = [quad[0]!, quad[2]!, quad[4]!, quad[6]!];
   const ys = [quad[1]!, quad[3]!, quad[5]!, quad[7]!];
-  return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+}
+
+/** The part of a box inside a viewport of the given size, or undefined when none of it is. */
+function clip(box: Box, width: number, height: number): Box | undefined {
+  const left = Math.max(0, box.x);
+  const top = Math.max(0, box.y);
+  const right = Math.min(width, box.x + box.width);
+  const bottom = Math.min(height, box.y + box.height);
+  return right > left && bottom > top ? { x: left, y: top, width: right - left, height: bottom - top } : undefined;
 }
 
 function area(quad: readonly number[]): number {

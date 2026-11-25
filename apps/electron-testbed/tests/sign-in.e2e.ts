@@ -65,6 +65,11 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('slow')).toHaveValue('');
   });
 
+  test('taps a button wider than the window', async ({ screen }) => {
+    await screen.getByRole('button', 'Wide action').tap();
+    await expect(screen.getByTestId('wide-result')).toHaveText('Wide action ran');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });

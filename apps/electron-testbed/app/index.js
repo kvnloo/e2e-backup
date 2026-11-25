@@ -55,6 +55,10 @@ document.querySelector('[data-testid="slow"]').addEventListener('focus', () => {
   }
 });
 
+document.getElementById('wide').addEventListener('click', () => {
+  document.querySelector('[data-testid="wide-result"]').textContent = 'Wide action ran';
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');
