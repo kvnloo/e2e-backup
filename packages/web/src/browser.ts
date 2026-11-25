@@ -128,9 +128,11 @@ export interface WebConsoleMessage {
   /**
    * The message type, such as `'log'`, `'error'`, or `'warning'` (the type of
    * `console.warn`). Most values are Playwright's console message types. The
-   * rest come from one browser: `'verbose'` from Chromium's own messages,
-   * `'countReset'`, `'timeLog'`, and `'timeStamp'` from Firefox, and
-   * `'image'` and `''` from WebKit.
+   * rest are browser-specific:
+   *
+   * - `'verbose'`: the level of messages from Chromium, not from the page
+   * - `'countReset'`, `'timeLog'`, and `'timeStamp'`: from Firefox
+   * - `'image'` and `''`: from WebKit
    */
   readonly type:
     | 'log' | 'debug' | 'info' | 'error' | 'warning' | 'verbose'

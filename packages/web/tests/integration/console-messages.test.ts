@@ -3,8 +3,8 @@
  *
  * Each list holds the active tab's entries since it opened, across
  * navigations, frames, and dedicated workers. Each tab has separate lists.
- * A persistent browser's first tab drops its messages and errors from before
- * the attempt.
+ * On a persistent browser's first tab, entries from before the attempt are
+ * dropped.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
