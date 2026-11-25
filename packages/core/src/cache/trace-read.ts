@@ -227,9 +227,12 @@ function readActionBody(document: unknown): RecordedAction | undefined {
   if (isNodeActionName(name)) {
     const target = readDescriptor(raw['target']);
     if (target === undefined) return undefined;
-    if (raw['modifiers'] === undefined) return { name, summary, target };
+    // Provenance: a malformed role is dropped, and the action still replays.
+    const controlRole = readBoundedText(raw['controlRole'], MAX_TRACE_DESCRIPTOR_CHARS);
+    const read = { name, summary, target, ...(controlRole === undefined ? {} : { controlRole }) };
+    if (raw['modifiers'] === undefined) return read;
     const modifiers = isTapActionName(name) ? readModifiers(raw['modifiers']) : undefined;
-    return modifiers === undefined ? undefined : { name, summary, target, modifiers };
+    return modifiers === undefined ? undefined : { ...read, modifiers };
   }
   switch (name) {
     case 'type': {

@@ -223,6 +223,12 @@ export interface NodeAction extends ActionBase {
   readonly target: TraceTargetDescriptor;
   /** Keys a tap-family action held for the click; replayed with the action. */
   readonly modifiers?: readonly KeyModifier[];
+  /**
+   * For a tap, the role of the control at the target's center when that is
+   * not the target's own role: an icon tapped inside a switch sets the
+   * switch. Provenance only, never replay input (`cache/detours.ts`).
+   */
+  readonly controlRole?: string;
 }
 
 export interface TypeAction extends ActionBase {

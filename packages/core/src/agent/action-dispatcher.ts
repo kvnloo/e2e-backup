@@ -22,7 +22,7 @@ import { PROJECT_TOOL_EVENT_PREFIX, READ_ONLY_GRAMMAR, type GrammarActionName } 
 import { actionEvent, containerKey, describeAction, type PlacedPoint, type Placement, type RecordableAction } from './actions.ts';
 import { describePosition, hasTwinsWithoutTestId } from '../cache/relocate.ts';
 import { appLocation, appNavigation } from '../cache/route.ts';
-import { isTapActionName, type NodeActionName, type PointActionName, type RecordedAction } from '../cache/trace.ts';
+import { isNodeAction, isTapActionName, type NodeActionName, type PointActionName, type RecordedAction } from '../cache/trace.ts';
 import { derivedJoinReason, derivedReason } from './derived.ts';
 import { ActionHookError, AgentError, toAgentError } from './error.ts';
 import {
@@ -49,6 +49,9 @@ import { authorizeUploadPaths } from './upload-paths.ts';
 
 /** Actions available during assertions, shared by every dispatcher. */
 const ASSERTION_ACTIONS = new Set<string>(Object.values(READ_ONLY_GRAMMAR).flat());
+
+/** The node verbs that press a control, whose enclosing control the trace notes (`withControl`). */
+const TAP_VERBS: ReadonlySet<NodeActionName> = new Set<NodeActionName>(['tap', 'doubleTap', 'longPress', 'secondaryTap']);
 
 /**
  * How many times a targeted action re-finds its node after the engine reports
@@ -819,6 +822,20 @@ export class ActionDispatcher {
     return at;
   }
 
+  /**
+   * A tap with the control at its target's center on the newest look, when
+   * that is another node: an icon tapped inside a switch sets the switch,
+   * which the detour check reads (`NodeAction.controlRole`).
+   */
+  private withControl(action: RecordableAction): RecordableAction {
+    if (!isNodeAction(action) || !TAP_VERBS.has(action.name) || action.node.rect === undefined) return action;
+    const observed = this.feed.latest;
+    if (observed === undefined) return action;
+    const { x, y, width, height } = action.node.rect;
+    const { control } = hitTest(observed, { x: x + width / 2, y: y + height / 2 });
+    return control === undefined ? action : { ...action, control };
+  }
+
   /** Writes a committed action to the step's trace cache, when caching is on. */
   private recordTrace(action: RecordableAction, startedOn: AgentObservation | undefined): void {
     const trace = this.options.trace();
@@ -849,7 +866,7 @@ export class ActionDispatcher {
       return;
     }
     if (!keepsTypedRun(action)) this.typedRun = [];
-    trace.record(action, at);
+    trace.record(this.withControl(action), at);
   }
 
   /**

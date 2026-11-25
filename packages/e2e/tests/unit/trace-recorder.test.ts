@@ -109,6 +109,18 @@ describe('TraceRecorder', () => {
     expect(read?.payload.actions.map((action) => action.at)).toEqual(['/settings', undefined, '/reset?code=<secret:token>']);
   });
 
+  it('records the role of the control a node tap landed in when it is not the target\'s own, and reads it back', () => {
+    const toggle = redacted({ ref: { id: 's1', revision: 'r1' }, role: 'switch', name: 'Dark mode' });
+    const icon = redacted({ ref: { id: 'i1', revision: 'r1' }, role: 'img', name: 'Moon' });
+    const recorder = makeRecorder();
+    recorder.record({ name: 'tap', node: icon, control: toggle });
+    recorder.record({ name: 'tap', node: upgradeButton, control: upgradeButton });
+    const trace = recorder.finalize(conclusion)!;
+    expect(trace.actions.map((action) => ('controlRole' in action ? action.controlRole : undefined))).toEqual(['switch', undefined]);
+    const read = readTraceEntry(JSON.parse(JSON.stringify(buildTraceEntry(trace))));
+    expect(read?.payload.actions[0]).toMatchObject({ name: 'tap', target: { role: 'img', name: 'Moon' }, controlRole: 'switch' });
+  });
+
   it('masks a secret resolved after an action ran in that action\'s location', () => {
     const ledger = new SecretLedger();
     const recorder = new TraceRecorder({ redact: ledger.redact, redactCut: ledger.redactCut });

@@ -28,7 +28,13 @@ import type { ActionDetails, ActionEvent, ScrollDirection } from '../types.ts';
 
 /** One committed grammar action, addressed by the node it actually ran against. */
 export type RecordableAction =
-  | ({ readonly name: NodeActionName; readonly node: RedactedNode; readonly modifiers?: readonly KeyModifier[] } & Placement)
+  | ({
+      readonly name: NodeActionName;
+      readonly node: RedactedNode;
+      readonly modifiers?: readonly KeyModifier[];
+      /** For a tap, the innermost interactive node at the target's center, when the screen listed one. */
+      readonly control?: RedactedNode;
+    } & Placement)
   | ({ readonly name: 'type'; readonly node: RedactedNode; readonly value: string } & Placement)
   | ({ readonly name: 'typeSecret'; readonly node: RedactedNode; readonly secret: string } & Placement)
   | ({ readonly name: 'press'; readonly node: RedactedNode; readonly key: string } & Placement)
