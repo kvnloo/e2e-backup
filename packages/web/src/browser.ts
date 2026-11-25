@@ -36,6 +36,16 @@ import {
   type OperationContext,
 } from '@e2e-dev/core/engine';
 import { classifyInputError } from './actions.ts';
+import {
+  clockInstallLabel,
+  clockTicks,
+  clockTicksLabel,
+  clockTime,
+  clockTimeLabel,
+  translateClockError,
+  type BrowserClock,
+  type ClockCall,
+} from './clock.ts';
 import { cookieUrlsLabel, resolveCookieUrl, resolveCookieUrls, validateCookies } from './cookies.ts';
 import type { AttemptTab } from './attempt-session.ts';
 import type { DialogHandler } from './dialogs.ts';
@@ -402,6 +412,14 @@ export interface Browser extends Expectable<BrowserExpectation> {
    * from the page, so treat them as untrusted input.
    */
   readonly webmcp: WebMcp;
+  /**
+   * Controls time in the attempt's pages, as Playwright's `page.clock` does:
+   * `Date`, timers, and `requestAnimationFrame` in every tab and frame, the
+   * ones the app opens included. It covers the whole browser, survives
+   * navigation, `app.restart()`, and `app.clearState()`, and ends with the
+   * attempt.
+   */
+  readonly clock: BrowserClock;
 }
 
 interface StoredRoute {
@@ -577,6 +595,11 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     tabHandles.set(tab, handle);
     return handle;
   };
+
+  /** Runs one checked clock call as the step's operation. */
+  const runClock = (call: ClockCall): Promise<void> =>
+    surface.guard(context.operation(), `browser.clock.${call.method}`, () => surface.clock(call), (cause, label) =>
+      translateClockError(cause, label, call.method));
 
   /** Unregisters the stored routes `match` selects, newest first. */
   const removeRoutes = async (match: (stored: StoredRoute) => boolean): Promise<void> => {
@@ -967,6 +990,20 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       up: () => surface.guard(context.operation(), 'mouse.up', () => surface.requirePage().mouse.up(), classifyInputError),
     },
     webmcp: createWebMcp(surface, context),
+    // Async, so an argument a check refuses rejects like a failed call.
+    clock: {
+      async install(options) {
+        rejectUnknownOptions('browser.clock.install', options, ['time']);
+        const time = options?.time;
+        await runClock({ method: 'install', ms: time === undefined ? Date.now() : clockTime('browser.clock.install', time) });
+      },
+      fastForward: async (ticks) => runClock({ method: 'fastForward', ms: clockTicks('browser.clock.fastForward', ticks) }),
+      runFor: async (ticks) => runClock({ method: 'runFor', ms: clockTicks('browser.clock.runFor', ticks) }),
+      pauseAt: async (time) => runClock({ method: 'pauseAt', ms: clockTime('browser.clock.pauseAt', time) }),
+      resume: () => runClock({ method: 'resume' }),
+      setFixedTime: async (time) => runClock({ method: 'setFixedTime', ms: clockTime('browser.clock.setFixedTime', time) }),
+      setSystemTime: async (time) => runClock({ method: 'setSystemTime', ms: clockTime('browser.clock.setSystemTime', time) }),
+    },
   };
 
   const action: FixtureOperation = { kind: 'resource' };
@@ -1005,6 +1042,15 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     keyboard: { down: { ...action, label: (key) => key }, up: { ...action, label: (key) => key }, press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },
     mouse: { move: action, wheel: action, down: action, up: action },
     webmcp: { tools: action, callTool: { ...action, label: (name) => String(name) } },
+    clock: {
+      install: { ...action, label: clockInstallLabel },
+      fastForward: { ...action, label: clockTicksLabel },
+      runFor: { ...action, label: clockTicksLabel },
+      pauseAt: { ...action, label: clockTimeLabel },
+      resume: action,
+      setFixedTime: { ...action, label: clockTimeLabel },
+      setSystemTime: { ...action, label: clockTimeLabel },
+    },
   });
 }
 
