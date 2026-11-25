@@ -6,13 +6,14 @@
  * provision differently.
  */
 
-import { engineAppInfo } from '../config/app.ts';
+import { engineAppInfo, returnedEnv } from '../config/app.ts';
 import type { ResolvedTarget } from '../config/resolve.ts';
 import type { EnginePrepareResult } from '../engine/index.ts';
 import { ENGINE_SPI_VERSION, type EngineSpiVersion } from '../engine/contract.ts';
 import type { DebugTrace } from '../internal/debug.ts';
-import { ConfigurationError, InfrastructureError, translateProvisioningError } from '../internal/errors.ts';
-import { Deadline, NEVER_ABORTS, withScopedBudget } from '../internal/time.ts';
+import { ConfigurationError, errorMessage, InfrastructureError, translateProvisioningError } from '../internal/errors.ts';
+import { Deadline, NEVER_ABORTS, sleep, withScopedBudget } from '../internal/time.ts';
+import { portOf } from '../internal/urls.ts';
 import { isRetryMode, pairRecording, recordsOnSomeAttempt, type RecordingKind, type ResolvedRecording } from '../internal/recording-modes.ts';
 import type { RecordingMode } from '../types.ts';
 import { declaredCommands } from './declared-processes.ts';
@@ -271,9 +272,11 @@ export interface ProcessHooks extends Omit<ManagedProcessHooks, 'unexpectedExit'
 /**
  * Starts every distinct app command the targets declare, in target order,
  * deduplicated across targets (two browsers on one dev server share one
- * process). `pool` decides whether each is started for this call or shared
- * with others that declare it. Nothing more is acquired once `signal`
- * aborted; what was acquired is returned for release either way.
+ * process). Any `env` functions run first with `services`, and their
+ * returned variables replace the functions in each command. `pool`
+ * decides whether each is started for this call or shared with others that
+ * declare it. Nothing more is acquired once `signal` aborted; what was
+ * acquired is returned for release either way.
  */
 export async function startDeclaredProcesses(
   targets: readonly ResolvedTarget[],
@@ -281,6 +284,7 @@ export async function startDeclaredProcesses(
   hooks: ProcessHooks,
   signal: AbortSignal,
   debug: DebugTrace,
+  services: Readonly<Record<string, unknown>> = {},
   pool: ProcessPool = UNSHARED,
 ): Promise<AppProcesses> {
   const held: AppProcesses[] = [];
@@ -291,14 +295,30 @@ export async function startDeclaredProcesses(
   };
   // A cleanup failure after a failed start is a notice at most: the startup failure is the one reported.
   const onCleanupFailure = (failure: unknown): void => hooks.notice?.(`cleanup after a failed start: ${String(failure)}`);
+
+  // Only await when a target has an `env` function. Otherwise, startup
+  // reaches `pool.acquire` in the same tick, so an immediate abort still
+  // ends the wait there with `CANCELLED`.
+  const envs = targets.some((target) => typeof target.app.command?.env === 'function')
+    ? await commandEnvs(targets, services, signal)
+    : new Map<string, Readonly<Record<string, string>>>();
+
+  if (envs === undefined) {
+    return processes;
+  }
+
   try {
-    for (const { label, command, readyUrl, key, targetNames } of declaredCommands(targets)) {
-      if (signal.aborted) return processes;
+    for (const { label, command, readyUrl, key, targetNames } of declaredCommands(targets, envs)) {
+      if (signal.aborted) {
+        return processes;
+      }
+
       const start = async (scope: AbortSignal): Promise<AppProcesses> => {
         const app = new ManagedProcess(label, command, projectRoot, { readyUrl }, {
           ...hooks,
           unexpectedExit: (cause) => hooks.commandExited?.(targetNames, cause),
         });
+
         const stop: AppProcesses['stop'] = async (onFailure) => {
           try {
             await app.stop();
@@ -306,20 +326,95 @@ export async function startDeclaredProcesses(
             onFailure(cause);
           }
         };
+
         try {
           await debug.time(`app.start(${label})`, () => app.start(scope));
         } catch (cause) {
           await stop(onCleanupFailure);
           throw cause;
         }
+
         return { stop };
       };
+
       held.push(await pool.acquire(`${projectRoot}\0command:${key}`, start, signal));
     }
+
     return processes;
   } catch (cause) {
     // A process that failed to start must not leave the earlier ones running.
     await processes.stop(onCleanupFailure);
     throw cause;
   }
+}
+
+/** Sentinel returned when the runner stops waiting for an `env` function. */
+const STOPPED = Symbol('stopped');
+
+/**
+ * Calls each target's `app.command.env` function with `services`.
+ * Each distinct function runs once, so targets that share a function share
+ * its result. Returned objects are validated like static `env` objects,
+ * with `{port}` expanded to each target URL's port.
+ *
+ * The promise resolves to a map of target names to variables, or
+ * `undefined` if `signal` aborts. If a function doesn't return within its
+ * command's `startupTimeout`, startup fails with `APP_UNREACHABLE`.
+ */
+async function commandEnvs(
+  targets: readonly ResolvedTarget[],
+  services: Readonly<Record<string, unknown>>,
+  signal: AbortSignal,
+): Promise<ReadonlyMap<string, Readonly<Record<string, string>>> | undefined> {
+  const calls = new Map<unknown, Promise<unknown>>();
+  const envs = new Map<string, Readonly<Record<string, string>>>();
+
+  for (const target of targets) {
+    const { command, readyUrl, base } = target.app;
+    const env = command?.env;
+
+    if (command === undefined || readyUrl === undefined || typeof env !== 'function') {
+      continue;
+    }
+
+    const label = `target "${target.name}" app.command`;
+    // Run inside `then` so synchronous throws and rejections take the same error path.
+    const call =
+      calls.get(env) ??
+      Promise.resolve()
+        .then(() => env({ services }))
+        .catch((cause: unknown) => {
+          throw new ConfigurationError('INVALID_CONFIG', `${label}.env threw: ${errorMessage(cause)}`, { cause });
+        });
+
+    calls.set(env, call);
+
+    const timeoutMs = command.startupTimeout ?? 60_000;
+    const waiting = new AbortController();
+    let returned: unknown;
+
+    try {
+      returned = await Promise.race([
+        call,
+        sleep(timeoutMs, AbortSignal.any([signal, waiting.signal]))
+          .catch(() => undefined)
+          .then(() => STOPPED),
+      ]);
+    } finally {
+      waiting.abort();
+    }
+
+    // The function can't be cancelled, so any eventual result is ignored.
+    if (signal.aborted) {
+      return undefined;
+    }
+
+    if (returned === STOPPED) {
+      throw new InfrastructureError('APP_UNREACHABLE', `${label}.env didn't return within ${timeoutMs} ms`);
+    }
+
+    envs.set(target.name, returnedEnv(returned, label, base === undefined ? undefined : portOf(base)));
+  }
+
+  return envs;
 }

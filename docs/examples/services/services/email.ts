@@ -17,12 +17,18 @@ export const email = defineService({
       response.end();
     });
 
-    server.listen({ port: 4010, host: '127.0.0.1', signal });
+    server.listen({ port: 0, host: '127.0.0.1', signal });
 
     await once(server, 'listening', { signal });
 
+    const address = server.address();
+
+    if (address === null || typeof address === 'string') {
+      throw new Error('The email server has no TCP address.');
+    }
+
     yield {
-      url: 'http://127.0.0.1:4010',
+      url: `http://127.0.0.1:${address.port}`,
       sent: () => emails,
     };
 

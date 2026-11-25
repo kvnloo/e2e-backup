@@ -337,8 +337,8 @@ For an app started elsewhere, point `app.url` at it, literally or via
 ### Start the app's dependencies as services
 
 Define any dependency your app needs (like an email API, an OAuth provider,
-or a database) as a service, and pass its address to the app in
-`command.env`:
+or a database) as a service, and pass its address to the app from an `env`
+function:
 
 ```ts
 import { createEmulator } from 'emulate';
@@ -347,7 +347,7 @@ import { web } from '@e2e-dev/web';
 
 const resend = defineService({
   async *start() {
-    const emulator = await createEmulator({ service: 'resend', port: 4008 });
+    const emulator = await createEmulator({ service: 'resend', port: 0 });
     yield { url: emulator.url };
     await emulator.close();
   },
@@ -363,7 +363,7 @@ export default defineConfig({
         command: {
           executable: 'node',
           args: ['app/server.mjs'],
-          env: { PORT: '{port}', RESEND_BASE_URL: 'http://localhost:4008' },
+          env: ({ services }) => ({ PORT: '{port}', RESEND_BASE_URL: services.resend.url }),
         },
       },
     },
@@ -379,6 +379,11 @@ export default defineConfig({
   the service. It aborts if startup is cancelled or takes over 60 s, or if
   shutdown takes over 10 s. A second Ctrl+C while services are stopping aborts
   it too.
+- Use `defineConfig` instead of `satisfies E2EConfig` so `services` is typed
+  in `env`.
+- `env` is called one time per run, after services start and before any app
+  commands start. It still runs when `reuseExisting` is set and an app is
+  already running.
 - During `e2e run` and `e2e explore`, services start in key order before app
   commands and stop in reverse order afterward.
 - Run tests on configs with services using `e2e run`. `e2e mcp` and `openHost`
