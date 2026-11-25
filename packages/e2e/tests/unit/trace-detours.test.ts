@@ -126,6 +126,18 @@ describe('findDetours on an entry recorded without locations', () => {
     expect(describeDetour(detours[0]!)).toBe('actions 1-4 left a screen, only looked around, and went back');
   });
 
+  it('reads a point tap on a link as leaving, and one on a switch as setting it', () => {
+    const pointOn = (role: string, name: string): RecordedAction => ({
+      name: 'tapAt',
+      summary: `tap the point (10, 10) on ${role} "${name}"`,
+      point: { x: 10, y: 10 },
+      viewport: { width: 1280, height: 720 },
+      within: { target: { role, name }, fx: 0.5, fy: 0.5 },
+    });
+    expect(findDetours(flow([pointOn('link', 'Reports'), scroll(), back()]))).toEqual([{ from: 0, to: 3, evidence: 'actions' }]);
+    expect(findDetours(flow([pointOn('switch', 'Dark mode'), back()]))).toEqual([]);
+  });
+
   it('is no detour when the step typed before going back, or never went back', () => {
     expect(findDetours(flow([tap('Edit'), type('Name', 'Ada'), back()]))).toEqual([]);
     expect(findDetours(flow([tap('Next'), scroll(), tap('Done')]))).toEqual([]);
