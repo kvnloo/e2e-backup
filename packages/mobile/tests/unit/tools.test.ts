@@ -4,7 +4,7 @@ import { defineEngine } from '@e2e-dev/core/engine';
 import { buildEngine } from '../../src/engine.ts';
 import { AgentDeviceSurface } from '../../src/surface.ts';
 import { foldTools, unstable_deviceSession, mobileTools, tvTools } from '../../src/tools.ts';
-import { createFakeClient, type FakeClient } from '../helpers/fake-client.ts';
+import { ANDROID_ID_SNAPSHOT, createFakeClient, type FakeClient } from '../helpers/fake-client.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 describe('agent tool pack', () => {
@@ -26,7 +26,7 @@ describe('agent tool pack', () => {
 
   it('dispatches to the engine whose attempt is running, and refuses outside an attempt', async () => {
     const iosFake = createFakeClient({ 'apps.open': () => ({ appName: 'Reminders' }) });
-    const androidFake = createFakeClient({ 'apps.open': () => ({ appName: 'Clock' }) });
+    const androidFake = createFakeClient({ 'apps.open': () => ({ appName: 'Clock' }), 'capture.snapshot': () => ANDROID_ID_SNAPSHOT });
     const ios = buildEngine(new AgentDeviceSurface({ platform: 'ios' }, () => iosFake.client));
     const android = buildEngine(new AgentDeviceSurface({ platform: 'android', device: 'emulator-5554' }, () => androidFake.client));
     const init = (engine: typeof ios | typeof android, targetName: string) =>
@@ -59,6 +59,7 @@ describe('agent tool pack', () => {
     expect(await run('alert', { action: 'dismiss' })).toBe('Alert dismissed.');
     expect(androidFake.methods().slice(1)).toEqual([
       'apps.open',
+      'capture.snapshot',
       'interactions.swipe',
       'command.alert',
     ]);
@@ -71,6 +72,30 @@ describe('agent tool pack', () => {
     await ios.startAttempt!(attempt('a2'));
     expect(await run('open_app', { app: 'Reminders' })).toBe('Opened Reminders.');
     expect(iosFake.lastArgs('apps.open')).toEqual({ app: 'Reminders', platform: 'ios' });
+  });
+
+  it('reads the Android density before a swipe when nothing has captured the screen yet', async () => {
+    const fake = createFakeClient({ 'capture.snapshot': () => ({ ...ANDROID_ID_SNAPSHOT, androidSnapshot: { backend: 'android-helper', pixelDensity: 2 } }) });
+    const android = buildEngine(new AgentDeviceSurface({ platform: 'android' }, () => fake.client));
+    await android.init!({
+      runId: 'r',
+      targetName: 'android',
+      projectRoot: '/project',
+      app: {},
+      headed: false,
+      workerSlot: 0,
+      log: () => undefined,
+      env: {},
+      signal: new AbortController().signal,
+    });
+    await android.startAttempt!({ attemptId: 'a1', artifactsDir: '/tmp', signal: new AbortController().signal, resolveSecret: noSecrets, ...ignoreTrace });
+    const before = fake.calls.length;
+    const swipe = mobileTools(android)['swipe']!.tool.execute as (input: unknown, options: object) => Promise<unknown>;
+
+    await swipe({ from: { x: 150, y: 100 }, to: { x: 10, y: 100 } }, { toolCallId: 'c1', messages: [] });
+
+    expect(fake.methods().slice(before)).toEqual(['capture.snapshot', 'interactions.swipe']);
+    expect(fake.lastArgs('interactions.swipe')).toEqual({ from: { x: 300, y: 200 }, to: { x: 20, y: 200 } });
   });
 
   it('keeps the TV remote in a pack of its own, which presses the button on the running device once per press', async () => {

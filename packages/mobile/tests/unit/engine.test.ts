@@ -1884,6 +1884,130 @@ describe('location', () => {
   });
 });
 
+describe('Android density', () => {
+  const withDensity = (pixelDensity: number) => ({ ...ANDROID_ID_SNAPSHOT, androidSnapshot: { backend: 'android-helper' as const, pixelDensity } });
+  /** The mobile benchmark's 240 by 100 dp tap pad on a 1080x2400 screen at 420 dpi, in the physical pixels agent-device reports. */
+  const PAD = { x: 105, y: 1050, width: 630, height: 263 };
+  const phone = (extra: readonly RawNode[] = []) => ({
+    nodes: [
+      { ref: 'e1', index: 0, depth: 0, type: 'android.widget.FrameLayout', rect: { x: 0, y: 0, width: 1080, height: 2400 } },
+      { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'android.widget.Button', label: 'Pad', rect: PAD },
+      ...extra,
+    ],
+    viewport: { width: 1080, height: 2400 },
+    appBundleId: ANDROID_APP_PACKAGE,
+    androidSnapshot: { backend: 'android-helper' as const, pixelDensity: 2.625 },
+  });
+
+  it('reads bounds and the viewport in whole dp and sends every point back in physical pixels', async () => {
+    const h = harness({ platform: 'android' });
+    await openAttempt(h);
+    h.fake.respond('capture.snapshot', () => phone());
+    const snapshot = await h.engine.observe!(operation());
+    const pad = named(snapshot.root, 'Pad');
+
+    expect(snapshot.viewport).toEqual({ width: 411, height: 914 });
+    expect(pad.rect?.width).toBeCloseTo(240, 0);
+    expect(pad.rect?.height).toBeCloseTo(100, 0);
+
+    const box = pad.rect!;
+    await h.engine.performAt!({ x: box.x + box.width / 2, y: box.y + box.height / 2 }, { kind: 'swipeTo', target: { x: box.x, y: box.y } }, operation());
+    expect(h.fake.lastArgs('interactions.swipe')).toMatchObject({
+      from: { x: expect.closeTo(420, 6), y: expect.closeTo(1181.5, 6) },
+      to: { x: expect.closeTo(105, 6), y: expect.closeTo(1050, 6) },
+    });
+
+    await h.engine.perform!(pad.ref, { kind: 'swipe', direction: 'left' }, operation());
+    const { from, to } = swipeWithin(PAD, 'left', undefined);
+    expect(h.fake.lastArgs('interactions.swipe')).toMatchObject({
+      from: { x: expect.closeTo(from.x, 6), y: expect.closeTo(from.y, 6) },
+      to: { x: expect.closeTo(to.x, 6), y: expect.closeTo(to.y, 6) },
+    });
+  });
+
+  it('masks a secure field to its physical rows and compares the screenshot at the viewport size', async () => {
+    const h = harness({ platform: 'android' });
+    const image = { width: 1080, height: 2400, channels: 3 as const, pixels: new Uint8Array(1080 * 2400 * 3).fill(255) };
+    h.fake.respond('capture.screenshot', (args) => {
+      writeFileSync((args as { path: string }).path, encodePng(image));
+      return { path: (args as { path: string }).path };
+    });
+    await openAttempt(h);
+    // Low on the screen, where one scale for both axes would shift the mask
+    // by more than a row.
+    h.fake.respond('capture.snapshot', () =>
+      phone([{ ref: 'e3', index: 2, parentIndex: 0, depth: 1, type: 'android.widget.EditText', label: 'Password', password: true, rect: { x: 0, y: 2100, width: 1080, height: 150 } }]),
+    );
+
+    const snapshot = await h.engine.observe!(operation(), { pixels: true });
+
+    expect(snapshot.maskedRegionCount).toBe(1);
+    const decoded = decodePng(snapshot.pixels!.data);
+    const at = (y: number) => [...decoded.pixels.subarray((y * 1080 + 540) * 4, (y * 1080 + 540) * 4 + 3)];
+    expect(at(2100)).toEqual([0, 0, 0]);
+    expect(at(2249)).toEqual([0, 0, 0]);
+    expect(at(2090)).toEqual([255, 255, 255]);
+    expect(at(2260)).toEqual([255, 255, 255]);
+    const { width, height, scale } = snapshot.pixels!;
+    expect({ width: Math.round(width / scale), height: Math.round(height / scale) }).toEqual({ width: 411, height: 914 });
+  });
+
+  it('reads the density before a point tap when the screen hasn\'t been captured yet', async () => {
+    const h = harness({ platform: 'android' }, false);
+    h.fake.respond('capture.snapshot', () => withDensity(2));
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    const test = { ...operation(), origin: 'test' as const };
+
+    await h.engine.performAt!({ x: 100, y: 200 }, { kind: 'tap' }, test);
+    await h.engine.performAt!({ x: 100, y: 200 }, { kind: 'tap' }, test);
+
+    expect(h.fake.methods().slice(before)).toEqual(['capture.snapshot', 'interactions.press', 'interactions.press']);
+    expect(h.fake.lastArgs('interactions.press')).toEqual({ x: 200, y: 400 });
+  });
+
+  it('captures again through a screen that can\'t be read yet, then taps', async () => {
+    const h = harness({ platform: 'android' }, false);
+    await openAttempt(h);
+    let captures = 0;
+    h.fake.respond('capture.snapshot', () => {
+      captures += 1;
+      if (captures === 1) {
+        throw new AppError('COMMAND_FAILED', 'Android snapshot helper returned insufficient foreground app content', {
+          androidSnapshotHelperFailureReason: 'content-poor-app-window',
+        });
+      }
+      return withDensity(2);
+    });
+
+    await h.engine.performAt!({ x: 100, y: 200 }, { kind: 'tap' }, { ...operation(), origin: 'test' });
+
+    expect(captures).toBe(2);
+    expect(h.fake.lastArgs('interactions.press')).toEqual({ x: 200, y: 400 });
+  });
+
+  it('sends nothing and times out when no capture gives the screen size', async () => {
+    const h = harness({ platform: 'android' }, false);
+    await openAttempt(h);
+    h.fake.respond('capture.snapshot', () => ({ nodes: [] }));
+
+    await expect(h.engine.performAt!({ x: 100, y: 200 }, { kind: 'tap' }, { ...operation(), timeoutMs: 600, origin: 'test' })).rejects.toMatchObject({
+      code: 'OPERATION_TIMEOUT',
+    });
+    expect(h.fake.methods()).not.toContain('interactions.press');
+  });
+
+  it('keeps physical pixels when Android doesn\'t report a density', async () => {
+    const h = harness({ platform: 'android' });
+    await openAttempt(h);
+    h.fake.respond('capture.snapshot', () => ANDROID_ID_SNAPSHOT);
+
+    expect((await observed(h, 'Greet')).rect).toEqual({ x: 0, y: 180, width: 390, height: 44 });
+    await h.engine.performAt!({ x: 10, y: 20 }, { kind: 'tap' }, operation());
+    expect(h.fake.lastArgs('interactions.press')).toMatchObject({ x: 10, y: 20 });
+  });
+});
+
 describe('a screen agent-device cannot read yet', () => {
   const ABOUT = { kind: 'query', query: { kind: 'text', value: { kind: 'string', value: 'About', exact: true } } } as const;
   const insufficientContent = () =>
@@ -2414,6 +2538,27 @@ describe('device fixture', () => {
       h.fake.respond('capture.snapshot', () => ({ ...SETTINGS_SNAPSHOT, viewport: { width: 844, height: 390 } }));
       expect(await device.viewport()).toEqual({ width: 844, height: 390 });
       expect(h.fake.methods().filter((method) => method === 'capture.screenshot')).toHaveLength(screenshotsBeforeRotation);
+    });
+
+    it('reads the Android pixel scale again after a rotation', async () => {
+      const h = harness({ platform: 'android' }, false);
+      const screen = (width: number, height: number) => ({
+        nodes: [{ ref: 'e1', index: 0, depth: 0, type: 'android.widget.FrameLayout', rect: { x: 0, y: 0, width, height } }],
+        viewport: { width, height },
+        androidSnapshot: { backend: 'android-helper' as const, pixelDensity: 2.625 },
+      });
+      h.fake.respond('capture.snapshot', () => screen(1080, 2400));
+      await openAttempt(h);
+      const device = fixture(h);
+      const tap = () => h.engine.performAt!({ x: 100, y: 100 }, { kind: 'tap' }, { ...operation(), origin: 'test' });
+      await tap();
+      expect(h.fake.lastArgs('interactions.press')).toEqual({ x: (100 * 1080) / 411, y: (100 * 2400) / 914 });
+
+      await device.setOrientation('landscape-left');
+      h.fake.respond('capture.snapshot', () => screen(2400, 1080));
+      await tap();
+
+      expect(h.fake.lastArgs('interactions.press')).toEqual({ x: (100 * 2400) / 914, y: (100 * 1080) / 411 });
     });
 
     it.each([

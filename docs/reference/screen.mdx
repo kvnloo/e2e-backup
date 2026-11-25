@@ -407,8 +407,9 @@ await screen.tapAt({ x: map.x + 360, y: map.y + 70 });
 await screen.tapAt({ x: '50%', y: '50%' });
 ```
 
-- Each coordinate is CSS pixels, the space `boundingBox()` reports in, or a
-  percentage of the viewport from `'0%'` through `'100%'`, rounded to the
+- Each coordinate is CSS pixels on the web, points on iOS, and dp on
+  Android, the space `boundingBox()` reports in, or a percentage of the
+  viewport from `'0%'` through `'100%'`, rounded to the
   nearest pixel (`'100%'` is the last one). They may mix: `{ x: '50%', y: 120 }`.
 - A percentage reads the screen once for its size.
 - Nothing is resolved or waited for; the page decides what the tap lands on.
@@ -706,7 +707,8 @@ The options are [`TapOptions`](#types):
   engines both do.
 - `modifiers`: the browser engine holds them.
 - `position`: an offset from the node's top-left corner, inside its border,
-  in CSS pixels. The engine scrolls the node into view when it lists
+  in CSS pixels on the web, points on iOS, and dp on Android. The engine
+  scrolls the node into view when it lists
   `scrollIntoView`. Then it reads the node's box and dispatches the pointer at
   the point. No node is behind the gesture, so the platform's other
   actionability checks (enabled, not covered) do not run.
@@ -1177,8 +1179,8 @@ boundingBox(): Promise<{ x: number; y: number; width: number; height: number } |
 const map = (await screen.getByRole('image', 'Map').boundingBox())!;
 ```
 
-The box is in CSS pixels, and on a device in points (physical pixels on
-Android). It is `null` for a node that lays out no box
+The box is in CSS pixels on the web, points on iOS, and dp on Android.
+It is `null` for a node that lays out no box
 (`display: none` on it or an ancestor). A `visibility: hidden` node keeps
 its box.
 
@@ -1471,14 +1473,14 @@ export interface SwipePathOptions {
 }
 
 /**
- * A point in CSS pixels. For `tap({ position })` the origin is the node's own
+ * A point in CSS pixels on the web, points on iOS, and dp on Android. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
  * also a `ScreenPoint`, whose origin is the viewport's top-left corner, the
  * space `boundingBox()` reports in.
  */
 export type Point = ViewportPoint; // { x: number; y: number }
 
-/** CSS pixels, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. */
+/** CSS pixels on the web, points on iOS, and dp on Android, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. */
 export type ScreenCoordinate = number | `${number}%`;
 
 /** A viewport point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. */

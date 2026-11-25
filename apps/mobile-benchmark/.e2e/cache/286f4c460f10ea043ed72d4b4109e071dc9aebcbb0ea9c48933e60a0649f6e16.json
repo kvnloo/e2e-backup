@@ -1,18 +1,30 @@
 {
   "schemaVersion": "trace-1",
-  "createdAt": "2026-10-09T06:53:08.882Z",
+  "createdAt": "2026-11-25T09:15:26.986Z",
   "payload": {
     "actions": [
       {
         "name": "tapAt",
-        "summary": "tap the point (637, 1389) on group",
+        "summary": "tap the point (242, 529) on group in \"Tap the green circle to continue\" (5 of 6)",
         "point": {
-          "x": 637,
-          "y": 1389
+          "x": 242,
+          "y": 529
         },
         "viewport": {
-          "width": 1080,
-          "height": 2400
+          "width": 411,
+          "height": 914
+        },
+        "within": {
+          "target": {
+            "role": "group",
+            "within": "Tap the green circle to continue",
+            "position": {
+              "index": 4,
+              "of": 6
+            }
+          },
+          "fx": 0.5096,
+          "fy": 0.4834
         }
       },
       {
@@ -42,6 +54,10 @@
       "callIndex": 0,
       "agent": "default"
     },
+    "recordedBy": {
+      "provider": "gateway",
+      "model": "openai/gpt-6-luna-fast"
+    },
     "summary": "Tapped the green circle, entered code 7291, and pressed the arrow. The screen now displays “Access granted.”",
     "startPath": "dev.e2e.benchmark",
     "endPath": "dev.e2e.benchmark",
@@ -57,7 +73,7 @@
         "name": "Tap the green circle to continue"
       }
     ],
-    "endWaitMs": 14422,
+    "endWaitMs": 11525,
     "keyedBy": {
       "cacheSchema": "trace-1",
       "policyVersion": "conservative/6",

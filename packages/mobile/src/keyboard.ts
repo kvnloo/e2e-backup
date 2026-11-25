@@ -114,7 +114,7 @@ function contains(rect: Rect, point: Point): boolean {
 }
 
 /** The parts of a capture the keyboard answer reads. */
-export type KeyboardCapture = Partial<Pick<CaptureSnapshotResult, 'nodes' | 'keyboard' | 'viewport'>>;
+export type KeyboardCapture = Partial<Pick<CaptureSnapshotResult, 'nodes' | 'keyboard'>> & { readonly viewport?: ViewportSize };
 
 /** Why a capture cannot say whether the keyboard is shown, as the error `device.isKeyboardShown()` fails with. */
 export type KeyboardUnknown = {

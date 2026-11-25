@@ -1,42 +1,78 @@
 {
   "schemaVersion": "trace-1",
-  "createdAt": "2026-10-09T06:53:41.843Z",
+  "createdAt": "2026-11-25T09:15:38.455Z",
   "payload": {
     "actions": [
       {
         "name": "tapAt",
-        "summary": "tap the point (749, 1458) on group",
+        "summary": "tap the point (284, 555) on group in \"Tap: square, then circle, then diamond\" (5 of 5)",
         "point": {
-          "x": 749,
-          "y": 1458
+          "x": 284,
+          "y": 555
         },
         "viewport": {
-          "width": 1080,
-          "height": 2400
+          "width": 411,
+          "height": 914
+        },
+        "within": {
+          "target": {
+            "role": "group",
+            "within": "Tap: square, then circle, then diamond",
+            "position": {
+              "index": 4,
+              "of": 5
+            }
+          },
+          "fx": 0.4713,
+          "fy": 0.492
         }
       },
       {
         "name": "tapAt",
-        "summary": "tap the point (331, 1458) on group",
+        "summary": "tap the point (125, 555) on group in \"Tap: square, then circle, then diamond\" (3 of 5)",
         "point": {
-          "x": 331,
-          "y": 1458
+          "x": 125,
+          "y": 555
         },
         "viewport": {
-          "width": 1080,
-          "height": 2400
+          "width": 411,
+          "height": 914
+        },
+        "within": {
+          "target": {
+            "role": "group",
+            "within": "Tap: square, then circle, then diamond",
+            "position": {
+              "index": 2,
+              "of": 5
+            }
+          },
+          "fx": 0.4862,
+          "fy": 0.492
         }
       },
       {
         "name": "tapAt",
-        "summary": "tap the point (540, 1458) on group",
+        "summary": "tap the point (206, 555) on group in \"Tap: square, then circle, then diamond\" (4 of 5)",
         "point": {
-          "x": 540,
-          "y": 1458
+          "x": 206,
+          "y": 555
         },
         "viewport": {
-          "width": 1080,
-          "height": 2400
+          "width": 411,
+          "height": 914
+        },
+        "within": {
+          "target": {
+            "role": "group",
+            "within": "Tap: square, then circle, then diamond",
+            "position": {
+              "index": 3,
+              "of": 5
+            }
+          },
+          "fx": 0.5039,
+          "fy": 0.4943
         }
       }
     ],
@@ -52,7 +88,11 @@
       "callIndex": 0,
       "agent": "default"
     },
-    "summary": "Tapped the square, circle, and diamond in the instructed order. The screen now displays “Sequence complete.”",
+    "recordedBy": {
+      "provider": "gateway",
+      "model": "openai/gpt-6-luna-fast"
+    },
+    "summary": "Tapped the square, then circle, then diamond as instructed. The screen now displays “Sequence complete.”",
     "startPath": "dev.e2e.benchmark",
     "endPath": "dev.e2e.benchmark",
     "endAnchors": [
@@ -71,7 +111,7 @@
         "name": "Progress: 0/3"
       }
     ],
-    "endWaitMs": 14472,
+    "endWaitMs": 11542,
     "keyedBy": {
       "cacheSchema": "trace-1",
       "policyVersion": "conservative/6",

@@ -439,7 +439,7 @@ tools: { ...mobileTools(iphoneDuo), ...foldTools(iphoneDuo) },
 
 [`app.startRecording()` and `app.stopRecording()`](/reference/app#startrecording)
 record one span of the screen as an `.mp4`. A locator's `boundingBox()`
-gives an element's frame in points (physical pixels on Android).
+gives an element's frame in points.
 
 ```ts
 test('the sheet slides up', { video: 'off' }, async ({ app, screen }) => {

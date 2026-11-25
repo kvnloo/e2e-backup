@@ -23,6 +23,12 @@ import type { AgentDeviceSurface, FoldPose } from './surface.ts';
  * is an optional peer dependency, and this module loads with the project's
  * config, so it must not need the package at run time.
  */
+/**
+ * The budget for reading the screen's pixel scale before the agent's swipe,
+ * the bound of a targeted agent action (`actionTimeout` caps it lower).
+ */
+const TARGETED_ACTION_MS = 15_000;
+
 function deviceTool<INPUT>(definition: Tool<INPUT, string>): Tool<INPUT, string> {
   return definition;
 }
@@ -143,7 +149,10 @@ export function mobileTools(
           to: z.object({ x: z.number(), y: z.number() }),
         }),
         execute: async ({ from, to }, options) => {
-          await active().command('swipe', (client) => client.interactions.swipe({ from, to }), abort(options));
+          const surface = active();
+          const signal = abort(options) ?? new AbortController().signal;
+          await surface.readPixelScale(signal, surface.inputBudget('swipe', { timeoutMs: TARGETED_ACTION_MS, signal }));
+          await surface.command('swipe', (client) => client.interactions.swipe({ from: surface.toDevicePoint(from), to: surface.toDevicePoint(to) }), signal);
           return `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y}).`;
         },
       }),

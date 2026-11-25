@@ -354,7 +354,8 @@ and `modifiers`.
 field and types one character per `delay`, plain string only (a `Secret` is
 `INVALID_ARGUMENT` and goes through `fill`).
 
-Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
+Coordinates are CSS pixels on the web, points on iOS, and dp on
+Android, for what the tree does not list: `tap({ position:
 { x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` it is
 `INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
