@@ -72,7 +72,7 @@ describe.each(schemas)('%s schema', (name) => {
       );
     });
 
-    it('accepts tapButtons with engine/perform or engine/performAt, and the multiTap pointer action, and refuses tapButtons with neither', () => {
+    it('accepts multiTap and tapButtons with engine/perform or engine/performAt, rejecting tapButtons without either', () => {
       const web = {
         name: 'web', version: '0.1.0', spiVersion: 1, platform: 'web',
         methods: ['engine/observe', 'engine/perform', 'engine/performAt'],

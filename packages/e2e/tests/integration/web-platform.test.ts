@@ -288,7 +288,7 @@ test('clicks hold the modifiers they name', async ({ app, screen, browser }) => 
   await expect(status).toHaveText('click');
 });
 
-test('taps use the mouse button, count, and position they name', async ({ app, screen, browser }) => {
+test('taps use the requested mouse button, count, and position', async ({ app, screen, browser }) => {
   await app.open();
   await browser.evaluate(() => {
     document.body.innerHTML = '<a href="/next" style="display: inline-block; padding: 20px">Next</a>';
@@ -611,7 +611,7 @@ describe('web platform integration', () => {
     'a *css= capture is refused before the last selector part',
     'downloads are captured as artifacts',
     'clicks hold the modifiers they name',
-    'taps use the mouse button, count, and position they name',
+    'taps use the requested mouse button, count, and position',
     'a viewport set before the first navigation holds through app.open',
     'an empty class attribute is an empty class list',
     'reads wait for a node that arrives late',

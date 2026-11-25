@@ -31,15 +31,15 @@ function heldKeys(action: Extract<LocatorAction, { kind: 'tap' | 'doubleTap' | '
 }
 
 /**
- * The most clicks one multi-tap sends. Playwright queues every press before it
- * sends the first, so a larger count could hold the worker past its timeout.
+ * The click limit for one multi-tap. Playwright queues every press before
+ * sending the first, so a larger count could hold the worker past its timeout.
  */
 const MAX_CLICK_COUNT = 200;
 
 /** Returns the click count of a multi-tap, refusing one above `MAX_CLICK_COUNT` before any input. */
 function clickCount(count: number): number {
   if (count > MAX_CLICK_COUNT) {
-    throw new EngineError('UNSUPPORTED_CAPABILITY', `the browser engine clicks at most ${MAX_CLICK_COUNT} times in a row; got a count of ${count}`, {
+    throw new EngineError('UNSUPPORTED_CAPABILITY', `the browser engine clicks at most ${MAX_CLICK_COUNT} times in a row (got ${count})`, {
       retryable: false,
     });
   }
@@ -306,7 +306,7 @@ export async function dispatchLocatorAction(
   const locator = asActionable(target);
   switch (action.kind) {
     case 'tap':
-      // A middle click goes to the node itself: a label stand-in would take the click away from its control.
+      // A middle click goes straight to the node, so a label stand-in can't intercept it.
       if (action.button === 'middle') {
         await locator.click({ button: 'middle', timeout, ...heldKeys(action) });
         return;

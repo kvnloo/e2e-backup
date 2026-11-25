@@ -209,8 +209,8 @@ export class LocatorEngine {
    * resolved: an undeclared kind, or modifiers on an engine that does not
    * declare `tapModifiers`, is `UNSUPPORTED_CAPABILITY`, a `press` key
    * outside the grammar is `INVALID_ARGUMENT`. Waiting for a node the engine
-   * could never act on would report it as missing instead. The same check
-   * refuses a `button` on an engine without `tapButtons`.
+   * could never act on would report it as missing instead. Passing `button`
+   * to an engine without `tapButtons` fails before lookup.
    */
   private checkAction(action: LocatorAction): void {
     if (!this.session.actions.has(action.kind)) {

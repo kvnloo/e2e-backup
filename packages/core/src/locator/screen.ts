@@ -472,7 +472,7 @@ class LocatorImpl extends ScreenImpl implements Locator {
     return this.dispatchTap(api, { kind, ...modifiers }, this.tapLabel(undefined, undefined, modifiers.modifiers), options?.timeout);
   }
 
-  /** Runs one tap-family action as a step with the label given. */
+  /** Runs one tap-family action as a step with the given label. */
   private dispatchTap(api: string, action: TapAction, label: string, timeout: number | undefined): Promise<void> {
     return this.context.steps.run('locator', `locator.${api}`, label, () =>
       this.context.engine.perform(this.expression, action, timeout),
@@ -881,8 +881,8 @@ function validateSwipeDuration(duration: number | undefined): number | undefined
  * Returns the pointer action for `count` presses of `button`. The left button
  * is used when `button` is undefined.
  *
- * - 1 press: `tap`, or `secondaryTap` for the right button, so an engine that
- *   already right-clicks takes it without declaring `tapButtons`.
+ * - 1 press: `tap`, or `secondaryTap` for the right button, so an engine with
+ *   `secondaryTap` doesn't need `tapButtons` for it.
  * - 2 presses: `doubleTap`.
  * - 3 or more: `multiTap`.
  *

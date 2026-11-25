@@ -492,7 +492,7 @@ export interface TapOptions extends ClickOptions {
    * on a document platform. Without it the platform picks a point of the
    * node, usually its center, behind its own actionability checks; with it
    * the pointer is dispatched at that point once the node is in view and has
-   * a box, which needs the engine's pointer action for the tap: `tap`,
+   * a box. The engine needs the matching pointer action: `tap`,
    * `secondaryTap` for a single right tap, `doubleTap` for 2 taps, or
    * `multiTap` for 3 or more.
    */
@@ -502,8 +502,8 @@ export interface TapOptions extends ClickOptions {
    * same as `doubleTap()`; 3 or more needs an engine that declares the
    * `multiTap` action, `UNSUPPORTED_CAPABILITY` otherwise. A count above the
    * engine's own limit (200 on the browser and mobile engines) is also
-   * `UNSUPPORTED_CAPABILITY`. With `position`, the pointer actions named
-   * there are needed instead.
+   * `UNSUPPORTED_CAPABILITY`. With `position`, the matching pointer action is
+   * needed instead.
    */
   count?: number;
   /**

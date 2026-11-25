@@ -886,7 +886,7 @@ void screen.getByRole('link').doubleTap({ button: 'middle' });
 void screen.getByRole('link').click({ button: 'right', count: 3, position: { x: 4, y: 4 } });
 void ({ kind: 'doubleTap', button: 'right' } satisfies import('e2e/engine').LocatorAction);
 void ({ kind: 'multiTap', count: 3, button: 'middle' } satisfies import('e2e/engine').PointerAction);
-// @ts-expect-error a single right click is the secondaryTap kind, so a tap's button is the middle one
+// @ts-expect-error single right clicks use secondaryTap, so tap only accepts 'middle'
 void ({ kind: 'tap', button: 'right' } satisfies import('e2e/engine').LocatorAction);
 void screen.getByRole('image').click({ position: point });
 void screen.getByRole('button').tap({ count: 3, timeout: 1_000 });

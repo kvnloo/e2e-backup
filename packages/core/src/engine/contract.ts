@@ -298,10 +298,7 @@ export interface ObservationPixels {
   readonly scale: number;
 }
 
-/**
- * The tap kinds `perform` and `performAt` share. `LocatorAction` adds the
- * held keys to each of them.
- */
+/** Tap kinds shared by `perform` and `performAt`. On `LocatorAction`, each also has `modifiers`. */
 type TapActions =
   | {
       readonly kind: 'tap';
@@ -314,7 +311,7 @@ type TapActions =
     }
   | {
       readonly kind: 'doubleTap';
-      /** The button for both clicks, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
+      /** Mouse button for both clicks (left when unset). Sent only to an engine that declares `tapButtons`. */
       readonly button?: 'middle' | 'right';
     }
   | { readonly kind: 'secondaryTap' }
@@ -328,7 +325,7 @@ type TapActions =
        */
       readonly kind: 'multiTap';
       readonly count: number;
-      /** The button for every click, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
+      /** Mouse button for every click (left when unset). Sent only to an engine that declares `tapButtons`. */
       readonly button?: 'middle' | 'right';
     };
 

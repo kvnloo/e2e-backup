@@ -499,9 +499,9 @@ describe('an action cancelled while its stand-in read is in flight', () => {
 });
 
 /**
- * A padded link that logs every click event it gets, as the event type, then
- * `b` and the button, `d` and the detail, `x` and the offset from its left
- * edge, then the held keys. The link's text starts 20 pixels in.
+ * A link with 20 pixels of padding, so its text starts 20 pixels in. It logs
+ * each click event as `<type> b<button> d<detail> x<offset from its left
+ * edge>`, plus `shift` and `alt` when they're held.
  */
 const PRESSED_LINK = `<a href="/next" id="next" style="display: inline-block; padding: 20px">Next</a>
 <script>
@@ -548,7 +548,7 @@ describe.each(KINDS)('a mouse button, through the %s target', (kind) => {
     expect(events.at(-1)).toBe('auxclick b2 d3');
   });
 
-  it('presses the middle button on a hidden checkbox itself, never on the label a left tap would take', async () => {
+  it('middle-clicks a hidden checkbox directly instead of falling back to its label', async () => {
     await page.setContent(`<input type="checkbox" id="box" style="display: none"><label for="box">Agree</label><p id="pressed"></p>
       <script>
         for (const id of ['box', 'label']) {
@@ -564,7 +564,7 @@ describe.each(KINDS)('a mouse button, through the %s target', (kind) => {
     await page.setContent(PRESSED_LINK);
     expect(await perform(await targetOf(kind, '#next'), { kind: 'multiTap', count: 201, button: 'middle' })).toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY',
-      message: expect.stringContaining('the browser engine clicks at most 200 times in a row; got a count of 201'),
+      message: expect.stringContaining('the browser engine clicks at most 200 times in a row (got 201)'),
     });
     expect(await pressed()).toEqual([]);
   });

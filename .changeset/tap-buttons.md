@@ -6,4 +6,4 @@
 '@e2e-dev/desktop': patch
 ---
 
-On the web, `tap` and `click` take `{ button: 'middle' }` and `{ button: 'right' }`, and the button combines with `count` and `position` like Playwright's `click({ button, clickCount, position })`. `count` combines with `position` on any engine that lists the matching pointer action, where it used to fail. An engine opts in to buttons with `tapButtons: true`, and to 3 or more taps at a position with the new `multiTap` pointer kind.
+On the web, `tap` and `click` accept `{ button: 'middle' }` and `{ button: 'right' }`, including with `count` and `position`, like Playwright's `click({ button, clickCount, position })`. Using `count` with `position` now works on any engine that declares the matching pointer action. Engines declare `tapButtons: true` for mouse buttons and the `multiTap` pointer kind for 3 or more taps at a position.

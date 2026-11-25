@@ -831,15 +831,14 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set to `true` when the engine handles `button` on the `tap`,
-   * `doubleTap`, and `multiTap` actions, in `perform` or `performAt`,
-   * whichever it implements. Without it, an action with a `button` fails
-   * with `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left tap and
-   * a single right tap (`secondaryTap`) don't carry `button`, so they don't
-   * need it.
+   * Set to `true` when the engine handles `button` on `tap`, `doubleTap`,
+   * and `multiTap` in `perform` or `performAt`. Otherwise, an action with a
+   * `button` fails with `UNSUPPORTED_CAPABILITY` before it reaches the
+   * engine. Left taps and single right taps (`secondaryTap`) don't carry
+   * `button`, so they don't need `tapButtons`.
    *
-   * An engine written before this field never receives a `button`, so it
-   * can't turn a middle or right click into a left click.
+   * An engine that doesn't declare `tapButtons` never receives `button`, so
+   * it can't turn a middle or right click into a left click.
    */
   readonly tapButtons?: boolean;
   /**

@@ -282,12 +282,11 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set to `true` when the engine handles `button` on the `tap`,
-   * `doubleTap`, and `multiTap` actions, in `perform` or `performAt`,
-   * whichever it implements. Without it, an action with a `button` fails
-   * with `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left tap and
-   * a single right tap (`secondaryTap`) don't carry `button`, so they don't
-   * need it.
+   * Set to `true` when the engine handles `button` on `tap`, `doubleTap`,
+   * and `multiTap` in `perform` or `performAt`. Otherwise, an action with a
+   * `button` fails with `UNSUPPORTED_CAPABILITY` before it reaches the
+   * engine. Left taps and single right taps (`secondaryTap`) don't carry
+   * `button`, so they don't need `tapButtons`.
    */
   readonly tapButtons?: boolean;
   /**
@@ -581,7 +580,7 @@ engine. Without `tapButtons`, an action with a `button` fails the same way.
 | `screen` and `Locator` actions | `perform`, each only for a kind listed in `actions` |
 | `screen.swipe()` | `perform` with `swipe` on the observation root |
 | `modifiers` on a tap (`row.click({ modifiers: ['Shift'] })`) | `tapModifiers: true`; the keys are held for the click |
-| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true` for a middle tap, or a right tap with a `count` above 1. A single right tap needs the `secondaryTap` kind, and a `left` tap needs neither. |
+| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true` for a middle tap or a right tap with a `count` above 1, and `secondaryTap` for a single right tap. A `left` tap doesn't need either. |
 | `screen.tapAt`, `tap({ position })` | `performAt` with the `tap` pointer kind |
 | `tap({ position })` with a `count` or `button` | `performAt` with the `doubleTap` pointer kind for 2 taps, `multiTap` for 3 or more, or `secondaryTap` for a single right tap |
 | `screen.doubleTapAt` | `performAt` with the `doubleTap` pointer kind |
@@ -1307,7 +1306,7 @@ async perform(ref, action, context) {
 ```
 
 ```ts
-/** The tap kinds `perform` and `performAt` share. `LocatorAction` adds the held keys to each of them. */
+/** Tap kinds shared by `perform` and `performAt`. On `LocatorAction`, each also has `modifiers`. */
 type TapActions =
   | {
       readonly kind: 'tap';
@@ -1316,7 +1315,7 @@ type TapActions =
     }
   | {
       readonly kind: 'doubleTap';
-      /** The button for both clicks, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
+      /** Mouse button for both clicks (left when unset). Sent only to an engine that declares `tapButtons`. */
       readonly button?: 'middle' | 'right';
     }
   | { readonly kind: 'secondaryTap' }
@@ -1324,7 +1323,7 @@ type TapActions =
       /** `count` taps in a row (3 or more; 2 is `doubleTap`): one multi-click in a browser, presses at the device's cadence on a device. */
       readonly kind: 'multiTap';
       readonly count: number;
-      /** The button for every click, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
+      /** Mouse button for every click (left when unset). Sent only to an engine that declares `tapButtons`. */
       readonly button?: 'middle' | 'right';
     };
 
