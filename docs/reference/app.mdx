@@ -73,8 +73,8 @@ schemes included.
 With `relaunch: true`, the app is started fresh before the path is opened:
 
 - On a device with `app.linkBase`, the pinned app is stopped if it's running,
-  then launched from the link. It isn't supported on every device target
-  ([mobile](/reference/mobile#the-app-under-test)).
+  then launched from the link. `relaunch` isn't supported on every device
+  target ([mobile](/reference/mobile#the-app-under-test)).
 - On a web target, the open tabs are closed and a new one is opened in the
   same browser context, as in [`restart`](#restart). Then the path is opened
   instead of the base URL.
@@ -89,8 +89,8 @@ await app.open('/orders/42', { relaunch: true }); // default: false
 | `POLICY_DENIED` | A URL whose scheme is not `http:` or `https:`. `about:blank` is allowed. On a target whose [`app.url` is a file](/reference/config#a-file-as-the-app), a `file:` URL outside that file's directory, or of a directory. On a device with `app.linkBase`, a link whose scheme is `file:`, `data:`, `javascript:`, `view-source:`, `blob:`, or `filesystem:`. |
 | `APP_UNREACHABLE` | The app URL could not be reached. |
 | `ACTION_FAILED` | The operation failed or timed out. |
-| `INVALID_ARGUMENT` | `options` is not a plain object or has a key other than `relaunch`, or `relaunch` is not a boolean. With `relaunch` on a device, an otherwise allowed link whose scheme differs from `app.linkBase`. |
-| `UNSUPPORTED_CAPABILITY` | No `session.open` on a target with a URL, or no `session.restart` on one without. With `relaunch`, also no `session.restart` on a target with a URL, or no `linkRelaunch` on a device with `app.linkBase`, or a `mobile()` target that refuses it ([mobile](/reference/mobile#the-app-under-test)). On a device with no `app.bundleId`, also the target's build not installed yet ([mobile](/reference/mobile#the-app-under-test)). |
+| `INVALID_ARGUMENT` | `options` isn't a plain object, has a key other than `relaunch`, or has a non-boolean `relaunch`. With `relaunch` on a device, an allowed link whose scheme doesn't match `app.linkBase`. |
+| `UNSUPPORTED_CAPABILITY` | No `session.open` on a target with a URL, or no `session.restart` on one without. With `relaunch`, missing `session.restart` on a URL target, missing `linkRelaunch` on a device with `app.linkBase`, or an unsupported `mobile()` target ([mobile](/reference/mobile#the-app-under-test)). On a device with no `app.bundleId`, also the target's build not installed yet ([mobile](/reference/mobile#the-app-under-test)). |
 
 ### `restart`
 
@@ -266,7 +266,7 @@ export interface App {
 /** Options for `app.open`. */
 export interface AppOpenOptions {
   /**
-   * Set to start the app fresh before the path is opened.
+   * Set to `true` to start the app fresh before opening the path.
    *
    * - On a device target with `app.linkBase`, the pinned app is stopped if
    *   it's running, then launched from the link.

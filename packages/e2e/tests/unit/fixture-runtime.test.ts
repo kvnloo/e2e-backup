@@ -845,7 +845,7 @@ describe('app steering hooks', () => {
     expect(calls).toEqual([]);
   });
 
-  it('app.open(path, { relaunch: true }) needs both session.restart and session.open, and restarts nothing without them', async () => {
+  it('app.open(path, { relaunch: true }) needs session.restart and session.open, and doesn\'t restart without them', async () => {
     const calls: string[] = [];
     const opener = defineEngine({
       name: 'fake', version: '1', spiVersion: 1,

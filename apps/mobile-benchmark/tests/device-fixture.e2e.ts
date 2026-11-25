@@ -12,9 +12,9 @@ import { BUILDS, expect, openScenario, test } from './fixtures.ts';
 const APP_ID = 'dev.e2e.benchmark';
 
 /**
- * Waits for Login Form after a relaunch from its link, accepting the iOS
- * simulator's "Open in “e2e Benchmark”?" prompt, which belongs to the system
- * and not to the app's tree.
+ * Waits for Login Form after a link relaunch, accepting the iOS simulator's
+ * "Open in “e2e Benchmark”?" prompt. The prompt is a system alert outside
+ * the app's tree.
  */
 async function expectLoginForm({ device, platform, screen }: { device: Device; platform: string; screen: Screen }): Promise<void> {
   const email = screen.getByTestId('email-input');

@@ -88,7 +88,7 @@ describe('device provider', () => {
     const operation = { signal: new AbortController().signal, timeoutMs: 30_000, runId: 'run-1', attemptId: 'a1', origin: 'test' as const };
     await expect(h.engine.session!.openLink!('e2e-benchmark://orders/42', operation, { relaunch: true })).rejects.toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY',
-      message: expect.stringContaining("device provider's device"),
+      message: expect.stringContaining('on a device from a provider'),
     });
     expect(h.fake.calls.slice(before)).toEqual([]);
   });

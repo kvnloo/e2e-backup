@@ -247,11 +247,10 @@ export class DevicePool {
   }
 
   /**
-   * Whether the engine drives the device itself, rather than a provider's
-   * lease. `e2e run --device` can name only a local device, since a
-   * provider's leases have none to name. A link relaunches only a local app:
-   * a provider's driver can launch the app first and then hand it the link
-   * (Revyl's does).
+   * True when the engine drives a local device rather than a leased device
+   * from a provider. Only a local device can be selected with
+   * `e2e run --device` or relaunched from a link (a provider's driver, such
+   * as Revyl's, can launch the app first and then pass it the link).
    */
   get isLocal(): boolean {
     return !(this.source instanceof LeasedDevices);

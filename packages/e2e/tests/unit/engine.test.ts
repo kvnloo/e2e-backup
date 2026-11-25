@@ -78,7 +78,7 @@ describe('defineEngine', () => {
     );
   });
 
-  it('carries linkRelaunch onto the handle only with session.openLink, and only as a boolean', () => {
+  it('sets linkRelaunch on the handle only when it\'s true and session.openLink is there, and refuses a value that isn\'t a boolean', () => {
     const session = { openLink: async () => undefined };
     expect(defineEngine(observingEngine({ session, linkRelaunch: true })).linkRelaunch).toBe(true);
     expect(defineEngine(observingEngine({ session, linkRelaunch: false })).linkRelaunch).toBeUndefined();

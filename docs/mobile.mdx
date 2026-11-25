@@ -277,21 +277,20 @@ await app.open('/orders/42', { relaunch: true });
 Before the app starts, the iOS simulator can ask "Open in ...?" for a
 custom-scheme link. Accept it with `device.alert('accept')`.
 
-When the app can't start from the link, the call fails with
-`UNSUPPORTED_CAPABILITY` instead:
+`app.open` fails with `UNSUPPORTED_CAPABILITY` when the app can't start from
+the link:
 
-- An `http(s)` link on an iOS simulator, since agent-device launches the app
-  first and then opens the URL in it. Use a custom scheme in `app.linkBase`.
-- A physical iPhone that agent-device drives through its XCTest backend,
-  which can't launch the app with a URL. This one fails only after the app
-  has been stopped, so the app is left stopped. An iPhone that
-  `xcrun devicectl list devices` shows is driven through CoreDevice and
-  relaunches from the link.
-- A target with a device provider, launch arguments, or permissions.
+- On an iOS simulator with an `http(s)` link, since agent-device launches the
+  app before opening the URL. Use a custom scheme in `app.linkBase`.
+- On a physical iPhone driven through agent-device's XCTest backend, which
+  can't launch the app with a URL. With XCTest, agent-device stops the app
+  before the call fails, so the app is left closed. If the iPhone appears in
+  `xcrun devicectl list devices`, agent-device uses CoreDevice and relaunches
+  the app from the link.
+- On a target with a device provider, launch arguments, or permissions.
 
-See the [reference](/reference/mobile#the-app-under-test). The call works on
-a web target too, where a fresh tab is opened at the path
-([`app.open`](/reference/app#open)).
+See the [reference](/reference/mobile#the-app-under-test). On a web target,
+`app.open` opens the path in a fresh tab ([`app.open`](/reference/app#open)).
 
 `device.setNetwork('offline')` and `device.setAirplaneMode(true)` work on
 Android only. An iOS simulator shares the Mac's network, and simctl can only

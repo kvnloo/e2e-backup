@@ -545,7 +545,7 @@ describe('engine protocol', () => {
     await remote.dispose!(cleanup);
   });
 
-  it("keeps the server's linkRelaunch only while the server answers openLink", () => {
+  it("keeps the server's linkRelaunch only when the server handles openLink", () => {
     const linking = toy({ session: { openLink: async () => {} }, linkRelaunch: true });
     expect(overLoopback(linking).remote.linkRelaunch).toBe(true);
     expect(overLoopback(linking, { session: { openLink: async () => {} } }).remote.linkRelaunch).toBeUndefined();

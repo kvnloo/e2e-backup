@@ -3401,7 +3401,7 @@ describe('device fixture', () => {
     await expect(h.engine.session!.openLink!('javascript:alert(1)', operation())).rejects.toMatchObject({ code: 'POLICY_DENIED' });
   });
 
-  it('relaunches the pinned app from the link for app.open(path, { relaunch: true }) in one agent-device open', async () => {
+  it('relaunches the pinned app from the link for app.open(path, { relaunch: true }) in one agent-device open call', async () => {
     const h = harness({ bundleId: 'dev.e2e.benchmark' });
     expect(h.engine.linkRelaunch).toBe(true);
     await openAttempt(h);
@@ -3412,13 +3412,13 @@ describe('device fixture', () => {
     ]);
   });
 
-  it('refuses to relaunch from an http(s) link on an iOS simulator, before any device command, and relaunches from one on Android', async () => {
+  it('refuses an http(s) relaunch on an iOS simulator before any device command, and relaunches from one on Android', async () => {
     const ios = harness({ bundleId: 'dev.e2e.benchmark' });
     await openAttempt(ios);
     const before = ios.fake.calls.length;
     await expect(ios.engine.session!.openLink!('https://shop.example.com/orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY',
-      message: expect.stringContaining('custom-scheme link only'),
+      message: expect.stringContaining('only supports custom-scheme links'),
     });
     expect(ios.fake.calls.slice(before)).toEqual([]);
 
@@ -3428,7 +3428,7 @@ describe('device fixture', () => {
     expect(android.fake.lastArgs('apps.open')).toEqual({ platform: 'android', app: 'dev.e2e.benchmark', url: 'https://shop.example.com/orders/42', relaunch: true });
   });
 
-  it("relaunches from a link on a physical iPhone, and names what to do when agent-device's XCTest backend refuses the URL", async () => {
+  it("relaunches from a link on a physical iPhone, and explains what to do if agent-device's XCTest backend refuses it", async () => {
     const physical = () => ({ platform: 'ios', target: 'mobile', device: 'iPhone', id: '00008110-0001', kind: 'device', booted: true });
     const coredevice = harness({ bundleId: 'dev.e2e.benchmark' });
     coredevice.fake.respond('devices.boot', physical);

@@ -147,7 +147,7 @@ test('shows the home screen', async ({ agent, app, screen }) => {
 | `device.launchApp({ delete: true })` | `device.installApp(path, { reinstall: true })`, then `app.open()` |
 | `device.uninstallApp()` | `device.uninstallApp(id)`; without an id, the pinned app |
 | `device.launchApp({ url })`, `device.openURL({ url })` | `device.openLink(url)` |
-| `device.launchApp({ newInstance: true, url })` | `app.open(url, { relaunch: true })` on a device target whose [`app.linkBase`](/reference/config#linkbase) has the URL's scheme ([limits](/reference/mobile#the-app-under-test)) |
+| `device.launchApp({ newInstance: true, url })` | `app.open(url, { relaunch: true })` on a device target whose [`app.linkBase`](/reference/config#linkbase) matches the URL's scheme ([limits](/reference/mobile#the-app-under-test)) |
 | `device.terminateApp()`, `sendToHome()`, `pressBack()` | `device.closeApp()`, `home()`, `back()` |
 | `device.setLocation(lat, lon)`, `setOrientation('landscape')` | `device.setLocation({ latitude, longitude })`, `setOrientation('landscape-left')` |
 | `device.shake()` | `device.shake()`, on a local simulator or emulator |

@@ -378,7 +378,7 @@ export interface VideoLink {
 
 /** Options for `EngineSession.openLink`. */
 export interface OpenLinkOptions {
-  /** When true, the pinned app has to be stopped if it's running, then launched from the link. */
+  /** When `true`, stop the pinned app if it's running, then launch it from the link. */
   readonly relaunch?: boolean;
 }
 
@@ -406,8 +406,8 @@ export interface EngineSession {
    * would: `app.open(path)` on a target that declares `app.linkBase` lands
    * here with the link joined and its scheme checked. A device engine's hook;
    * a target whose engine lacks it cannot declare `linkBase`. `options` is
-   * `{ relaunch: true }` for `app.open(path, { relaunch: true })`, which
-   * reaches only an engine that declares `linkRelaunch`.
+   * `{ relaunch: true }` for `app.open(path, { relaunch: true })`. It's
+   * passed only to an engine that declares `linkRelaunch`.
    */
   openLink?(url: string, context: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once in the surface's history. */
@@ -838,7 +838,7 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set when `{ relaunch: true }` is handled in `session.openLink`. With
+   * `true` if `session.openLink` handles `{ relaunch: true }`. With
    * `relaunch`, the pinned app is stopped if it's running, then launched from
    * the link.
    *

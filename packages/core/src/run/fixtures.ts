@@ -693,7 +693,7 @@ export function createApp(
         if (relaunch && new URL(link).protocol !== new URL(linkBase).protocol) {
           throw new TestError(
             'INVALID_ARGUMENT',
-            `app.open("${openPath}", { relaunch: true }) on target "${target.name}" takes a path or a link with the scheme of app.linkBase, since a link with another scheme can open another app`,
+            `app.open("${openPath}", { relaunch: true }) on target "${target.name}" requires a path or a link matching the scheme of app.linkBase, since another scheme can open a different app`,
           );
         }
         await engine.session.app.openLink(link, engine.operation(lifecycleMs()), relaunch ? { relaunch: true } : undefined);
