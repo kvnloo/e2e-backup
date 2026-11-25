@@ -91,6 +91,13 @@ describe('findDetours by recorded locations', () => {
     ]);
   });
 
+  it('finds the trip that ended before a project tool ran, from where the tool ran', () => {
+    const tool: RecordedAction = { name: 'tool', summary: 'tool open_billing', at: '/settings' };
+    expect(findDetours(flow([tap('Privacy', '/settings'), back('/privacy'), tool], { endPath: '/billing' }))).toEqual([
+      { from: 0, to: 2, at: '/settings', via: '/privacy', evidence: 'locations' },
+    ]);
+  });
+
   it('starts at the action that left, not at the looking around before it', () => {
     const detours = findDetours(flow([scroll('/home'), tap('Reports', '/home'), back('/reports'), tap('Billing', '/home')], { endPath: '/billing' }));
     expect(detours).toEqual([{ from: 1, to: 3, at: '/home', via: '/reports', evidence: 'locations' }]);
