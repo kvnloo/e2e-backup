@@ -20,6 +20,7 @@ import { describeAction, type DescribedAction, type PlacedPoint, type Recordable
 import type { RedactedNode } from '../agent/observation.ts';
 import type { ViewportPoint } from '../engine/surface.ts';
 import { isRelocatableDescriptor } from './relocate.ts';
+import { sameRoute } from './route.ts';
 import {
   DESCRIPTOR_FIELDS,
   MAX_TRACE_ACTIONS,
@@ -336,9 +337,11 @@ export class TraceRecorder {
   private push(action: RecordedAction): void {
     // A scroll repeated in the same direction on the same target is one
     // action that ran several times, not several actions: a long list paged
-    // to its end fits the trace, and replays with the same repeats.
+    // to its end fits the trace, and replays with the same repeats. A scroll
+    // seen on another route stays its own action, so the route change it
+    // stood on is kept for the detour check.
     const last = this.actions[this.actions.length - 1];
-    if (action.name === 'scroll' && last?.name === 'scroll' && sameScroll(last, action)) {
+    if (action.name === 'scroll' && last?.name === 'scroll' && sameScroll(last, action) && sameRouteOrUnknown(last.at, action.at)) {
       // The smallest coverage of the repeats decides the viewport fallback,
       // so a list that shrank on the way is never promoted by its first size.
       const { spans: previous, ...rest } = last;
@@ -375,6 +378,11 @@ function withinOf(
 /** A place inside a box as a fraction of its side, clamped to the box and rounded so the entry stays small. */
 function fraction(value: number): number {
   return Math.round(Math.min(1, Math.max(0, value)) * 10_000) / 10_000;
+}
+
+/** Whether two locations are one route, or either is unknown. */
+function sameRouteOrUnknown(a: string | undefined, b: string | undefined): boolean {
+  return a === undefined || b === undefined || sameRoute(a, b);
 }
 
 /** True when two recorded scrolls move the same way on the same target. */
