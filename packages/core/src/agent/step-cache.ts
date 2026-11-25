@@ -665,12 +665,23 @@ export class StepTraceSession {
 
   /**
    * The recording's detours as the report names them (`cache/detours.ts`),
-   * or undefined when it has none; with `executed`, only those whose every
-   * action a replay that handed off ran. Joined with commas: the report line
+   * or undefined when it has none; with `executed`, those of the actions a
+   * replay that handed off ran, read as a flow of their own that ends where
+   * the next recorded action stood, so a trip the replay completed is not
+   * merged with one it never reached. Joined with commas: the report line
    * separates its own parts with semicolons (`cacheLine`).
    */
   private detourOf(trace: ActionTrace, executed = trace.actions.length): string | undefined {
-    const detours = findDetours(trace).filter((detour) => detour.to <= executed);
+    const next = trace.actions[executed]?.at;
+    const ran =
+      executed >= trace.actions.length
+        ? trace
+        : {
+            actions: trace.actions.slice(0, executed),
+            ...(trace.startPath === undefined ? {} : { startPath: trace.startPath }),
+            ...(next === undefined ? {} : { endPath: next }),
+          };
+    const detours = findDetours(ran);
     return detours.length === 0 ? undefined : this.reportable(detours.map(describeDetour).join(', '));
   }
 
