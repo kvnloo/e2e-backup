@@ -809,7 +809,9 @@ export class ElectronSurface {
           const point = await this.actionablePoint(window, backendNodeId, operation, false, deadline);
           const session = await this.session(window.page);
           const { quads } = await session.send('DOM.getContentQuads', { backendNodeId });
-          const quad = quads.find((candidate) => area(candidate) > 0)!;
+          const quad = quads.find((candidate) => area(candidate) > 0);
+          // The layout can change after the wait for actionability read the box.
+          if (quad === undefined) throw notActionable(`node ${backendNodeId} has no box on screen to swipe`);
           const box = boxOf(quad);
           await commit(() => mouse.move(point.x, point.y));
           await commit(() => this.wheel(window, action.direction, action.momentum ?? 'none', box));
