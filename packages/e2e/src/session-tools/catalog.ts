@@ -228,8 +228,8 @@ export interface LocateQuery {
 
 /**
  * Builds the expression and the matching `screen.*` call from the tool
- * arguments. `defaultVisible` is the target's `locators.visible`. It's left
- * out of the call, since in a test it comes from the config.
+ * arguments. `defaultVisible` is the target's `locators.visible`. `visible`
+ * isn't printed in the call, since a test gets it from the config.
  */
 export function locateQuery(args: LocateArgs, defaultVisible = false): LocateQuery {
   const exact = args.exact !== false;

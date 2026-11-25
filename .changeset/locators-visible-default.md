@@ -3,4 +3,4 @@
 'e2e': patch
 ---
 
-With `locators: { visible: true }` in the config or on a target, hidden nodes are skipped by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and `getByTestId` by default. Passing `visible` to a query overrides that. `getByRole` doesn't use this default.
+With `locators: { visible: true }` in the config or on a target, hidden nodes are skipped by default in `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and `getByTestId`. Passing `visible` to a query overrides the default. `getByRole` isn't affected.

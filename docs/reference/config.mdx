@@ -308,8 +308,8 @@ An id is its factory called with no options. An unknown id is
 #### `locators`
 
 Defaults for screen queries. With `visible: true`, hidden nodes are skipped
-by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
-`getByTestId`, as if `{ visible: true }` were passed to each query.
+in `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
+`getByTestId`, the same as passing `{ visible: true }` to each one.
 
 ```ts
 locators: { visible: true }, // default: { visible: false }
@@ -326,8 +326,8 @@ locators: { visible: true }, // default: { visible: false }
   [Hidden duplicates](/reference/screen#hidden-duplicates).
 - In an [`e2e mcp`](/reference/mcp) session, `run_code`, `locate`, and the
   test lines use the target's value.
-- `locators` must be a plain object with only an optional boolean `visible`
-  key. Anything else is `INVALID_CONFIG`.
+- `locators` must be a plain object. Only a boolean `visible` key is
+  allowed. Anything else is `INVALID_CONFIG`.
 
 ### targets
 
@@ -1746,7 +1746,7 @@ export interface E2EConfig {
   trace?: RecordingMode;
   /** Which attempts record a video; default `off`. */
   video?: RecordingMode;
-  /** Defaults for screen queries on every target. A target's `locators.visible` overrides the config's. */
+  /** Defaults for screen queries on every target. A target's `locators.visible` overrides this. */
   locators?: LocatorsConfig;
   /** The results directory, relative to the project root; default `.e2e`. */
   output?: string;
@@ -1787,7 +1787,7 @@ export interface Target {
   video?: RecordingMode;
   /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`. */
   fullyParallel?: boolean;
-  /** Defaults for this target's screen queries. Setting `visible` here overrides the config's. */
+  /** Defaults for this target's screen queries. Setting `visible` here overrides the top-level value. */
   locators?: LocatorsConfig;
 }
 ```

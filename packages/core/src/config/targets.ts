@@ -42,7 +42,7 @@ export interface ResolvedTarget {
    * set on every engine with the fixture, and `test` otherwise.
    */
   readonly fixtureScopes: ReadonlyMap<string, FixtureScope>;
-  /** Defaults for the target's screen queries. They come from the target's `locators`, else the config's, else `visible: false`. */
+  /** Defaults for the target's screen queries, from the target's `locators`, then the top-level `locators`, then `visible: false`. */
   readonly locators: Readonly<Required<LocatorsConfig>>;
 }
 
