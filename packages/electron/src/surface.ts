@@ -562,15 +562,13 @@ export class ElectronSurface {
         const reason = (exceptionDetails.exception?.description ?? exceptionDetails.text).split('\n')[0];
         throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(selector)} is not a CSS selector this window can match: ${reason}`, { retryable: false });
       }
-      const ids = new Set<number>();
-      if (result.objectId === undefined) return ids;
+      if (result.objectId === undefined) return new Set();
       const { result: entries } = await session.send('Runtime.getProperties', { objectId: result.objectId, ownProperties: true });
-      for (const entry of entries) {
-        if (!/^\d+$/.test(entry.name) || entry.value?.objectId === undefined) continue;
-        const { node } = await session.send('DOM.describeNode', { objectId: entry.value.objectId });
-        ids.add(node.backendNodeId);
-      }
-      return ids;
+      // One round trip per match, sent together: a broad selector on a long list is read on every poll of an expect.
+      const described = await Promise.all(
+        entries.flatMap((entry) => (/^\d+$/.test(entry.name) && entry.value?.objectId !== undefined ? [session.send('DOM.describeNode', { objectId: entry.value.objectId })] : [])),
+      );
+      return new Set(described.map(({ node }) => node.backendNodeId));
     } finally {
       await session.send('Runtime.releaseObjectGroup', { objectGroup: group }).catch(() => undefined);
     }
