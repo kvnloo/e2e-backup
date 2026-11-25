@@ -1128,7 +1128,8 @@ const SELECT_OPTION = `function (wanted) { ${ELEMENT}
   const index = options.findIndex((option, at) =>
     wanted.index !== undefined ? at === wanted.index : wanted.value !== undefined ? option.value === wanted.value : option.label === wanted.label || option.text.trim() === wanted.label);
   if (index < 0) return { ok: false, reason: 'no option matches ' + JSON.stringify(wanted) + '; the options are ' + options.map((option) => JSON.stringify(option.label)).join(', ') };
-  if (options[index].disabled) return { ok: false, reason: 'option ' + JSON.stringify(options[index].label) + ' is disabled' };
+  // :disabled covers an option a disabled group holds, which its own disabled property does not.
+  if (options[index].matches(':disabled')) return { ok: false, reason: 'option ' + JSON.stringify(options[index].label) + ' is disabled' };
   element.focus();
   element.selectedIndex = index;
   element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));

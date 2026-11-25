@@ -32,6 +32,12 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('status')).toHaveText('Password is required');
   });
 
+  test('refuses an option in a disabled group', async ({ screen }) => {
+    const refused = await screen.getByRole('combobox', 'Plan').selectOption('Legacy', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(refused)).toContain('is disabled');
+    await expect(screen.getByRole('combobox', 'Plan')).toHaveValue('Pro');
+  });
+
   test('submits with the Enter key and types into the focused field', async ({ screen }) => {
     await screen.getByTestId('username').tap();
     await screen.getByTestId('username').pressSequentially('lin');
