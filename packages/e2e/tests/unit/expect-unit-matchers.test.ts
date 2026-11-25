@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { publishAttempt } from '@e2e-dev/core/lib/expect/attempt';
 import { PollScope, runInPollScope } from '@e2e-dev/core/lib/expect/poll-scope';
 import { SoftFailures } from '@e2e-dev/core/lib/expect/soft';
-import { TestError } from '@e2e-dev/core/lib/internal/errors';
+import { serializeError, TestError } from '@e2e-dev/core/lib/internal/errors';
 import { Deadline } from '@e2e-dev/core/lib/internal/time';
 import { AttemptBudget } from '@e2e-dev/core/lib/run/budget';
 import { expect as e2eExpect } from '../../src/expect/index.ts';
@@ -73,10 +73,33 @@ describe('toStrictEqual', () => {
     failsWith(() => e2eExpect(sparse).toStrictEqual([undefined, 1]), 'expected [ <1 empty item>, 1 ] to strictly equal [ undefined, 1 ]');
   });
 
+  it('prints on one line, with an asymmetric matcher as its description', () => {
+    failsWith(
+      () => e2eExpect([1, 2, 3, 4, 5, 6, 7, 8]).toStrictEqual([1]),
+      'expected [ 1, 2, 3, 4, 5, 6, 7, 8 ] to strictly equal [ 1 ]',
+    );
+    failsWith(
+      () => e2eExpect({ id: 'a', lines: [1] }).toStrictEqual({ id: e2eExpect.any(Number), lines: [e2eExpect.closeTo(1)] }),
+      "expected { id: 'a', lines: [ 1 ] } to strictly equal { id: Any<Number>, lines: [ CloseTo 1 (2 digits) ] }",
+    );
+  });
+
   it('compares class types, where toEqual does not', () => {
     e2eExpect(new Order(1)).toEqual({ id: 1 });
     failsWith(() => e2eExpect(new Order(1)).toStrictEqual({ id: 1 }), 'expected Order { id: 1 } to strictly equal { id: 1 }');
     failsWith(() => e2eExpect({ id: 1 }).not.toStrictEqual({ id: 1 }), 'expected { id: 1 } not to strictly equal { id: 1 }');
+  });
+});
+
+describe('an error in a failure message', () => {
+  it('reads by its class and message, with the own properties equality compares', () => {
+    const failed = (status: number): Error => Object.assign(new PaymentError('failed'), { status });
+    failsWith(
+      () => e2eExpect(failed(404)).toEqual(failed(500)),
+      'expected [PaymentError: failed] {"status":404} to equal [PaymentError: failed] {"status":500}',
+    );
+    failsWith(() => e2eExpect<unknown>(new TypeError('boom')).toBe(1), 'expected [TypeError: boom] to be 1');
+    failsWith(() => e2eExpect({ error: new RangeError('') }).toEqual({}), 'expected {"error":"[RangeError]"} to equal {}');
   });
 });
 
@@ -198,7 +221,7 @@ describe('toThrow', () => {
     e2eExpect(coded).toThrow(e2eExpect.objectContaining({ code: 'E_DECLINED' }));
     failsWith(
       () => e2eExpect(coded).toThrow(e2eExpect.objectContaining({ code: 'E_OTHER' })),
-      'expected the function to throw a value matching ObjectContaining {"code":"E_OTHER"}, but it threw [Error: no]',
+      'expected the function to throw a value matching ObjectContaining {"code":"E_OTHER"}, but it threw [Error: no] {"code":"E_DECLINED"}',
     );
   });
 
@@ -287,12 +310,18 @@ describe('resolves', () => {
     );
   });
 
-  it('fails on a rejection, with the rejection as the cause', async () => {
-    const boom = new Error('boom');
-    const error = await rejectionOf(e2eExpect(Promise.reject<number>(boom), 'the order').resolves.toBe(1));
+  it('fails on a rejection, at the line of the call and not where the rejection was made', async () => {
+    const error = await rejectionOf(e2eExpect(Promise.reject<number>(new Error('boom')), 'the order').resolves.toBe(1));
     vexpect(error.code).toBe('ASSERTION_FAILED');
     vexpect(error.message).toBe('the order: expected the promise to resolve, but it rejected with [Error: boom]');
-    vexpect(error.cause).toBe(boom);
+    vexpect(error.cause).toBeUndefined();
+    vexpect(serializeError(error, { projectRoot: import.meta.dirname }).source?.file).toBe('expect-unit-matchers.test.ts');
+  });
+
+  it('toThrow takes an error the promise resolved with, as in Jest, and calls a function', async () => {
+    await e2eExpect(Promise.resolve(new PaymentError('card declined'))).resolves.toThrow('declined');
+    await e2eExpect(Promise.resolve(declined)).resolves.toThrow(PaymentError);
+    await rejectsWith(e2eExpect(Promise.resolve(1)).resolves.toThrow(), 'toThrow requires a function, got 1');
   });
 
   it('resolves toMatchSchema to the schema output', async () => {

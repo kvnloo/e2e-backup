@@ -688,7 +688,8 @@ expect(() => parsePrice('abc')).toThrow(new Error('abc is not a price'));
   Any other argument is `INVALID_ARGUMENT`.
 - An async function does not throw, it returns a promise that rejects. So
   `toThrow` fails on it, and the failure says to use
-  [`rejects`](#resolves-and-rejects). `not.toThrow()` passes on it.
+  [`rejects`](#resolves-and-rejects). `not.toThrow()` passes on it, as in
+  Jest, and leaves the rejection unhandled, which fails the test.
 
 #### `resolves` and `rejects`
 
@@ -707,9 +708,12 @@ await expect(loadOrder(7)).resolves.not.toHaveProperty('error');
 - `.not` inverts the matcher only, before or after `resolves` and `rejects`.
   A promise that settles the other way always fails.
 - After `rejects`, `toThrow` checks the rejection by the rules of
-  [`toThrow`](#tothrow), without a call.
+  [`toThrow`](#tothrow), without a call. A rejection that is not an error
+  counts too: `rejects.toThrow('boom')` passes on `Promise.reject('boom')`,
+  where Jest reports that nothing was thrown.
+- After `resolves`, `toThrow` checks an error the promise resolved with as
+  it is, and calls a function, as in Jest.
 - `resolves.toMatchSchema(schema)` resolves to the schema's output.
-- A failed `resolves` has the rejection as its `cause`.
 - A value that is not a promise or a thenable is `INVALID_ARGUMENT`.
 - A call that the test body does not await fails the test with
   `STEP_NOT_AWAITED` when the body returns before the promise settles.

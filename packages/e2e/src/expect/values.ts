@@ -31,13 +31,13 @@ class ValueExpectationImpl<T> implements ValueExpectation<T>, NegatedValueExpect
     private readonly negated: boolean,
     /** The caller's label for this check, opening every failure message. */
     private readonly message: string | undefined,
-    /** Set by `.rejects`: the value is a rejection, which `toThrow` checks as it is instead of calling. */
-    private readonly rejection = false,
+    /** Set by `.resolves` and `.rejects`: what the promise settled with, which `toThrow` may check without a call. */
+    private readonly settledBy?: 'resolves' | 'rejects',
   ) {}
 
   /** One class serves the positive and negated forms, so `.not` is the class and not either interface. */
   get not(): ValueExpectationImpl<T> {
-    return new ValueExpectationImpl(this.actual, !this.negated, this.message, this.rejection);
+    return new ValueExpectationImpl(this.actual, !this.negated, this.message, this.settledBy);
   }
 
   get resolves(): Promised<Awaited<T>> {
@@ -248,14 +248,16 @@ class ValueExpectationImpl<T> implements ValueExpectation<T>, NegatedValueExpect
   }
 
   /**
-   * Calls the function and checks what it threw. After `.rejects` the value
-   * is the rejection itself, checked the same way without a call.
+   * Calls the function and checks what it threw. A rejection is checked as
+   * it is, without a call, and so is an error a promise resolved with, as in
+   * Jest.
    */
   toThrow(expected?: ThrowExpectation): void {
     const wanted = describeExpected(expected);
     const actual = this.actual as unknown;
     let outcome: { readonly thrown: unknown } | { readonly returned: unknown };
-    if (this.rejection) {
+    const rejected = this.settledBy === 'rejects';
+    if (rejected || (this.settledBy === 'resolves' && actual instanceof Error)) {
       outcome = { thrown: actual };
     } else {
       if (typeof actual !== 'function') fail(`toThrow requires a function, got ${format(actual)}`);
@@ -266,11 +268,11 @@ class ValueExpectationImpl<T> implements ValueExpectation<T>, NegatedValueExpect
       }
     }
     const not = this.negated ? 'not ' : '';
-    const claim = this.rejection
+    const claim = rejected
       ? `expected the promise ${not}to reject${wanted === '' ? '' : ' with'}${wanted}`
       : `expected the function ${not}to throw${wanted}`;
     const got = (): string => {
-      if ('thrown' in outcome) return `it ${this.rejection ? 'rejected with' : 'threw'} ${format(outcome.thrown)}`;
+      if ('thrown' in outcome) return `it ${rejected ? 'rejected with' : 'threw'} ${format(outcome.thrown)}`;
       if (!types.isPromise(outcome.returned)) return 'it did not throw';
       // The failure below already reports the call; its rejection must not surface as a second, unhandled error.
       outcome.returned.catch(() => undefined);
@@ -478,11 +480,8 @@ async function settled(
   const outcome = await (signal === undefined ? settling : withAbort(settling, signal, cancelledError));
   if (kind === 'resolves') {
     if ('value' in outcome) return outcome.value;
-    throw new TestError(
-      'ASSERTION_FAILED',
-      withMessage(message, `expected the promise to resolve, but it rejected with ${format(outcome.error)}`),
-      { cause: outcome.error },
-    );
+    // No `cause`: a report takes its source line from the cause's stack, and the line to show is this call's.
+    fail(withMessage(message, `expected the promise to resolve, but it rejected with ${format(outcome.error)}`));
   }
   if ('error' in outcome) return outcome.error;
   fail(withMessage(message, `expected the promise to reject, but it resolved with ${format(outcome.value)}`));
@@ -504,7 +503,7 @@ function promised<T>(
       name,
       (...args: unknown[]) =>
         track(`expect(...).${kind}.${negated ? 'not.' : ''}${name}(...)`, async (signal) => {
-          const expectation = new ValueExpectationImpl(await settled(actual, kind, message, signal), negated, message, kind === 'rejects');
+          const expectation = new ValueExpectationImpl(await settled(actual, kind, message, signal), negated, message, kind);
           return (expectation[name] as ValueMatcher).apply(expectation, args);
         }),
     ]),
