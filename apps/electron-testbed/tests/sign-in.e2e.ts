@@ -98,6 +98,15 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('drag-result')).toHaveText('Dropped drag-source on the zone');
   });
 
+  test('stops typing once pressSequentially has run out of time', async ({ screen }) => {
+    const laggy = screen.getByTestId('laggy');
+    const refused = await laggy.pressSequentially('abcdefgh', { timeout: 1000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(refused)).not.toBe('undefined');
+    // Eight keys take 2.4 seconds; typing that went on past the timeout would finish by now.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    expect((await laggy.inputValue()).length).toBeLessThan(8);
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });

@@ -115,6 +115,19 @@ function stale(message: string, cause?: unknown): EngineError {
   return new EngineError('NODE_STALE', message, { retryable: true, ...(cause === undefined ? {} : { cause }) });
 }
 
+/**
+ * The check every input an operation sends passes first: once the
+ * operation's budget is spent or it was cancelled, its caller stopped
+ * waiting, and nothing more may reach the app.
+ */
+function inputGate(operation: OperationContext, label: string): () => void {
+  const ends = Date.now() + operation.timeoutMs;
+  return () => {
+    if (operation.signal.aborted) throw new EngineError('CANCELLED', `${label} was cancelled`, { retryable: false });
+    if (Date.now() >= ends) throw new EngineError('OPERATION_TIMEOUT', `${label} timed out after ${operation.timeoutMs}ms`, { retryable: false });
+  };
+}
+
 function notActionable(message: string): EngineError {
   return new EngineError('NOT_ACTIONABLE', message, { retryable: false });
 }
@@ -669,13 +682,10 @@ export class ElectronSurface {
     // The wait for actionability ends a little before the operation does, so it reports why the node never became actionable.
     const deadline = Date.now() + Math.max(0, operation.timeoutMs - Math.min(250, operation.timeoutMs / 10));
     const { mouse, keyboard } = window.page;
-    const ends = Date.now() + operation.timeoutMs;
+    const open = inputGate(operation, action.kind);
     let committed = false;
-    // Every input goes through here: once the operation's budget is spent or it was cancelled, its caller stopped
-    // waiting, and nothing more may reach the app.
     const commit = <T>(send: () => Promise<T>): Promise<T> => {
-      if (operation.signal.aborted) throw new EngineError('CANCELLED', `${action.kind} was cancelled`, { retryable: false });
-      if (Date.now() >= ends) throw new EngineError('OPERATION_TIMEOUT', `${action.kind} timed out after ${operation.timeoutMs}ms`, { retryable: false });
+      open();
       committed = true;
       return send();
     };
@@ -889,14 +899,22 @@ export class ElectronSurface {
 
   async typeText(text: string, options: { readonly replace: boolean }, operation: OperationContext): Promise<void> {
     const window = this.requireWindow();
+    const { keyboard } = window.page;
+    const open = inputGate(operation, 'keyboard.type');
     await this.bounded(operation, 'keyboard.type', true, async () => {
       const editable = await this.evaluateIn<boolean>(window, FOCUSED_EDITABLE);
       if (!editable) throw notActionable('nothing that takes text has keyboard focus; tap the field first');
       if (options.replace) {
-        await window.page.keyboard.press('ControlOrMeta+A');
-        await window.page.keyboard.press('Delete');
+        open();
+        await keyboard.press('ControlOrMeta+A');
+        open();
+        await keyboard.press('Delete');
       }
-      await window.page.keyboard.type(text);
+      // One character at a time, through the gate: no key goes out once the caller stopped waiting.
+      for (const character of text) {
+        open();
+        await keyboard.type(character);
+      }
     });
     await this.settle(operation);
   }

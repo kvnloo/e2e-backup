@@ -69,6 +69,14 @@ document.addEventListener('mouseup', (event) => {
   document.querySelector('[data-testid="drag-result"]').textContent = `Dropped ${pressed || 'nothing'} on the zone`;
 });
 
+// A field whose key handler holds the page for 300 ms per key, so typing a word outlasts a short timeout.
+document.querySelector('[data-testid="laggy"]').addEventListener('keydown', () => {
+  const until = Date.now() + 300;
+  while (Date.now() < until) {
+    // Busy on purpose.
+  }
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');
