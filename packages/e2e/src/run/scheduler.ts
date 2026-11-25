@@ -1115,7 +1115,7 @@ class Scheduler {
         }
         if (worker.state !== 'retired') {
           // Discard the worker after a failing unit.
-          if (this.targetState(worker).unavailable !== undefined) this.retire(worker, false);
+          if (worker.killed || this.targetState(worker).unavailable !== undefined) this.retire(worker, false);
           else if (worker.sawFailure) this.retire(worker, !this.interrupting);
           else worker.state = 'idle';
         }
@@ -1131,6 +1131,10 @@ class Scheduler {
       case 'fatal': {
         this.options.events.onRunError({ error: message.error });
         worker.killed = true;
+        // It stays alive until its exit is observed and may still report
+        // `ready` or `unit-done`: it must not be handed a unit in the
+        // meantime, which its exit would then skip.
+        if (worker.state === 'idle' || worker.state === 'starting') worker.state = 'retired';
         worker.runner.kill();
         break;
       }
