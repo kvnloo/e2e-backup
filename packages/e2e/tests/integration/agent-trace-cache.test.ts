@@ -1326,6 +1326,13 @@ describe('trace cache: a replay that hands off after a detour', () => {
       replayedActions: 2,
       detour: 'actions 1-2 left / for /about and came back with nothing typed, chosen, or set',
     });
+    // A span that ends inside the prefix is reported as the recording run found it.
+    rewriteOnlyEntry(project, (payload) => ({ ...payload, detours: [{ from: 0, to: 2 }] }));
+    const finished = await runExisting(project, options({ calls: 0, prefixes: [] }, 'read-only'));
+    expect(resultByTitle(finished, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!.cache).toMatchObject({
+      mode: 'agent-concluded',
+      detour: 'actions 1-2 left / for /about and came back with nothing typed, chosen, or set',
+    });
     // A stored location reads a record id as :id, so a trip the prefix shows counts only inside a span the recording run found.
     rewriteOnlyEntry(project, (payload) => ({ ...payload, detours: [] }));
     const unfound = await runExisting(project, options({ calls: 0, prefixes: [] }, 'read-only'));
