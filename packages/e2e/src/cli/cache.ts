@@ -20,7 +20,7 @@ import type { Command } from 'commander';
 import picocolors from 'picocolors';
 import { describeDetour, findDetours, type TraceDetour } from '@e2e-dev/core/lib/cache/detours';
 import { FileCacheStore, MAX_CACHE_WIRE_BYTES } from '@e2e-dev/core/lib/cache/store';
-import { targetLabel, type ActionTrace } from '@e2e-dev/core/lib/cache/trace';
+import { targetLabel } from '@e2e-dev/core/lib/cache/trace';
 import { discoverConfig, loadConfigModule, missingConfigError } from '../config/load.ts';
 import { resolveConfig } from '../config/resolve-run.ts';
 import { errorMessage, sanitizeText } from '@e2e-dev/core/lib/internal/errors';
@@ -53,9 +53,7 @@ interface CacheEntrySummary {
   readonly testId: string | undefined;
   readonly targetId: string | undefined;
   readonly instructionDigest: string | undefined;
-  /** The recording itself, as a run would read it. */
-  readonly trace: ActionTrace;
-  /** Where its flow leaves a screen and comes back with nothing typed, chosen, or set. */
+  /** Where its flow leaves a screen and comes back with nothing typed, chosen, or set; empty when the command reads no detours. */
   readonly detours: readonly TraceDetour[];
 }
 
@@ -92,8 +90,9 @@ async function cache(command: CacheCommand | { readonly show: string }, options:
   }
 
   try {
-    const contents = await readContents(directory);
-    if (typeof command === 'object') return show(contents, command.show);
+    // Only the commands that print detours pay for reading them.
+    const contents = await readContents(directory, command !== 'stats' && command !== 'clear');
+    if (typeof command === 'object') return await show(contents, command.show);
     switch (command) {
       case 'ls':
         return list(contents);
@@ -190,7 +189,7 @@ async function resolveCacheDirectory(options: CacheOptions): Promise<string> {
  * replay: an oversized or unparseable file is unreadable here and a miss
  * there. A directory that does not exist is an empty store.
  */
-async function readContents(directory: string): Promise<CacheContents> {
+async function readContents(directory: string, withDetours: boolean): Promise<CacheContents> {
   const store = new FileCacheStore({ directory, maxBytes: MAX_CACHE_WIRE_BYTES, writable: false });
   const entries: CacheEntrySummary[] = [];
   const unreadable: { name: string; bytes: number }[] = [];
@@ -227,8 +226,7 @@ async function readContents(directory: string): Promise<CacheContents> {
       testId: trace.recordedFor?.testId,
       targetId: trace.recordedFor?.targetId,
       instructionDigest: trace.recordedFor?.instructionDigest,
-      trace,
-      detours: findDetours(trace),
+      detours: withDetours ? findDetours(trace) : [],
     });
   }
   return { directory, entries, unreadable, foreign };
@@ -307,10 +305,16 @@ function findEntry(contents: CacheContents, ref: string): CacheEntrySummary | un
  * each action numbered from 1 with the screen it ran on, the end state a
  * replay checks, and every detour, whose actions are marked in the list.
  */
-function show(contents: CacheContents, ref: string): number {
+async function show(contents: CacheContents, ref: string): Promise<number> {
   const entry = findEntry(contents, ref);
   if (entry === undefined) return 2;
-  const { trace } = entry;
+  // Read again rather than kept from the listing: only this one entry's actions are printed.
+  const read = await new FileCacheStore({ directory: contents.directory, maxBytes: MAX_CACHE_WIRE_BYTES, writable: false }).read(entry.keyHash);
+  if (read.status !== 'hit') {
+    process.stderr.write(`${entry.keyHash}.json in ${contents.directory} changed while it was read; run the command again\n`);
+    return 2;
+  }
+  const trace = read.entry.payload;
   const model = trace.recordedBy === undefined ? '' : ` with ${trace.recordedBy.provider}/${trace.recordedBy.model}`;
   const facts: [string, string | undefined][] = [
     ['entry', path.join(contents.directory, `${entry.keyHash}.json`)],
