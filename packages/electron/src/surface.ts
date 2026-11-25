@@ -48,6 +48,14 @@ const ROOT_ID = 'window';
 /** The isolated world the engine's own page-side reads run in, apart from the app's globals. */
 const WORLD_NAME = '__e2e_electron__';
 
+let objectGroups = 0;
+
+/** A DevTools object group of one call's own: releasing it frees that call's handles and never another's still in use. */
+function objectGroup(): string {
+  objectGroups += 1;
+  return `${WORLD_NAME}${objectGroups}`;
+}
+
 /** Everything that can hold a secure value or show another document in a screenshot: masked, or the capture is not taken. */
 const MASKED_SELECTOR = 'input[type=password i], iframe, frame, webview';
 
@@ -411,7 +419,8 @@ export class ElectronSurface {
   private async callOn<T>(window: AppWindow, backendNodeId: number, fn: string, args: readonly unknown[] = []): Promise<T> {
     const session = await this.session(window.page);
     const executionContextId = await this.world(window.page);
-    const { object } = await session.send('DOM.resolveNode', { backendNodeId, executionContextId, objectGroup: WORLD_NAME });
+    const group = objectGroup();
+    const { object } = await session.send('DOM.resolveNode', { backendNodeId, executionContextId, objectGroup: group });
     if (object.objectId === undefined) throw stale(`node ${backendNodeId} is no longer in the window`);
     try {
       const { result, exceptionDetails } = await session.send('Runtime.callFunctionOn', {
@@ -424,7 +433,7 @@ export class ElectronSurface {
       if (exceptionDetails !== undefined) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
       return result.value as T;
     } finally {
-      await session.send('Runtime.releaseObjectGroup', { objectGroup: WORLD_NAME }).catch(() => undefined);
+      await session.send('Runtime.releaseObjectGroup', { objectGroup: group }).catch(() => undefined);
     }
   }
 
@@ -542,10 +551,11 @@ export class ElectronSurface {
   private async querySelectorAll(window: AppWindow, selector: string): Promise<ReadonlySet<number>> {
     const session = await this.session(window.page);
     const contextId = await this.world(window.page);
+    const group = objectGroup();
     const { result, exceptionDetails } = await session.send('Runtime.evaluate', {
       expression: `(${QUERY_ALL})(${JSON.stringify(selector)})`,
       contextId,
-      objectGroup: WORLD_NAME,
+      objectGroup: group,
     });
     try {
       if (exceptionDetails !== undefined) {
@@ -562,7 +572,7 @@ export class ElectronSurface {
       }
       return ids;
     } finally {
-      await session.send('Runtime.releaseObjectGroup', { objectGroup: WORLD_NAME }).catch(() => undefined);
+      await session.send('Runtime.releaseObjectGroup', { objectGroup: group }).catch(() => undefined);
     }
   }
 
