@@ -7,7 +7,7 @@
  * contract of `@e2e-dev/core/engine`.
  */
 
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron, type CDPSession, type ElectronApplication, type Locator, type Page } from 'playwright-core';
@@ -509,7 +509,10 @@ export class ElectronSurface {
       const masked = await masks.count();
       // A secure field or nested document in a closed shadow root is out of every selector's reach: the pixels are withheld, and the count says so.
       if (unmaskableCount(raw.document, raw.strings) > 0) return { ...snapshot, maskedRegionCount: masked };
-      return { ...snapshot, pixels: await this.capture(window, masks), maskedRegionCount: masked };
+      const pixels = await this.capture(window, masks);
+      // The app may have rendered such an element while the capture ran: read the document again before the pixels go out.
+      if ((await this.unmaskable(window)) > 0) return { ...snapshot, maskedRegionCount: masked };
+      return { ...snapshot, pixels, maskedRegionCount: masked };
     });
   }
 
@@ -963,6 +966,14 @@ export class ElectronSurface {
 
   // --- pixels ---
 
+  /** How many password fields and nested documents in the window's document no selector mask reaches; see `unmaskableCount`. */
+  private async unmaskable(window: AppWindow): Promise<number> {
+    const session = await this.session(window.page);
+    const snapshot = await session.send('DOMSnapshot.captureSnapshot', { computedStyles: [] });
+    const document = snapshot.documents[0];
+    return document === undefined ? 0 : unmaskableCount(document, snapshot.strings);
+  }
+
   /** A CSS-scale screenshot of the window with the masks painted over. */
   private async capture(window: AppWindow, masks: Locator): Promise<ObservationPixels> {
     const data = new Uint8Array(await window.page.screenshot({ scale: 'css', mask: [masks], maskColor: '#000000', caret: 'hide' }));
@@ -980,13 +991,19 @@ export class ElectronSurface {
       const name = `${String(this.artifactCounter).padStart(3, '0')}${label === undefined || fileLabel(label) === '' ? '' : `-${fileLabel(label)}`}.png`;
       const relative = path.posix.join('screenshots', name);
       const absolute = path.join(attempt.artifactsDir, relative);
-      const raw = await this.read(window);
-      const unmaskable = unmaskableCount(raw.document, raw.strings);
-      if (unmaskable > 0) {
-        throw new ConfigurationError('POLICY_DENIED', `the window shows ${unmaskable} password field${unmaskable === 1 ? '' : 's'} or nested document${unmaskable === 1 ? '' : 's'} inside a closed shadow root, which no mask reaches, so the screenshot is withheld`);
-      }
+      const withheld = (count: number): ConfigurationError =>
+        new ConfigurationError(
+          'POLICY_DENIED',
+          `the window shows ${count} password field${count === 1 ? '' : 's'} or nested document${count === 1 ? '' : 's'} inside a closed shadow root, which no mask reaches, so the screenshot is withheld`,
+        );
+      const before = await this.unmaskable(window);
+      if (before > 0) throw withheld(before);
+      const image = await window.page.screenshot({ mask: [window.page.locator(MASKED_SELECTOR)], maskColor: '#000000', caret: 'hide' });
+      // The app may have rendered such an element while the capture ran: the file is written only once the document still has none.
+      const after = await this.unmaskable(window);
+      if (after > 0) throw withheld(after);
       mkdirSync(path.dirname(absolute), { recursive: true });
-      await window.page.screenshot({ path: absolute, mask: [window.page.locator(MASKED_SELECTOR)], maskColor: '#000000', caret: 'hide' });
+      writeFileSync(absolute, image);
       return relative;
     });
   }
