@@ -20,7 +20,7 @@ function type(name: string, value: string, at?: string): RecordedAction {
   return { name: 'type', summary: `type "${value}" into textbox "${name}"`, target: { role: 'textbox', name }, value, ...(at === undefined ? {} : { at }) };
 }
 
-function flow(actions: readonly RecordedAction[], ends: { startPath?: string; endPath?: string } = {}): Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'> {
+function flow(actions: readonly RecordedAction[], ends: { startPath?: string; endPath?: string; truncated?: boolean } = {}): Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'> {
   return { actions, ...ends };
 }
 
@@ -104,6 +104,12 @@ describe('findDetours by recorded locations', () => {
   it('reads a unique() placeholder in a stored location as the record id it stood for', () => {
     // Stored with /items/123 templated: the live run saw /items/456, /items/123, /items/456, one route.
     expect(findDetours(flow([tap('Next', '/items/456'), tap('Back', '/items/{{param:/id}}'), tap('Save', '/items/456')], { endPath: '/items/456' }))).toEqual([]);
+  });
+
+  it('does not read a cut recording\'s end location as where its last kept action led', () => {
+    // Actions past the cap (typing, then the way back) ran but were not kept.
+    expect(findDetours(flow([tap('Edit', '/'), scroll('/edit')], { endPath: '/', truncated: true }))).toEqual([]);
+    expect(findDetours(flow([tap('Edit', '/'), scroll('/edit')], { endPath: '/' }))).toHaveLength(1);
   });
 
   it('skips actions whose location is unknown without matching them', () => {
