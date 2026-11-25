@@ -978,13 +978,16 @@ export class ElectronSurface {
   // --- what the fixture asks ---
 
   async windows(): Promise<readonly ElectronWindow[]> {
+    return (await this.listWindows()).map(({ entry }) => entry);
+  }
+
+  /** The open windows as the fixture lists them, each beside its handle, so a window that closes while the titles are read cannot shift a match onto another. */
+  private async listWindows(): Promise<readonly { readonly window: AppWindow; readonly entry: ElectronWindow }[]> {
     const shown = this.current();
     return await Promise.all(
       this.openWindows().map(async (window, index) => ({
-        index,
-        title: await window.page.title().catch(() => ''),
-        url: window.page.url(),
-        shown: window === shown,
+        window,
+        entry: { index, title: await window.page.title().catch(() => ''), url: window.page.url(), shown: window === shown },
       })),
     );
   }
@@ -994,15 +997,18 @@ export class ElectronSurface {
     // The wait ends a little before the step does, so the step reports which windows are open rather than a bare timeout.
     const deadline = Date.now() + Math.max(0, operation.timeoutMs - Math.min(250, operation.timeoutMs / 10));
     for (;;) {
-      const listed = await this.windows();
-      const found = listed.find((window) => matchesWindow(window, which));
-      if (found !== undefined) {
-        this.shown = this.openWindows()[found.index];
-        await this.shown?.page.bringToFront().catch(() => undefined);
-        return { ...found, shown: true };
+      const listed = await this.listWindows();
+      const found = listed.find(({ entry }) => matchesWindow(entry, which));
+      const open = this.openWindows();
+      // A match that closed while the list was read is not shown; the next pass looks again.
+      const index = found === undefined ? -1 : open.indexOf(found.window);
+      if (found !== undefined && index !== -1) {
+        this.shown = found.window;
+        await found.window.page.bringToFront().catch(() => undefined);
+        return { ...found.entry, index, shown: true };
       }
       if (Date.now() >= deadline || operation.signal.aborted) {
-        throw notActionable(`no window matches ${describeMatcher(which)}; open: ${listed.map((window) => JSON.stringify(window.title)).join(', ') || 'none'}`);
+        throw notActionable(`no window matches ${describeMatcher(which)}; open: ${listed.map(({ entry }) => JSON.stringify(entry.title)).join(', ') || 'none'}`);
       }
       await sleep(100, operation.signal);
     }
