@@ -266,17 +266,14 @@ describe('TraceRecorder', () => {
     expect(read?.payload.actions[0]).toMatchObject({ name: 'scroll', direction: 'down', times: 5 });
   });
 
-  it('folds repeated scrolls on one route, and keeps a scroll seen on another route its own', () => {
+  it('folds repeated scrolls whatever route each was seen on, keeping the first location a repeat was seen on', () => {
     const recorder = makeRecorder();
-    recorder.record({ name: 'scroll', direction: 'down' }, '/feed?page=1');
-    recorder.record({ name: 'scroll', direction: 'down' }, '/feed?page=2');
     recorder.record({ name: 'scroll', direction: 'down' });
+    recorder.record({ name: 'scroll', direction: 'down' }, '/away');
     recorder.record({ name: 'scroll', direction: 'down' }, '/articles/next-story');
     const trace = recorder.finalize(conclusion);
-    expect(trace?.actions.map((action) => [action.name === 'scroll' ? action.times : undefined, action.at])).toEqual([
-      [3, '/feed?page=1'],
-      [undefined, '/articles/next-story'],
-    ]);
+    // One action, so replay keeps its settled look between repeats and the action cap counts it once.
+    expect(trace?.actions).toEqual([{ name: 'scroll', summary: 'scroll down', direction: 'down', times: 3, at: '/away' }]);
   });
 
   it('marks a gap that ends replay for a mutating project tool', () => {

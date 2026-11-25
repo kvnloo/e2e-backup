@@ -460,6 +460,8 @@ destination in the instruction.
 - Each action records the screen it ran on: its route, as in
   [What counts as the same route](#how-a-replay-works), or the screen title
   on a device. Two screens with the same route or title count as one.
+  Repeated scrolls are one action, so a route the page moves to while it
+  scrolls doesn't count.
 - A typed value, a secret fill, a select, a check, an upload, a drag, a key
   press, a project tool, or a tap on or inside a checkbox, switch, radio,
   option, slider, or spin button ends a detour. A hover sets nothing. Going back after one of these is
