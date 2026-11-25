@@ -23,6 +23,7 @@
  */
 
 import { routeKey } from './route.ts';
+import { placeholdersAsIds } from './template.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
 /** One stretch of a recording that left a screen and came back to it with nothing typed, chosen, or set on the way. */
@@ -138,7 +139,8 @@ function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath
   const route = (place: string): string => {
     let key = keys.get(place);
     if (key === undefined) {
-      key = routeKey(place);
+      // A stored entry spells a `unique()` value as a placeholder; the live run compared the value.
+      key = routeKey(placeholdersAsIds(place));
       keys.set(place, key);
     }
     return key;

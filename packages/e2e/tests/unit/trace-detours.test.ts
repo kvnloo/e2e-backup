@@ -101,6 +101,11 @@ describe('findDetours by recorded locations', () => {
     expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/123', via: '/invoices', evidence: 'locations' }]);
   });
 
+  it('reads a unique() placeholder in a stored location as the record id it stood for', () => {
+    // Stored with /items/123 templated: the live run saw /items/456, /items/123, /items/456, one route.
+    expect(findDetours(flow([tap('Next', '/items/456'), tap('Back', '/items/{{param:/id}}'), tap('Save', '/items/456')], { endPath: '/items/456' }))).toEqual([]);
+  });
+
   it('skips actions whose location is unknown without matching them', () => {
     const detours = findDetours(flow([tap('Help', '/settings'), scroll(), back(), tap('Privacy', '/settings')], { endPath: '/privacy' }));
     // Nothing known stood between the two visits to /settings, so nothing shows the flow left.
