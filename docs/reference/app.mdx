@@ -70,13 +70,28 @@ A path opens as a link in the app when the target declares
 without it. With a link base, an absolute link opens as given, custom app
 schemes included.
 
+With `relaunch: true`, the app is started fresh before the path is opened:
+
+- On a device with `app.linkBase`, the pinned app is stopped if it's running,
+  then launched from the link. If the app isn't running, there's no error.
+  The launch is limited on some targets
+  ([mobile](/reference/mobile#the-app-under-test)).
+- On a web target, the open tabs are closed and a new one is opened in the
+  same browser context, as in [`restart`](#restart). Then the path is opened
+  instead of the base URL.
+
+```ts
+await app.open('/orders/42', { relaunch: true }); // default: false
+```
+
 | Throws | When |
 | --- | --- |
 | `APP_URL_REQUIRED` | A path, on a target that declares no `app.url` (or, on a device, no `app.linkBase`). |
 | `POLICY_DENIED` | A URL whose scheme is not `http:` or `https:`. `about:blank` is allowed. On a target whose [`app.url` is a file](/reference/config#a-file-as-the-app), a `file:` URL outside that file's directory, or of a directory. On a device with `app.linkBase`, a link whose scheme is `file:`, `data:`, `javascript:`, `view-source:`, `blob:`, or `filesystem:`. |
 | `APP_UNREACHABLE` | The app URL could not be reached. |
 | `ACTION_FAILED` | The operation failed or timed out. |
-| `UNSUPPORTED_CAPABILITY` | No `session.open` on a target with a URL, or no `session.restart` on one without. On a device with no `app.bundleId`, also the target's build not installed yet ([mobile](/reference/mobile#the-app-under-test)). |
+| `INVALID_ARGUMENT` | `options` is not a plain object or has a key other than `relaunch`, or `relaunch` is not a boolean. With `relaunch` on a device, a link whose scheme differs from `app.linkBase`. |
+| `UNSUPPORTED_CAPABILITY` | No `session.open` on a target with a URL, or no `session.restart` on one without. With `relaunch`, no `session.restart` or `session.open` on a target with a URL, or no `linkRelaunch` on a device with `app.linkBase`. On a device with no `app.bundleId`, also the target's build not installed yet ([mobile](/reference/mobile#the-app-under-test)). |
 
 ### `restart`
 
@@ -218,9 +233,10 @@ export interface App {
    * Opens the app: the declared URL, a path relative to it, or any absolute
    * http(s) URL. On a device target, which has no URL, it launches the pinned
    * app fresh; a path opens as a link in it when the target declares
-   * `app.linkBase`.
+   * `app.linkBase`. With `relaunch`, the app starts fresh before the path
+   * opens.
    */
-  open(path?: string): Promise<void>;
+  open(path?: string, options?: AppOpenOptions): Promise<void>;
   /**
    * Recreates the execution context while preserving persisted state, then
    * reopens the app at its base URL when the target declares one.
@@ -246,6 +262,20 @@ export interface App {
    * web one per page it showed: a tab switch or a replaced page starts another.
    */
   stopRecording(): Promise<readonly [RecordedVideo, ...RecordedVideo[]]>;
+}
+
+/** Options for `app.open`. */
+export interface AppOpenOptions {
+  /**
+   * Set to start the app fresh before the path is opened.
+   *
+   * - On a device target with `app.linkBase`, the pinned app is stopped if
+   *   it's running, then launched from the link.
+   * - On a web target, the open tabs are closed and a new one is opened in
+   *   the same browser context, as in `app.restart()`. Then the path is
+   *   opened instead of the base URL.
+   */
+  readonly relaunch?: boolean;
 }
 
 /** How `app.startRecording` names its file. */

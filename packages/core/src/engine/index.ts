@@ -376,6 +376,12 @@ export interface VideoLink {
   readonly startedAt: string;
 }
 
+/** Options for `EngineSession.openLink`. */
+export interface OpenLinkOptions {
+  /** Set to launch the pinned app from the link. The app is stopped first if it's running. */
+  readonly relaunch?: boolean;
+}
+
 /**
  * Steering hooks behind the universal `app` fixture and the agent's
  * `navigate` verb. The app itself is the target's `app`, handed over as data;
@@ -399,9 +405,10 @@ export interface EngineSession {
    * Opens a link in the app under test, as a deep link or a universal link
    * would: `app.open(path)` on a target that declares `app.linkBase` lands
    * here with the link joined and its scheme checked. A device engine's hook;
-   * a target whose engine lacks it cannot declare `linkBase`.
+   * a target whose engine lacks it cannot declare `linkBase`. `options` is
+   * `{ relaunch: true }` only when `linkRelaunch` is declared on the engine.
    */
-  openLink?(url: string, context: OperationContext): Promise<void>;
+  openLink?(url: string, context: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once in the surface's history. */
   back?(context: OperationContext): Promise<void>;
   /** Sets the viewport to `size` in CSS pixels, for this page and every page the attempt opens after it. */
@@ -829,6 +836,17 @@ export interface Engine {
    * that predates the field never drops one silently.
    */
   readonly tapModifiers?: boolean;
+  /**
+   * Set when `{ relaunch: true }` is handled in `session.openLink`. With
+   * `relaunch`, the pinned app is stopped if it's running, then launched from
+   * the link.
+   *
+   * On a target with `app.linkBase`, without it,
+   * `app.open(path, { relaunch: true })` fails with
+   * `UNSUPPORTED_CAPABILITY` before the engine is called, so the link is never
+   * opened in the running app by an engine that predates the field.
+   */
+  readonly linkRelaunch?: boolean;
   /**
    * `prepare` binds the target to the device `EnginePrepareInfo.device`
    * names, for `e2e run --device`, over the device the engine was configured

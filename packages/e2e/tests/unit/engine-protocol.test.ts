@@ -545,6 +545,12 @@ describe('engine protocol', () => {
     await remote.dispose!(cleanup);
   });
 
+  it("keeps the server's linkRelaunch only while the server answers openLink", () => {
+    const linking = toy({ session: { openLink: async () => {} }, linkRelaunch: true });
+    expect(overLoopback(linking).remote.linkRelaunch).toBe(true);
+    expect(overLoopback(linking, { session: { openLink: async () => {} } }).remote.linkRelaunch).toBeUndefined();
+  });
+
   it('answers locators on the client from observations when asked to', async () => {
     const { remote } = overLoopback(toy(), { resolveLocators: true });
     expect(remote.capabilities.has('location')).toBe(true);

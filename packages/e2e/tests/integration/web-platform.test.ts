@@ -213,6 +213,23 @@ test('routes are attempt-scoped: registered before the first page, kept across r
   await expect(screen.getByRole('status', { name: 'Flags' })).toHaveText('beta on');
 });
 
+test('app.open with relaunch opens the path on a fresh page that keeps persisted state', async ({ app, browser, screen }) => {
+  await app.open();
+  await browser.evaluate(() => {
+    sessionStorage.setItem('page', 'first');
+    localStorage.setItem('stored', 'kept');
+  });
+  await app.open('/records/42');
+  const sameTab = await browser.evaluate(() => sessionStorage.getItem('page'));
+  if (sameTab !== 'first') throw new Error('sessionStorage after app.open ' + sameTab);
+  await app.open('/records/43', { relaunch: true });
+  await expect(screen.getByRole('heading', { name: 'Record 43' })).toBeVisible();
+  const page = await browser.evaluate(() => sessionStorage.getItem('page'));
+  if (page !== null) throw new Error('sessionStorage after a relaunch ' + page);
+  const stored = await browser.evaluate(() => localStorage.getItem('stored'));
+  if (stored !== 'kept') throw new Error('localStorage after a relaunch ' + stored);
+});
+
 test('evaluate keeps a nested named binding the loader compiled', async ({ app, browser }) => {
   await app.open();
   // A nested named binding survives serialization whatever the loader
@@ -563,6 +580,7 @@ describe('web platform integration', () => {
     'a textarea value compares raw',
     'toHaveAttribute reads the value attribute of plain fields',
     'routes are attempt-scoped: registered before the first page, kept across restart and clearState',
+    'app.open with relaunch opens the path on a fresh page that keeps persisted state',
     'reads under an absent frame answer with no match',
     'a nested absent frame counts as zero matches at once',
     'absence matchers and waits under an absent frame pass at once',

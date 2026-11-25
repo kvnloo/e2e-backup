@@ -79,6 +79,11 @@ describe('device provider', () => {
     expect(harness({ device: provider().impl }).engine.selectsDevice).toBeUndefined();
   });
 
+  it('declares no linkRelaunch, so app.open(path, { relaunch: true }) is refused before a provider driver opens the link in a running app', () => {
+    expect(harness({ device: provider().impl }).engine.linkRelaunch).toBeUndefined();
+    expect(harness().engine.linkRelaunch).toBe(true);
+  });
+
   it('leases one device per slot at prepare, warms each through its own daemon, and hands the bindings to the workers', async () => {
     const cloud = provider();
     const h = harness({ device: cloud.impl });

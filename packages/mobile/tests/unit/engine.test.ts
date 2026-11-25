@@ -3401,6 +3401,41 @@ describe('device fixture', () => {
     await expect(h.engine.session!.openLink!('javascript:alert(1)', operation())).rejects.toMatchObject({ code: 'POLICY_DENIED' });
   });
 
+  it('relaunches the pinned app from the link for app.open(path, { relaunch: true }) in one agent-device open', async () => {
+    const h = harness({ bundleId: 'dev.e2e.benchmark' });
+    expect(h.engine.linkRelaunch).toBe(true);
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await h.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true });
+    expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([
+      ['apps.open', { platform: 'ios', app: 'dev.e2e.benchmark', url: 'e2e-benchmark://orders/42', relaunch: true }],
+    ]);
+  });
+
+  it('refuses to relaunch from a link on a target with launch arguments or permissions, before any device command', async () => {
+    for (const options of [{ launchArguments: ['-e2e', 'YES'] }, { permissions: { camera: 'grant' as const } }]) {
+      const h = harness({ bundleId: 'dev.e2e.benchmark', ...options });
+      await openAttempt(h);
+      const before = h.fake.calls.length;
+      await expect(h.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
+        code: 'UNSUPPORTED_CAPABILITY',
+        message: expect.stringContaining('app.launchArguments'),
+      });
+      expect(h.fake.calls.slice(before)).toEqual([]);
+    }
+  });
+
+  it.each(['ios', 'android'] as const)('on %s, refuses to relaunch from a link with no pinned app, before any device command', async (platform) => {
+    const h = harness({ platform }, false);
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await expect(h.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('relaunching the app from a link'),
+    });
+    expect(h.fake.calls.slice(before)).toEqual([]);
+  });
+
   it('lets Android route a link without an app, and needs one on iOS, where an unbound open leaves no session', async () => {
     const android = harness({ platform: 'android' }, false);
     await openAttempt(android);

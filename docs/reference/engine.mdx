@@ -137,6 +137,7 @@ rules:
 | `perform`, `actions` | One without the other. An `actions` list that is empty, repeats a kind, or names one outside `KNOWN_LOCATOR_ACTION_KINDS`. |
 | `performAt`, `pointerActions` | One without the other. A `pointerActions` list that is empty, repeats a kind, or names one outside `POINTER_ACTION_KINDS`. |
 | `tapModifiers` | Not a boolean, or `true` without `perform`. |
+| `linkRelaunch` | Not a boolean. |
 | `selectsDevice` | Not a boolean, or `true` without `prepare`. |
 | `grantsAllPermissions` | Not a boolean. |
 | `launchArgumentValues` | Not a boolean. |
@@ -172,6 +173,7 @@ The body of one target. Every member but `name`, `version`, and
 | [`locate`](#capabilities) | method |
 | [`performAt`, `pointerActions`](#pointer-actions) | method, kinds |
 | [`tapModifiers`](#capabilities) | `boolean` |
+| [`linkRelaunch`](#capabilities) | `boolean` |
 | [`selectsDevice`](#capabilities) | `boolean` |
 | [`grantsAllPermissions`](#capabilities) | `boolean` |
 | [`launchArgumentValues`](#engineappinfo) | `boolean` |
@@ -279,6 +281,16 @@ export interface Engine {
    * reaches the engine.
    */
   readonly tapModifiers?: boolean;
+  /**
+   * Set when `{ relaunch: true }` is handled in `session.openLink`. With
+   * `relaunch`, the pinned app is stopped if it's running, then launched from
+   * the link.
+   *
+   * On a target with `app.linkBase`, without it,
+   * `app.open(path, { relaunch: true })` fails with
+   * `UNSUPPORTED_CAPABILITY` before the engine is called.
+   */
+  readonly linkRelaunch?: boolean;
   /**
    * `prepare` binds the target to the device `EnginePrepareInfo.device`
    * names, for `e2e run --device`. Without it the runner refuses the flag
@@ -454,6 +466,7 @@ member. Two gaps end differently:
 | `locate` | `location` | `observe` | `screen`, `Locator`, `expect(locator)`. |
 | `viewportIntersection` | `viewport-intersection` | `locate` | `expect(locator).toBeInViewport()`. |
 | `tapModifiers: true` | - | `perform` | `modifiers` on `tap`, `doubleTap`, `multiTap`, and `secondaryTap`. |
+| `linkRelaunch: true` | - | - | `app.open(path, { relaunch: true })` on a target with `app.linkBase`, through `session.openLink`. |
 | `selectsDevice: true` | - | `prepare` | `e2e run --device`, the device `prepare` binds. |
 | `grantsAllPermissions: true` | - | - | `app.permissions: 'all'`, which the engine receives as `EngineAppInfo.allPermissions`. Without it, config load refuses `'all'`, so an engine released before it never receives the string. |
 | `launchArgumentValues: true` | - | - | The object form of `app.launchArguments`, in `EngineAppInfo.launchArgumentValues`. |
@@ -578,6 +591,7 @@ engine.
 | `locator.screenshot()` | `artifacts`, with `observe` and `locate`; the `scrollIntoView` action when declared |
 | every [`video` mode](/reference/config#recording) but `off`, from the config, a target, a test, or `--video` | `artifacts` |
 | `app.open()` | `session.open`; on a target with no app URL, `session.restart`, or `session.openLink` for a path on a target with `app.linkBase` |
+| `app.open(path, { relaunch: true })` | `session.restart`, then `session.open`. On a target with `app.linkBase`, `linkRelaunch: true` and `session.openLink` |
 | `app.back()` | `session.back` |
 | `app.restart()` | `session.restart` |
 | `app.clearState()` | `session.reset` |
@@ -1634,7 +1648,7 @@ Steering hooks behind the universal `app` fixture and the agent's `navigate`,
 | Hook | Behind |
 | --- | --- |
 | `open(url)` | `app.open()`, the agent's `navigate` verb, the reopen after `restart` and `reset` |
-| `openLink(url)` | `app.open(path)` on a target with `app.linkBase`: the joined link, its scheme checked, opened in the app under test. A target can declare `linkBase` only when its engine has this hook. |
+| `openLink(url, context, options?)` | `app.open(path)` on a target with `app.linkBase`: the joined link, its scheme checked, opened in the app under test. A target can declare `linkBase` only when its engine has this hook. `options` is `{ relaunch: true }` for `app.open(path, { relaunch: true })`, and only on an engine with `linkRelaunch`. With it, the app is stopped if it's running, then launched from the link. |
 | `back()` | `app.back()`, the agent's `back` verb |
 | `resize(size)` | the agent's `resize_viewport` verb; `size` is `{ width, height }` in CSS pixels and holds for the rest of the attempt |
 | `switchTab(index)` | the agent's `switch_tab` verb; `index` is zero-based in the order the tabs opened, as [`tabs`](#observation) counts them. An index with no open tab is `ACTION_FAILED`. |
@@ -1650,6 +1664,12 @@ session: {
 ```
 
 ```ts
+/** Options for `EngineSession.openLink`. */
+export interface OpenLinkOptions {
+  /** Set to launch the pinned app from the link. The app is stopped first if it's running. */
+  readonly relaunch?: boolean;
+}
+
 /**
  * Steering hooks behind the universal `app` fixture and the agent's
  * `navigate` verb. The app itself is the target's `app`, handed over as data;
@@ -1673,9 +1693,10 @@ export interface EngineSession {
    * Opens a link in the app under test, as a deep link or a universal link
    * would: `app.open(path)` on a target that declares `app.linkBase` lands
    * here with the link joined and its scheme checked. A device engine's hook;
-   * a target whose engine lacks it cannot declare `linkBase`.
+   * a target whose engine lacks it cannot declare `linkBase`. `options` is
+   * `{ relaunch: true }` only when `linkRelaunch` is declared on the engine.
    */
-  openLink?(url: string, context: OperationContext): Promise<void>;
+  openLink?(url: string, context: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once in the surface's history. */
   back?(context: OperationContext): Promise<void>;
   /** Sets the viewport to `size` in CSS pixels, for this page and every page the attempt opens after it. */

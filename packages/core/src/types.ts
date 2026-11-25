@@ -694,9 +694,10 @@ export interface App {
   /**
    * Opens the app: the declared URL, a path relative to it, or any absolute
    * http(s) URL. On a device target, which has no URL, it launches the pinned
-   * app fresh and takes no path.
+   * app fresh and takes no path. With `relaunch`, the app starts fresh before
+   * the path opens.
    */
-  open(path?: string): Promise<void>;
+  open(path?: string, options?: AppOpenOptions): Promise<void>;
   /**
    * Recreates the execution context while preserving persisted state, then
    * reopens the app at its base URL when the target declares one.
@@ -722,6 +723,20 @@ export interface App {
    * web one per page it showed: a tab switch or a replaced page starts another.
    */
   stopRecording(): Promise<readonly [RecordedVideo, ...RecordedVideo[]]>;
+}
+
+/** Options for `app.open`. */
+export interface AppOpenOptions {
+  /**
+   * Set to start the app fresh before the path is opened.
+   *
+   * - On a device target with `app.linkBase`, the pinned app is stopped if
+   *   it's running, then launched from the link.
+   * - On a web target, the open tabs are closed and a new one is opened in
+   *   the same browser context, as in `app.restart()`. Then the path is
+   *   opened instead of the base URL.
+   */
+  readonly relaunch?: boolean;
 }
 
 /** How `app.startRecording` names its file. */

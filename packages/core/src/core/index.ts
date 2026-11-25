@@ -12,6 +12,7 @@ export type { EngineHandle } from '../engine/index.ts';
 export type {
   ActionOptions,
   App,
+  AppOpenOptions,
   AppPermissionState,
   ClickOptions,
   Expectable,

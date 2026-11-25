@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { defineEngine, EngineError, type EngineHandle, LOCATOR_ACTION_KINDS, TestError } from '@e2e-dev/core/lib/engine/index';
+import { defineEngine, EngineError, type EngineHandle, LOCATOR_ACTION_KINDS, type OpenLinkOptions, TestError } from '@e2e-dev/core/lib/engine/index';
 import { createEngineSession } from '@e2e-dev/core/lib/engine/session';
 import { resolveConfig } from '../../src/config/resolve-run.ts';
 import { credentials, secrets, setSecretRegistry } from '@e2e-dev/core/lib/secrets';
@@ -17,6 +17,9 @@ import type { E2EConfig } from '../../src/run-types.ts';
 import { installFakeLoopModel } from '../helpers/fake-loop-model.ts';
 import { extracted, fakeCalls, installFakeModel, judgment, notFound } from '../helpers/fake-model.ts';
 import { snapshot } from '../helpers/snapshot.ts';
+
+/** One session hook call a fake device engine records. */
+type SessionCall = { readonly method: 'restart' | 'openLink'; readonly url?: string; readonly options?: OpenLinkOptions | undefined };
 
 /** A real fixture graph with an in-memory engine and no runner process or model provider. */
 function runtime(engine: EngineHandle, overrides: Partial<E2EConfig> = {}, app?: TargetApp) {
@@ -815,6 +818,74 @@ describe('app steering hooks', () => {
     expect(runtime(empty()).fixtures.app.baseUrl).toBeUndefined();
   });
 
+  it('app.open(path, { relaunch: true }) restarts, then opens the path, as one app.open step', async () => {
+    const { engine, calls, app } = steerable({ url: 'http://127.0.0.1:4599' });
+    const { fixtures, steps } = runtime(engine, {}, app);
+    await fixtures.app.open('/orders/42', { relaunch: true });
+    await fixtures.app.open('/orders/43', { relaunch: false });
+    await fixtures.app.open(undefined, { relaunch: true });
+    expect(calls).toEqual([
+      'restart',
+      'open http://127.0.0.1:4599/orders/42',
+      'open http://127.0.0.1:4599/orders/43',
+      'restart',
+      'open http://127.0.0.1:4599/',
+    ]);
+    expect(steps.all().map((step) => [step.api, step.label, step.status])).toEqual([
+      ['app.open', '/orders/42', 'passed'],
+      ['app.open', '/orders/43', 'passed'],
+      ['app.open', '/', 'passed'],
+    ]);
+  });
+
+  it('app.open(path, { relaunch: true }) refuses a forbidden URL before it restarts', async () => {
+    const { engine, calls, app } = steerable({ url: 'http://127.0.0.1:4599' });
+    const { fixtures } = runtime(engine, {}, app);
+    await expect(fixtures.app.open('javascript:alert(1)', { relaunch: true })).rejects.toMatchObject({ code: 'POLICY_DENIED' });
+    expect(calls).toEqual([]);
+  });
+
+  it('app.open(path, { relaunch: true }) needs both session.restart and session.open, and restarts nothing without them', async () => {
+    const calls: string[] = [];
+    const opener = defineEngine({
+      name: 'fake', version: '1', spiVersion: 1,
+      observe: async () => snapshot([]),
+      session: { open: async (url) => { calls.push(`open ${url}`); } },
+    });
+    await expect(runtime(opener, {}, { url: 'http://127.0.0.1:4599' }).fixtures.app.open('/orders/42', { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+    });
+    const restarter = defineEngine({
+      name: 'fake', version: '1', spiVersion: 1,
+      observe: async () => snapshot([]),
+      session: { restart: async () => { calls.push('restart'); } },
+    });
+    await expect(runtime(restarter, {}, { url: 'http://127.0.0.1:4599' }).fixtures.app.open('/orders/42', { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('has no session.open'),
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('app.open with invalid options fails before any engine call', async () => {
+    const { engine, calls, app } = steerable({ url: 'http://127.0.0.1:4599' });
+    const { fixtures, steps } = runtime(engine, {}, app);
+    await expect(fixtures.app.open('/', { relanch: true } as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: 'app.open options has no key "relanch"; it takes relaunch',
+    });
+    await expect(fixtures.app.open('/', { relaunch: 'yes' } as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: 'app.open relaunch must be a boolean',
+    });
+    await expect(fixtures.app.open('/', true as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      message: 'app.open options must be a plain object',
+    });
+    expect(calls).toEqual([]);
+    expect(steps.all()).toEqual([]);
+  });
+
   it('reopen nothing on a surface without an address', async () => {
     const { engine, calls, app } = steerable({});
     const { fixtures } = runtime(engine, {}, app);
@@ -859,6 +930,66 @@ describe('app steering hooks', () => {
       code: 'UNSUPPORTED_CAPABILITY',
       message: expect.stringContaining('does not relaunch a pinned app'),
     });
+  });
+
+  /** Creates a device engine with `session.openLink`. Pass `false` to leave out `linkRelaunch`. */
+  function linking(linkRelaunch = true) {
+    const calls: SessionCall[] = [];
+    const engine = defineEngine({
+      name: 'fake', version: '1', spiVersion: 1,
+      observe: async () => snapshot([]),
+      session: {
+        restart: async () => { calls.push({ method: 'restart' }); },
+        openLink: async (url, _operation, options) => { calls.push({ method: 'openLink', url, options }); },
+      },
+      ...(linkRelaunch ? { linkRelaunch: true } : {}),
+    });
+    return { engine, calls, app: { bundleId: 'com.example.shop', linkBase: 'shopapp://' } };
+  }
+
+  it('app.open(path, { relaunch: true }) on a device asks the engine to relaunch the app from the link', async () => {
+    const { engine, calls, app } = linking();
+    const { fixtures, steps } = runtime(engine, {}, app);
+    await fixtures.app.open('/orders/42', { relaunch: true });
+    await fixtures.app.open('/orders/43');
+    expect(calls).toEqual([
+      { method: 'openLink', url: 'shopapp://orders/42', options: { relaunch: true } },
+      { method: 'openLink', url: 'shopapp://orders/43', options: undefined },
+    ]);
+    expect(steps.all().map((step) => [step.api, step.label, step.status])).toEqual([
+      ['app.open', '/orders/42', 'passed'],
+      ['app.open', '/orders/43', 'passed'],
+    ]);
+  });
+
+  it('app.open(path, { relaunch: true }) on an engine without linkRelaunch fails with UNSUPPORTED_CAPABILITY instead of opening the link in the running app', async () => {
+    const { engine, calls, app } = linking(false);
+    const { fixtures } = runtime(engine, {}, app);
+    await expect(fixtures.app.open('/orders/42', { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('does not declare linkRelaunch'),
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('app.open(undefined, { relaunch: true }) on a device launches the pinned app fresh, as app.open() does', async () => {
+    const { engine, calls, app } = linking();
+    const { fixtures } = runtime(engine, {}, app);
+    await fixtures.app.open(undefined, { relaunch: true });
+    expect(calls).toEqual([{ method: 'restart' }]);
+  });
+
+  it('app.open(link, { relaunch: true }) on a device refuses a link with a scheme other than app.linkBase, before the app stops', async () => {
+    const { engine, calls, app } = linking();
+    const { fixtures } = runtime(engine, {}, app);
+    await expect(fixtures.app.open('otherapp://orders/42', { relaunch: true })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(calls).toEqual([]);
+    await fixtures.app.open('shopapp://orders/42', { relaunch: true });
+    await fixtures.app.open('otherapp://orders/42');
+    expect(calls).toEqual([
+      { method: 'openLink', url: 'shopapp://orders/42', options: { relaunch: true } },
+      { method: 'openLink', url: 'otherapp://orders/42', options: undefined },
+    ]);
   });
 
   it("app.open() keeps the engine's own reason it cannot launch", async () => {

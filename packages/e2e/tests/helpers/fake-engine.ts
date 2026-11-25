@@ -21,6 +21,7 @@ import type {
   LocatorExpression,
   NodeRef,
   ObservationPixels,
+  OpenLinkOptions,
   OperationContext,
   PointerAction,
   PointerActionKind,
@@ -75,6 +76,7 @@ export interface RecordedSessionCall {
   readonly attemptId: string;
   readonly method: 'open' | 'openLink' | 'back' | 'restart' | 'reset';
   readonly url?: string;
+  readonly relaunch?: boolean;
 }
 
 /** What the test's actions asked the engine to do, with their payloads. */
@@ -144,7 +146,7 @@ export interface FakeEngineBehavior {
    * the app, opening the scene at the fake's location. Overrides `navigation`.
    */
   device?: boolean;
-  /** With `device`, declares `session.openLink`: every call is a `session` record, and the app opens at the link. */
+  /** With `device`, declares `session.openLink`: every call is a `session` record, and the app opens at the link. `linkRelaunch` is declared with it. */
   links?: boolean;
   /** Declares the state capability. */
   state?: boolean;
@@ -325,9 +327,9 @@ export function createFakeEngine(behavior: FakeEngineBehavior = {}): FakeEngineH
       },
       ...(behavior.links === true
         ? {
-            async openLink(url: string, operation: OperationContext) {
+            async openLink(url: string, operation: OperationContext, options?: OpenLinkOptions) {
               record('session.openLink', operation);
-              calls.push({ kind: 'session', attemptId: operation.attemptId, method: 'openLink', url });
+              calls.push({ kind: 'session', attemptId: operation.attemptId, method: 'openLink', url, ...(options?.relaunch === true ? { relaunch: true } : {}) });
               sceneOf(operation)?.open(url);
             },
           }
@@ -370,6 +372,7 @@ export function createFakeEngine(behavior: FakeEngineBehavior = {}): FakeEngineH
       await behavior.perform?.(ref, action, operation, current);
     },
     ...(behavior.tapModifiers === undefined ? {} : { tapModifiers: behavior.tapModifiers }),
+    ...(behavior.device === true && behavior.links === true ? { linkRelaunch: true } : {}),
     ...(behavior.isolation === undefined ? {} : { isolation: behavior.isolation }),
     ...(behavior.pointerActions === undefined
       ? {}
