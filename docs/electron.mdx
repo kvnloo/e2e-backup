@@ -60,8 +60,7 @@ export default {
 
 To test a packaged app, set `electron({ executablePath })` to its binary, such as
 `'dist/mac/MyApp.app/Contents/MacOS/MyApp'` (not the `.app` directory),
-and leave out `appPath`. The app gets the run's environment, without
-`ELECTRON_RUN_AS_NODE`, plus `electron({ env })`.
+and leave out `appPath`.
 
 ## Write a test
 
@@ -130,20 +129,14 @@ The `electron` fixture has these methods:
 
 ## Options
 
-| Option | Type | Default |
-| --- | --- | --- |
-| `executablePath` | `string` | the project's `electron` |
-| `args` | `string[]` | `[]` |
-| `env` | `Record<string, string>` | `{}` |
-| `launchTimeout` | `number` | `30000` |
-| `testIdAttribute` | `string` | `'data-testid'` |
-| `settle` | `number \| false` | `100` |
-
-`args` are Electron and Chromium switches, passed before the app path. The
-engine sets `--user-data-dir` itself. `launchTimeout` is how long
-`app.open()` waits for the first window, in milliseconds. `settle` is how
-long the engine waits after an agent action before the agent reads the
-screen.
+| Option | Type | Default | What it sets |
+| --- | --- | --- | --- |
+| `executablePath` | `string` | the project's `electron` | The binary to start, such as a packaged app's |
+| `args` | `string[]` | `[]` | Electron and Chromium switches, passed before the app path. Not `--user-data-dir`, which the engine sets |
+| `env` | `Record<string, string>` | `{}` | Variables added to the app's environment: the run's, without `ELECTRON_RUN_AS_NODE` |
+| `launchTimeout` | `number` | `30000` | How long `app.open()` waits for the first window, in milliseconds |
+| `testIdAttribute` | `string` | `'data-testid'` | The attribute `getByTestId` reads |
+| `settle` | `number \| false` | `100` | How long the engine waits after an agent action before the agent reads the screen |
 
 ## Next
 
