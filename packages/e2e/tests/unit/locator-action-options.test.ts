@@ -68,7 +68,7 @@ function boxScreen() {
   return { screen, steps, performed, actions, locate };
 }
 
-/** Creates a screen over the box with the given actions and tap flags, recording every lookup and action. */
+/** Creates a screen with the given actions and tap flags, recording lookups and actions. */
 function tapScreen(flags: Pick<ScreenOverOptions, 'actions' | 'tapModifiers' | 'tapButtons'> = {}) {
   const received: LocatorAction[] = [];
   const locate = vi.fn(async (expression: LocatorExpression) => resolveExpression(expression, NODES));
@@ -84,7 +84,7 @@ function tapScreen(flags: Pick<ScreenOverOptions, 'actions' | 'tapModifiers' | '
   return { screen, steps, received, locate };
 }
 
-/** Creates a screen with a positioned box and every pointer action, recording lookups and point actions. */
+/** Creates a screen with a positioned box and all pointer actions, recording lookups and point actions. */
 function pointScreen(flags: { tapButtons?: boolean } = {}) {
   const box = { ...BOX, rect: { x: 10, y: 20, width: 100, height: 40 } };
   const at: { action: PointerAction; point: { x: number; y: number } }[] = [];
@@ -325,7 +325,7 @@ describe('locator action options', () => {
       ]);
     });
 
-    it('sends a right click as a secondaryTap that does not need tapButtons', async () => {
+    it('sends a right click as secondaryTap so engines without tapButtons support it', async () => {
       const { screen, steps, received } = tapScreen({ tapModifiers: true });
       await screen.getByLabel('Agree').tap({ button: 'right' });
       await screen.getByLabel('Agree').click({ button: 'right', modifiers: ['Alt'] });

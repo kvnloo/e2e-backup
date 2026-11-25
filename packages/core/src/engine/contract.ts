@@ -311,7 +311,7 @@ type TapActions =
     }
   | {
       readonly kind: 'doubleTap';
-      /** Mouse button for both clicks (left when unset). Sent only to an engine that declares `tapButtons`. */
+      /** Mouse button for both clicks (defaults to left). Sent only to engines that declare `tapButtons`. */
       readonly button?: 'middle' | 'right';
     }
   | { readonly kind: 'secondaryTap' }
@@ -325,7 +325,7 @@ type TapActions =
        */
       readonly kind: 'multiTap';
       readonly count: number;
-      /** Mouse button for every click (left when unset). Sent only to an engine that declares `tapButtons`. */
+      /** Mouse button for every click (defaults to left). Sent only to engines that declare `tapButtons`. */
       readonly button?: 'middle' | 'right';
     };
 

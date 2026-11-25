@@ -332,7 +332,11 @@ substring; a `RegExp` matches as written.
 
 Each action resolves one node, waits up to `config.actionTimeout` (30 s, or
 `{ timeout }`) for it to be actionable, and does one thing: `tap()` (alias
-`click()`, with the `button` and `count` options below),
+`click()`, `{ button: 'middle' }` or `{ button: 'right' }` clicks with that
+mouse button, and `{ count: 3 }` taps three times in a row, a triple click in
+a browser. `count` is a positive safe integer. `2` is `doubleTap()`, and 3 or
+more need `multiTap`, up to 200 on browser and mobile, and browser-only with
+`position`),
 `doubleTap()` (alias `dblclick()`),
 `secondaryTap()` (each takes `{ modifiers: ['Shift'] }`),
 `longPress({ duration? })`
@@ -344,16 +348,9 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 (paths relative to the project root, or `{ name, mimeType, buffer: Buffer }` payloads, singly or as an array; `[]` clears; a missing path, or one under a directory the runner cannot search, is `INVALID_ARGUMENT`), `dragTo(locator)`, `scrollIntoView()`,
 `swipe({ direction, momentum? })`. Web only, `UNSUPPORTED_CAPABILITY` on a
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
-and `modifiers`.
-
-`tap({ button: 'middle' })` or `tap({ button: 'right' })` clicks with that
-mouse button. A single right click works on web and desktop. Only the web
-engine supports middle clicks and repeated right clicks. The mobile engine
-doesn't support the middle or the right button. `tap({ count: 3 })` taps three
-times in a row, a triple click in a browser. `count` is a positive safe
-integer, and `2` is `doubleTap()`. 3 or more need the engine's `multiTap`. The
-browser and mobile engines have it, and both refuse more than 200. With
-`position`, 3 or more work in a browser only.
+and `modifiers`. `tap({ button: 'right' })` does a single right click on web
+and desktop. Only the web engine supports middle or repeated right clicks.
+Mobile doesn't support either button.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the

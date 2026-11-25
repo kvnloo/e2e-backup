@@ -403,7 +403,7 @@ describe('createEngineSession', () => {
     await expect(none.performAt({ x: 1, y: 1 }, { kind: 'tap' }, OP)).rejects.toThrow(/point/);
   });
 
-  it('refuses a button on a node and at a point before dispatch when tapButtons is not declared', async () => {
+  it('refuses button on nodes and points before dispatch when tapButtons is not declared', async () => {
     const calls: string[] = [];
     const session = createEngineSession({
       engine: defineEngine(

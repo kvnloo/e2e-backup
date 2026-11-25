@@ -103,7 +103,7 @@ describe('manifest', () => {
     expect([...pinned.capabilities].toSorted()).toEqual(['actions', 'artifacts', 'device', 'keyboard', 'location', 'observation', 'pointer', 'viewport-intersection']);
     expect(pinned.name).toBe('mobile');
     expect(describeEngine(pinned).launchArgumentValues).toBe(true);
-    // Without `tapButtons`, core refuses a middle click or a repeated right click before waiting for the node.
+    // Without `tapButtons`, core rejects a middle click or right click with `count` above 1 before waiting.
     expect(describeEngine(pinned).tapButtons).toBeUndefined();
     expect(pinned.version).not.toBe('unknown');
     expect(Object.keys(pinned.session!).toSorted()).toEqual(['back', 'openLink', 'reset', 'restart']);

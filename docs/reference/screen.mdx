@@ -701,9 +701,9 @@ The options are [`TapOptions`](#types):
 
 - `button`: the mouse button to click with, `left` (default), `middle`, or
   `right`. Works with `count` and `position`, like Playwright's
-  `click({ button, clickCount, position })`. A right tap with a `count` of 1
-  is the same as [`secondaryTap()`](#secondarytap). Only the browser engine
-  supports middle taps or right taps with a `count` above 1. On
+  `click({ button, clickCount, position })`. A right tap with `count` 1 is the
+  same as [`secondaryTap()`](#secondarytap). Only the browser engine supports
+  middle taps or right taps with `count` above 1. On
   Chromium, a tab opened by a middle click on a link isn't listed by
   `tabs()` or seen by `waitForPopup` (see [Tabs](/reference/web#tabs)).
 - `count`: how many taps in a row, a positive safe integer, default 1. In a
@@ -712,8 +712,7 @@ The options are [`TapOptions`](#types):
   `count: 2` is the same action as [`doubleTap()`](#doubletap). Three or more
   need an engine that lists the `multiTap` action; the browser and mobile
   engines both do. With `position`, 2 taps need the `doubleTap` pointer
-  action, and 3 or more need the `multiTap` pointer action (browser engine
-  only).
+  action and 3 or more need `multiTap` (browser engine only).
 - `modifiers`: the browser engine holds them.
 - `position`: an offset from the node's top-left corner, inside its border,
   in CSS pixels. The engine scrolls the node into view when it lists
@@ -727,7 +726,7 @@ The options are [`TapOptions`](#types):
 | `INVALID_ARGUMENT` | A `button` other than `left`, `middle`, or `right`. |
 | `UNSUPPORTED_CAPABILITY` | `modifiers` on an engine that does not declare `tapModifiers`, the mobile engine among them; thrown before it acts. |
 | `UNSUPPORTED_CAPABILITY` | A `count` of 3 or more on an engine without the `multiTap` action, or above the engine's limit (200 on the browser and mobile engines); thrown before it acts. |
-| `UNSUPPORTED_CAPABILITY` | A middle `button`, or a right `button` with a `count` above 1, on an engine without `tapButtons` (such as the mobile engine). Thrown before the engine acts. |
+| `UNSUPPORTED_CAPABILITY` | A middle `button`, or a right `button` with `count` above 1, on an engine without `tapButtons` (such as mobile). Thrown before acting. |
 | `UNSUPPORTED_CAPABILITY` | A single right tap on an engine that doesn't list `secondaryTap`. A `secondaryTap()` call fails the same way. |
 | `UNSUPPORTED_CAPABILITY` | `position` on an engine without the pointer action for the tap: `tap`, `doubleTap` for a `count` of 2, `multiTap` for 3 or more, or `secondaryTap` for a single right tap. |
 | `ACTION_FAILED` | `position` on a node the browser engine cannot bring into view; its scroll waits for visibility. Other engines fail as they report it. |

@@ -881,8 +881,8 @@ function validateSwipeDuration(duration: number | undefined): number | undefined
  * Returns the pointer action for `count` presses of `button`. The left button
  * is used when `button` is undefined.
  *
- * - 1 press: `tap`, or `secondaryTap` for the right button, so an engine with
- *   `secondaryTap` doesn't need `tapButtons` for it.
+ * - 1 press: `tap`, or `secondaryTap` for the right button so engines with
+ *   `secondaryTap` don't need `tapButtons`.
  * - 2 presses: `doubleTap`.
  * - 3 or more: `multiTap`.
  *

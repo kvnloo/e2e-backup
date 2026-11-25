@@ -498,11 +498,7 @@ describe('an action cancelled while its stand-in read is in flight', () => {
   });
 });
 
-/**
- * A link with 20 pixels of padding, so its text starts 20 pixels in. It logs
- * each click event as `<type> b<button> d<detail> x<offset from its left
- * edge>`, plus `shift` and `alt` when they're held.
- */
+/** Padded link (20px) that logs each click event as `<type> b<button> d<detail> x<offset> [shift] [alt]`. */
 const PRESSED_LINK = `<a href="/next" id="next" style="display: inline-block; padding: 20px">Next</a>
 <script>
   window.pressed = [];
@@ -564,7 +560,7 @@ describe.each(KINDS)('a mouse button, through the %s target', (kind) => {
     await page.setContent(PRESSED_LINK);
     expect(await perform(await targetOf(kind, '#next'), { kind: 'multiTap', count: 201, button: 'middle' })).toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY',
-      message: expect.stringContaining('the browser engine clicks at most 200 times in a row (got 201)'),
+      message: expect.stringContaining('the browser engine clicks at most 200 times in a row, got 201'),
     });
     expect(await pressed()).toEqual([]);
   });
