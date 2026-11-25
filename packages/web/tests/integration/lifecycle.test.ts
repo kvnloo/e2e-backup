@@ -351,9 +351,10 @@ describe('web engine lifecycle', () => {
         expect(afterMenu?.text).toBe('context menu');
 
         // Every pointer kind at a bare point, read back from the page's event log.
-        expect(engine.pointerActions).toEqual(['tap', 'doubleTap', 'secondaryTap', 'longPress', 'hover', 'dragTo', 'swipe', 'swipeTo']);
+        expect(engine.pointerActions).toEqual(['tap', 'doubleTap', 'secondaryTap', 'longPress', 'hover', 'dragTo', 'swipe', 'swipeTo', 'multiTap']);
         await engine.performAt!({ x: 150, y: 350 }, { kind: 'tap' }, op());
         await engine.performAt!({ x: 160, y: 360 }, { kind: 'doubleTap' }, op());
+        await engine.performAt!({ x: 165, y: 365 }, { kind: 'multiTap', count: 3 }, op());
         await engine.performAt!({ x: 170, y: 370 }, { kind: 'secondaryTap' }, op());
         await engine.performAt!({ x: 180, y: 380 }, { kind: 'longPress', durationMs: 120 }, op());
         await engine.performAt!({ x: 190, y: 390 }, { kind: 'hover' }, op());
@@ -364,7 +365,8 @@ describe('web engine lifecycle', () => {
         const [log] = await engine.locate!({ kind: 'selector', selector: '#log' }, op());
         const lines = (log?.text ?? '').split('\n').filter((line) => line !== '');
         expect(lines).toContain('click:150,350');
-        expect(lines.filter((line) => line.startsWith('dblclick:'))).toEqual(['dblclick:160,360']);
+        expect(lines.filter((line) => line.startsWith('dblclick:'))).toEqual(['dblclick:160,360', 'dblclick:165,365']);
+        expect(lines.filter((line) => line === 'click:165,365')).toHaveLength(3);
         expect(lines).toContain('contextmenu:170,370');
         expect(lines).toContain('mousedown:180,380');
         expect(lines).toContain('mouseup:180,380');

@@ -209,8 +209,8 @@ export class LocatorEngine {
    * resolved: an undeclared kind, or modifiers on an engine that does not
    * declare `tapModifiers`, is `UNSUPPORTED_CAPABILITY`, a `press` key
    * outside the grammar is `INVALID_ARGUMENT`. Waiting for a node the engine
-   * could never act on would report it as missing instead. A middle button
-   * on an engine without `tapButtons` is refused the same way.
+   * could never act on would report it as missing instead. A `button` on an
+   * engine without `tapButtons` is refused the same way.
    */
   private checkAction(action: LocatorAction): void {
     if (!this.session.actions.has(action.kind)) {
@@ -244,8 +244,11 @@ export class LocatorEngine {
     if (action.kind === 'press') requireKey(action.key);
   }
 
-  /** Refuses a pointer action the session would refuse: an undeclared kind is `UNSUPPORTED_CAPABILITY`. */
-  private checkPointerAction(action: Pick<PointerAction, 'kind'>): void {
+  /**
+   * Refuses a pointer action the session would refuse: an undeclared kind,
+   * or a `button` on an engine without `tapButtons`, is `UNSUPPORTED_CAPABILITY`.
+   */
+  private checkPointerAction(action: ScreenPointerAction): void {
     if (!this.session.pointerActions.has(action.kind)) {
       throw new ConfigurationError(
         'UNSUPPORTED_CAPABILITY',
@@ -254,6 +257,12 @@ export class LocatorEngine {
             ? 'no pointer actions'
             : [...this.session.pointerActions].join(', ')
         }`,
+      );
+    }
+    if ('button' in action && action.button !== undefined && !this.session.tapButtons) {
+      throw new ConfigurationError(
+        'UNSUPPORTED_CAPABILITY',
+        `the ${action.button} button on the "${action.kind}" action at a point is not available on this target: its engine does not declare tapButtons`,
       );
     }
   }

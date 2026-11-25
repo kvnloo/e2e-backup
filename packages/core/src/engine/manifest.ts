@@ -9,7 +9,7 @@ import { engineBrand } from '../internal/brands.ts';
 import { ConfigurationError } from '../internal/errors.ts';
 import { obj } from '../internal/objects.ts';
 import { isSecret } from '../secrets.ts';
-import { ENGINE_SPI_VERSION, KNOWN_LOCATOR_ACTION_KINDS, POINTER_ACTION_KINDS } from './contract.ts';
+import { ENGINE_SPI_VERSION, KNOWN_LOCATOR_ACTION_KINDS, KNOWN_POINTER_ACTION_KINDS } from './contract.ts';
 import type { Secret } from '../types.ts';
 import type { Engine, EngineCapability, EngineFixtureContext, EngineHandle, EngineIsolation } from './index.ts';
 
@@ -344,7 +344,7 @@ export function defineEngine<
   if (spec.fileApps === true) handle['fileApps'] = true;
   if (spec.isolation === 'worker') handle['isolation'] = 'worker';
   if (spec.pointerActions !== undefined) {
-    handle['pointerActions'] = declaredKinds(name, 'pointerActions', spec.pointerActions, POINTER_ACTION_KINDS);
+    handle['pointerActions'] = declaredKinds(name, 'pointerActions', spec.pointerActions, KNOWN_POINTER_ACTION_KINDS);
   }
   if (spec.fixtures !== undefined) {
     if (!isRecord(spec.fixtures)) throw invalid(name, 'fixtures must be an object');

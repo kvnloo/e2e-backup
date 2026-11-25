@@ -94,6 +94,7 @@ export function pointerInteraction(
       }
       return input.send(() => client.interactions.swipe({ from: at, to, ...stabilization }));
     }
+    case 'multiTap':
     case 'secondaryTap':
     case 'hover':
     case 'dragTo':

@@ -3,7 +3,7 @@
 import nodePath from 'node:path';
 import { describeValue } from '../config/validate.ts';
 import { isKeyModifier, KEY_MODIFIERS, type KeyModifier } from '../engine/contract.ts';
-import type { LocatorAction, LocatorExpression, Observation, SemanticNode } from '../engine/surface.ts';
+import type { LocatorAction, LocatorExpression, Observation, PointerAction, SemanticNode } from '../engine/surface.ts';
 import { locatorBrand } from '../internal/brands.ts';
 import { isSecret } from '../secrets.ts';
 import { TestError } from '../internal/errors.ts';
@@ -147,6 +147,8 @@ const ABSENCE_STATES: ReadonlySet<string> = new Set(['detached', 'hidden']);
 type WaitForState = NonNullable<NonNullable<Parameters<Locator['waitFor']>[0]>['state']>;
 /** The actions a tap, click, double tap, or secondary tap sends. */
 type TapAction = Extract<LocatorAction, { kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'multiTap' }>;
+/** The pointer actions a tap or click at a position sends. */
+type PointTapAction = Extract<PointerAction, { kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'multiTap' }>;
 
 /**
  * Whether the one match, or its absence, is in `state`: `attached` is any
@@ -421,8 +423,8 @@ class LocatorImpl extends ScreenImpl implements Locator {
    * pointer dispatched at that offset of the node's box. Two taps are the
    * `doubleTap` kind, so `tap({ count: 2 })` is `doubleTap()` on every
    * engine; three or more are `multiTap`. A left click is sent without
-   * `button`, so it works on an engine without `tapButtons`. A right click
-   * is the `secondaryTap` kind.
+   * `button`, so it works on an engine without `tapButtons`. A single right
+   * click is the `secondaryTap` kind.
    */
   private tapWith(api: 'tap' | 'click', options: TapOptions | undefined): Promise<void> {
     rejectUnknownOptions(api, options, ['timeout', 'position', 'modifiers', 'count', 'button']);
@@ -432,32 +434,18 @@ class LocatorImpl extends ScreenImpl implements Locator {
     if (button !== undefined && button !== 'middle' && button !== 'right') {
       throw new TestError('INVALID_ARGUMENT', `${api}() button ${describeValue(button)} is not one of left, middle, right`);
     }
-    if (button !== undefined && count !== 1) {
-      throw new TestError('INVALID_ARGUMENT', `${api}() does not take count with the ${button} button yet; drop one of them`);
-    }
-    if (options?.position === undefined) {
-      if (button === 'right') return this.dispatchTap(api, { kind: 'secondaryTap', ...modifiers }, options?.timeout);
-      if (count === 1) {
-        return this.dispatchTap(api, { kind: 'tap', ...modifiers, ...(button === undefined ? {} : { button }) }, options?.timeout);
-      }
-      if (count === 2) return this.dispatchTap(api, { kind: 'doubleTap', ...modifiers }, options?.timeout, count);
-      return this.dispatchTap(api, { kind: 'multiTap', count, ...modifiers }, options?.timeout, count);
-    }
-    if (count !== 1) {
-      throw new TestError('INVALID_ARGUMENT', `${api}() does not take count with a position yet; drop one of them`);
-    }
+    const action = tapAction(count, button);
+    const times = count === 1 ? undefined : count;
+    if (options?.position === undefined) return this.dispatchTap(api, { ...action, ...modifiers }, options?.timeout, times);
     if (modifiers.modifiers !== undefined) {
       throw new TestError('INVALID_ARGUMENT', `${api}() does not take modifiers with a position yet; drop one of them`);
-    }
-    if (button !== undefined) {
-      throw new TestError('INVALID_ARGUMENT', `${api}() does not take the ${button} button with a position yet; drop one of them`);
     }
     const position = requirePoint(options.position, `${api} position`);
     return this.context.steps.run(
       'locator',
       `locator.${api}`,
-      `${this.label} at ${describePoint(position)}`,
-      () => this.context.engine.performWithin(this.expression, position, { kind: 'tap' }, options.timeout),
+      `${this.tapLabel(api, action, times)} at ${describePoint(position)}`,
+      () => this.context.engine.performWithin(this.expression, position, action, options.timeout),
     );
   }
 
@@ -483,23 +471,27 @@ class LocatorImpl extends ScreenImpl implements Locator {
     return this.dispatchTap(api, { kind, ...requireModifiers(options?.modifiers, api) }, options?.timeout);
   }
 
-  /**
-   * One tap-family action as a step labelled after the node, then the
-   * `count` the caller asked for when it names one, then the mouse button
-   * and the keys held.
-   */
+  /** Runs one tap-family action as a step labelled by `tapLabel`. */
   private dispatchTap(api: string, action: TapAction, timeout: number | undefined, count?: number): Promise<void> {
+    return this.context.steps.run('locator', `locator.${api}`, this.tapLabel(api, action, count), () =>
+      this.context.engine.perform(this.expression, action, timeout),
+    );
+  }
+
+  /**
+   * Labels a tap step after the node, then the `count` the caller asked for
+   * when it names one, then the mouse button and the keys held. A right tap
+   * through `tap` or `click` is a `secondaryTap`, so its button is named here.
+   */
+  private tapLabel(api: string, action: TapAction | PointTapAction, count: number | undefined): string {
     const times = count === undefined ? '' : ` ${count} times`;
     const rightTap = action.kind === 'secondaryTap' && api !== 'secondaryTap';
     const button = rightTap ? 'right' : 'button' in action ? action.button : undefined;
     const held = [
       ...(button === undefined ? [] : [`the ${button} button`]),
-      ...(action.modifiers === undefined ? [] : [action.modifiers.join('+')]),
+      ...('modifiers' in action && action.modifiers !== undefined ? [action.modifiers.join('+')] : []),
     ];
-    const label = `${this.label}${times}${held.length === 0 ? '' : ` with ${held.join(' and ')}`}`;
-    return this.context.steps.run('locator', `locator.${api}`, label, () =>
-      this.context.engine.perform(this.expression, action, timeout),
-    );
+    return `${this.label}${times}${held.length === 0 ? '' : ` with ${held.join(' and ')}`}`;
   }
 
   longPress(options?: LongPressOptions): Promise<void> {
@@ -890,6 +882,21 @@ function validateSwipeDuration(duration: number | undefined): number | undefined
 }
 
 /** A tap `count`: a positive safe integer, 1 when unset. Each engine keeps its own upper limit. */
+/**
+ * Returns the pointer-side action for `count` presses of `button`, the
+ * primary one when it's undefined. A single right press is `secondaryTap`, the
+ * right click every pointer engine already takes. Two presses are
+ * `doubleTap`, and more are `multiTap`. The node action is the same with the
+ * held keys spread in.
+ */
+function tapAction(count: number, button: 'middle' | 'right' | undefined): PointTapAction {
+  const pressed = button === undefined ? {} : { button };
+  if (count === 2) return { kind: 'doubleTap', ...pressed };
+  if (count > 2) return { kind: 'multiTap', count, ...pressed };
+  if (button === 'right') return { kind: 'secondaryTap' };
+  return { kind: 'tap', ...(button === undefined ? {} : { button }) };
+}
+
 function requireTapCount(value: unknown, api: string): number {
   if (value === undefined) return 1;
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {

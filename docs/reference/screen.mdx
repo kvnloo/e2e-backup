@@ -700,15 +700,19 @@ await screen.getByRole('link', 'Docs').click({ button: 'middle' });
 The options are [`TapOptions`](#types):
 
 - `button`: the mouse button for the click, `left` (default), `middle`, or
-  `right`. A right tap is a [`secondaryTap`](#secondarytap). On Chromium, a
-  tab opened by a middle click on a link isn't listed by `tabs()` or seen by
-  `waitForPopup` (see [Tabs](/reference/web#tabs)).
+  `right`. It works with `count` and `position`, like Playwright's
+  `click({ button, clickCount, position })`. A single right tap is a
+  [`secondaryTap`](#secondarytap). On Chromium, a tab opened by a middle click
+  on a link isn't listed by `tabs()` or seen by `waitForPopup` (see
+  [Tabs](/reference/web#tabs)).
 - `count`: how many taps in a row, a positive safe integer, default 1. In a
   browser the clicks arrive as one multi-click, so a triple click selects a
   paragraph. On a device they are `count` presses at the `doubleTap` cadence.
   `count: 2` is the same action as [`doubleTap()`](#doubletap). Three or more
   need an engine that lists the `multiTap` action; the browser and mobile
-  engines both do.
+  engines both do. With `position`, 2 taps need the `doubleTap` pointer
+  action and 3 or more the `multiTap` one, which only the browser engine
+  lists.
 - `modifiers`: the browser engine holds them.
 - `position`: an offset from the node's top-left corner, inside its border,
   in CSS pixels. The engine scrolls the node into view when it lists
@@ -718,13 +722,13 @@ The options are [`TapOptions`](#types):
 
 | Throws | When |
 | --- | --- |
-| `INVALID_ARGUMENT` | An unknown or repeated modifier, `modifiers` beside `position`, a `count` that is not a positive safe integer, or a `count` above 1 beside `position`. |
-| `INVALID_ARGUMENT` | A `button` other than `left`, `middle`, or `right`, or a middle or right `button` beside `position` or a `count` above 1. |
+| `INVALID_ARGUMENT` | An unknown or repeated modifier, `modifiers` beside `position`, or a `count` that is not a positive safe integer. |
+| `INVALID_ARGUMENT` | A `button` other than `left`, `middle`, or `right`. |
 | `UNSUPPORTED_CAPABILITY` | `modifiers` on an engine that does not declare `tapModifiers`, the mobile engine among them; thrown before it acts. |
 | `UNSUPPORTED_CAPABILITY` | A `count` of 3 or more on an engine without the `multiTap` action, or above the engine's limit (200 on the mobile engine); thrown before it acts. |
-| `UNSUPPORTED_CAPABILITY` | A middle `button` on an engine without `tapButtons` (such as the mobile engine). Thrown before any action. |
-| `UNSUPPORTED_CAPABILITY` | A right `button` on an engine that doesn't list `secondaryTap`, as with `secondaryTap()`. |
-| `UNSUPPORTED_CAPABILITY` | `position` on an engine without the `tap` pointer action. |
+| `UNSUPPORTED_CAPABILITY` | A middle `button`, or a right one with a `count` above 1, on an engine without `tapButtons` (such as the mobile engine). Thrown before any action. |
+| `UNSUPPORTED_CAPABILITY` | A single right tap on an engine that doesn't list `secondaryTap`, as with `secondaryTap()`. |
+| `UNSUPPORTED_CAPABILITY` | `position` on an engine without the pointer action for the tap: `tap`, `doubleTap` for a `count` of 2, `multiTap` for 3 or more, or `secondaryTap` for a single right tap. |
 | `ACTION_FAILED` | `position` on a node the browser engine cannot bring into view; its scroll waits for visibility. Other engines fail as they report it. |
 | `LOCATOR_NOT_FOUND` | `position` on a node that resolves but never shows a visible box within the timeout. |
 
@@ -1524,14 +1528,15 @@ export interface TapOptions extends ClickOptions {
    * same as `doubleTap()`; 3 or more needs an engine that declares the
    * `multiTap` action, `UNSUPPORTED_CAPABILITY` otherwise. A count above the
    * engine's own limit (200 on the mobile engine) is also
-   * `UNSUPPORTED_CAPABILITY`. A count above 1 is not combined with `position`.
+   * `UNSUPPORTED_CAPABILITY`. With `position`, 2 needs the engine's
+   * `doubleTap` pointer action and 3 or more its `multiTap` one.
    */
   count?: number;
   /**
    * The mouse button to click with: `left` (default), `middle`, or `right`.
-   * A right tap is a `secondaryTap`. A middle tap needs an engine that
-   * declares `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise. Neither can be
-   * combined with `position` or a `count` above 1 yet.
+   * A single right tap is a `secondaryTap`. Any other middle or right tap (a
+   * middle tap, or a `count` above 1) needs an engine that declares
+   * `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise.
    */
   button?: 'left' | 'middle' | 'right';
 }

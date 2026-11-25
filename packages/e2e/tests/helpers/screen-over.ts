@@ -17,6 +17,7 @@ import {
   type NodeRef,
   type OperationContext,
   type PointerAction,
+  type PointerActionKind,
   type SemanticNode,
   type ViewportPoint,
   type ViewportIntersection,
@@ -39,8 +40,10 @@ export interface ScreenOverOptions {
   readonly perform?: (ref: NodeRef, action: LocatorAction, operation: OperationContext) => void | Promise<void>;
   /** Action kinds the engine declares with `perform`; default every kind. */
   readonly actions?: readonly LocatorActionKind[];
-  /** Receives every pointer action at a viewport point; with it the engine declares the `tap` pointer action. */
+  /** Receives every pointer action at a viewport point; with it the engine declares `pointerActions`. */
   readonly performAt?: (point: ViewportPoint, action: PointerAction) => void | Promise<void>;
+  /** Pointer action kinds the engine declares with `performAt`; default `tap` alone. */
+  readonly pointerActions?: readonly PointerActionKind[];
   /** Answers every `viewportIntersection`; without it the engine declares none. */
   readonly viewportIntersection?: (ref: NodeRef) => ViewportIntersection | Promise<ViewportIntersection>;
   /** The keyboard the engine declares, if any. */
@@ -79,7 +82,7 @@ export function screenOver(options: ScreenOverOptions): { screen: Screen; steps:
     ...(performAt === undefined
       ? {}
       : {
-          pointerActions: ['tap'] as const,
+          pointerActions: options.pointerActions ?? ['tap'],
           performAt: async (point: ViewportPoint, action: PointerAction) => {
             await performAt(point, action);
           },

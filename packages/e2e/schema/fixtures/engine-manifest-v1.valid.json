@@ -28,6 +28,7 @@
   ],
   "actions": ["tap", "doubleTap", "multiTap", "longPress", "fill", "clear", "press", "check", "uncheck", "focus", "scrollIntoView", "dragTo", "swipe"],
   "pointerActions": ["tap", "doubleTap", "longPress", "dragTo", "swipe", "swipeTo"],
+  "tapButtons": false,
   "selectsDevice": true,
   "grantsAllPermissions": true,
   "launchArgumentValues": true,

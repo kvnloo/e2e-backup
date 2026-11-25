@@ -288,35 +288,46 @@ test('clicks hold the modifiers they name', async ({ app, screen, browser }) => 
   await expect(status).toHaveText('click');
 });
 
-test('taps are pressed with the mouse button they name', async ({ app, screen, browser }) => {
+test('taps are pressed with the mouse button they name, as often and where they say', async ({ app, screen, browser }) => {
   await app.open();
   await browser.evaluate(() => {
-    document.body.innerHTML = '<a href="/next">Next</a><p role="status"></p>';
+    document.body.innerHTML = '<a href="/next" style="display: inline-block; padding: 20px">Next</a>';
     const link = document.querySelector('a')!;
-    const status = document.querySelector('p')!;
-    const pressed = (event: MouseEvent) => {
-      event.preventDefault();
-      // Chromium follows a right click's contextmenu with an auxclick for button 2.
-      if (event.type === 'auxclick' && event.button === 2) return;
-      status.textContent = [event.type, event.button, event.shiftKey && 'shift', event.ctrlKey && 'ctrl', event.altKey && 'alt']
-        .filter((part) => part !== false)
-        .join(' ');
-    };
-    link.addEventListener('click', pressed);
-    link.addEventListener('auxclick', pressed);
-    link.addEventListener('contextmenu', pressed);
+    const log: string[] = [];
+    (window as unknown as { pressed: string[] }).pressed = log;
+    for (const type of ['click', 'auxclick', 'contextmenu']) {
+      link.addEventListener(type, (event) => {
+        event.preventDefault();
+        const mouse = event as MouseEvent;
+        const x = Math.round(mouse.clientX - link.getBoundingClientRect().left);
+        log.push([type, 'b' + mouse.button, 'd' + mouse.detail, 'x' + x, mouse.shiftKey && 'shift', mouse.ctrlKey && 'ctrl', mouse.altKey && 'alt'].filter(Boolean).join(' '));
+      });
+    }
     return null;
   });
   const next = screen.getByRole('link', { name: 'Next' });
-  const status = screen.getByRole('status');
-  await next.tap({ button: 'middle' });
-  await expect(status).toHaveText('auxclick 1');
-  await next.click({ button: 'middle', modifiers: ['Shift', 'Control'] });
-  await expect(status).toHaveText('auxclick 1 shift ctrl');
-  await next.tap({ button: 'right', modifiers: ['Alt'] });
-  await expect(status).toHaveText('contextmenu 2 alt');
-  await next.tap({ button: 'left' });
-  await expect(status).toHaveText('click 0');
+  const pressed = async (options: Parameters<typeof next.tap>[0]) => {
+    await browser.evaluate(() => {
+      (window as unknown as { pressed: string[] }).pressed.length = 0;
+      return null;
+    });
+    await next.tap(options);
+    return browser.evaluate(() => (window as unknown as { pressed: string[] }).pressed);
+  };
+  const onNode = (events: string[]) => events.map((event) => event.replace(/ x\\d+/, ''));
+  expect(onNode(await pressed({ button: 'middle' }))).toEqual(['auxclick b1 d1']);
+  expect(onNode(await pressed({ button: 'middle', modifiers: ['Shift', 'Control'] }))).toEqual(['auxclick b1 d1 shift ctrl']);
+  expect(onNode(await pressed({ button: 'right', modifiers: ['Alt'] }))).toEqual(['contextmenu b2 d0 alt', 'auxclick b2 d1 alt']);
+  expect(onNode(await pressed({ button: 'left' }))).toEqual(['click b0 d1']);
+  expect(onNode(await pressed({ button: 'middle', count: 2 }))).toEqual(['auxclick b1 d1', 'auxclick b1 d2']);
+  expect(onNode(await pressed({ button: 'right', count: 3 }))).toEqual([
+    'contextmenu b2 d0', 'auxclick b2 d1', 'contextmenu b2 d0', 'auxclick b2 d2', 'contextmenu b2 d0', 'auxclick b2 d3',
+  ]);
+  expect(await pressed({ button: 'middle', position: { x: 5, y: 5 } })).toEqual(['auxclick b1 d1 x5']);
+  expect(await pressed({ button: 'right', count: 2, position: { x: 7, y: 5 } })).toEqual([
+    'contextmenu b2 d0 x7', 'auxclick b2 d1 x7', 'contextmenu b2 d0 x7', 'auxclick b2 d2 x7',
+  ]);
+  expect(await pressed({ count: 3, position: { x: 9, y: 5 } })).toEqual(['click b0 d1 x9', 'click b0 d2 x9', 'click b0 d3 x9']);
 });
 
 test('a trigger that starts no download times out saying so', async ({ app, browser }) => {
@@ -600,7 +611,7 @@ describe('web platform integration', () => {
     'a *css= capture is refused before the last selector part',
     'downloads are captured as artifacts',
     'clicks hold the modifiers they name',
-    'taps are pressed with the mouse button they name',
+    'taps are pressed with the mouse button they name, as often and where they say',
     'a viewport set before the first navigation holds through app.open',
     'an empty class attribute is an empty class list',
     'reads wait for a node that arrives late',

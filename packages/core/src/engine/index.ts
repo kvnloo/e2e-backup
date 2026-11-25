@@ -80,6 +80,7 @@ export {
   KEY_MODIFIERS,
   KEY_NAMES,
   KNOWN_LOCATOR_ACTION_KINDS,
+  KNOWN_POINTER_ACTION_KINDS,
   LOCATOR_ACTION_KINDS,
   OBSERVED_NAME_LIMIT,
   OBSERVED_TEXT_LIMIT,
@@ -830,13 +831,14 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set when `button` on the `tap` action is honored by `perform`, for
-   * middle clicks. Without it, `tap({ button: 'middle' })` fails with
-   * `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left or right
-   * tap doesn't need it.
+   * Set when `button` is honored on the tap actions: `tap`, `doubleTap`, and
+   * `multiTap` for `perform`, and the same kinds for `performAt`. Without it,
+   * an action with a `button` fails with `UNSUPPORTED_CAPABILITY` before it
+   * reaches the engine. A left tap and a single right tap (`secondaryTap`)
+   * don't need it.
    *
    * The button is never sent to an engine written before this field, so a
-   * middle click can't turn into a primary click there.
+   * middle or right click can't turn into a primary click there.
    */
   readonly tapButtons?: boolean;
   /**

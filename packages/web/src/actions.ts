@@ -30,6 +30,11 @@ function heldKeys(action: Extract<LocatorAction, { kind: 'tap' | 'doubleTap' | '
   return action.modifiers === undefined ? {} : { modifiers: [...action.modifiers] };
 }
 
+/** The mouse button of a tap-family action, as Playwright's `button` takes it; left out for the primary one. */
+function pressed(action: { readonly button?: 'middle' | 'right' }): { button?: 'middle' | 'right' } {
+  return action.button === undefined ? {} : { button: action.button };
+}
+
 /** Playwright's words for an element handle whose element left the DOM. */
 const DETACHED_PATTERN = /element (is |was )?(detached|not attached)/i;
 
@@ -167,7 +172,7 @@ function controlPoint(label: HTMLLabelElement): { x: number; y: number } | null 
 async function clickControl(
   target: ActionTarget,
   verb: 'tap' | 'check' | 'uncheck',
-  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; button?: 'middle' },
+  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; button?: 'middle' | 'right' },
 ): Promise<void> {
   const { signal, ...click } = options;
   const deadline = new Deadline(options.timeout);
@@ -294,15 +299,15 @@ export async function dispatchLocatorAction(
         timeout,
         signal: operation.signal,
         ...heldKeys(action),
-        ...(action.button === undefined ? {} : { button: action.button }),
+        ...pressed(action),
       });
       return;
     case 'doubleTap':
-      await locator.dblclick({ timeout, ...heldKeys(action) });
+      await locator.dblclick({ timeout, ...heldKeys(action), ...pressed(action) });
       return;
     case 'multiTap':
       // One click sequence with a rising `detail`, as a person's triple click is.
-      await locator.click({ clickCount: action.count, timeout, ...heldKeys(action) });
+      await locator.click({ clickCount: action.count, timeout, ...heldKeys(action), ...pressed(action) });
       return;
     case 'secondaryTap':
       await locator.click({ button: 'right', timeout, ...heldKeys(action) });
@@ -417,10 +422,13 @@ export async function dispatchPointerAction(
   const point = nearestPixel(at);
   switch (action.kind) {
     case 'tap':
-      await mouse.click(point.x, point.y);
+      await mouse.click(point.x, point.y, pressed(action));
       return;
     case 'doubleTap':
-      await mouse.dblclick(point.x, point.y);
+      await mouse.dblclick(point.x, point.y, pressed(action));
+      return;
+    case 'multiTap':
+      await mouse.click(point.x, point.y, { clickCount: action.count, ...pressed(action) });
       return;
     case 'secondaryTap':
       await mouse.click(point.x, point.y, { button: 'right' });

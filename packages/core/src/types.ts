@@ -500,14 +500,15 @@ export interface TapOptions extends ClickOptions {
    * same as `doubleTap()`; 3 or more needs an engine that declares the
    * `multiTap` action, `UNSUPPORTED_CAPABILITY` otherwise. A count above the
    * engine's own limit (200 on the mobile engine) is also
-   * `UNSUPPORTED_CAPABILITY`. A count above 1 is not combined with `position`.
+   * `UNSUPPORTED_CAPABILITY`. With `position`, 2 needs the engine's
+   * `doubleTap` pointer action and 3 or more its `multiTap` one.
    */
   count?: number;
   /**
    * The mouse button to click with: `left` (default), `middle`, or `right`.
-   * A right tap is a `secondaryTap`. A middle tap needs an engine that
-   * declares `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise. Neither can be
-   * combined with `position` or a `count` above 1 yet.
+   * A single right tap is a `secondaryTap`. Any other middle or right tap (a
+   * middle tap, or a `count` above 1) needs an engine that declares
+   * `tapButtons`, `UNSUPPORTED_CAPABILITY` otherwise.
    */
   button?: 'left' | 'middle' | 'right';
 }

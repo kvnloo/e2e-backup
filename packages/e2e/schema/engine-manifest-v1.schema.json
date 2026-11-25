@@ -113,7 +113,8 @@
           "hover",
           "dragTo",
           "swipe",
-          "swipeTo"
+          "swipeTo",
+          "multiTap"
         ]
       }
     },

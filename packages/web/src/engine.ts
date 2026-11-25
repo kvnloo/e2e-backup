@@ -144,7 +144,7 @@ export function web(options: WebOptions = {}): WebEngine<'web', 'attempt'> {
     tapButtons: true,
     // A page takes every pointer action of the contract at a bare point too.
     performAt: (point, action, operation) => surface.performAt(point, action, operation),
-    pointerActions: POINTER_ACTION_KINDS,
+    pointerActions: [...POINTER_ACTION_KINDS, 'multiTap'],
     keyboard: {
       type: (text, keyboardOptions, operation) => surface.typeText(text, keyboardOptions, operation),
       press: (key, operation) => surface.pressKey(key, operation),

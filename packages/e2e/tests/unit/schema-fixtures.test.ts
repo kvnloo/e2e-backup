@@ -61,13 +61,34 @@ describe.each(schemas)('%s schema', (name) => {
       expect(validate.errors).toEqual([expect.objectContaining({ instancePath: '/actions', keyword: 'uniqueItems' })]);
     });
 
-    it('rejects the invalid fixture for viewportIntersection without engine/observe and for a non-boolean fileApps', () => {
+    it('rejects the invalid fixture for viewportIntersection without engine/observe, and for a non-boolean fileApps and tapButtons', () => {
       expect(validate(readJson('fixtures', 'engine-manifest-v1.invalid.json'))).toBe(false);
       expect(validate.errors).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ instancePath: '/methods', keyword: 'contains' }),
           expect.objectContaining({ instancePath: '/fileApps', keyword: 'type' }),
+          expect.objectContaining({ instancePath: '/tapButtons', keyword: 'type' }),
         ]),
+      );
+    });
+
+    it('accepts a web manifest with tapButtons and the multiTap pointer action, and refuses tapButtons without engine/perform', () => {
+      const web = {
+        name: 'web', version: '0.1.0', spiVersion: 1, platform: 'web',
+        methods: ['engine/observe', 'engine/perform', 'engine/performAt'],
+        actions: ['tap', 'multiTap'],
+        pointerActions: ['tap', 'multiTap'],
+        tapButtons: true,
+      };
+      expect(validate(web)).toBe(true);
+      expect(validate({
+        name: 'web', version: '0.1.0', spiVersion: 1,
+        methods: ['engine/observe', 'engine/performAt'],
+        pointerActions: ['tap'],
+        tapButtons: true,
+      })).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([expect.objectContaining({ instancePath: '/methods', keyword: 'contains', schemaPath: expect.stringContaining('/then/') })]),
       );
     });
 

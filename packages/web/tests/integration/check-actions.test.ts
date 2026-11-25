@@ -4,8 +4,8 @@
  * observation. A control the app replaces or navigates away from once it is
  * picked took the click, so the action is done; a control the click never
  * reached stays a stale node, one that commits its state after a timer is
- * waited for, and one the click never changes fails at the deadline. A
- * middle tap and a secondary tap press the mouse button they name.
+ * waited for, and one the click never changes fails at the deadline. A tap
+ * with a mouse button presses that button, on a node and at a point.
  */
 
 import { createServer, type Server } from 'node:http';
@@ -13,7 +13,7 @@ import type { AddressInfo } from 'node:net';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { LocatorAction, SemanticNode } from '@e2e-dev/core/engine';
-import { classifyActionError, dispatchLocatorAction } from '../../src/actions.ts';
+import { classifyActionError, dispatchLocatorAction, dispatchPointerAction } from '../../src/actions.ts';
 import { ElementList } from '../../src/element-list.ts';
 import { captureDocument } from '../../src/observation.ts';
 import type { ActionTarget } from '../../src/support.ts';
@@ -498,29 +498,88 @@ describe('an action cancelled while its stand-in read is in flight', () => {
   });
 });
 
-/** A link that writes the type, button, and held keys of each click it gets into the paragraph below it. */
-const PRESSED_LINK = `<a href="/next" id="next">Next</a><p id="pressed"></p>
+/**
+ * A padded link that logs every click event it gets, as the event type, then
+ * `b` and the button, `d` and the detail, `x` and the offset from its left
+ * edge, then the held keys. The link's text starts 20 pixels in.
+ */
+const PRESSED_LINK = `<a href="/next" id="next" style="display: inline-block; padding: 20px">Next</a>
 <script>
-  const pressed = (event) => {
-    event.preventDefault();
-    document.getElementById('pressed').textContent = [event.type, event.button, event.shiftKey && 'shift', event.altKey && 'alt']
-      .filter((part) => part !== false)
-      .join(' ');
-  };
-  document.getElementById('next').addEventListener('auxclick', (event) => event.button === 1 && pressed(event));
-  document.getElementById('next').addEventListener('contextmenu', pressed);
+  window.pressed = [];
+  const link = document.getElementById('next');
+  for (const type of ['click', 'auxclick', 'contextmenu']) {
+    link.addEventListener(type, (event) => {
+      event.preventDefault();
+      const x = Math.round(event.clientX - link.getBoundingClientRect().left);
+      window.pressed.push([event.type, 'b' + event.button, 'd' + event.detail, 'x' + x, event.shiftKey && 'shift', event.altKey && 'alt'].filter(Boolean).join(' '));
+    });
+  }
 </script>`;
+
+/** The click events the link logged since the page loaded. */
+function pressed(): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as { pressed: string[] }).pressed);
+}
 
 describe.each(KINDS)('a mouse button, through the %s target', (kind) => {
   it('fires auxclick with button 1 for a middle tap, holding its modifiers', async () => {
     await page.setContent(PRESSED_LINK);
     expect(await perform(await targetOf(kind, '#next'), { kind: 'tap', button: 'middle', modifiers: ['Shift'] })).toBeUndefined();
-    expect(await page.textContent('#pressed')).toBe('auxclick 1 shift');
+    expect(await pressed()).toEqual([expect.stringMatching(/^auxclick b1 d1 x\d+ shift$/)]);
   });
 
   it('fires contextmenu with button 2 for a secondary tap, holding its modifiers', async () => {
     await page.setContent(PRESSED_LINK);
     expect(await perform(await targetOf(kind, '#next'), { kind: 'secondaryTap', modifiers: ['Alt'] })).toBeUndefined();
-    expect(await page.textContent('#pressed')).toBe('contextmenu 2 alt');
+    expect((await pressed())[0]).toMatch(/^contextmenu b2 d0 x\d+ alt$/);
+  });
+
+  it('presses the middle button twice for a double tap, with a rising detail', async () => {
+    await page.setContent(PRESSED_LINK);
+    expect(await perform(await targetOf(kind, '#next'), { kind: 'doubleTap', button: 'middle' })).toBeUndefined();
+    expect((await pressed()).map((event) => event.replace(/ x\d+/, ''))).toEqual(['auxclick b1 d1', 'auxclick b1 d2']);
+  });
+
+  it('presses the right button three times for a multi-tap, opening the menu each time', async () => {
+    await page.setContent(PRESSED_LINK);
+    expect(await perform(await targetOf(kind, '#next'), { kind: 'multiTap', count: 3, button: 'right' })).toBeUndefined();
+    const events = (await pressed()).map((event) => event.replace(/ x\d+/, ''));
+    expect(events.filter((event) => event.startsWith('contextmenu'))).toEqual(['contextmenu b2 d0', 'contextmenu b2 d0', 'contextmenu b2 d0']);
+    expect(events.at(-1)).toBe('auxclick b2 d3');
+  });
+});
+
+describe('a mouse button at a point', () => {
+  /** The viewport point `dx` pixels into the link, 5 pixels down. */
+  async function into(dx: number): Promise<{ x: number; y: number }> {
+    const box = await page.locator('#next').boundingBox();
+    if (box === null) throw new Error('the link has no box');
+    return { x: box.x + dx, y: box.y + 5 };
+  }
+
+  it('presses the middle button at the point', async () => {
+    await page.setContent(PRESSED_LINK);
+    await dispatchPointerAction(page, await into(5), { kind: 'tap', button: 'middle' });
+    expect(await pressed()).toEqual(['auxclick b1 d1 x5']);
+  });
+
+  it('double-presses the middle button at the point', async () => {
+    await page.setContent(PRESSED_LINK);
+    await dispatchPointerAction(page, await into(6), { kind: 'doubleTap', button: 'middle' });
+    expect(await pressed()).toEqual(['auxclick b1 d1 x6', 'auxclick b1 d2 x6']);
+  });
+
+  it('presses the right button three times at the point', async () => {
+    await page.setContent(PRESSED_LINK);
+    await dispatchPointerAction(page, await into(7), { kind: 'multiTap', count: 3, button: 'right' });
+    const events = await pressed();
+    expect(events.filter((event) => event.startsWith('contextmenu'))).toEqual(['contextmenu b2 d0 x7', 'contextmenu b2 d0 x7', 'contextmenu b2 d0 x7']);
+    expect(events.at(-1)).toBe('auxclick b2 d3 x7');
+  });
+
+  it('clicks three times at the point with the primary button for a multi-tap without one', async () => {
+    await page.setContent(PRESSED_LINK);
+    await dispatchPointerAction(page, await into(8), { kind: 'multiTap', count: 3 });
+    expect(await pressed()).toEqual(['click b0 d1 x8', 'click b0 d2 x8', 'click b0 d3 x8']);
   });
 });
