@@ -315,6 +315,9 @@ export class ElectronSurface {
       ...(launchArguments ?? []),
     ];
     const timeout = Math.max(1, Math.min(operation.timeoutMs, this.options.launchTimeoutMs));
+    // One budget for the whole launch: each phase gets what the ones before it left.
+    const ends = Date.now() + timeout;
+    const left = (): number => Math.max(1, ends - Date.now());
     let app: ElectronApplication;
     const launching = _electron.launch({ executablePath: this.executable, args, cwd: this.projectRoot, env: this.launchEnv(), timeout });
     try {
@@ -341,19 +344,27 @@ export class ElectronSurface {
     });
     for (const page of app.windows()) this.track(app, page);
     try {
-      const first = await raceAbort(() => app.firstWindow({ timeout }), operation.signal, 'waiting for the first window');
+      const first = await raceAbort(() => app.firstWindow({ timeout: left() }), operation.signal, 'waiting for the first window');
       this.track(app, first);
-      await raceAbort(() => first.waitForLoadState('domcontentloaded', { timeout }), operation.signal, 'waiting for the first window to load');
+      await raceAbort(() => first.waitForLoadState('domcontentloaded', { timeout: left() }), operation.signal, 'waiting for the first window to load');
     } catch (cause) {
       await this.quit({ timeoutMs: 5_000 });
       if (cause instanceof EngineError) throw cause;
       throw new EngineError('OPERATION_TIMEOUT', `the app opened no window within ${timeout}ms`, { retryable: false, cause });
     }
+    let timer: NodeJS.Timeout | undefined;
     try {
-      const versions = await app.evaluate(() => ({ electron: process.versions.electron ?? '', chromium: process.versions.chrome ?? '' }));
+      const versions = await Promise.race([
+        app.evaluate(() => ({ electron: process.versions.electron ?? '', chromium: process.versions.chrome ?? '' })),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('no time left to read the versions')), ends - Date.now());
+        }),
+      ]);
       attempt.environment({ electron: versions.electron, chromium: versions.chromium });
     } catch {
-      // A packaged app may disable the inspector's evaluation; the versions are provenance only.
+      // A packaged app may disable the inspector's evaluation, or the launch spent its budget; the versions are provenance only.
+    } finally {
+      clearTimeout(timer);
     }
   }
 
