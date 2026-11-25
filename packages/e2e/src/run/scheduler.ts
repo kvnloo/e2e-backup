@@ -1210,11 +1210,13 @@ class Scheduler {
    * Attempts the worker finished stand. The test in flight gets a
    * `WORKER_CRASH` attempt after them when the crash landed during an
    * attempt; one between attempts (an `afterAll` after the last) is recorded
-   * on the last attempt instead, whose cleanup it forced. A serial group in
-   * flight gets a failed group attempt after its finished ones. A worker the
-   * run's interrupt stopped charges no crash: a test keeps the attempts it
-   * finished and the verdict they reach, as a retry the interrupt cut short
-   * does, and a serial group's attempt in flight is recorded interrupted.
+   * on the last attempt instead, whose cleanup it forced; a setup's passed
+   * last attempt fails with it, since its dependents skip as setup failed.
+   * A serial group in flight gets a failed group attempt after its finished
+   * ones. A worker the run's interrupt stopped charges no crash: a test keeps
+   * the attempts it finished and the verdict they reach, as a retry the
+   * interrupt cut short does, and a serial group's attempt in flight is
+   * recorded interrupted.
    *
    * A worker the watchdog killed hung in one attempt: that attempt timed out
    * (`TEST_TIMEOUT`, after the attempts before it, never retried), and the
@@ -1296,6 +1298,17 @@ class Scheduler {
       }
       const last = finished.at(-1);
       if (last !== undefined && running === undefined) {
+        // Its dependents skip as setup failed (`markSessionsFailed`), so a
+        // setup that passed and then died fails too.
+        if (pair.test.kind === 'setup' && last.status === 'passed') {
+          this.report(
+            finishedResult(pair, [
+              ...finished.slice(0, -1),
+              { ...last, status: 'failed', error: crash, cleanup: 'forced' },
+            ]),
+          );
+          continue;
+        }
         this.report(
           finishedResult(pair, [
             ...finished.slice(0, -1),

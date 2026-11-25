@@ -1508,6 +1508,83 @@ describe('scheduler fault handling', () => {
     expect(collected.runErrors.some((error) => error.error.code === 'WORKER_INIT_FAILED')).toBe(true);
   });
 
+  it('fails a setup whose worker dies after its passed attempt, matching the dependents it skips', async () => {
+    const target = makeTarget('web', 0);
+    const setup = makePair(
+      makeTest('tests/setup.e2e.ts', 'login', {
+        kind: 'setup',
+        sessions: ['user'],
+        id: 'setup::user',
+      }),
+      target,
+    );
+    const dependent = makePair(makeTest('tests/a.e2e.ts', 'a'), target, {
+      options: { ...defaultOptions, session: 'user' },
+    });
+    const pairs = [setup, dependent];
+    const fleet = new FakeFleet({
+      hangOn: ['setup::web::setup::user'],
+      attemptsBeforeHang: [{ ...PASSED_RETRY, id: 'attempt-0', index: 0 }],
+      exitInsteadOfHang: true,
+    });
+
+    const collected = await run(
+      makeSelection([{ target, pairs }]),
+      makeCollection(
+        pairs.map((pair) => pair.test.file),
+        pairs,
+      ),
+      fleet,
+      { workers: 1 },
+    );
+
+    const setupResult = collected.results.find((result) => result.test.id === 'setup::user');
+    expect(setupResult?.status).toBe('failed');
+    expect(setupResult?.attempts).toEqual([
+      expect.objectContaining({ id: 'attempt-0', status: 'failed', cleanup: 'forced', error: expect.objectContaining({ code: 'WORKER_CRASH' }) }),
+    ]);
+    const dependentResult = collected.results.find((result) => result.test.id === dependent.test.id);
+    expect([dependentResult?.status, dependentResult?.skip?.cause]).toEqual(['skipped', 'setup-failed']);
+  });
+
+  it('fails a flaky setup whose worker dies after its passing retry', async () => {
+    const target = makeTarget('web', 0);
+    const setup = makePair(
+      makeTest('tests/setup.e2e.ts', 'login', { kind: 'setup', sessions: ['user'], id: 'setup::user' }),
+      target,
+    );
+    const fleet = new FakeFleet({
+      hangOn: ['setup::web::setup::user'],
+      attemptsBeforeHang: [FAILED_ATTEMPT, PASSED_RETRY],
+      exitInsteadOfHang: true,
+    });
+
+    const collected = await run(makeSelection([{ target, pairs: [setup] }]), makeCollection([setup.test.file], [setup]), fleet, { workers: 1 });
+
+    expect(collected.results.map((result) => result.status)).toEqual(['failed']);
+    expect(collected.results[0]?.attempts.map((attempt) => [attempt.status, attempt.error?.code])).toEqual([
+      ['failed', FAILED_ATTEMPT.error?.code],
+      ['failed', 'WORKER_CRASH'],
+    ]);
+  });
+
+  it('keeps an ordinary test passed when its worker dies after its passed attempt', async () => {
+    const target = makeTarget('web', 0);
+    const pair = makePair(makeTest('tests/a.e2e.ts', 'a'), target);
+    const fleet = new FakeFleet({
+      hangOn: ['file::web::tests/a.e2e.ts'],
+      attemptsBeforeHang: [{ ...PASSED_RETRY, id: 'attempt-0', index: 0 }],
+      exitInsteadOfHang: true,
+    });
+
+    const collected = await run(makeSelection([{ target, pairs: [pair] }]), makeCollection([pair.test.file], [pair]), fleet, { workers: 1 });
+
+    expect(collected.results.map((result) => result.status)).toEqual(['passed']);
+    expect(collected.results[0]?.attempts).toEqual([
+      expect.objectContaining({ status: 'passed', cleanup: 'forced', secondaryErrors: [expect.objectContaining({ code: 'WORKER_CRASH' })] }),
+    ]);
+  });
+
   it('a forced interrupt tears busy workers down at once instead of waiting out the grace', async () => {
     const target = makeTarget('web', 0);
     const pairs = ['a', 'b'].map((name) => makePair(makeTest(`tests/${name}.e2e.ts`, name), target));
