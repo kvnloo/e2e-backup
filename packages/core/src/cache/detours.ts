@@ -23,8 +23,10 @@
  */
 
 import { routeKey } from './route.ts';
-import { placeholdersAsIds } from './template.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
+
+/** What the detour check reads of a trace. */
+type DetourInput = Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated' | 'detours'>;
 
 /** One stretch of a recording that left a screen and came back to it with nothing typed, chosen, or set on the way. */
 export interface TraceDetour {
@@ -110,11 +112,28 @@ function tappedRole(action: RecordedAction): string | undefined {
 }
 
 /**
- * Every detour in a recording, in order and never overlapping. Read by
- * locations when any action carries one, else by the actions' shape alone.
+ * Every detour in a recording, in order and never overlapping: the ones the
+ * recording run found, when the entry keeps them, since a stored location
+ * spells each `unique()` value as a placeholder and no longer compares the
+ * way the run's did; else read by locations when any action carries one,
+ * else by the actions' shape alone.
  */
-export function findDetours(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'>): TraceDetour[] {
+export function findDetours(trace: DetourInput): TraceDetour[] {
+  if (trace.detours !== undefined) return recorded(trace);
   return trace.actions.some((action) => action.at !== undefined) ? byLocations(trace) : byActions(trace.actions);
+}
+
+/**
+ * The spans the recording run kept, named by the locations as stored: the
+ * screen the span started on, and the first other location it reached.
+ */
+function recorded(trace: DetourInput): TraceDetour[] {
+  const where = places(trace);
+  return (trace.detours ?? []).map(({ from, to }) => {
+    const at = where[from];
+    const via = where.slice(from + 1, to).find((place) => place !== undefined && place !== at);
+    return { from, to, ...(at === undefined ? {} : { at }), ...(via === undefined ? {} : { via }), evidence: 'locations' as const };
+  });
 }
 
 /**
@@ -124,7 +143,7 @@ export function findDetours(trace: Pick<ActionTrace, 'actions' | 'startPath' | '
  * A recording cut at the action cap ran actions it did not keep, so its end
  * location is not where its last kept action led.
  */
-function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'>): (string | undefined)[] {
+function places(trace: DetourInput): (string | undefined)[] {
   const end = trace.truncated === true ? undefined : trace.endPath;
   return [...trace.actions.map((action, index) => action.at ?? (index === 0 ? trace.startPath : undefined)), end];
 }
@@ -135,15 +154,14 @@ function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | '
  * The last, so a flow that tried two wrong pages from one menu reads as one
  * detour; a return, so actions that stay home after it are not part of it.
  */
-function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'>): TraceDetour[] {
+function byLocations(trace: DetourInput): TraceDetour[] {
   const where = places(trace);
   // Each route read once: the scan compares every place with many others.
   const keys = new Map<string, string>();
   const route = (place: string): string => {
     let key = keys.get(place);
     if (key === undefined) {
-      // A stored entry spells a `unique()` value as a placeholder; the live run compared the value.
-      key = routeKey(placeholdersAsIds(place));
+      key = routeKey(place);
       keys.set(place, key);
     }
     return key;

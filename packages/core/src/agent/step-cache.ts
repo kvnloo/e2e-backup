@@ -15,7 +15,7 @@
 import { deltaEvidenced, deltaMismatch, describeDelta, type DeltaMismatch } from '../cache/anchors.ts';
 import type { AgentCacheContext, ClaimedKey } from '../cache/context.ts';
 import { decideTraceReplay, opensWithNavigate, type TraceReplayMissReason } from '../cache/decide.ts';
-import { describeDetour, findDetours } from '../cache/detours.ts';
+import { describeDetour, findDetours, type TraceDetour } from '../cache/detours.ts';
 import { sameRoute } from '../cache/route.ts';
 import { keyContextChanges, type CacheAgentIdentity } from '../cache/identity.ts';
 import { recordedProvenance, TraceRecorder } from '../cache/recorder.ts';
@@ -659,11 +659,17 @@ export class StepTraceSession {
     }
     const templated = templateTrace(trace, this.options.templates);
     if (templated === undefined) return 'skipped';
-    this.cache.staged.push({ kind: 'write', keyHash: this.keyHash, trace: templated, stepIndex: this.options.stepIndex, redact: this.options.redact });
+    // The detours are found here, on the locations this run saw, and kept in
+    // the entry: once `unique()` values are placeholders, a stored location
+    // no longer compares the way this run's did.
+    const detours = findDetours(trace);
+    const located = trace.actions.some((action) => action.at !== undefined);
+    const staged = located ? { ...templated, detours: detours.map(({ from, to }) => ({ from, to })) } : templated;
+    this.cache.staged.push({ kind: 'write', keyHash: this.keyHash, trace: staged, stepIndex: this.options.stepIndex, redact: this.options.redact });
     // The report names the detours of the recording it stages, and none when that has none.
     if (this.info !== undefined) {
       const { detour: _replayed, ...info } = this.info;
-      const detour = this.detourOf(trace);
+      const detour = this.describeDetours(detours);
       this.info = detour === undefined ? info : { ...info, detour };
     }
     return 'staged';
@@ -687,7 +693,11 @@ export class StepTraceSession {
             ...(trace.startPath === undefined ? {} : { startPath: trace.startPath }),
             ...(next === undefined ? {} : { endPath: next }),
           };
-    const detours = findDetours(ran);
+    return this.describeDetours(findDetours(ran));
+  }
+
+  /** Detours as the report names them, or undefined for none. */
+  private describeDetours(detours: readonly TraceDetour[]): string | undefined {
     return detours.length === 0 ? undefined : this.reportable(detours.map(describeDetour).join(', '));
   }
 
