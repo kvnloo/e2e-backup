@@ -429,8 +429,9 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     const rect = rectOf(facts);
     if (rect !== undefined) draft.rect = rect;
     if (rect === undefined || rect.width === 0 || rect.height === 0) draft.states['hidden'] = true;
-    // A field's inner editor repeats its value as text: a secure one would leak its length, any other says nothing new.
-    draft.children = secure || role === 'textbox' || role === 'searchbox' ? [] : children();
+    // A native field's inner editor repeats its value as text: a secure one would leak its length, any other says
+    // nothing new. An editing host (contenteditable) keeps its content, which is its text.
+    draft.children = secure || facts?.nodeName === 'INPUT' || facts?.nodeName === 'TEXTAREA' ? [] : children();
     // Text runs that are the node's only content are the node's text, not nodes of their own. Beside other
     // children they stay nodes, and an observation does not repeat them on the node; a locator reads all of it.
     const onlyText = draft.children.length > 0 && draft.children.every((child) => child.isText);

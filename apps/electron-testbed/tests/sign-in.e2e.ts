@@ -128,6 +128,14 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('link-result')).toHaveText('Archive opened');
   });
 
+  test('reads and fills an editing host as text', async ({ screen }) => {
+    const rich = screen.getByTestId('rich');
+    await expect(rich).toContainText('Second paragraph');
+    await expect(screen.getByText('Second paragraph')).toHaveCount(1);
+    await rich.fill('Rewritten');
+    await expect(rich).toHaveText('Rewritten');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });
