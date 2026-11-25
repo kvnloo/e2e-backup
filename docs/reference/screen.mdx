@@ -502,6 +502,10 @@ scrolls `distance` of the container, so `speed` doesn't change anything
 there. A pane inside an iframe is measured as the whole viewport. For a
 share of the pane, use `locator.swipe()` on it.
 
+On the desktop, a swipe scrolls by the app's own scroll units, so how far
+it moves depends on the app. `distance` there isn't a share of the
+container ([Desktop](/desktop#what-differs-from-the-web)).
+
 <a id="momentum" />
 `momentum` is deprecated. It still works, and the first use in each worker
 process prints a warning. It will be removed no earlier than April 1,
@@ -515,7 +519,8 @@ process prints a warning. It will be removed no earlier than April 1,
 
 Before, on the web, `'slow'` scrolled 0.75 of the viewport or the node and
 `'fast'` 1.5. On a device, `'fast'` on a locator swiped 0.8 of the node. On
-the desktop, `'slow'` sent 2 wheel notches and `'fast'` 10.
+the desktop, a value scrolls by the app's own scroll units: `'slow'` 3 of
+them (it was 2), `'none'` 5, and `'fast'` 2 (it was 10).
 
 When `distance` or `speed` is set with `momentum`, it's used instead of the
 value `momentum` stands for.
