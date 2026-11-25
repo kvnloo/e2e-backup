@@ -21,7 +21,7 @@ import type { ActionEvent, ActionHook, BeforeActionHook, ClickOptions, JsonValue
 import { PROJECT_TOOL_EVENT_PREFIX, READ_ONLY_GRAMMAR, type GrammarActionName } from './action-names.ts';
 import { actionEvent, containerKey, describeAction, type PlacedPoint, type Placement, type RecordableAction } from './actions.ts';
 import { describePosition, hasTwinsWithoutTestId } from '../cache/relocate.ts';
-import { appNavigation } from '../cache/route.ts';
+import { appLocation, appNavigation } from '../cache/route.ts';
 import { isTapActionName, type NodeActionName, type PointActionName, type RecordedAction } from '../cache/trace.ts';
 import { derivedJoinReason, derivedReason } from './derived.ts';
 import { ActionHookError, AgentError, toAgentError } from './error.ts';
@@ -804,12 +804,14 @@ export class ActionDispatcher {
   private recordTrace(action: RecordableAction): void {
     const trace = this.options.trace();
     if (trace === undefined) return;
-    // Where the action ran: the newest look's location, kept only when the
-    // step looked again since its previous action. Two actions on one look
-    // may stand on different screens (a link tapped, then back), and a
-    // location the step never saw would invent a route the flow did not take.
+    // Where the action ran: the newest look's location, spelled as the start
+    // and end paths are (`appLocation`), so a page on another origin keeps
+    // its origin. Kept only when the step looked again since its previous
+    // action: two actions on one look may stand on different screens (a link
+    // tapped, then back), and a location the step never saw would invent a
+    // route the flow did not take.
     const observed = this.feed.latest;
-    const at = observed !== undefined && observed !== this.tracedOn ? observed.path : undefined;
+    const at = observed?.location !== undefined && observed !== this.tracedOn ? appLocation(observed.location, this.runtime.app.base?.origin) : undefined;
     this.tracedOn = observed;
     // A typed value the step read off the screen (its tree, or a screenshot
     // it was shown) or reckoned from the date is this run's data, not the
