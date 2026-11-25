@@ -277,6 +277,9 @@ test.describe('screenshots', () => {
     await expect(screen.getByRole('textbox', 'Vault key')).toHaveCount(1);
     const refused = await app.screenshot('vault').then(() => undefined, (error: unknown) => error);
     expect(refused).toMatchObject({ code: 'POLICY_DENIED' });
+    // The observation's pixels, what an agent and toHaveScreenshot read, are withheld too.
+    const compared = await expect(screen).toHaveScreenshot('vault.png', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
+    expect(compared).toMatchObject({ code: 'POLICY_DENIED' });
   });
 });
 
