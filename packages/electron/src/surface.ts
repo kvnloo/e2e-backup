@@ -927,7 +927,8 @@ export class ElectronSurface {
 
   /** Makes the first open window `which` matches the one read and acted in, waiting for it to open until the operation's deadline. */
   async useWindow(which: WindowMatcher, operation: OperationContext): Promise<ElectronWindow> {
-    const deadline = Date.now() + operation.timeoutMs;
+    // The wait ends a little before the step does, so the step reports which windows are open rather than a bare timeout.
+    const deadline = Date.now() + Math.max(0, operation.timeoutMs - Math.min(250, operation.timeoutMs / 10));
     for (;;) {
       const listed = await this.windows();
       const found = listed.find((window) => matchesWindow(window, which));

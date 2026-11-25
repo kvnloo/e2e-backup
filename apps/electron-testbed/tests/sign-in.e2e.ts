@@ -184,6 +184,8 @@ test.describe('windows', () => {
     ]);
     await electron.useWindow(0);
     await expect(screen.getByTestId('status')).toHaveText('Not signed in');
+    const missing = await electron.useWindow({ title: 'Preferences' }).then(() => undefined, (error: unknown) => error);
+    expect(String(missing)).toContain('no window matches title Preferences; open: "Sign In", "Settings"');
     expect(await electron.evaluate(() => (globalThis as unknown as { testbedState: { settingsOpened: number } }).testbedState.settingsOpened)).toBe(1);
   });
 });
