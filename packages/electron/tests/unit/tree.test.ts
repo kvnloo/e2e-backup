@@ -106,6 +106,21 @@ describe('projectTree', () => {
     expect(counter.text).toBe('Counter Add one 0');
   });
 
+  it('shows a link as the web engine does: origin and path, the rest elided', () => {
+    const hrefs = ['https://example.com/p?token=abc#f', 'data:text/csv;base64,U0VDUkVU', 'javascript:run("secret")', 'mailto:ada@example.com', 'settings.html?tab=2'];
+    const strings = ['#document', 'BODY', 'A', 'href', ...hrefs];
+    const document: SnapshotDocument = {
+      nodes: { backendNodeId: [1, 2, ...hrefs.map((_, at) => 10 + at)], nodeName: [0, 1, ...hrefs.map(() => 2)], parentIndex: [-1, 0, ...hrefs.map(() => 1)], attributes: [[], [], ...hrefs.map((_, at) => [3, 4 + at])] },
+      layout: { nodeIndex: hrefs.map((_, at) => 2 + at), bounds: hrefs.map(() => [0, 0, 10, 10]) },
+    };
+    const ax: AXNode[] = [
+      { nodeId: 'root', ignored: false, role: { value: 'RootWebArea' }, childIds: hrefs.map((_, at) => String(at)), backendDOMNodeId: 1 },
+      ...hrefs.map((_, at) => ({ nodeId: String(at), ignored: false, role: { value: 'link' }, name: { value: `Link ${at}` }, parentId: 'root', backendDOMNodeId: 10 + at })),
+    ];
+    const { root } = projectTree(ax, document, strings, { scale: 1, scrollX: 0, scrollY: 0, width: 640, height: 480 }, { mode: 'tree', testIdAttribute: 'data-testid', idOf: (id) => `1.${id}`, rootId: 'window', baseUrl: 'https://app.example/index.html' });
+    expect(root.children?.map((link) => link.attributes?.['href'])).toEqual(['https://example.com/p?…#…', 'data:…', 'javascript:…', 'mailto:ada@example.com', 'https://app.example/settings.html?…']);
+  });
+
   it('keeps attribute values whole for the harness to redact, however long', () => {
     const long = `${'x'.repeat(500)}secret-value-crossing-the-limit`;
     const strings = ['#document', 'BODY', 'INPUT', 'placeholder', long];

@@ -496,6 +496,7 @@ export class ElectronSurface {
       testIdAttribute: this.options.testIdAttribute,
       idOf: (backendNodeId) => `${serial}.${backendNodeId}`,
       rootId: ROOT_ID,
+      baseUrl: raw.url,
       ...(raw.title === '' ? {} : { title: raw.title }),
     });
     const open = this.openWindows();

@@ -86,6 +86,8 @@ export interface ProjectionOptions {
   readonly idOf: (backendNodeId: number) => string;
   /** The root's id, stable for the surface. */
   readonly rootId: string;
+  /** The document's URL, which a relative link resolves against. */
+  readonly baseUrl?: string;
   /** The document's title, the root's name. */
   readonly title?: string;
   /** Backend ids of elements a locator's CSS selector matched: kept as nodes even where the tree would leave them out. */
@@ -261,11 +263,30 @@ function stringOf(value: AXValue | undefined): string | undefined {
   return typeof raw === 'string' ? raw : String(raw);
 }
 
-/** Origin and path of a link: query strings and fragments routinely carry tokens, so an observation never shows them. */
-function originAndPath(href: string): string {
-  if (!URL.canParse(href)) return href.replace(/[?#].*$/, '');
-  const url = new URL(href);
-  return url.protocol === 'http:' || url.protocol === 'https:' ? `${url.origin}${url.pathname}` : `${url.protocol}${url.pathname}`;
+/**
+ * A link as an observation shows it, as the web engine reduces it: origin and
+ * path, a query and a fragment only as `?…` and `#…` (they routinely carry
+ * tokens), and a scheme with no origin (`data:`, `javascript:`), whose path
+ * is a whole file or script, as `scheme:…`. A relative link resolves against
+ * the document's URL.
+ */
+function originAndPath(value: string, base: string | undefined): string {
+  const elided = (query: boolean, fragment: boolean): string => `${query ? '?…' : ''}${fragment ? '#…' : ''}`;
+  try {
+    const url = new URL(value, base);
+    const rest = `${url.pathname}${elided(url.search !== '', url.hash !== '')}`;
+    if (url.protocol === 'blob:') {
+      const inner = URL.canParse(url.pathname) ? new URL(url.pathname) : null;
+      return inner === null || inner.origin === 'null' ? 'blob:…' : `blob:${inner.origin}${inner.pathname}${elided(url.search !== '', url.hash !== '')}`;
+    }
+    if (url.origin !== 'null') return `${url.origin}${rest}`;
+    if (url.protocol === 'mailto:' || url.protocol === 'tel:') return `${url.protocol}${rest}`;
+    return `${url.protocol}…`;
+  } catch {
+    const [beforeFragment = '', ...fragment] = value.split('#');
+    const [path = '', ...query] = beforeFragment.split('?');
+    return `${path}${elided(query.join('?') !== '', fragment.join('#') !== '')}`;
+  }
 }
 
 /** Collapses runs of white space the way rendered text reads. */
@@ -399,7 +420,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       if (mode === 'tree' && !TREE_ATTRIBUTES.has(key) && !key.startsWith('aria-')) continue;
       // Whole, as the web engine keeps them: the harness redacts an attribute by whole values only, so a cut here could
       // leave the start of a secret behind; it bounds what it renders after redaction.
-      shown[key] = mode === 'tree' && key === 'href' ? originAndPath(value) : value;
+      shown[key] = mode === 'tree' && key === 'href' ? originAndPath(value, options.baseUrl) : value;
     }
     if (Object.keys(shown).length > 0) draft.attributes = shown;
     const rect = rectOf(facts);
