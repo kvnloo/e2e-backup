@@ -518,7 +518,7 @@ describe('expect.poll in a poll scope', () => {
     vexpect(error).toBeInstanceOf(TestError);
     vexpect(error?.code).toBe('STEP_NOT_AWAITED');
     vexpect(error?.message).toBe(
-      'the test body returned before expect.poll(...).toBe(...) finished; put `await` in front of every expect.poll matcher and toPass call',
+      'the test body returned before expect.poll(...).toBe(...) finished; put `await` in front of every expect.poll, resolves, rejects, and toPass matcher',
     );
     vexpect(error?.stack).toContain('expect-poll.test.ts');
     const rejection = await rejectionOf(poll);

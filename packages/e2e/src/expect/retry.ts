@@ -82,6 +82,16 @@ function callStack(): string | undefined {
   }
 }
 
+/**
+ * Runs `work` owned by the current phase, which cancels it through the signal
+ * and fails when it returns while the work still runs; outside a phase the
+ * work runs untracked, without a signal.
+ */
+export function track<T>(label: string, work: (signal?: AbortSignal) => Promise<T>): Promise<T> {
+  const scope = currentPollScope() ?? currentAttempt()?.polls;
+  return scope === undefined ? work() : scope.track(label, callStack(), work);
+}
+
 /** Tracks a retry in the current phase and applies the phase deadline to reads and waits. */
 export function retry(
   read: () => unknown,
@@ -89,8 +99,6 @@ export function retry(
   options: RetryOptions,
   context: RetryContext | undefined,
 ): Promise<unknown> {
-  const scope = currentPollScope() ?? currentAttempt()?.polls;
-
   const run = async (scopeSignal?: AbortSignal): Promise<unknown> => {
     const { api, label, timeout, intervals, message, noSample } = options;
     const budget = context?.budget;
@@ -175,7 +183,7 @@ export function retry(
     throw assertionFailure(end.deadline, end.at);
   };
 
-  return scope === undefined ? run() : scope.track(options.label, callStack(), run);
+  return track(options.label, run);
 }
 
 /** A malformed option would poll forever; it is refused before the first read. */

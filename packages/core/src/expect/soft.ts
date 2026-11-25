@@ -57,18 +57,21 @@ function keepOrThrow(error: unknown, soft: SoftFailures | undefined): void {
   if (classified.code !== 'ASSERTION_FAILED' || soft?.keep(classified) !== true) throw error;
 }
 
+/** The properties of an expectation that lead to another one. */
+const CHAINS: ReadonlySet<string | symbol> = new Set(['not', 'resolves', 'rejects']);
+
 /**
  * Every matcher of `expectation` with its `ASSERTION_FAILED` swallowed into
- * the running attempt's soft failures. `.not` softens the same way. Methods
- * run against the real expectation, so nothing about how it is built matters
- * here: the value matchers, the locator matchers, and an engine fixture's
+ * the running attempt's soft failures. `.not`, `.resolves`, and `.rejects`
+ * soften the same way. Methods run against the real expectation, so nothing
+ * about how it is built matters here: the value matchers, the locator matchers, and an engine fixture's
  * attached matchers all go through the one wrapper.
  */
 export function soften<E extends object>(expectation: E): E {
   return new Proxy(expectation, {
     get(target, key) {
       const value: unknown = Reflect.get(target, key, target);
-      if (key === 'not' && typeof value === 'object' && value !== null) return soften(value);
+      if (CHAINS.has(key) && typeof value === 'object' && value !== null) return soften(value);
       if (typeof value !== 'function') return value;
       return (...args: unknown[]): unknown => {
         // An asynchronous matcher belongs to the attempt that called it, not a later session.

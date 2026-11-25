@@ -432,9 +432,10 @@ A retry that skips after an earlier failed attempt stays skipped; the CLI shows
 it under `Skipped After Failure`, and `failOnSkippedFailure: true` in the
 config fails the run with exit code 1. The default is `false`.
 `expect.any(Class)`, `expect.anything()`, `expect.objectContaining(obj)`,
-`expect.arrayContaining(arr)`, `expect.stringContaining(s)`, and
-`expect.stringMatching(s | RegExp)` stand in for values inside `toEqual`,
-`toMatchObject`, `toContain`, and `toHaveProperty`.
+`expect.arrayContaining(arr)`, `expect.stringContaining(s)`,
+`expect.stringMatching(s | RegExp)`, and `expect.closeTo(n, digits?)` stand in
+for values inside `toEqual`, `toStrictEqual`, `toMatchObject`, `toContain`,
+`toContainEqual`, and `toHaveProperty`.
 
 ```ts
 await expect(screen.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
@@ -443,6 +444,8 @@ expect(order).toMatchObject({ id: expect.any(Number), lines: [{ sku: 'a' }] });
 expect.soft(await screen.getByTestId('tax').textContent()).toBe('$8.00');  // kept, body runs on
 expect(response).toBeOK();                                  // a request, waitForResponse, or route.fetch() response; status 200-299
 const users = expect(await response.json()).toMatchSchema(z.array(User)); // any Standard Schema; typed output
+expect(() => parsePrice('abc')).toThrow(/not a price/);     // a string, RegExp, class, or error; none = any throw
+await expect(loadOrder(-1)).rejects.toThrow(NotFoundError); // resolves/rejects: every value matcher, awaited
 ```
 
 `toMatchSchema(schema)` takes a synchronous Standard Schema (Zod, Valibot,
@@ -451,7 +454,7 @@ typed; prefer it when the app already has a schema for the response.
 
 | Locator matchers | Browser matchers | Value matchers |
 | --- | --- | --- |
-| `toBeVisible`, `toBeHidden`, `toBeInViewport`, `toBeAttached`, `toBeEnabled`, `toBeDisabled`, `toBeEditable`, `toBeChecked`, `toBeSelected`, `toBeExpanded`, `toBeFocused`, `toBeEmpty`, `toHaveText`, `toContainText`, `toHaveValue`, `toHaveAttribute`, `toHaveCount`, `toHaveAccessibleName`, `toHaveRole`, `toHaveScreenshot` (also on `screen`) | `toHaveURL`, `toHaveTitle`, `toHaveClass(locator, expected)` | `toBe`, `toEqual`, `toMatchObject`, `toBeTruthy`, `toBeFalsy`, `toBeNull`, `toBeUndefined`, `toBeDefined`, `toHaveLength`, `toHaveProperty`, `toContain`, `toMatch`, `toBeGreaterThan`, `toBeGreaterThanOrEqual`, `toBeLessThan`, `toBeLessThanOrEqual`, `toBeCloseTo`, `toMatchSchema`, `toBeOK` |
+| `toBeVisible`, `toBeHidden`, `toBeInViewport`, `toBeAttached`, `toBeEnabled`, `toBeDisabled`, `toBeEditable`, `toBeChecked`, `toBeSelected`, `toBeExpanded`, `toBeFocused`, `toBeEmpty`, `toHaveText`, `toContainText`, `toHaveValue`, `toHaveAttribute`, `toHaveCount`, `toHaveAccessibleName`, `toHaveRole`, `toHaveScreenshot` (also on `screen`) | `toHaveURL`, `toHaveTitle`, `toHaveClass(locator, expected)` | `toBe`, `toEqual`, `toMatchObject`, `toBeTruthy`, `toBeFalsy`, `toBeNull`, `toBeUndefined`, `toBeDefined`, `toHaveLength`, `toHaveProperty`, `toContain`, `toMatch`, `toBeGreaterThan`, `toBeGreaterThanOrEqual`, `toBeLessThan`, `toBeLessThanOrEqual`, `toBeCloseTo`, `toMatchSchema`, `toBeOK`, `toStrictEqual`, `toContainEqual`, `toBeInstanceOf`, `toThrow`, and all of them after `.resolves` / `.rejects` |
 
 `toHaveText` compares the whole normalized text, `toContainText` a substring
 or RegExp, `toHaveValue` a control's value as is, whitespace included

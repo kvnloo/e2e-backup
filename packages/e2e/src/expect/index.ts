@@ -6,6 +6,7 @@ import { expectationBrand } from '@e2e-dev/core/lib/internal/brands';
 import { realmSlot } from '@e2e-dev/core/lib/internal/realm-slot';
 import { locatorInternals, screenInternals } from '@e2e-dev/core/lib/locator/screen';
 import { createAsyncExpectation } from './async.ts';
+import { CloseTo } from './close-to.ts';
 import { createPollExpectation } from './poll.ts';
 import { createScreenExpectation } from './screenshot.ts';
 import { soften } from '@e2e-dev/core/lib/expect/soft';
@@ -59,4 +60,5 @@ export const expect: Expect = Object.assign(dispatch, {
   arrayContaining: (sample: readonly unknown[]): AsymmetricMatcher => new ArrayContaining([...sample]),
   stringContaining: (sample: string): AsymmetricMatcher => new StringContaining(sample),
   stringMatching: (sample: string | RegExp): AsymmetricMatcher => new StringMatching(sample),
+  closeTo: (expected: number, digits?: number): AsymmetricMatcher => new CloseTo(expected, digits),
 });

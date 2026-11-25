@@ -1,61 +1,51 @@
 /** Synchronous plain-value matchers. */
 
 import { types } from 'node:util';
-import { equals, isAsymmetric, iterableEquality, subsetEquality } from '@vitest/expect';
+import { arrayBufferEquality, equals, iterableEquality, sparseArrayEquality, subsetEquality, typeEquality } from '@vitest/expect';
 import { DEFAULT_PASS_OPTIONS } from '@e2e-dev/core/lib/config/validate';
 import { currentAttempt } from '@e2e-dev/core/lib/expect/attempt';
 import { errorMessage, TestError } from '@e2e-dev/core/lib/internal/errors';
+import { cancelledError, withAbort } from '@e2e-dev/core/lib/internal/time';
 import { testPattern } from '@e2e-dev/core/lib/internal/regexp';
 import { describeIssue, requireStandardSchema } from '@e2e-dev/core/lib/internal/standard-schema';
 import { runningSuiteHook } from '@e2e-dev/core/lib/internal/test-timeout';
 import { toTextPattern } from '@e2e-dev/core/lib/internal/text';
 import { printableUrl } from '@e2e-dev/core/lib/internal/urls';
-import type { AsymmetricMatcher, NegatedValueExpectation, PassOptions, PropertyPath, StandardSchemaV1, ValueExpectation, WebResponse } from '@e2e-dev/core/lib/types';
+import type { Class, NegatedPromisedValueExpectation, NegatedValueExpectation, PassOptions, PromisedValueExpectation, PropertyPath, StandardSchemaV1, ThrowExpectation, ValueExpectation, ValueMatcherName, WebResponse } from '@e2e-dev/core/lib/types';
+import { format, formatStrict } from './format.ts';
+import { isCloseTo, validDigits } from './close-to.ts';
 import { withMessage } from './heading.ts';
-import { checkOptions, retry } from './retry.ts';
+import { checkOptions, retry, track } from './retry.ts';
+import { describeExpected, isInstance, matchesThrown } from './thrown.ts';
 
 function fail(message: string): never {
   throw new TestError('ASSERTION_FAILED', message);
 }
 
-/**
- * An asymmetric matcher as it reads in a failure: `Any<Number>` and
- * `Anything` describe themselves; the rest print their name and sample,
- * `ObjectContaining {"id":1}`.
- */
-function describeMatcher(matcher: AsymmetricMatcher): string {
-  const own = (matcher as { toAsymmetricMatcher?: () => string }).toAsymmetricMatcher?.();
-  if (own !== undefined) return own;
-  const sample = (matcher as { sample?: unknown }).sample;
-  return `${matcher.toString()} ${format(sample)}`;
-}
+/** A promised expectation of either polarity: one object serves both, as the class below does. */
+type Promised<T> = PromisedValueExpectation<T> & NegatedPromisedValueExpectation<T>;
 
-function format(value: unknown): string {
-  if (typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'bigint') return `${value}n`;
-  if (typeof value === 'function') return `[Function ${value.name || 'anonymous'}]`;
-  if (typeof value === 'symbol') return value.toString();
-  if (isAsymmetric(value)) return describeMatcher(value);
-  if (value instanceof RegExp) return String(value);
-  try {
-    const json = JSON.stringify(value, (_key, nested: unknown) => (isAsymmetric(nested) ? describeMatcher(nested) : nested));
-    if (json !== undefined) return json;
-  } catch {
-    // fall through
-  }
-  return String(value);
-}
-
-class ValueExpectationImpl<T> implements ValueExpectation<T> {
+class ValueExpectationImpl<T> implements ValueExpectation<T>, NegatedValueExpectation<T> {
   constructor(
     private readonly actual: T,
     private readonly negated: boolean,
     /** The caller's label for this check, opening every failure message. */
     private readonly message: string | undefined,
+    /** Set by `.rejects`: the value is a rejection, which `toThrow` checks as it is instead of calling. */
+    private readonly rejection = false,
   ) {}
 
-  get not(): NegatedValueExpectation<T> {
-    return new ValueExpectationImpl(this.actual, !this.negated, this.message);
+  /** One class serves the positive and negated forms, so `.not` is the class and not either interface. */
+  get not(): ValueExpectationImpl<T> {
+    return new ValueExpectationImpl(this.actual, !this.negated, this.message, this.rejection);
+  }
+
+  get resolves(): Promised<Awaited<T>> {
+    return promised(this.actual, 'resolves', this.negated, this.message);
+  }
+
+  get rejects(): Promised<unknown> {
+    return promised(this.actual, 'rejects', this.negated, this.message);
   }
 
   /** Retries the function passed to `expect` until the assertion passes or the deadline is reached. */
@@ -110,6 +100,15 @@ class ValueExpectationImpl<T> implements ValueExpectation<T> {
       equals(this.actual, expected, [iterableEquality]),
       () => `expected ${format(this.actual)} to equal ${format(expected)}`,
       () => `expected ${format(this.actual)} not to equal ${format(expected)}`,
+    );
+  }
+
+  /** Jest's `toStrictEqual` testers: class types, array holes, and `undefined` properties count. */
+  toStrictEqual(expected: unknown): void {
+    this.check(
+      equals(this.actual, expected, [iterableEquality, typeEquality, sparseArrayEquality, arrayBufferEquality], true),
+      () => `expected ${formatStrict(this.actual)} to strictly equal ${formatStrict(expected)}`,
+      () => `expected ${formatStrict(this.actual)} not to strictly equal ${formatStrict(expected)}`,
     );
   }
 
@@ -215,8 +214,8 @@ class ValueExpectationImpl<T> implements ValueExpectation<T> {
         fail(`toContain on a string requires a string, got ${format(expected)}`);
       }
       contains = actual.includes(expected);
-    } else if (typeof actual === 'object' && actual !== null && Symbol.iterator in actual) {
-      contains = [...(actual as Iterable<unknown>)].some((item) => equals(item, expected, [iterableEquality]));
+    } else if (isCollection(actual)) {
+      contains = hasEqualItem(actual, expected);
     } else {
       fail(`toContain requires a string or collection, got ${format(actual)}`);
     }
@@ -225,6 +224,60 @@ class ValueExpectationImpl<T> implements ValueExpectation<T> {
       () => `expected ${format(this.actual)} to contain ${format(expected)}`,
       () => `expected ${format(this.actual)} not to contain ${format(expected)}`,
     );
+  }
+
+  toContainEqual(expected: unknown): void {
+    const actual = this.actual as unknown;
+    if (!isCollection(actual)) fail(`toContainEqual requires a collection, got ${format(actual)}`);
+    this.check(
+      hasEqualItem(actual, expected),
+      () => `expected ${format(actual)} to contain an item equal to ${format(expected)}`,
+      () => `expected ${format(actual)} not to contain an item equal to ${format(expected)}`,
+    );
+  }
+
+  toBeInstanceOf(expected: Class): void {
+    const actual = this.actual as unknown;
+    const name = (expected as { name?: unknown } | null | undefined)?.name;
+    const label = typeof name === 'string' && name !== '' ? name : 'the class';
+    this.check(
+      isInstance('toBeInstanceOf', actual, expected),
+      () => `expected ${formatStrict(actual)} to be an instance of ${label}`,
+      () => `expected ${formatStrict(actual)} not to be an instance of ${label}`,
+    );
+  }
+
+  /**
+   * Calls the function and checks what it threw. After `.rejects` the value
+   * is the rejection itself, checked the same way without a call.
+   */
+  toThrow(expected?: ThrowExpectation): void {
+    const wanted = describeExpected(expected);
+    const actual = this.actual as unknown;
+    let outcome: { readonly thrown: unknown } | { readonly returned: unknown };
+    if (this.rejection) {
+      outcome = { thrown: actual };
+    } else {
+      if (typeof actual !== 'function') fail(`toThrow requires a function, got ${format(actual)}`);
+      try {
+        outcome = { returned: (actual as () => unknown)() };
+      } catch (thrown) {
+        outcome = { thrown };
+      }
+    }
+    const not = this.negated ? 'not ' : '';
+    const claim = this.rejection
+      ? `expected the promise ${not}to reject${wanted === '' ? '' : ' with'}${wanted}`
+      : `expected the function ${not}to throw${wanted}`;
+    const got = (): string => {
+      if ('thrown' in outcome) return `it ${this.rejection ? 'rejected with' : 'threw'} ${format(outcome.thrown)}`;
+      if (!types.isPromise(outcome.returned)) return 'it did not throw';
+      // The failure below already reports the call; its rejection must not surface as a second, unhandled error.
+      outcome.returned.catch(() => undefined);
+      return 'it returned a promise; for an async function use `await expect(promise).rejects.toThrow()`';
+    };
+    const failure = (): string => `${claim}, but ${got()}`;
+    this.check('thrown' in outcome && matchesThrown(outcome.thrown, expected), failure, failure);
   }
 
   toMatch(expected: string | RegExp): void {
@@ -262,22 +315,12 @@ class ValueExpectationImpl<T> implements ValueExpectation<T> {
     this.compareNumber('toBeLessThanOrEqual', expected, (actual) => actual <= expected, 'less than or equal to');
   }
 
-  /**
-   * Jest's rule: the difference must be under half a unit of the last kept
-   * digit, so `toBeCloseTo(60)` accepts 59.996 and rejects 59.99. Infinite
-   * values pass only when they are the same infinity.
-   */
   toBeCloseTo(expected: number, digits = 2): void {
     const actual = this.actual as unknown;
     if (typeof actual !== 'number') fail(`toBeCloseTo requires a number, got ${format(actual)}`);
-    if (!Number.isInteger(digits) || digits < 0) {
-      fail(`toBeCloseTo digits must be a non-negative integer, got ${format(digits)}`);
-    }
-    const close =
-      actual === expected ||
-      (Number.isFinite(actual) && Number.isFinite(expected) && Math.abs(actual - expected) < 10 ** -digits / 2);
+    if (!validDigits(digits)) fail(`toBeCloseTo digits must be a non-negative integer, got ${format(digits)}`);
     this.check(
-      close,
+      isCloseTo(actual, expected, digits),
       () => `expected ${actual} to be close to ${expected} (${digits} digits)`,
       () => `expected ${actual} not to be close to ${expected} (${digits} digits)`,
     );
@@ -376,6 +419,102 @@ function lookup(value: unknown, keys: readonly (string | number)[]): { present: 
     current = (holder as Record<string | number, unknown>)[key];
   }
   return { present: true, value: current };
+}
+
+function isCollection(value: unknown): value is Iterable<unknown> {
+  return typeof value === 'object' && value !== null && Symbol.iterator in value;
+}
+
+/** Whether an item of the collection equals `expected` by `toEqual` rules. */
+function hasEqualItem(collection: Iterable<unknown>, expected: unknown): boolean {
+  return [...collection].some((item) => equals(item, expected, [iterableEquality]));
+}
+
+/** `satisfies` keeps this list equal to the ValueExpectation matcher set. */
+const VALUE_MATCHERS = {
+  toBe: true,
+  toEqual: true,
+  toStrictEqual: true,
+  toMatchObject: true,
+  toBeTruthy: true,
+  toBeFalsy: true,
+  toBeNull: true,
+  toBeUndefined: true,
+  toBeDefined: true,
+  toHaveLength: true,
+  toHaveProperty: true,
+  toContain: true,
+  toContainEqual: true,
+  toMatch: true,
+  toBeGreaterThan: true,
+  toBeGreaterThanOrEqual: true,
+  toBeLessThan: true,
+  toBeLessThanOrEqual: true,
+  toBeCloseTo: true,
+  toBeInstanceOf: true,
+  toThrow: true,
+  toMatchSchema: true,
+  toBeOK: true,
+} satisfies Record<ValueMatcherName, true>;
+
+export const VALUE_MATCHER_NAMES = Object.keys(VALUE_MATCHERS) as ValueMatcherName[];
+
+export type ValueMatcher = (this: unknown, ...args: unknown[]) => unknown;
+
+/** The promise's value for `.resolves` or its rejection for `.rejects`; the other outcome fails the assertion. */
+async function settled(
+  actual: unknown,
+  kind: 'resolves' | 'rejects',
+  message: string | undefined,
+  signal: AbortSignal | undefined,
+): Promise<unknown> {
+  if (typeof (actual as { then?: unknown } | null | undefined)?.then !== 'function') {
+    throw new TestError('INVALID_ARGUMENT', `expect(...).${kind} requires a promise, got ${format(actual)}`);
+  }
+  const settling = Promise.resolve(actual as PromiseLike<unknown>).then(
+    (value) => ({ value }),
+    (error: unknown) => ({ error }),
+  );
+  const outcome = await (signal === undefined ? settling : withAbort(settling, signal, cancelledError));
+  if (kind === 'resolves') {
+    if ('value' in outcome) return outcome.value;
+    throw new TestError(
+      'ASSERTION_FAILED',
+      withMessage(message, `expected the promise to resolve, but it rejected with ${format(outcome.error)}`),
+      { cause: outcome.error },
+    );
+  }
+  if ('error' in outcome) return outcome.error;
+  fail(withMessage(message, `expected the promise to reject, but it resolved with ${format(outcome.value)}`));
+}
+
+/**
+ * Every value matcher run on what the promise settles with. The call is
+ * tracked like a poll, so a phase that returns without awaiting it fails
+ * instead of losing the assertion.
+ */
+function promised<T>(
+  actual: unknown,
+  kind: 'resolves' | 'rejects',
+  negated: boolean,
+  message: string | undefined,
+): Promised<T> {
+  const matchers = Object.fromEntries(
+    VALUE_MATCHER_NAMES.map((name) => [
+      name,
+      (...args: unknown[]) =>
+        track(`expect(...).${kind}.${negated ? 'not.' : ''}${name}(...)`, async (signal) => {
+          const expectation = new ValueExpectationImpl(await settled(actual, kind, message, signal), negated, message, kind === 'rejects');
+          return (expectation[name] as ValueMatcher).apply(expectation, args);
+        }),
+    ]),
+  );
+  return {
+    ...matchers,
+    get not() {
+      return promised<T>(actual, kind, !negated, message);
+    },
+  } as Promised<T>;
 }
 
 export function createValueExpectation<T>(actual: T, message?: string): ValueExpectation<T> {

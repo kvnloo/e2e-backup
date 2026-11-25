@@ -147,7 +147,7 @@ Planned gaps are on the roadmap, and Not yet gaps have no date. Not planned gaps
 | --- | --- |
 | `cy.wait(ms)` | A locator assertion on the state the test waits for |
 | `it`, `context`, `specify`, `xit` | `test`, `describe`, `test.skip` |
-| chai `expect(x).to...`, `assert.*` | `toEqual`, `toContain`, `toMatchObject` on `expect(value)`, or import `chai` yourself |
+| chai `expect(x).to...`, `assert.*` | `toEqual`, `toStrictEqual`, `toContain`, `toMatchObject`, `toBeInstanceOf`, `toThrow` on `expect(value)`, or import `chai` yourself |
 | `cy.window()`, `cy.document()`, `onBeforeLoad(win)` | `browser.evaluate` and `browser.addInitScript` with JSON values. Tests run in Node, not in the page |
 | Mocha reporters, `reporterOptions` | `list`, `dot`, `line`, `json`, `junit`, `markdown`, `ctrf`, `htmlReporter()`, `github()`, or your own [reporter](/reference/reporters) |
 | Cucumber `.feature` files, `file:preprocessor` | Rewrite features as tests. TypeScript needs no preprocessor |

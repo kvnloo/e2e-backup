@@ -1326,9 +1326,12 @@ export type Class = abstract new (...args: never[]) => unknown;
 /** A property path for `toHaveProperty`: dotted (`'user.address.city'`) or one key per element (`['user', 'address', 'city']`). */
 export type PropertyPath = string | readonly (string | number)[];
 
+/** What `toThrow` checks the thrown value against: a message substring, a message pattern, a class, or an error with the same message. */
+export type ThrowExpectation = string | RegExp | Class | Error | AsymmetricMatcher;
+
 /**
- * A stand-in for a value inside `toEqual`, `toMatchObject`, `toContain`, and
- * `toHaveProperty`: `expect.any(Number)` in place of a number,
+ * A stand-in for a value inside `toEqual`, `toStrictEqual`, `toMatchObject`,
+ * `toContain`, `toContainEqual`, and `toHaveProperty`: `expect.any(Number)` in place of a number,
  * `expect.objectContaining({ id: 1 })` in place of a record. The structural
  * matchers ask it whether a value matches instead of comparing.
  */
@@ -1342,10 +1345,16 @@ export interface AsymmetricMatcher {
 export interface ValueExpectation<T> {
   /** Inverts the matcher. */
   readonly not: NegatedValueExpectation<T>;
+  /** Waits for the promise and runs the matcher on its value; a rejection fails the assertion. */
+  readonly resolves: PromisedValueExpectation<Awaited<T>>;
+  /** Waits for the promise and runs the matcher on its rejection; a promise that resolves fails the assertion. */
+  readonly rejects: PromisedValueExpectation<unknown>;
   /** Compares with Object.is. */
   toBe(expected: T): void;
   /** Performs recursive structural equality; `undefined` properties are ignored and class types are not compared. */
   toEqual(expected: unknown): void;
+  /** Performs `toEqual`'s comparison, and also tells apart class types, an `undefined` property from a missing one, and an array hole from `undefined`. */
+  toStrictEqual(expected: unknown): void;
   /** Requires every property of `expected` to match recursively; extra properties on the value are fine, arrays must match element-wise with equal length. */
   toMatchObject(expected: object): void;
   /** Requires a truthy value. */
@@ -1364,6 +1373,8 @@ export interface ValueExpectation<T> {
   toHaveProperty(path: PropertyPath, ...expected: [] | [expected: unknown]): void;
   /** Requires string or collection containment. */
   toContain(expected: unknown): void;
+  /** Requires a collection with an item equal to `expected` by `toEqual` rules. */
+  toContainEqual(expected: unknown): void;
   /** Requires a string or regexp match. */
   toMatch(expected: string | RegExp): void;
   /** Requires a numeric lower bound. */
@@ -1376,6 +1387,15 @@ export interface ValueExpectation<T> {
   toBeLessThanOrEqual(expected: number): void;
   /** Requires a number within `10 ** -digits / 2` of `expected`; `digits` defaults to 2. */
   toBeCloseTo(expected: number, digits?: number): void;
+  /** Requires an instance of the class, by `instanceof`. */
+  toBeInstanceOf(expected: Class): void;
+  /**
+   * Calls the function and requires it to throw. `expected` narrows the
+   * error: a string its message contains, a RegExp its message matches, a
+   * class it is an instance of, or an error with the same message. After
+   * `.rejects`, checks the rejection instead of calling.
+   */
+  toThrow(expected?: ThrowExpectation): void;
   /**
    * Requires the value to pass a synchronous Standard Schema (Zod, Valibot,
    * ArkType, ...) and returns the schema's output, typed:
@@ -1391,13 +1411,21 @@ export interface ValueExpectation<T> {
   toBeOK(...valueIsNotAResponse: [T] extends [WebResponse] ? [] : [never]): void;
 }
 
-/** The names of the value matchers, every key of `ValueExpectation` but `not`. */
-export type ValueMatcherName = Exclude<keyof ValueExpectation<unknown>, 'not'>;
+/** The names of the value matchers, every key of `ValueExpectation` but `not`, `resolves`, and `rejects`. */
+export type ValueMatcherName = Exclude<keyof ValueExpectation<unknown>, 'not' | 'resolves' | 'rejects'>;
 
-/** `expect(value).not`: every value matcher inverted, none returning a value; `Back` is what `.not` returns to. */
-export type NegatedValueExpectation<T, Back = ValueExpectation<T>> = {
+/**
+ * `expect(value).not`: every value matcher inverted, none returning a value;
+ * `Back` is what `.not` returns to, and `Kept` is `undefined` under
+ * `expect.soft`.
+ */
+export type NegatedValueExpectation<T, Back = ValueExpectation<T>, Kept = never> = {
   /** Inverts the matcher back. */
   readonly not: Back;
+  /** Waits for the promise and runs the inverted matcher on its value. */
+  readonly resolves: NegatedPromisedValueExpectation<Awaited<T>, Kept>;
+  /** Waits for the promise and runs the inverted matcher on its rejection. */
+  readonly rejects: NegatedPromisedValueExpectation<unknown, Kept>;
 } & {
   readonly [K in ValueMatcherName]: (...args: Parameters<ValueExpectation<T>[K]>) => void;
 };
@@ -1407,9 +1435,13 @@ export type NegatedValueExpectation<T, Back = ValueExpectation<T>> = {
  * `undefined` when the value failed and the failure was kept for the end of
  * the body.
  */
-export type SoftValueExpectation<T> = Omit<ValueExpectation<T>, 'toMatchSchema' | 'not'> & {
+export type SoftValueExpectation<T> = Omit<ValueExpectation<T>, 'toMatchSchema' | 'not' | 'resolves' | 'rejects'> & {
   /** Inverts the matcher; still soft, so a double negation's `toMatchSchema` may return `undefined` too. */
-  readonly not: NegatedValueExpectation<T, SoftValueExpectation<T>>;
+  readonly not: NegatedValueExpectation<T, SoftValueExpectation<T>, undefined>;
+  /** Waits for the promise and runs the matcher on its value; still soft. */
+  readonly resolves: PromisedValueExpectation<Awaited<T>, undefined>;
+  /** Waits for the promise and runs the matcher on its rejection; still soft. */
+  readonly rejects: PromisedValueExpectation<unknown, undefined>;
   /** Requires the value to pass the schema; returns its output, or `undefined` after a kept failure. */
   toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): StandardSchemaV1.InferOutput<Schema> | undefined;
 };
@@ -1447,29 +1479,36 @@ export type PassExpectation<T, Value = ValueExpectation<T>> = Omit<Value, 'not'>
 
 /**
  * The asynchronous form of every `ValueExpectation<T>` matcher: the same
- * names and parameters, each resolving once the re-read value passes.
- * Derived from `ValueExpectation<T>` so the two cannot drift; the one
- * matcher that returns a value, `toMatchSchema`, is spelled out to resolve
- * to the schema's output for the passing read.
+ * names and parameters, each resolving once the matcher passes. Derived from
+ * `ValueExpectation<T>` so the two cannot drift; the one matcher that returns
+ * a value, `toMatchSchema`, is spelled out to resolve to the schema's output.
+ * `Kept` is `undefined` under `expect.soft`, where a kept failure resolves
+ * to nothing.
  */
-export type PollExpectation<T> = {
-  readonly not: NegatedPollExpectation<T>;
+export type PromisedValueExpectation<T, Kept = never> = {
+  readonly not: NegatedPromisedValueExpectation<T, Kept>;
 } & {
   readonly [K in Exclude<ValueMatcherName, 'toMatchSchema'>]: (
     ...args: Parameters<ValueExpectation<T>[K]>
   ) => Promise<void>;
 } & {
-  /** Resolves to the schema's output once a read passes it. */
-  toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): Promise<StandardSchemaV1.InferOutput<Schema>>;
+  /** Resolves to the schema's output once the value passes it. */
+  toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): Promise<StandardSchemaV1.InferOutput<Schema> | Kept>;
 };
 
-/** `expect.poll(read).not`: every poll matcher inverted, none resolving to a value. */
-export type NegatedPollExpectation<T> = {
+/** `.not` of a promised expectation: every matcher inverted, none resolving to a value. */
+export type NegatedPromisedValueExpectation<T, Kept = never> = {
   /** Inverts the matcher back. */
-  readonly not: PollExpectation<T>;
+  readonly not: PromisedValueExpectation<T, Kept>;
 } & {
   readonly [K in ValueMatcherName]: (...args: Parameters<ValueExpectation<T>[K]>) => Promise<void>;
 };
+
+/** `expect.poll(read)`: every value matcher, each resolving once a re-read value passes. */
+export type PollExpectation<T> = PromisedValueExpectation<T>;
+
+/** `expect.poll(read).not`: every poll matcher inverted, none resolving to a value. */
+export type NegatedPollExpectation<T> = NegatedPromisedValueExpectation<T>;
 
 /** `T`, or `never` when `T` is `any`, so an `any` argument skips an overload. */
 type NotAny<T> = 0 extends 1 & T ? never : T;
@@ -1527,6 +1566,8 @@ export interface Expect extends ExpectCall {
   stringContaining(sample: string): AsymmetricMatcher;
   /** Matches a string the RegExp tests true on; a string sample is compiled to a RegExp. */
   stringMatching(sample: string | RegExp): AsymmetricMatcher;
+  /** Matches a number within `10 ** -digits / 2` of `expected`, as `toBeCloseTo` does; `digits` defaults to 2. */
+  closeTo(expected: number, digits?: number): AsymmetricMatcher;
 }
 
 export interface CommandConfig {

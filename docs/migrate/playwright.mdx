@@ -139,7 +139,7 @@ run only in a browser, so a test that uses it declares
 | `toHaveId(id)`, `toContainClass(name)` | `toHaveAttribute('id', id)`, `toHaveAttribute('class', RegExp)` |
 | `expect(page).toHaveURL()`, `toHaveTitle()` | `expect(browser).toHaveURL()`, `toHaveTitle()` |
 | `expect(page).toHaveScreenshot()`, `expect(locator).toHaveScreenshot()` | `expect(screen).toHaveScreenshot()` and the locator form, see [Visual comparison](/visual-testing) |
-| `expect(value)` with `toBe()`, `toEqual()`, `toMatchObject()`, `toContain()`, `toHaveLength()`, `toHaveProperty()`, `toMatch()`, and the truthiness and number matchers | the same, see [value matchers](/reference/expect#value-matchers) |
+| `expect(value)` with `toBe()`, `toEqual()`, `toStrictEqual()`, `toMatchObject()`, `toContain()`, `toContainEqual()`, `toHaveLength()`, `toHaveProperty()`, `toMatch()`, `toBeInstanceOf()`, `toThrow()`, `.resolves`, `.rejects`, `expect.closeTo()`, and the truthiness and number matchers | the same, see [value matchers](/reference/expect#value-matchers) |
 | `expect(locator, 'message')`, `expect(page, 'message').toHaveScreenshot()`, `expect(value, 'message')` | the same, `expect(screen, 'message')` for the page; the message opens the failure, see [locator matchers](/reference/expect#locator-matchers) |
 | `expect.any()`, `anything()`, `objectContaining()`, `arrayContaining()`, `stringMatching()`, `stringContaining()`, `expect.poll()`, `expect.soft()` | the same |
 | `expect.poll(read, { intervals })` | the same. See [Polling a value](/reference/expect#polling-a-value) |
@@ -279,7 +279,6 @@ purpose. Use the workaround, or keep the test in Playwright.
 | `{ fullPage, clip }`, `snapshotPathTemplate`, `ignoreSnapshots` | The viewport or one locator in `toHaveScreenshot`; a tag and `--exclude-tag` to skip visual tests |
 | `expect.configure()` | `{ timeout }` on each call |
 | `@axe-core/playwright` | axe-core through `browser.addInitScript({ path: 'node_modules/axe-core/axe.min.js' })`, then `axe.run()` in `browser.evaluate` |
-| `.resolves`, `.rejects`, `toThrow()`, `toStrictEqual()`, `toContainEqual()`, `toBeInstanceOf()`, `expect.closeTo()` | `await` first, or catch the error and assert on it; `toEqual`; `toContain`, which compares by deep equality; `toBeCloseTo` |
 | A `.not` locator matcher that passes on the first read | It passes after the condition holds for 1 s. The positive inverse passes on the first read: `toBeHidden()`, `toBeDisabled()`, `toBeChecked({ checked: false })` |
 | `expect.extend()` | An async helper that calls `expect` |
 

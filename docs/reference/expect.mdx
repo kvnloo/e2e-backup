@@ -45,7 +45,8 @@ test('checkout summary', async ({ screen }) => {
   `E` through [`expectable`](/reference/engine#contributed-fixtures), and
   `expect(fixture)` returns it.
 - Every other argument gets the value matchers, a promise included. Await a
-  promise before passing its result to `expect`.
+  promise before passing its result to `expect`, or check what it settles
+  with through [`resolves` and `rejects`](#resolves-and-rejects).
 
 The declarations are under [Types](#types).
 
@@ -465,15 +466,20 @@ still change, use [Polling a value](#polling-a-value).
 | --- | --- |
 | [`toBe`](#tobe) | Compares with `Object.is` |
 | [`toEqual`](#toequal) | Recursive structural equality |
+| [`toStrictEqual`](#tostrictequal) | Equality with types and `undefined` |
 | [`toMatchObject`](#tomatchobject) | Recursive subset match |
 | [`toBeTruthy`, `toBeFalsy`](#tobetruthy-and-tobefalsy) | Truthy or falsy value |
 | [`toBeNull`, `toBeUndefined`, `toBeDefined`](#tobenull-tobeundefined-and-tobedefined) | `null`, `undefined`, or defined |
 | [`toHaveLength`](#tohavelength) | `length` equals `expected` |
 | [`toHaveProperty`](#tohaveproperty) | Property at a path |
 | [`toContain`](#tocontain) | String or collection containment |
+| [`toContainEqual`](#tocontainequal) | Collection holds an equal item |
 | [`toMatch`](#tomatch) | String or `RegExp` match |
 | [`toBeGreaterThan` and others](#numeric-comparisons) | Numeric bound holds |
 | [`toBeCloseTo`](#tobecloseto) | Within `10 ** -digits / 2` |
+| [`toBeInstanceOf`](#tobeinstanceof) | Instance of a class |
+| [`toThrow`](#tothrow) | Function throws |
+| [`resolves`, `rejects`](#resolves-and-rejects) | Matcher on a settled promise |
 | [`toMatchSchema`](#matching-a-schema) | Standard Schema validation |
 | [`toBeOK`](#tobeok) | Response status is 2xx |
 
@@ -505,8 +511,23 @@ expect(payload).toEqual({ ok: true, items: [{ sku: 'a' }] });
 - A property whose value is `undefined` is treated as absent, and a sparse
   array equals one holding `undefined`.
 - Class types are not compared: a class instance equals a plain object with
-  the same properties. There is no `toStrictEqual`; see
-  [Not included](#not-included).
+  the same properties. [`toStrictEqual`](#tostrictequal) compares them.
+
+#### `toStrictEqual`
+
+Performs the equality of [`toEqual`](#toequal) and also compares what
+`toEqual` ignores.
+
+```ts
+expect(order).toStrictEqual(new Order({ id: 7, note: undefined }));
+// ASSERTION_FAILED: expected { id: 7 } to strictly equal Order { id: 7, note: undefined }
+```
+
+- Class types count: a class instance does not equal a plain object with
+  the same properties.
+- A property whose value is `undefined` does not equal a missing property.
+- An array hole does not equal `undefined`: `[, 1]` is not `[undefined, 1]`.
+- The failure prints class names, `undefined` properties, and holes.
 
 #### `toMatchObject`
 
@@ -581,6 +602,22 @@ expect(rows).toContain(expect.objectContaining({ status: 'paid' }));
 - On a collection, an element must equal `expected`. This form takes
   [asymmetric matchers](#asymmetric-matchers).
 
+#### `toContainEqual`
+
+Requires a collection with an item equal to `expected` by
+[`toEqual`](#toequal) rules.
+
+```ts
+expect(rows).toContainEqual({ sku: 'a', status: 'paid' });
+```
+
+- It takes an array, a `Set`, or any other iterable object, and
+  [asymmetric matchers](#asymmetric-matchers).
+- A string fails as `ASSERTION_FAILED`. For a substring, use
+  [`toContain`](#tocontain).
+- The collection form of `toContain` compares by the same rules, so the two
+  agree on a collection.
+
 #### `toMatch`
 
 Requires a string or `RegExp` match.
@@ -611,6 +648,73 @@ expect(totals.lineTotal).toBeCloseTo(60); // digits default: 2
 
 `toBeCloseTo(60)` accepts 59.996 and rejects 59.99. Infinite values pass only
 when they are the same infinity.
+
+#### `toBeInstanceOf`
+
+Requires an instance of the class, by `instanceof`.
+
+```ts
+expect(error).toBeInstanceOf(TypeError);
+```
+
+An argument that is not a class is `INVALID_ARGUMENT`.
+
+#### `toThrow`
+
+Calls the function one time and requires it to throw.
+
+```ts
+expect(() => parsePrice('abc')).toThrow();
+expect(() => parsePrice('abc')).toThrow('not a price');
+expect(() => parsePrice('abc')).toThrow(/price$/);
+expect(() => parsePrice('abc')).toThrow(RangeError);
+expect(() => parsePrice('abc')).toThrow(new Error('abc is not a price'));
+// ASSERTION_FAILED: expected the function to throw an instance of RangeError, but it threw [TypeError: abc is not a price]
+```
+
+| Argument | The thrown value passes when |
+| --- | --- |
+| none | Anything was thrown |
+| `string` | Its message contains the text |
+| `RegExp` | Its message matches |
+| class | It is an instance, by `instanceof` |
+| error | Its message is the same, and so is each message down its `cause` chain |
+| [asymmetric matcher](#asymmetric-matchers) | The matcher accepts it |
+
+- The message of a thrown value that has no string `message` is the value
+  as text, so `toThrow('boom')` matches `throw 'boom'`.
+- An error argument is compared by message only. Its class is not compared.
+- A value that is not a function fails as `ASSERTION_FAILED`, negated too.
+  Any other argument is `INVALID_ARGUMENT`.
+- An async function does not throw, it returns a promise that rejects. So
+  `toThrow` fails on it, and the failure says to use
+  [`rejects`](#resolves-and-rejects). `not.toThrow()` passes on it.
+
+#### `resolves` and `rejects`
+
+`expect(promise).resolves` waits for the promise and runs a value matcher
+on its value. `expect(promise).rejects` runs it on the rejection. Every
+value matcher is there, and each returns a promise. Await it.
+
+```ts
+await expect(loadOrder(7)).resolves.toMatchObject({ status: 'paid' });
+await expect(loadOrder(-1)).rejects.toThrow('no such order');
+await expect(loadOrder(-1)).rejects.toBeInstanceOf(NotFoundError);
+await expect(loadOrder(7)).resolves.not.toHaveProperty('error');
+// ASSERTION_FAILED: expected the promise to reject, but it resolved with {"id":7,"status":"paid"}
+```
+
+- `.not` inverts the matcher only, before or after `resolves` and `rejects`.
+  A promise that settles the other way always fails.
+- After `rejects`, `toThrow` checks the rejection by the rules of
+  [`toThrow`](#tothrow), without a call.
+- `resolves.toMatchSchema(schema)` resolves to the schema's output.
+- A failed `resolves` has the rejection as its `cause`.
+- A value that is not a promise or a thenable is `INVALID_ARGUMENT`.
+- A call that the test body does not await fails the test with
+  `STEP_NOT_AWAITED` when the body returns before the promise settles.
+- There is no timeout of its own: a promise that never settles ends at the
+  test timeout.
 
 #### Matching a schema
 
@@ -678,17 +782,16 @@ same way. A `browser` expectation takes none; its failure names the matcher.
 
 #### Not included
 
-The unit-runner matchers (`toThrow`, `toBeInstanceOf`, `toBeNaN`,
-`toStrictEqual`, `resolves`, `rejects`, `expect.extend`) are not part of
-`expect`. An end-to-end test checks what the app shows and what its API
-returns; the value matchers cover that, see [API](/api-testing). Code-level
-checks belong in the unit runner.
+`toBeNaN` and `expect.extend` are not part of `expect`. `toBe(NaN)` passes
+on `NaN`, and a helper function that calls `expect` replaces a custom
+matcher.
 
 ### Asymmetric matchers
 
 An asymmetric matcher stands in for a value inside `toEqual`,
-`toMatchObject`, the collection form of `toContain`, and the value of
-`toHaveProperty`. Where the comparison would test equality, it asks the
+`toStrictEqual`, `toMatchObject`, `toContainEqual`, the collection form of
+`toContain`, and the value of `toHaveProperty`. `toThrow` takes one for the
+thrown value. Where the comparison would test equality, it asks the
 matcher instead. They are Jest's matchers, with Jest's rules.
 
 | Matcher | Matches |
@@ -699,6 +802,7 @@ matcher instead. They are Jest's matchers, with Jest's rules.
 | `expect.arrayContaining(sample)` | An array holding every element of `sample`, in any order, each compared by `toEqual` rules |
 | `expect.stringContaining(text)` | A string with `text` as a substring |
 | `expect.stringMatching(text \| RegExp)` | A string the RegExp tests true on; a text sample is compiled to a RegExp, so `'a.b'` matches `'axb'` |
+| `expect.closeTo(number, digits?)` | A number within `10 ** -digits / 2` of `number`, the rule of [`toBeCloseTo`](#tobecloseto); `digits` defaults to 2 |
 
 ```ts
 expect(created).toEqual({
@@ -706,13 +810,16 @@ expect(created).toEqual({
   createdAt: expect.any(String),
   roles: expect.arrayContaining(['member']),
   profile: expect.objectContaining({ name: 'Ada' }),
+  total: expect.closeTo(59.99),
 });
 expect(rows).toContain(expect.objectContaining({ status: 'paid' }));
 expect(response).toHaveProperty('body.total', expect.any(Number));
 ```
 
 - In a failure message a matcher prints as its description: `Any<Number>`,
-  `ObjectContaining {"name":"Ada"}`.
+  `ObjectContaining {"name":"Ada"}`, `CloseTo 59.99 (2 digits)`.
+- `expect.closeTo` with a `number` that is not a number, or `digits` that is
+  not a non-negative integer, is `INVALID_ARGUMENT`.
 - Matchers nest: an `objectContaining` sample may hold an `expect.any`.
 - The string form of `toContain` refuses them; see [`toContain`](#tocontain).
 
@@ -756,6 +863,8 @@ ASSERTION_FAILED: 2 soft assertions failed
   kept in the attempt's `skip`.
 - A soft `toMatchSchema` returns the schema's output when the value matches
   and `undefined` after a kept failure, and its type says so.
+- `expect.soft(promise).resolves` and `.rejects` are soft too: the returned
+  promise resolves after a kept failure.
 
 <Note>
 Outside a test body there is nothing to keep a failure for, so `expect.soft`
@@ -1049,6 +1158,7 @@ export interface Expect extends ExpectCall {
   arrayContaining(sample: readonly unknown[]): AsymmetricMatcher;
   stringContaining(sample: string): AsymmetricMatcher;
   stringMatching(sample: string | RegExp): AsymmetricMatcher;
+  closeTo(expected: number, digits?: number): AsymmetricMatcher;
 }
 ```
 
@@ -1174,10 +1284,16 @@ export interface BrowserExpectation {
 export interface ValueExpectation<T> {
   /** Inverts the matcher. */
   readonly not: NegatedValueExpectation<T>;
+  /** Waits for the promise and runs the matcher on its value; a rejection fails the assertion. */
+  readonly resolves: PromisedValueExpectation<Awaited<T>>;
+  /** Waits for the promise and runs the matcher on its rejection; a promise that resolves fails the assertion. */
+  readonly rejects: PromisedValueExpectation<unknown>;
   /** Compares with Object.is. */
   toBe(expected: T): void;
   /** Performs recursive structural equality; `undefined` properties are ignored and class types are not compared. */
   toEqual(expected: unknown): void;
+  /** Performs `toEqual`'s comparison, and also tells apart class types, an `undefined` property from a missing one, and an array hole from `undefined`. */
+  toStrictEqual(expected: unknown): void;
   /** Requires every property of `expected` to match recursively; extra properties on the value are fine, arrays must match element-wise with equal length. */
   toMatchObject(expected: object): void;
   /** Requires a truthy value. */
@@ -1196,6 +1312,8 @@ export interface ValueExpectation<T> {
   toHaveProperty(path: PropertyPath, ...expected: [] | [expected: unknown]): void;
   /** Requires string or collection containment. */
   toContain(expected: unknown): void;
+  /** Requires a collection with an item equal to `expected` by `toEqual` rules. */
+  toContainEqual(expected: unknown): void;
   /** Requires a string or regexp match. */
   toMatch(expected: string | RegExp): void;
   /** Requires a numeric lower bound. */
@@ -1208,6 +1326,15 @@ export interface ValueExpectation<T> {
   toBeLessThanOrEqual(expected: number): void;
   /** Requires a number within `10 ** -digits / 2` of `expected`; `digits` defaults to 2. */
   toBeCloseTo(expected: number, digits?: number): void;
+  /** Requires an instance of the class, by `instanceof`. */
+  toBeInstanceOf(expected: Class): void;
+  /**
+   * Calls the function and requires it to throw. `expected` narrows the
+   * error: a string its message contains, a RegExp its message matches, a
+   * class it is an instance of, or an error with the same message. After
+   * `.rejects`, checks the rejection instead of calling.
+   */
+  toThrow(expected?: ThrowExpectation): void;
   /**
    * Requires the value to pass a synchronous Standard Schema (Zod, Valibot,
    * ArkType, ...) and returns the schema's output, typed:
@@ -1223,18 +1350,52 @@ export interface ValueExpectation<T> {
   toBeOK(...valueIsNotAResponse: [T] extends [WebResponse] ? [] : [never]): void;
 }
 
-/** `expect(value).not`: every value matcher inverted, none returning a value; `Back` is what `.not` returns to. */
-export type NegatedValueExpectation<T, Back = ValueExpectation<T>> = {
+/** The names of the value matchers, every key of `ValueExpectation` but `not`, `resolves`, and `rejects`. */
+export type ValueMatcherName = Exclude<keyof ValueExpectation<unknown>, 'not' | 'resolves' | 'rejects'>;
+
+/** `expect(value).not`: every value matcher inverted, none returning a value; `Back` is what `.not` returns to, and `Kept` is `undefined` under `expect.soft`. */
+export type NegatedValueExpectation<T, Back = ValueExpectation<T>, Kept = never> = {
   readonly not: Back;
+  readonly resolves: NegatedPromisedValueExpectation<Awaited<T>, Kept>;
+  readonly rejects: NegatedPromisedValueExpectation<unknown, Kept>;
 } & {
-  readonly [K in Exclude<keyof ValueExpectation<T>, 'not'>]: (...args: Parameters<ValueExpectation<T>[K]>) => void;
+  readonly [K in ValueMatcherName]: (...args: Parameters<ValueExpectation<T>[K]>) => void;
 };
 
 /** `expect.soft(value)`: the value matchers, with `toMatchSchema` returning `undefined` after a kept failure. */
-export type SoftValueExpectation<T> = Omit<ValueExpectation<T>, 'toMatchSchema' | 'not'> & {
-  readonly not: NegatedValueExpectation<T, SoftValueExpectation<T>>;
+export type SoftValueExpectation<T> = Omit<ValueExpectation<T>, 'toMatchSchema' | 'not' | 'resolves' | 'rejects'> & {
+  readonly not: NegatedValueExpectation<T, SoftValueExpectation<T>, undefined>;
+  readonly resolves: PromisedValueExpectation<Awaited<T>, undefined>;
+  readonly rejects: PromisedValueExpectation<unknown, undefined>;
   toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): StandardSchemaV1.InferOutput<Schema> | undefined;
 };
+
+/**
+ * The asynchronous form of every `ValueExpectation<T>` matcher: the same
+ * names and parameters, each resolving once the matcher passes;
+ * `toMatchSchema` resolves to the schema's output. Derived from
+ * `ValueExpectation<T>` so the two cannot drift. `Kept` is `undefined` under
+ * `expect.soft`, where a kept failure resolves to nothing.
+ */
+export type PromisedValueExpectation<T, Kept = never> = {
+  readonly not: NegatedPromisedValueExpectation<T, Kept>;
+} & {
+  readonly [K in Exclude<ValueMatcherName, 'toMatchSchema'>]: (
+    ...args: Parameters<ValueExpectation<T>[K]>
+  ) => Promise<void>;
+} & {
+  toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): Promise<StandardSchemaV1.InferOutput<Schema> | Kept>;
+};
+
+/** `.not` of a promised expectation: every matcher inverted, none resolving to a value. */
+export type NegatedPromisedValueExpectation<T, Kept = never> = {
+  readonly not: PromisedValueExpectation<T, Kept>;
+} & {
+  readonly [K in ValueMatcherName]: (...args: Parameters<ValueExpectation<T>[K]>) => Promise<void>;
+};
+
+/** What `toThrow` checks the thrown value against: a message substring, a message pattern, a class, or an error with the same message. */
+export type ThrowExpectation = string | RegExp | Class | Error | AsymmetricMatcher;
 
 /** A class, abstract or not: what `expect.any` takes. */
 export type Class = abstract new (...args: never[]) => unknown;
@@ -1247,8 +1408,8 @@ export type PropertyPath = string | readonly (string | number)[];
 
 ```ts
 /**
- * A stand-in for a value inside `toEqual`, `toMatchObject`, `toContain`, and
- * `toHaveProperty`: `expect.any(Number)` in place of a number,
+ * A stand-in for a value inside `toEqual`, `toStrictEqual`, `toMatchObject`,
+ * `toContain`, `toContainEqual`, and `toHaveProperty`: `expect.any(Number)` in place of a number,
  * `expect.objectContaining({ id: 1 })` in place of a record. The structural
  * matchers ask it whether a value matches instead of comparing.
  */
@@ -1277,28 +1438,11 @@ export interface PollOptions {
   message?: string;
 }
 
-/**
- * The asynchronous form of every `ValueExpectation<T>` matcher: the same
- * names and parameters, each resolving once the re-read value passes;
- * `toMatchSchema` resolves to the schema's output for the passing read.
- * Derived from `ValueExpectation<T>` so the two cannot drift.
- */
-export type PollExpectation<T> = {
-  readonly not: NegatedPollExpectation<T>;
-} & {
-  readonly [K in Exclude<keyof ValueExpectation<T>, 'not' | 'toMatchSchema'>]: (
-    ...args: Parameters<ValueExpectation<T>[K]>
-  ) => Promise<void>;
-} & {
-  toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): Promise<StandardSchemaV1.InferOutput<Schema>>;
-};
+/** `expect.poll(read)`: every value matcher, each resolving once a re-read value passes. */
+export type PollExpectation<T> = PromisedValueExpectation<T>;
 
 /** `expect.poll(read).not`: every poll matcher inverted, none resolving to a value. */
-export type NegatedPollExpectation<T> = {
-  readonly not: PollExpectation<T>;
-} & {
-  readonly [K in Exclude<keyof ValueExpectation<T>, 'not'>]: (...args: Parameters<ValueExpectation<T>[K]>) => Promise<void>;
-};
+export type NegatedPollExpectation<T> = NegatedPromisedValueExpectation<T>;
 ```
 
 ### `PassOptions` and `PassExpectation`

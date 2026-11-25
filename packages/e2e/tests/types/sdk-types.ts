@@ -608,7 +608,7 @@ void screen.getByRole('row').filter({ hasNot: 'Paid' });
 
 // expect.poll carries every value matcher and no other, each resolving to void.
 declare const pollMatcherNames: Exclude<keyof PollExpectation<string>, 'not'>;
-declare const valueMatcherNames: Exclude<keyof ValueExpectation<string>, 'not'>;
+declare const valueMatcherNames: Exclude<keyof ValueExpectation<string>, 'not' | 'resolves' | 'rejects'>;
 pollMatcherNames satisfies typeof valueMatcherNames;
 valueMatcherNames satisfies typeof pollMatcherNames;
 void (expect.poll(() => 'x', { timeout: 15_000, intervals: [250], message: 'never settled' }).toBe('x') satisfies Promise<void>);
@@ -692,6 +692,40 @@ expect.any(1);
 expect.arrayContaining('a');
 // @ts-expect-error expect.stringContaining takes text
 expect.stringContaining(/a/);
+// The unit-runner matchers: strict equality, containment, instances, thrown errors, and closeTo.
+class TypedError extends Error {}
+expect({ a: 1 }).toStrictEqual({ a: 1 });
+expect([{ a: 1 }]).toContainEqual({ a: expect.closeTo(1, 5) });
+expect(new TypedError()).toBeInstanceOf(Error);
+expect(() => 1).toThrow();
+expect(() => 1).not.toThrow('boom');
+expect(() => 1).toThrow(/boom/);
+expect(() => 1).toThrow(TypedError);
+expect(() => 1).toThrow(new Error('boom'));
+expect(() => 1).toThrow(expect.objectContaining({ code: 'E' }));
+expect({ total: 0.3 }).toEqual({ total: expect.closeTo(0.3) });
+// @ts-expect-error toBeInstanceOf takes a class, not an instance
+expect(1).toBeInstanceOf(new TypedError());
+// @ts-expect-error toThrow takes a string, a RegExp, a class, an error, or an asymmetric matcher
+expect(() => 1).toThrow(1);
+// @ts-expect-error expect.closeTo takes a number
+expect.closeTo('1');
+// resolves and rejects carry every value matcher, typed by what the promise settles with, each a promise.
+void (expect(Promise.resolve(1)).resolves.toBe(1) satisfies Promise<void>);
+void (expect(Promise.resolve(1)).resolves.not.toBeGreaterThan(1) satisfies Promise<void>);
+void (expect(Promise.resolve(1)).not.resolves.toBe(2) satisfies Promise<void>);
+void (expect(Promise.reject(new Error('boom'))).rejects.toThrow('boom') satisfies Promise<void>);
+void (expect(Promise.reject(new Error('boom'))).rejects.not.toBeInstanceOf(TypedError) satisfies Promise<void>);
+void (expect(Promise.resolve([1])).resolves.toMatchSchema(z.array(z.number())) satisfies Promise<number[]>);
+void (expect.soft(Promise.resolve([1])).resolves.toMatchSchema(z.array(z.number())) satisfies Promise<number[] | undefined>);
+void (expect(Promise.resolve(1), 'the total').resolves.toBeCloseTo(1) satisfies Promise<void>);
+declare const promisedMatcherNames: Exclude<keyof ValueExpectation<Promise<string>>['resolves'], 'not'>;
+promisedMatcherNames satisfies typeof valueMatcherNames;
+valueMatcherNames satisfies typeof promisedMatcherNames;
+// @ts-expect-error the matcher is typed by what the promise resolves with
+void expect(Promise.resolve('x')).resolves.toBe(1);
+// @ts-expect-error toPass retries a function; it is not a matcher on a settled promise
+void expect(Promise.resolve(block)).resolves.toPass();
 // expect.soft has the expect call's three shapes and no poll of its own.
 expect.soft(1, 'why this holds').toBe(1);
 void (expect.soft(screen.getByRole('button')).toBeVisible() satisfies Promise<void>);

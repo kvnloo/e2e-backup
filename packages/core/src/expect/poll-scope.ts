@@ -75,7 +75,7 @@ export class PollScope {
     const more = polls.length > 1 ? ` and ${polls.length - 1} more` : '';
     const error = new TestError(
       'STEP_NOT_AWAITED',
-      withHint(`${this.owner} returned before ${first.label}${more} finished`, 'put `await` in front of every expect.poll matcher and toPass call'),
+      withHint(`${this.owner} returned before ${first.label}${more} finished`, 'put `await` in front of every expect.poll, resolves, rejects, and toPass matcher'),
     );
     relocateStack(error, first.stack);
     return error;
