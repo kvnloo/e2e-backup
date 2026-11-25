@@ -732,6 +732,12 @@ export class ElectronSurface {
           case 'clear': {
             const value = action.kind === 'fill' ? action.value : '';
             await this.waitReady(window, backendNodeId, operation, CHECK_EDITABLE, deadline);
+            // A date, time, color, or range input takes no typed text: its value is set, as Playwright's fill does.
+            const set = await commit(() => this.callOn<Readiness | null>(window, backendNodeId, SET_VALUE, [value]));
+            if (set !== null) {
+              if (!set.ok) throw notActionable(set.reason);
+              return;
+            }
             // The app's focus handler can hand focus on; text goes only to the node that still holds it.
             if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
             // Both edit the selection as typing would, with input events and no key events, as fill promises.
@@ -1148,13 +1154,28 @@ const BLUR = `function () { ${ELEMENT}
 
 const TEXT_INPUT_TYPES = "['', 'text', 'password', 'email', 'search', 'tel', 'url', 'number']";
 
+/** Input types whose value is set rather than typed. */
+const SET_VALUE_TYPES = "['date', 'time', 'datetime-local', 'month', 'week', 'color', 'range']";
+
 const CHECK_EDITABLE = `function () { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
   const tag = element.tagName;
-  const field = tag === 'TEXTAREA' || (tag === 'INPUT' && ${TEXT_INPUT_TYPES}.includes((element.getAttribute('type') || '').toLowerCase()));
+  const type = (element.getAttribute('type') || '').toLowerCase();
+  const field = tag === 'TEXTAREA' || (tag === 'INPUT' && (${TEXT_INPUT_TYPES}.includes(type) || ${SET_VALUE_TYPES}.includes(type)));
   if (!field && !element.isContentEditable) return { ok: false, reason: 'it is not a text field' };
   if (element.matches(':disabled')) return { ok: false, reason: 'it is disabled' };
   if (field && element.readOnly) return { ok: false, reason: 'it is read-only' };
+  return { ok: true };
+}`;
+
+/** Sets the value of an input that takes no typed text, with its input and change events; null for any other node. */
+const SET_VALUE = `function (value) { ${ELEMENT}
+  if (element.tagName !== 'INPUT' || !${SET_VALUE_TYPES}.includes((element.getAttribute('type') || '').toLowerCase())) return null;
+  element.focus();
+  element.value = value;
+  if (element.value !== value) return { ok: false, reason: 'the ' + element.type + ' input does not take ' + JSON.stringify(value) };
+  element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  element.dispatchEvent(new Event('change', { bubbles: true }));
   return { ok: true };
 }`;
 
