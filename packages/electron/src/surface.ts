@@ -897,8 +897,11 @@ export class ElectronSurface {
   }
 
   async closeTab(index: number, operation: OperationContext): Promise<void> {
-    const window = this.openWindows()[index];
-    if (window === undefined) throw notActionable(`the app has ${this.openWindows().length} windows; there is no window ${index}`);
+    const open = this.openWindows();
+    const window = open[index];
+    if (window === undefined) throw notActionable(`the app has ${open.length} windows; there is no window ${index}`);
+    // The contract keeps the last tab open; for most apps the last window closing quits the app.
+    if (open.length === 1) throw notActionable('this is the app\'s only window; closing it would end the app');
     await this.bounded(operation, 'close window', true, () => window.page.close());
   }
 
