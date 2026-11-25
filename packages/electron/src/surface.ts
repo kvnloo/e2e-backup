@@ -244,14 +244,14 @@ export class ElectronSurface {
     this.windowsByPage.clear();
     this.shown = undefined;
     if (app === undefined) return;
-    const child = app.process();
     let timer: NodeJS.Timeout | undefined;
     const closed = app.close().then(() => true, () => false);
     const timedOut = new Promise<false>((resolve) => {
       timer = setTimeout(() => resolve(false), Math.max(1, Math.min(budget.timeoutMs, 10_000)));
     });
     try {
-      if (!(await Promise.race([closed, timedOut]))) child.kill('SIGKILL');
+      // The process is read only for the kill: Playwright refuses it for an app that has already quit.
+      if (!(await Promise.race([closed, timedOut]))) app.process().kill('SIGKILL');
     } finally {
       clearTimeout(timer);
     }
@@ -310,7 +310,9 @@ export class ElectronSurface {
       this.attempt?.appLog({ source: 'console', level: levelOf(message.type()), text: `[main] ${message.text()}` });
     });
     app.on('close', () => {
+      // The app quit on its own (its last window closed, or it called app.quit()): there is nothing left to close.
       if (this.app === app) {
+        this.app = undefined;
         this.windowsByPage.clear();
         this.shown = undefined;
       }

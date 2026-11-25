@@ -140,6 +140,19 @@ test.describe('sign-in window', () => {
   });
 });
 
+test.describe('an app that quits on its own', () => {
+  test('relaunches with app.restart() and ends the test cleanly', async ({ app, screen, electron }) => {
+    await app.open();
+    await screen.getByTestId('username').fill('ada');
+    await electron.evaluate(({ app: main }) => setTimeout(() => main.quit(), 50));
+    await expect.poll(async () => (await electron.windows()).length).toBe(0);
+    await app.restart();
+    await expect(screen.getByTestId('status')).toHaveText('Not signed in');
+    await electron.evaluate(({ app: main }) => setTimeout(() => main.quit(), 50));
+    await expect.poll(async () => (await electron.windows()).length).toBe(0);
+  });
+});
+
 test.describe('screenshots', () => {
   test.beforeEach(async ({ app }) => {
     await app.open();
