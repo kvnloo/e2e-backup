@@ -403,6 +403,8 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
           break;
       }
     }
+    // An editing host, and an element inside one, takes text; Chromium marks it `editable` and gives no read-only state.
+    if (draft.states['readonly'] === undefined && node.properties?.some((property) => property.name === 'editable') === true) draft.states['readonly'] = false;
     // A native field has a read-only state whatever Chromium reports for it (none for a select): its readonly attribute.
     if (facts?.nodeName === 'INPUT' || facts?.nodeName === 'TEXTAREA' || facts?.nodeName === 'SELECT') draft.states['readonly'] = 'readonly' in attributes;
     const checkable = facts?.nodeName === 'INPUT' && ['checkbox', 'radio'].includes(attributes['type']?.toLowerCase() ?? '');

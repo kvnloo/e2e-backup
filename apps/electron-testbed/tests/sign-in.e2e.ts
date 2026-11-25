@@ -165,6 +165,11 @@ test.describe('sign-in window', () => {
     await expect(rich).toHaveText('Rewritten');
   });
 
+  test('reads an editing host with no role as editable', async ({ screen }) => {
+    await expect(screen.getByTestId('plain-notes')).toBeEditable();
+    await expect(screen.getByTestId('rich')).toBeEditable();
+  });
+
   test('counts a CSS locator in document order where aria-owns reorders the tree', async ({ electron }) => {
     await expect(electron.locator('button.ordered').first()).toHaveText('DOM first');
     await expect(electron.locator('button.ordered').last()).toHaveText('DOM second');
