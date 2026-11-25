@@ -145,6 +145,8 @@ function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath
     let via: string | undefined;
     let back: number | undefined;
     let away = false;
+    // The action that left: the last one known to stand home before the first departure.
+    let left = from;
     for (let to = from + 1; to <= actions.length; to += 1) {
       if (changesState(actions[to - 1]!)) break;
       const place = where[to];
@@ -152,6 +154,8 @@ function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath
       if (!sameRoute(home, place)) {
         via ??= place;
         away = true;
+      } else if (via === undefined) {
+        left = to;
       } else if (away) {
         // A return after another departure; staying home after it adds nothing.
         back = to;
@@ -162,7 +166,7 @@ function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath
       from += 1;
       continue;
     }
-    detours.push({ from, to: back, at: home, via, evidence: 'locations' });
+    detours.push({ from: left, to: back, at: home, via, evidence: 'locations' });
     from = back;
   }
   return detours;
