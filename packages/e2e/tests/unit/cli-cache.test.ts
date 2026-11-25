@@ -202,6 +202,19 @@ describe('e2e cache show', () => {
     expect(written(stdoutSpy)).toContain(`entry      ${path.join(root, 'copied', `${'c'.repeat(64)}.json`)}`);
   });
 
+  it('names the state and value a replay checks in the end state', async () => {
+    await seed([{
+      keyHash: 'c'.repeat(64),
+      trace: {
+        ...detouredTrace(),
+        endAnchors: [{ role: 'switch', name: 'Dark mode', states: ['checked'] }, { role: 'textbox', name: 'Nickname', value: 'Ada' }],
+        goneAnchors: [{ role: 'switch', name: 'Dark mode' }],
+      },
+    }]);
+    await invoke('cache', 'show', 'c'.repeat(12));
+    expect(written(stdoutSpy)).toContain('end state: shows switch "Dark mode" [checked], shows textbox "Nickname" value="Ada", no longer shows switch "Dark mode"');
+  });
+
   it('strips terminal controls the recorded text carries', async () => {
     const recorded = detouredTrace();
     await seed([{ keyHash: 'c'.repeat(64), trace: { ...recorded, summary: 'done\u001b[2J\u0007' } }]);

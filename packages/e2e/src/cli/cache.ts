@@ -20,7 +20,7 @@ import type { Command } from 'commander';
 import picocolors from 'picocolors';
 import { describeDetour, findDetours, type TraceDetour } from '@e2e-dev/core/lib/cache/detours';
 import { FileCacheStore, MAX_CACHE_WIRE_BYTES } from '@e2e-dev/core/lib/cache/store';
-import { targetLabel } from '@e2e-dev/core/lib/cache/trace';
+import { targetLabel, type TraceTargetDescriptor } from '@e2e-dev/core/lib/cache/trace';
 import { discoverConfig, loadConfigModule, missingConfigError } from '../config/load.ts';
 import { resolveConfig } from '../config/resolve-run.ts';
 import { errorMessage, sanitizeText } from '@e2e-dev/core/lib/internal/errors';
@@ -343,14 +343,29 @@ async function show(contents: CacheContents, ref: string): Promise<number> {
     ]),
   );
   const anchors = [
-    ...(trace.endAnchors ?? []).map((anchor) => `shows ${targetLabel(anchor)}`),
-    ...(trace.goneAnchors ?? []).map((anchor) => `no longer shows ${targetLabel(anchor)}`),
+    ...(trace.endAnchors ?? []).map((anchor) => `shows ${anchorLabel(anchor)}`),
+    ...(trace.goneAnchors ?? []).map((anchor) => `no longer shows ${anchorLabel(anchor)}`),
   ];
   if (anchors.length > 0) process.stdout.write(`\nend state: ${plain(anchors.join(', '))}\n`);
   if (trace.truncated === true) process.stdout.write('\nnever replays: recording hit a cap or kept a value it could not replay\n');
   if (entry.detours.length > 0) process.stdout.write('\n');
   for (const detour of entry.detours) process.stdout.write(`${picocolors.yellow('detour')}: ${plain(describeDetour(detour))}\n`);
   return 0;
+}
+
+/**
+ * An end-state anchor as `show` prints it: the node, then what a replay
+ * compares beyond its name, its text, value, and the states that were on,
+ * so a switch turned on reads apart from the same switch before.
+ */
+function anchorLabel(anchor: TraceTargetDescriptor): string {
+  const { name, text, value, states } = anchor;
+  return [
+    targetLabel(anchor),
+    ...(text !== undefined && name !== undefined && text !== name ? [`text=${JSON.stringify(text)}`] : []),
+    ...(value === undefined ? [] : [`value=${JSON.stringify(value)}`]),
+    ...(states === undefined || states.length === 0 ? [] : [`[${states.join(', ')}]`]),
+  ].join(' ');
 }
 
 /** Text from an entry as one terminal line: control sequences stripped, line breaks and tabs as spaces. */
