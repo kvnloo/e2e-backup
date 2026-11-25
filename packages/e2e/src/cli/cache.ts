@@ -428,7 +428,10 @@ function check(contents: CacheContents): number {
       : `${failing} of ${total} replay cache ${total === 1 ? 'entry takes' : 'entries take'} a detour; e2e cache show <entry> prints its actions\n`,
   );
   if (hinted > 0) {
-    process.stdout.write(`${hinted} ${entries(hinted)} recorded without locations only ${hinted === 1 ? 'looks' : 'look'} like one; a run that records ${hinted === 1 ? 'it' : 'them'} again can tell\n`);
+    // A run that records the same flow again keeps the stored entry, so only a new recording adds the locations.
+    process.stdout.write(
+      `${hinted} ${entries(hinted)} recorded without locations only ${hinted === 1 ? 'looks' : 'look'} like one; delete ${hinted === 1 ? 'it' : 'them'} and run the ${hinted === 1 ? 'test' : 'tests'} again to record the locations\n`,
+    );
   }
   warnAboutSkipped(contents);
   return failing === 0 ? 0 : 1;
