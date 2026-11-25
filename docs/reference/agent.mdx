@@ -759,6 +759,13 @@ export interface StepCacheInfo {
   detail?: string;
   /** Configured model when the consulted entry was recorded; absent on older entries. */
   recordedBy?: { readonly provider: string; readonly model: string };
+  /**
+   * Where the step's recording left a screen and came back to it with
+   * nothing changed on the way: the recording this step replayed, or the
+   * one it recorded. A hint to look at the recording, not a failure;
+   * absent when it has none.
+   */
+  detour?: string;
 }
 
 type TraceReplayMissReason = 'retry' | 'no-entry' | 'invalid-entry' | 'truncated' | 'wrong-context';

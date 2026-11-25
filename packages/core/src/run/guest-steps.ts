@@ -154,6 +154,7 @@ export function mirrorGuestSteps(steps: StepRecorder, actor: string, root: strin
     if (result.explanation !== undefined) result.explanation = redact(result.explanation);
     if (result.turns !== undefined) result.turns = result.turns.map((turn) => ({ ...turn, calls: turn.calls.map(redact), outcome: redact(turn.outcome) }));
     if (result.cache?.detail !== undefined) result.cache = { ...result.cache, detail: redact(result.cache.detail) };
+    if (result.cache?.detour !== undefined) result.cache = { ...result.cache, detour: redact(result.cache.detour) };
     if (result.error !== undefined) {
       const { source: theirSource, ...error } = redactSerializedError(result.error, redact);
       const source = relocated(theirSource);

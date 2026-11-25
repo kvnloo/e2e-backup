@@ -28,6 +28,7 @@ import {
   aiSegment,
   bounded,
   cacheText,
+  detourCount,
   durationText,
   fitColumns,
   emptyCacheTally,
@@ -176,7 +177,11 @@ function attemptDetails(attempts: readonly AttemptRecord[], passed: boolean, con
     durationMs: attempts.reduce((total, attempt) => total + attempt.durationMs, 0),
     usage: stepsUsage(steps),
     models: stepsModelTally(steps),
-    cache: { ...stepsCacheTally(steps), notSaved: notSavedCount(passingRunSteps(attempts, passed)) },
+    cache: {
+      ...stepsCacheTally(steps),
+      notSaved: notSavedCount(passingRunSteps(attempts, passed)),
+      detours: detourCount(passingRunSteps(attempts, passed)),
+    },
     error: told?.error,
     videos: videoPaths(attempts),
     screenshots: attempts.flatMap((attempt) => requestedScreenshots(attempt.steps, attempt.artifacts)),
@@ -243,7 +248,11 @@ function serialMemberDetails(group: SerialGroupRecord, testId: string, passed: b
     durationMs: runs.reduce((total, run) => total + (run.member?.durationMs ?? 0), 0),
     usage: stepsUsage(steps),
     models: stepsModelTally(steps),
-    cache: { ...stepsCacheTally(steps), notSaved: notSavedCount(passingRunSteps(runs.map((run) => run.member), passed)) },
+    cache: {
+      ...stepsCacheTally(steps),
+      notSaved: notSavedCount(passingRunSteps(runs.map((run) => run.member), passed)),
+      detours: detourCount(passingRunSteps(runs.map((run) => run.member), passed)),
+    },
     error: own?.error ?? (neverRan ? last?.attempt.error : undefined),
     // The group's recording covers every member, so a failed member points at it.
     videos: videoPaths(group.attempts),

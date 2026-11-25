@@ -15,6 +15,7 @@
 import { deltaEvidenced, deltaMismatch, describeDelta, type DeltaMismatch } from '../cache/anchors.ts';
 import type { AgentCacheContext, ClaimedKey } from '../cache/context.ts';
 import { decideTraceReplay, opensWithNavigate, type TraceReplayMissReason } from '../cache/decide.ts';
+import { describeDetour, findDetours } from '../cache/detours.ts';
 import { sameRoute } from '../cache/route.ts';
 import { keyContextChanges, type CacheAgentIdentity } from '../cache/identity.ts';
 import { recordedProvenance, TraceRecorder } from '../cache/recorder.ts';
@@ -553,11 +554,13 @@ export class StepTraceSession {
 
   private selfFinalize(trace: ActionTrace, outcome: ReplayOutcome): StepVerdict {
     this.replayedWhole = true;
+    const detour = this.detourOf(trace);
     this.info = {
       mode: 'self-finalized',
       replayedActions: outcome.executed,
       totalActions: outcome.total,
       entry: this.keyHash,
+      ...(detour === undefined ? {} : { detour }),
     };
     return { status: 'passed', summary: replaySummary(outcome.executed, trace.summary) };
   }
@@ -654,7 +657,19 @@ export class StepTraceSession {
     const templated = templateTrace(trace, this.options.templates);
     if (templated === undefined) return 'skipped';
     this.cache.staged.push({ kind: 'write', keyHash: this.keyHash, trace: templated, stepIndex: this.options.stepIndex });
+    const detour = this.detourOf(trace);
+    if (detour !== undefined && this.info !== undefined) this.info = { ...this.info, detour };
     return 'staged';
+  }
+
+  /**
+   * The recording's detours as the report names them (`cache/detours.ts`),
+   * or undefined when it has none. Joined with commas: the report line
+   * separates its own parts with semicolons (`cacheLine`).
+   */
+  private detourOf(trace: ActionTrace): string | undefined {
+    const detours = findDetours(trace);
+    return detours.length === 0 ? undefined : this.reportable(detours.map(describeDetour).join(', '));
   }
 
   /**

@@ -60,6 +60,12 @@
                 "durationMs": 1000,
                 "observationTruncated": "yes",
                 "events": [],
+                "cache": {
+                  "mode": "self-finalized",
+                  "replayedActions": 3,
+                  "totalActions": 3,
+                  "detour": 3
+                },
                 "metrics": {
                   "modelCalls": 1,
                   "actionSteps": 0,

@@ -442,6 +442,11 @@ matches. Misses and hand-offs use the model; `agent.assert`,
   `unique()` value equals, is spelled inside, or is the encoded form of
   another param's value is not recorded either (`step.cache.notRecorded`:
   `param-collision`).
+- A recording that leaves a screen and comes back to it with nothing typed,
+  chosen, or set on the way (an agent that opened the wrong page and backed
+  out) still replays, and `step.cache.detour` names the actions; the run
+  summary counts them as `detoured`. Delete the entry and record the step
+  again, naming the destination in the instruction if the agent repeats it.
 - `e2e init` gitignores `.e2e/cache/`; remove that line to commit entries
   and share replays with CI and teammates (CI stays `read-only` unless
   `cache: 'read-write'` is set).

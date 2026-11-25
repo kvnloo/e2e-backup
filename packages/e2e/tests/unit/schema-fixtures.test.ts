@@ -103,7 +103,7 @@ describe.each(schemas)('%s schema', (name) => {
       expect(validate(report)).toBe(true);
     });
 
-    it("bounds what a step tells and what the app logged: a log line's source and level, a hook phase, and the cache detail, entry, and write", () => {
+    it("bounds what a step tells and what the app logged: a log line's source and level, a hook phase, and the cache detail, detour, entry, and write", () => {
       const report = readJson('fixtures', 'report-v1.valid.json') as {
         run: { results: { attempts: (Record<string, unknown> & { steps: Record<string, unknown>[] })[] }[] };
       };
@@ -120,6 +120,7 @@ describe.each(schemas)('%s schema', (name) => {
         [() => (navigation['level'] = 'info'), () => delete navigation['level']],
         [() => (step['phase'] = 'body'), () => delete step['phase']],
         [() => (cache['detail'] = 'x'.repeat(601)), () => (cache['detail'] = 'x'.repeat(600))],
+        [() => (cache['detour'] = 'x'.repeat(601)), () => (cache['detour'] = 'x'.repeat(600))],
         [() => (cache['entry'] = 'not-a-digest'), () => (cache['entry'] = 'a'.repeat(64))],
         [() => (cache['write'] = 'written'), () => (cache['write'] = 'kept')],
       ];

@@ -274,6 +274,8 @@ export interface CacheTally {
   handedOff: number;
   missed: number;
   notSaved: number;
+  /** Steps of a passing attempt whose recording leaves a screen and comes back with nothing changed. */
+  detours: number;
 }
 
 /** The `step.cache.write` outcomes where the step's recording was not written. */
@@ -284,8 +286,13 @@ export function notSavedCount(steps: readonly StepRecord[]): number {
   return steps.filter((step) => step.cache?.write !== undefined && NOT_SAVED.has(step.cache.write)).length;
 }
 
+/** The steps whose recording, replayed or just recorded, has a detour (`step.cache.detour`). */
+export function detourCount(steps: readonly StepRecord[]): number {
+  return steps.filter((step) => step.cache?.detour !== undefined).length;
+}
+
 export function emptyCacheTally(): CacheTally {
-  return { replayed: 0, handedOff: 0, missed: 0, notSaved: 0 };
+  return { replayed: 0, handedOff: 0, missed: 0, notSaved: 0, detours: 0 };
 }
 
 export function addCacheTally(into: CacheTally, counts: CacheTally): void {
@@ -293,6 +300,7 @@ export function addCacheTally(into: CacheTally, counts: CacheTally): void {
   into.handedOff += counts.handedOff;
   into.missed += counts.missed;
   into.notSaved += counts.notSaved;
+  into.detours += counts.detours;
 }
 
 /** The trace cache's part in several step lists, by step. */
@@ -319,8 +327,8 @@ export function stepsCacheTally(stepLists: readonly (readonly StepRecord[])[]): 
 }
 
 /**
- * `9 replayed · 2 handed off · 4 missed · 1 not saved`, zero counts left
- * out, or undefined when no step went through the trace cache.
+ * `9 replayed · 2 handed off · 4 missed · 1 not saved · 1 detoured`, zero
+ * counts left out, or undefined when no step went through the trace cache.
  */
 export function cacheText(pc: Colors, counts: CacheTally): string | undefined {
   const parts = [
@@ -328,6 +336,7 @@ export function cacheText(pc: Colors, counts: CacheTally): string | undefined {
     counts.handedOff > 0 ? pc.yellow(`${counts.handedOff} handed off`) : undefined,
     counts.missed > 0 ? `${counts.missed} missed` : undefined,
     counts.notSaved > 0 ? pc.yellow(`${counts.notSaved} not saved`) : undefined,
+    counts.detours > 0 ? pc.yellow(`${counts.detours} detoured`) : undefined,
   ].filter((part) => part !== undefined);
   return parts.length === 0 ? undefined : parts.join(pc.dim(' · '));
 }

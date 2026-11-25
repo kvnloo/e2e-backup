@@ -145,6 +145,13 @@ export interface StepCacheInfo {
   detail?: string;
   /** Configured model when the consulted entry was recorded; absent on older entries. */
   recordedBy?: RecordedModel;
+  /**
+   * Where the step's recording left a screen and came back to it with
+   * nothing changed on the way (`cache/detours.ts`): the recording this step
+   * replayed, or the one it recorded. A hint to look at the recording, not a
+   * failure; absent when it has none.
+   */
+  detour?: string;
 }
 
 /** The cache detail as the report keeps it: what `agent.act()` returns, and what became of the recording once the attempt settled. */
