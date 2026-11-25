@@ -52,6 +52,16 @@ const PLACEHOLDER_PREFIX = '{{param:';
 const PLACEHOLDER = /\{\{param:(.*?)\}\}/gu;
 
 /**
+ * `text` with each placeholder in place of the value it stands for, read as
+ * a value the app minted: a stored recording's location then compares as a
+ * route the way the live one did (`cache/route.ts`), where the `unique()`
+ * value was a record's id or name.
+ */
+export function placeholdersAsIds(text: string): string {
+  return text.replace(PLACEHOLDER, '0000000000');
+}
+
+/**
  * How a value may be spelled in recorded text: as given, percent-encoded,
  * form-encoded with `+` for spaces, as the slug an app derives for a
  * record's path (`/companies/e2e-abc-company`), or on one line, the way the
