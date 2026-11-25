@@ -312,8 +312,8 @@ no field declares a purpose, as no field does on iOS and Android.
 
 Each entry is a JSON file under `.e2e/cache/`, named by a hash of its key.
 It holds actions, the screen each ran on, the detours the recording run
-found, target descriptions, typed text, a step summary, and the end checks: the route and up to eight controls that appeared and eight that
-went away. Entries hold no prompts, conversations, screenshots, observed
+found, target descriptions, typed text, a step summary, and the end checks:
+the route and up to eight controls that appeared and eight that went away. Entries hold no prompts, conversations, screenshots, observed
 trees, or secret values. A secret fill stores only the secret's name.
 
 <Warning>
@@ -447,27 +447,21 @@ step's [trace page](/debugging#traces) names the actions:
 cache: replayed all 4 recorded actions, no model call; detour: actions 1-3 left /settings for /settings/notifications and came back with nothing typed, chosen, or set
 ```
 
-To check a whole cache before you commit recordings, run
-[`e2e cache check`](#inspect-the-cache). It lists every entry with a
-detour and exits 1 when the recorded screens show one. `e2e cache show <entry>` prints an
-entry's actions with the screen each ran on.
-
-To remove a detour, delete the entry file and run the test again in
-`read-write` mode. If the agent takes the same wrong turn, name the
-destination in the instruction.
+Before you commit recordings, run [`e2e cache check`](#inspect-the-cache):
+it exits 1 when an entry's recorded screens show a detour. To remove one,
+delete the entry file and run the test again in `read-write` mode. If the
+agent takes the same wrong turn, name the destination in the instruction.
 
 <Accordion title="What counts as a detour">
 - Each action records the screen it ran on: its route, as in
   [What counts as the same route](#how-a-replay-works), or the screen title
   on a device. Two screens with the same route or title count as one. An
-  action the agent took on the same look as the one before it records no
-  screen of its own (`-` in `e2e cache show`).
-  Repeated scrolls are one action, so a route the page moves to while it
-  scrolls doesn't count.
+  action taken on the same look as the one before it records no screen
+  (`-` in `e2e cache show`). Repeated scrolls are one action, so a route the
+  page moves to while it scrolls doesn't count.
 - A typed value, a secret fill, a select, a check, an upload, a drag, a key
   press, a project tool, or a tap on or inside a checkbox, switch, radio,
-  option, slider, or spin button ends a detour. A hover sets nothing. Going back after one of these is
-  ordinary navigation.
+  option, slider, or spin button ends a detour. A hover sets nothing.
 - An entry recorded by an earlier version has no screens. There, only a tap
   or a navigate, then scrolls or hovers, then `back`, counts, and only as a
   hint: `e2e cache check` lists it and doesn't fail on it.
