@@ -324,11 +324,11 @@ substring; a `RegExp` matches as written.
   `attachShadow`, not declarative closed roots. `browser.locator(css)`,
   `frameLocator`, and `filter({ hasText })` stop at a closed root; query the
   text inside or filter with `has`.
-- With `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`,
-  the container under the screen's center scrolls on the web and on a
-  device (`down`, 0.65 of it a step by default) until the locator resolves
-  visibly, else it fails with `LOCATOR_NOT_FOUND`. On a locator, that node
-  scrolls instead. On a device, the node can also be dragged to the middle
+- `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`
+  scrolls the container under the screen's center on the web and on a
+  device (`down`, 0.65 of it per step by default) until the locator
+  resolves visibly, or fails with `LOCATOR_NOT_FOUND`. On a locator, it
+  scrolls that node instead. On a device, the node can also be dragged to the middle
   of its container
   ([Mobile scrolling](https://e2e.com/docs/reference/mobile#scrolling)).
 

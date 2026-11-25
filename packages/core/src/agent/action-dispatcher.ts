@@ -619,9 +619,9 @@ export class ActionDispatcher {
           // An engine that can bring a node in does, whatever the box says: a
           // windowed list renders a row a little before it is visible. After a
           // page, the call passes `center`, as `scrollUntilVisible` does, so a
-          // device drags a row far from the middle of its list to the middle.
-          // For an engine that can't, one more page is taken for a row still
-          // past the edge.
+          // device can drag a row far from its list's center toward the center.
+          // If the engine doesn't support `scrollIntoView`, the loop pages once
+          // more when the row is still past the edge.
           if (this.verbs.has('scrollTo')) {
             await this.session.perform(found.ref, { kind: 'scrollIntoView', ...(screens > 0 ? { center: true } : {}) }, this.accounting.actionOperation());
             return { name: 'scrollUntil', text, direction, screens, ...paged };

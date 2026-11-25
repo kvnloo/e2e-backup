@@ -6,4 +6,4 @@
 "@e2e-dev/desktop": patch
 ---
 
-A swipe's `momentum` is deprecated in favor of `distance` and `speed`. It prints a warning once per worker process and will be removed no earlier than April 1, 2027. Its values scroll different distances: on the web, `'slow'` 0.25 (was 0.75) and `'fast'` 0.65 (was 1.5), on a device locator `'fast'` 0.65 (was 0.8), and on the desktop `'slow'` 3 of the app's scroll units (was 2).
+`momentum` on a swipe is deprecated in favor of `distance` and `speed`, and will be removed no earlier than April 1, 2027. Using it prints a warning once per worker process. Its distances changed: on the web, `'slow'` is 0.25 (was 0.75) and `'fast'` is 0.65 (was 1.5), on a device locator `'fast'` is 0.65 (was 0.8), and on the desktop `'slow'` is 3 of the app's scroll units (was 2).

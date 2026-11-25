@@ -536,9 +536,8 @@ export interface SwipeOptions {
   /**
    * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
    * `speed: 'slow'`, `none` is `distance: 0.5` with `speed: 'normal'`, and
-   * `fast` is `distance: 0.65` with `speed: 'fast'`. A `distance` or `speed`
-   * set beside it is used instead. It will be removed no earlier than April
-   * 1, 2027.
+   * `fast` is `distance: 0.65` with `speed: 'fast'`. Setting `distance` or
+   * `speed` overrides it. It will be removed no earlier than April 1, 2027.
    */
   momentum?: Momentum;
   from?: never;
@@ -596,9 +595,9 @@ export interface Screen {
   /** Performs a viewport-level swipe: in a direction, or along a path from one point to another. */
   swipe(options: SwipeOptions | SwipePathOptions): Promise<void>;
   /**
-   * Scrolls until a locator resolves visibly or times out. On `screen`, the
-   * scroll container under the screen's center scrolls (web and device). On
-   * a locator, the node scrolls.
+   * Scrolls until a locator resolves visibly or times out. On `screen`, it
+   * scrolls the container under the screen's center (web and device). On a
+   * locator, it scrolls the node.
    *
    * After at least one step, the found node is brought into view when the
    * engine supports `scrollIntoView`. On a device, it can also be dragged

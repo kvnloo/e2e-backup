@@ -329,7 +329,7 @@ describe('dispatchLocatorAction', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-  it('brings a node in with the minimal browser scroll within the operation for center, and with Playwright otherwise', async () => {
+  it('uses the minimal browser scroll within the operation timeout when center is set, and Playwright otherwise', async () => {
     const { locator, target } = stubLocator();
     await dispatchLocatorAction(target, { kind: 'scrollIntoView', center: true }, OPERATION, lookup);
     expect(locator.evaluate).toHaveBeenCalledWith(expect.any(Function), undefined, { timeout: 7, signal: OPERATION.signal });
@@ -422,7 +422,7 @@ describe('dispatchPointerAction', () => {
       dblclick: async (x: number, y: number) => { calls.push(`dblclick ${x},${y}`); },
       wheel: async (dx: number, dy: number) => { calls.push(`wheel ${dx},${dy}`); },
     };
-    // The scroll container's size is read with an argument, and comes back as the viewport's here. The frame wait takes none.
+    // Reading the container size passes an argument and returns the viewport size here. The frame wait passes no argument.
     const evaluate = async (_fn: unknown, along?: { vertical: boolean }) => {
       if (along !== undefined) return along.vertical ? 600 : 800;
       calls.push('frame');

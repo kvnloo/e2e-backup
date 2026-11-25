@@ -853,12 +853,12 @@ export function scrollBoxOf(entry: ProjectedNode | undefined): ScrollBox | undef
 const SCROLL_KINDS: ReadonlySet<string> = new Set(['scroll-area', 'list', 'collection', 'table']);
 
 /**
- * Returns the node's box when it's a scroll container: a node of a kind
- * agent-device treats as scrolling, `scroll-area` (an iOS or Android
- * `ScrollView`, which React Native renders its lists as), `list` (an Android
- * `RecyclerView` or `ListView`), `collection` (an iOS `CollectionView`, which
- * SwiftUI renders lists as), or `table` (an iOS `TableView`). A hidden node
- * or one with no area isn't a container.
+ * Returns the node's box if it's a visible scroll container with a non-zero
+ * area. It matches the kinds agent-device treats as scrolling: `scroll-area`
+ * (an iOS or Android `ScrollView`, including React Native lists), `list` (an
+ * Android `RecyclerView` or `ListView`), `collection` (an iOS
+ * `CollectionView`, including SwiftUI lists), and `table` (an iOS
+ * `TableView`).
  */
 function scrollBox(entry: ProjectedNode): ScrollBox | undefined {
   const rect = entry.node.rect;

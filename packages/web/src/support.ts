@@ -489,10 +489,10 @@ export function staleOr(cause: unknown, operation: string): Error {
 }
 
 /**
- * Wheels at `point` by `distance` of the scroll container under it. The
- * container is the nearest element there that scrolls along the swipe's
- * axis, or the viewport when none does. The wheel event lands on that
- * container, so the swipe scrolls what a person's wheel over the point would.
+ * Sends a wheel event at `point` for `distance` of the scroll container
+ * under it. The container is the nearest element there that scrolls on the
+ * swipe's axis, or the viewport if none does. The event lands on that
+ * container, so it scrolls the same element a person's wheel would.
  */
 export async function performPointSwipe(page: Page, point: ViewportPoint, direction: ScrollDirection, distance: number): Promise<void> {
   const extent = await page.evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
@@ -610,10 +610,10 @@ function wheelAim(element: Element): WheelAim {
 }
 
 /**
- * Returns the client size, along the swipe's axis, of the container a wheel
- * at `at` scrolls. It runs in the page. The container is the nearest element
- * at the point, that element included, whose content overflows along that
- * axis and whose style lets it scroll.
+ * Runs in the page and returns the client size, on the swipe's axis, of the
+ * container a wheel event at `at` scrolls. Starting at the element at that
+ * point, it finds the nearest one, itself included, whose content overflows
+ * on that axis and whose style lets it scroll.
  *
  * The element at the point is found inside open shadow roots. On the way up,
  * the walk goes from a slotted element to its slot, and from a shadow root
@@ -628,9 +628,9 @@ function scrollExtent({ vertical, at }: { vertical: boolean; at: ViewportPoint }
     if (inner === null || inner === node) break;
     node = inner;
   }
-  // The root element scrolls the viewport. `body`'s overflow scrolls the
-  // viewport too, unless the root element has an overflow of its own
-  // (CSS Overflow 3, section 3.3), and then `body` scrolls on its own.
+  // The root element scrolls the viewport. `body` does too, unless the root
+  // element sets an `overflow` other than `visible` (CSS Overflow 3, section
+  // 3.3), in which case `body` scrolls independently.
   const bodyScrollsViewport = getComputedStyle(document.documentElement)[axis] === 'visible';
   while (node !== null && node !== document.documentElement) {
     const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;

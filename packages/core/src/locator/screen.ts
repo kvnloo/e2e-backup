@@ -304,11 +304,12 @@ class ScreenImpl implements Screen {
           throw cause;
         }
         if (isNodeVisible(node)) {
-          // After a step, the node is brought fully into view. On a device, a
-          // node more than a fifth of its container from the middle is dragged
-          // to the middle, clear of a sticky header or footer at the edge. A
-          // node that's visible before any step doesn't get a gesture, since a
-          // list at its top could take one as a pull to refresh.
+          // After a step, the node is brought into view. On a device, a node
+          // more than a fifth of its container from the middle is dragged
+          // toward the center when the container has content hidden on that side,
+          // clear of a sticky header or footer at the edge. A node already
+          // visible before any step isn't scrolled, since a list at its top
+          // could take a drag as a pull to refresh.
           if (stepped && engine.supports('scrollIntoView')) {
             try {
               await engine.performUntil(internals.expression, { kind: 'scrollIntoView', center: true }, deadline);
@@ -332,11 +333,11 @@ class ScreenImpl implements Screen {
           if (deadline.expired() || (isOperationTimeout(cause) && deadline.remaining() < POLL_INTERVAL_MS)) {
             throw notVisible(cause);
           }
-          // A device refuses a step, before it sends any drag, when the drags
-          // can't finish in the time left (`OPERATION_TIMEOUT`). A later drag
-          // of a split step can run out the same way after an earlier one
-          // answered late (`ACTION_MAY_HAVE_COMMITTED`). Both count as the
-          // scroll timing out.
+          // On a device, a step fails before any drag is sent when there isn't
+          // time for every drag (`OPERATION_TIMEOUT`). If an earlier drag
+          // answers late and leaves too little time for the next one, it fails
+          // with `ACTION_MAY_HAVE_COMMITTED`. Both count as the scroll timing
+          // out.
           const code = engineErrorCode(cause);
           if ((code === 'OPERATION_TIMEOUT' || code === 'ACTION_MAY_HAVE_COMMITTED') && deadline.remaining() <= dragsMs) throw notVisible(cause);
           throw cause;

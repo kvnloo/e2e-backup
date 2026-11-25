@@ -193,7 +193,7 @@ export class ReadWindow {
   }
 }
 
-/** The code of the engine error `cause` is, bare or wrapped by the locator failure it was translated into. */
+/** Returns the engine error code from `cause`, whether bare or wrapped in the locator failure it was translated into. */
 export function engineErrorCode(cause: unknown): EngineErrorCode | undefined {
   return (asEngineError(cause) ?? asEngineError(cause instanceof Error ? cause.cause : undefined))?.code;
 }

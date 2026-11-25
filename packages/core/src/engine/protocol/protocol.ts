@@ -211,7 +211,7 @@ export function encodeLocatorAction(action: LocatorAction): WireLocatorAction {
   return { ...action, files: action.files.map((file) => ({ ...file, buffer: Buffer.from(file.buffer.buffer, file.buffer.byteOffset, file.buffer.byteLength).toString('base64') })) };
 }
 
-/** Restores file payload bytes, and fills in an older client's swipe, at the engine protocol boundary. */
+/** Restores file payload bytes and fills in older clients' swipes at the engine protocol boundary. */
 export function decodeLocatorAction(action: WireLocatorAction): LocatorAction {
   if (action.kind === 'swipe') return upgradeSwipe(action);
   if (action.kind !== 'setInputFilePayloads') return action;

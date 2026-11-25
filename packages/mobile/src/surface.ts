@@ -1490,20 +1490,20 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   }
 
   /**
-   * Sends `drags` one after another, each taking `durationMs`. Nothing is
-   * sent when the budget has no room for every drag: that is
-   * `OPERATION_TIMEOUT`, so `scrollUntilVisible` reads a step it can't
-   * finish as its deadline. A later drag can still run out of budget when an
-   * earlier one answers late, which is `ACTION_MAY_HAVE_COMMITTED`.
+   * Sends `drags` one after another, each taking `durationMs`. If there
+   * isn't enough time left for every drag, it sends nothing and throws
+   * `OPERATION_TIMEOUT`, so `scrollUntilVisible` treats the step as its
+   * deadline. If an earlier drag answers late and a later one runs out of
+   * time, it throws `ACTION_MAY_HAVE_COMMITTED`.
    */
   private async pan(client: AgentDeviceClient, drags: readonly Drag[], durationMs: number, input: InputBudget): Promise<void> {
     const needed = drags.length * durationMs;
     const remaining = input.remainingMs();
     if (needed >= remaining) {
-      throw new EngineError('OPERATION_TIMEOUT', `the swipe's drags take ${needed} ms, but only ${Math.floor(remaining)} ms of its timeout are left; nothing was sent`, { retryable: false });
+      throw new EngineError('OPERATION_TIMEOUT', `the swipe's drags take ${needed} ms, but only ${Math.floor(remaining)} ms of its timeout are left. Nothing was sent`, { retryable: false });
     }
-    // A drag can move the screen even when the swipe fails later, so the
-    // last capture's containers stop counting.
+    // A drag can move the screen even if the swipe fails later, so the last
+    // capture's containers are stale.
     this.actedSinceLatestScreen = true;
     for (const drag of drags) {
       await input.send((signal) => client.interactions.pan({ ...drag, durationMs, signal }), durationMs);
@@ -1595,8 +1595,9 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);
       if (deterministic) await this.waitOutTransition(operation, input);
       // A capture from before the last input can have the wrong containers:
-      // the input may have replaced the screen, or a fill read the field
-      // before it typed. In that case, the screen is read again. The
+      // the input may have replaced the screen, or a fill located its field
+      // on a capture taken before it typed. In that case, the screen is read
+      // again. The
       // viewport is read after it, since the screen may have rotated or
       // changed size.
       const latest = this.latestScreen;

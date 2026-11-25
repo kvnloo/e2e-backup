@@ -34,10 +34,9 @@ export type WireSwipeAction = Omit<SwipeAction, 'distance' | 'durationMs'> & Par
 
 /**
  * Builds the swipe action for `direction` from a test's `distance` and
- * `speed`. A value the test doesn't set comes from its deprecated
- * `momentum`, else from `defaults`. A warning is printed the first time
- * `momentum` is used in a process, and `momentum` goes on the action too,
- * for an engine that reads it. It throws INVALID_ARGUMENT for an unknown
+ * `speed`. Unset values fall back to the deprecated `momentum`, then to
+ * `defaults`. The first use of `momentum` in a process prints a warning.
+ * The action also keeps `momentum` for engines that still read it. It throws INVALID_ARGUMENT for an unknown
  * `direction`, a `distance` outside (0, 1], or an unknown `speed`.
  */
 export function swipeAction(

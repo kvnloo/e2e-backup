@@ -88,7 +88,7 @@ export class InputBudget {
       const left = `holds for ${holdMs} ms, but only ${Math.floor(remaining)} ms of its timeout are left`;
       return Promise.reject(
         this.sent
-          ? new EngineError('ACTION_MAY_HAVE_COMMITTED', `${this.label} sent part of its input, and the next part ${left}; raise the timeout`, { retryable: false })
+          ? new EngineError('ACTION_MAY_HAVE_COMMITTED', `${this.label} sent part of its input, and the next part ${left}. Raise the timeout`, { retryable: false })
           : new EngineError('NOT_ACTIONABLE', `${this.label} ${left}; raise the timeout or shorten the hold`, { retryable: false }),
       );
     }

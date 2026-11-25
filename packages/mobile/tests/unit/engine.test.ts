@@ -5097,7 +5097,7 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -290, durationMs: 800 }]);
     });
 
-    it('with center, also drags a node more than a fifth of its container from the middle, toward hidden content only', async () => {
+    it('drags a node more than a fifth of its container from the center toward hidden content when center is set', async () => {
       const h = harness({ settle: false, transition: 0 });
       h.fake.respond('capture.snapshot', () => hiddenPast(false, true));
       await openAttempt(h);
@@ -5134,7 +5134,7 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([LIST_DOWN]);
     });
 
-    it('sends a swipe from an older client, with momentum and no distance, at the distance and duration its momentum stands for', async () => {
+    it('maps momentum to a distance and a duration when an older client sends momentum alone', async () => {
       const local = harness({ settle: false, transition: 0 });
       local.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
       const h = { ...local, engine: connectEngine({ manifest: describeEngine(local.engine), transport: loopbackTransport(local.engine) }) };

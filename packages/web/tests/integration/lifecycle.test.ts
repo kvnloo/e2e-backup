@@ -796,7 +796,7 @@ describe('web engine lifecycle', () => {
         await engine.perform!(again.root.ref, swipe, operation('sc1'));
         await expect.poll(shadowOffsets).toEqual([150, 0]);
 
-        // A body that scrolls on its own, since the root element has an overflow of its own.
+        // `body` scrolls independently when the root element sets `overflow`.
         await page.setContent(`<!DOCTYPE html>
           <html style="overflow: hidden">
             <body style="margin: 250px 0 0; height: 300px; overflow: auto"><div style="height: 3000px"></div></body>

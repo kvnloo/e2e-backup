@@ -1391,13 +1391,13 @@ export class DesktopSurface {
   }
 
   /**
-   * Scrolls by the app's own scroll units, which agent-desktop repeats
-   * `--amount` times. How far a unit moves depends on the app, so a
-   * `distance` of 1 is ten units, and a default swipe of 0.5 is five. A
-   * distance of `SCROLL_STEP.distance` (a `scrollUntilVisible` step or the
-   * agent's page) is two units, since a longer step could skip rows of a
-   * short pane. The deprecated `momentum: 'fast'` maps to that same
-   * distance, so it's read from `momentum` and stays ten units, as before.
+   * Scrolls by the app's scroll units, which agent-desktop repeats
+   * `--amount` times. How far one unit moves depends on the app. A
+   * `distance` of 1 is 10 units, and the default 0.5 is 5.
+   * `SCROLL_STEP.distance` (a `scrollUntilVisible` step or the agent's page)
+   * is 2 units, so a step doesn't skip rows in a short pane. The deprecated
+   * `momentum: 'fast'` maps to that same distance, so `momentum` is checked
+   * to keep it at 10 units, as before.
    * `durationMs` doesn't change anything.
    */
   private async scroll(binding: NodeBinding, action: SwipeAction, operation: OperationContext): Promise<void> {

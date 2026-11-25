@@ -126,9 +126,9 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `inputText`, `eraseText`, `pressKey: Enter` after a `tapOn` | `.fill('text')`, `.clear()`, `.press('Enter')` on the field's locator |
 | `inputRandomEmail`, `inputRandomText`, `faker` | `unique()` around a value in `act` params, so the cache still replays; any npm faker for the rest |
 | `copyTextFrom`, `pasteText` | `await locator.textContent()`, then `.fill(text)` |
-| `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`. In Maestro, the direction is the finger's, and in e2e it's the content's. A Maestro `scroll` is 0.4 of the screen. Use `distance: 0.4` to match it when the list fills the screen |
+| `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`. Maestro uses the finger's direction, while e2e uses the content's. A Maestro `scroll` is 0.4 of the screen. Use `distance: 0.4` to match it when the list fills the screen |
 | `swipe: { start, end }` | `screen.swipe({ from, to })` in pixels or percentages. Set `duration` in milliseconds to change how long the drag takes |
-| `scrollUntilVisible` | `screen.scrollUntilVisible(locator, { direction })`. Maestro's `speed` (0 to 100) becomes `speed: 'slow'`, `'normal'`, or `'fast'`. On a device, after a step, the node is dragged to the middle of its container when it's far from the middle, as with `centerElement: true` ([Mobile scrolling](/reference/mobile#scrolling)) |
+| `scrollUntilVisible` | `screen.scrollUntilVisible(locator, { direction })`. Maestro's `speed` (0 to 100) becomes `speed: 'slow'`, `'normal'`, or `'fast'`. After a step on a device, a node far from its container's center is dragged toward the center when the container has content hidden on that side, as with `centerElement: true` ([Mobile scrolling](/reference/mobile#scrolling)) |
 
 </Accordion>
 <Accordion title="Assertions and flows">

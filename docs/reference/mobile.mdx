@@ -1385,23 +1385,24 @@ so does the focused field.
   same way. Dismiss the cover, or scroll the target clear of it.
 ## Scrolling
 
-- A scroll container is a node agent-device reports as a `scroll-area`,
-  `list`, `collection`, or `table`, with an area and not hidden. A screen
+- A scroll container is a visible node with a non-zero area that
+  agent-device reports as a `scroll-area`, `list`, `collection`, or
+  `table`. A screen
   swipe scrolls the smallest one under the screen's center, or the whole
   screen when there isn't one. agent-device doesn't report which way a
   container scrolls, so a vertical swipe is measured against a horizontal
   carousel when one is under the center.
-- `scrollIntoView` drags a node cut off at the top or bottom edge of its
-  scroll container toward the container's middle. agent-device clips a
+- If a node is cut off at the top or bottom edge of its scroll container,
+  `scrollIntoView` drags it toward the middle. agent-device clips a
   row's box to the screen, so a row flush with an edge counts as cut off
   when the container reports content hidden past that edge. Otherwise, a
   node inside its container doesn't move, and neither does a node outside
   any scroll container. The drag is vertical only, so a node cut off at the
   side stays where it is.
 - After a scroll step, `scrollUntilVisible` and the agent's `scroll_to` also
-  drag the found node toward the middle when its center is more than a
-  fifth of the container's height from the middle, and the container
-  reports content hidden on that side. A list at its top reports none
+  drag the found node toward the middle when it lands more than a fifth of
+  the container's height from the center and the container reports content
+  hidden on that side. A list at its top doesn't report hidden content
   above, so it isn't pulled to refresh. A node at the list's edge can be
   under a sticky header or footer and still count as visible, since a plain
   React Native `View` isn't in the tree. The drag moves it, and nothing

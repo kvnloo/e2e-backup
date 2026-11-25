@@ -146,7 +146,7 @@ The tools, one per engine action. Name the target as the screen names it
 - `press`: one key to a node or, on browser/device, to focus; `times` up to 20.
 - `select`: one option by visible label.
 - `check`: set a checkbox, switch, or radio to a state, not flip it.
-- `scroll`: one scrollable node, or without a target the container under the screen's center, half of it each time.
+- `scroll`: one scrollable node (or, without a target, the container under the screen's center), by half its size.
 - `scroll_to`: a listed node into view, or by `text` page a list to a row.
 - `drag`: one node onto another.
 - `upload`: project-root files, or e2e's samples (`sample:photo.png`,

@@ -579,13 +579,13 @@ export function grammarTools(
     tools['scroll'] = verbs.has('tap')
       ? screenTool({
           description:
-            'Scroll one scrollable node when target is given, else the scroll container under the screen\'s center (the viewport when there is none), by half of it each time. The result reports the rows that came into or left the tree. For a row far down a long or windowed list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
+            'Scroll the target node by half its size, or with no target, the container under the screen\'s center (or the viewport when there is none). The result reports the rows that came into or left the tree. For a row far down a long or windowed list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
           inputSchema: z.object({ direction, target: target.optional(), times }),
           execute: ({ direction: way, target: id, times: count }) =>
             acting(scrolled(way, count ?? 1, id), () => scrolling(way, id, count ?? 1), { expectChange: false }),
         })
       : screenTool({
-          description: 'Scroll the scroll container under the screen\'s center (the viewport when there is none) by half of it each time. The result reports the rows that came into or left the tree. For a row far down a long list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
+          description: 'Scroll the container under the screen\'s center (or the viewport when there is none) by half its size. The result reports the rows that came into or left the tree. For a row far down a long list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
           inputSchema: z.object({ direction, times }),
           execute: ({ direction: way, times: count }) =>
             acting(scrolled(way, count ?? 1), () => scrolling(way, undefined, count ?? 1), { expectChange: false }),

@@ -517,13 +517,13 @@ process prints a warning. It will be removed no earlier than April 1,
 | `'none'` | `0.5` | `'normal'` |
 | `'fast'` | `0.65` | `'fast'` |
 
-Before, on the web, `'slow'` scrolled 0.75 of the viewport or the node and
-`'fast'` 1.5. On a device, `'fast'` on a locator swiped 0.8 of the node. On
-the desktop, a value scrolls by the app's own scroll units: `'slow'` 3 of
-them (it was 2), `'none'` 5, and `'fast'` 10, as before.
+Previously, on the web, `'slow'` scrolled 0.75 of the viewport or the node
+and `'fast'` scrolled 1.5. On a device, `'fast'` on a locator swiped 0.8 of
+the node. On the desktop, each value scrolls by the app's scroll units:
+`'slow'` is 3 (it was 2), `'none'` is 5, and `'fast'` is 10, as before.
 
-When `distance` or `speed` is set with `momentum`, it's used instead of the
-value `momentum` stands for.
+A `distance` or `speed` passed with `momentum` overrides the value
+`momentum` maps to.
 
 `{ from, to, duration? }` is a swipe along a path between two viewport
 points: a touch swipe on a device, a pointer drag on a document platform.
@@ -547,9 +547,9 @@ Uses `config.actionTimeout` and takes no `timeout` option.
 
 ```ts
 /**
- * Scrolls until a locator resolves visibly or times out. On `screen`, the
- * scroll container under the screen's center scrolls (web and device). On
- * a locator, the node scrolls.
+ * Scrolls until a locator resolves visibly or times out. On `screen`, it
+ * scrolls the container under the screen's center (web and device). On a
+ * locator, it scrolls the node.
  *
  * After at least one step, the found node is brought into view when the
  * engine supports `scrollIntoView`. On a device, it can also be dragged
@@ -577,8 +577,8 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
   lifts. How much of the previous view stays on screen depends on how far
   it moves.
 - `speed` replaces the 800 ms with a preset from
-  [`screen.swipe`](#screen-swipe). After a `'normal'` or `'fast'` drag the
-  list moves further on its own, and a short row can pass unseen.
+  [`screen.swipe`](#screen-swipe). The list keeps moving further after a
+  `'normal'` or `'fast'` drag, so it can skip a short row.
 - `momentum` is deprecated and stands for a `distance` and a `speed`, as
   under [`screen.swipe`](#momentum).
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
@@ -590,7 +590,7 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
   ([Mobile visibility](/reference/mobile#visibility)).
 - After at least one step, the node is brought into view with
   [`scrollIntoView`](#scrollintoview) when the engine supports it. A node
-  that's visible on the first read doesn't get a gesture. On a device, the
+  already visible on the first read isn't scrolled. On a device, the
   node can also be dragged to the middle of its container
   ([Mobile scrolling](/reference/mobile#scrolling)).
 
@@ -598,7 +598,7 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 | --- | --- |
 | `INVALID_LOCATOR` | `target` is not a runner locator, or was made by another target's screen. |
 | `INVALID_ARGUMENT` | An option it doesn't take, a `direction` that isn't `'up'`, `'down'`, `'left'`, or `'right'`, a `distance` that isn't above 0 and at most 1, or a `speed` that isn't a preset. |
-| `LOCATOR_NOT_FOUND` | The deadline expires first. That includes a swipe the deadline cut short, and a step a device refuses because its drags can't finish before the deadline. |
+| `LOCATOR_NOT_FOUND` | The deadline expires first, including when the deadline cuts a swipe short, or when a device refuses a step because its drags can't finish in time. |
 
 ### Screen reads
 
@@ -1063,8 +1063,8 @@ It takes `{ direction, distance?, speed? }` as
 `screen.swipe` refuses. It doesn't have a `{ from, to }` form. `distance` is
 a share of the node's height for a vertical swipe, or its width for a
 horizontal one, not of the scroll container under the screen's center. On a
-device, the drag crosses the node, and it scrolls the node when the node is
-a scroll container. On the web, it's a wheel event over the node.
+device, the drag moves across the node, scrolling it if it's a scroll
+container. On the web, it's a wheel event over the node.
 
 ### Locator reads
 
@@ -1532,9 +1532,8 @@ export interface SwipeOptions {
   /**
    * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
    * `speed: 'slow'`, `none` is `distance: 0.5` with `speed: 'normal'`, and
-   * `fast` is `distance: 0.65` with `speed: 'fast'`. A `distance` or `speed`
-   * set beside it is used instead. It will be removed no earlier than April
-   * 1, 2027.
+   * `fast` is `distance: 0.65` with `speed: 'fast'`. Setting `distance` or
+   * `speed` overrides it. It will be removed no earlier than April 1, 2027.
    */
   momentum?: Momentum;
   from?: never;

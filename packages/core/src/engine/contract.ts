@@ -357,11 +357,11 @@ export type LocatorAction =
        * Set by `scrollUntilVisible` and the agent's `scroll_to` after a
        * scroll step, for a node already read as visible.
        *
-       * On a device, a node more than a fifth of its scroll container from
-       * the middle is also dragged toward the middle, when the container has
-       * content hidden on that side. A node at the edge can be under a
-       * sticky header or footer. One drag is sent and nothing checks what
-       * covers the node after it, so a sticky view can still cover it.
+       * On a device, if a node is more than a fifth of its scroll container
+       * from the middle and the container has content hidden on that side,
+       * it's also dragged toward the center. A node at the edge can sit
+       * under a sticky header or footer. One drag is sent with no check of
+       * what covers the node afterwards, so a sticky view can still cover it.
        *
        * On the web, the node is brought in with the browser's minimal
        * scroll, without waiting for it to stop moving.
@@ -398,11 +398,11 @@ export interface SwipeAction {
   /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
   /**
-   * @deprecated Read `distance` and `durationMs`. Core still sends it beside
-   * them for an engine that reads it: the test's `momentum`, or `slow` on
-   * core's own scroll steps. A swipe from an older client that sends only
-   * this is given the `distance` and `durationMs` it stands for. It will be
-   * removed no earlier than April 1, 2027.
+   * @deprecated Read `distance` and `durationMs`. Core still sends it for
+   * engines that read it: the test's `momentum`, or `slow` on core's scroll
+   * steps. When an older client sends only `momentum`, the protocol fills in
+   * the matching `distance` and `durationMs`. It will be removed no earlier
+   * than April 1, 2027.
    */
   readonly momentum?: Momentum;
 }
