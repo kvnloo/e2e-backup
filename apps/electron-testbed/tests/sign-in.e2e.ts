@@ -150,6 +150,14 @@ test.describe('sign-in window', () => {
     // A hidden element is still there for a selector to count.
     await expect(electron.locator('#spinner')).toHaveCount(1);
     await expect(electron.locator('#spinner')).toBeHidden();
+    // A hidden match keeps its place in the document and its text, and a test id finds it too.
+    await expect(electron.locator('.row').first()).toHaveAttribute('id', 'row-first');
+    expect(await electron.locator('.row').first().textContent()).toBe('First row');
+    await expect(screen.getByTestId('row')).toHaveCount(2);
+    await expect(screen.getByTestId('row', { visible: true })).toHaveText('Second row');
+    // A hidden password field is still a secure one: its attributes are not read.
+    const denied = await electron.locator('#stashed-key').getAttribute('value').then(() => undefined, (error: unknown) => error);
+    expect(denied).toMatchObject({ code: 'POLICY_DENIED' });
     // Reads at the same time keep their own handles.
     expect(await Promise.all([electron.locator('#increment').count(), electron.locator('#items li').count()])).toEqual([1, 40]);
   });

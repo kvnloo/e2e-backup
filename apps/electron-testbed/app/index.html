@@ -36,6 +36,11 @@
       <output data-testid="count">0</output>
       <p data-testid="price"><span>Price</span> <span>$10</span></p>
       <div id="spinner" hidden>Loading</div>
+      <ul id="rows">
+        <li class="row" id="row-first" data-testid="row" hidden>First row</li>
+        <li class="row" id="row-second" data-testid="row">Second row</li>
+      </ul>
+      <input type="password" id="stashed-key" value="stashed-secret" hidden />
       <div aria-disabled="true"><button type="button" id="locked">Locked action</button></div>
       <fieldset disabled><legend>Archived</legend><a href="#archive" id="archive-link">Open archive</a></fieldset>
       <output data-testid="link-result"></output>

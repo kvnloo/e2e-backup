@@ -250,6 +250,8 @@ interface Draft {
   children: Draft[];
   /** A text run: its text folds into the parent when it is the parent's only content. */
   isText: boolean;
+  /** The node's position in the DOM snapshot, its document order. */
+  order: number;
 }
 
 /** `value` cut at `limit` in tree mode, whole in node mode. */
@@ -324,6 +326,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
   let kept = 0;
   let truncated = false;
   const drafted = new Map<number, Draft>();
+  const domIndex = new Map((document.nodes.backendNodeId ?? []).map((id, index) => [id, index]));
 
   const rectOf = (facts: DomFacts | undefined): Draft['rect'] => {
     const box = facts?.bounds;
@@ -351,7 +354,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       }
       kept += 1;
       const rect = rectOf(facts);
-      const run: Draft = { id: options.idOf(backend), text: bound(text, OBSERVED_TEXT_LIMIT, mode), states: rect === undefined || rect.width === 0 || rect.height === 0 ? { hidden: true } : {}, ...(rect === undefined ? {} : { rect }), children: [], isText: true };
+      const run: Draft = { id: options.idOf(backend), text: bound(text, OBSERVED_TEXT_LIMIT, mode), states: rect === undefined || rect.width === 0 || rect.height === 0 ? { hidden: true } : {}, ...(rect === undefined ? {} : { rect }), children: [], isText: true, order: domIndex.get(backend) ?? -1 };
       drafted.set(backend, run);
       return [run];
     }
@@ -370,7 +373,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       return [];
     }
     kept += 1;
-    const draft: Draft = { id: options.idOf(backend), role: silent ? 'generic' : role, states: {}, children: [], isText: false };
+    const draft: Draft = { id: options.idOf(backend), role: silent ? 'generic' : role, states: {}, children: [], isText: false, order: domIndex.get(backend) ?? -1 };
     drafted.set(backend, draft);
     if (name !== '') draft.name = bound(name, OBSERVED_NAME_LIMIT, mode);
     if (testId !== undefined) draft.testId = testId;
@@ -451,25 +454,39 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     const child = byId.get(id);
     return child === undefined ? [] : build(child);
   });
-  // An element a locator's selector matched that the tree leaves out (`hidden`, `display: none`) is still there to
-  // count: it joins the tree as a hidden node under its nearest ancestor that did.
-  for (const backend of options.keep ?? []) {
-    if (drafted.has(backend)) continue;
-    const facts = dom.get(backend);
-    if (facts === undefined) continue;
-    const testId = facts.attributes[testIdAttribute.toLowerCase()];
-    const absent: Draft = {
+  // An element a locator asks for that the tree leaves out (`hidden`, `display: none`) is still there to count, as on
+  // the web: one a CSS selector matched, and on a locator's read one with a test id. It joins the tree as a hidden
+  // node at its place in the document, under its nearest ancestor that is in the tree, read by the same field rules.
+  const absentIds = new Set(options.keep ?? []);
+  if (mode === 'node') for (const [backend, facts] of dom) if (facts.attributes[testIdAttribute.toLowerCase()] !== undefined) absentIds.add(backend);
+  const absent = [...absentIds].filter((backend) => !drafted.has(backend) && dom.has(backend) && domIndex.has(backend)).toSorted((a, b) => domIndex.get(a)! - domIndex.get(b)!);
+  for (const backend of absent) {
+    const facts = dom.get(backend)!;
+    const order = domIndex.get(backend)!;
+    const attributes = { ...facts.attributes };
+    const secure = facts.nodeName === 'INPUT' && attributes['type']?.toLowerCase() === 'password';
+    const field = facts.nodeName === 'INPUT' || facts.nodeName === 'TEXTAREA';
+    if (secure) delete attributes['value'];
+    const testId = attributes[testIdAttribute.toLowerCase()];
+    const text = secure || field ? '' : domText(document, strings, order);
+    const value = secure || !field ? undefined : ((facts.nodeName === 'INPUT' ? facts.inputValue : facts.textValue) ?? '');
+    const node: Draft = {
       id: options.idOf(backend),
       role: 'generic',
-      states: { hidden: true },
+      states: { hidden: true, ...(secure ? { secure: true } : mode === 'node' ? { empty: field ? value === '' : !facts.hasText } : {}) },
       children: [],
       isText: false,
+      order,
+      ...(secure ? { inputPurpose: 'password' as const } : {}),
       ...(testId === undefined ? {} : { testId }),
-      ...(Object.keys(facts.attributes).length === 0 ? {} : { attributes: { ...facts.attributes } }),
+      ...(text === '' ? {} : { text: bound(text, OBSERVED_TEXT_LIMIT, mode) }),
+      ...(value === undefined ? {} : { value: bound(value, OBSERVED_TEXT_LIMIT, mode) }),
+      ...(Object.keys(attributes).length === 0 ? {} : { attributes }),
     };
-    const parent = ancestorOf(backend, drafted, document);
-    (parent === undefined ? children : parent.children).push(absent);
-    drafted.set(backend, absent);
+    const siblings = ancestorOf(order, drafted, document)?.children ?? children;
+    const at = siblings.findIndex((sibling) => sibling.order > order);
+    siblings.splice(at < 0 ? siblings.length : at, 0, node);
+    drafted.set(backend, node);
   }
   const rootName = options.title ?? stringOf(rootNode?.name);
   const root: SemanticNode = {
@@ -524,15 +541,29 @@ export function unmaskableCount(document: SnapshotDocument, strings: readonly st
   return count;
 }
 
-/** The nearest DOM ancestor of a node that has a draft, or undefined when none does (the node sits under the root). */
-function ancestorOf(backend: number, drafted: ReadonlyMap<number, Draft>, document: SnapshotDocument): Draft | undefined {
+/** The nearest DOM ancestor of the node at `index` that has a draft, or undefined when none does (the node sits under the root). */
+function ancestorOf(index: number, drafted: ReadonlyMap<number, Draft>, document: SnapshotDocument): Draft | undefined {
   const ids = document.nodes.backendNodeId ?? [];
   const parents = document.nodes.parentIndex ?? [];
-  for (let at = parents[ids.indexOf(backend)] ?? -1; at >= 0; at = parents[at] ?? -1) {
+  for (let at = parents[index] ?? -1; at >= 0; at = parents[at] ?? -1) {
     const draft = drafted.get(ids[at]!);
     if (draft !== undefined && !draft.isText) return draft;
   }
   return undefined;
+}
+
+/** The text content of the node at `index`, white space collapsed: its descendant text nodes, which follow it in the snapshot's document order. */
+function domText(document: SnapshotDocument, strings: readonly string[], index: number): string {
+  const parents = document.nodes.parentIndex ?? [];
+  const types = document.nodes.nodeType ?? [];
+  const values = document.nodes.nodeValue ?? [];
+  const inside = new Set([index]);
+  const parts: string[] = [];
+  for (let at = index + 1; at < parents.length && inside.has(parents[at] ?? -1); at += 1) {
+    inside.add(at);
+    if (types[at] === 3) parts.push(strings[values[at]!] ?? '');
+  }
+  return collapse(parts.join(''));
 }
 
 /** A draft as a contract node, empty fields left out. */
