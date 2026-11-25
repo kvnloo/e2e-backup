@@ -80,7 +80,7 @@ const LOOKING_ACTIONS: ReadonlySet<RecordedAction['name']> = new Set<RecordedAct
 ]);
 
 /** Verbs that leave a screen in the shape an entry without locations is read for. */
-const LEAVING_ACTIONS: ReadonlySet<RecordedAction['name']> = new Set<RecordedAction['name']>(['tap', 'doubleTap', 'navigate']);
+const LEAVING_ACTIONS: ReadonlySet<RecordedAction['name']> = new Set<RecordedAction['name']>(['tap', 'doubleTap', 'tapAt', 'navigate']);
 
 /**
  * Whether an action may have changed what the app holds, so a return after
