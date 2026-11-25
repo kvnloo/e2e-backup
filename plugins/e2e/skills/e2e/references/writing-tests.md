@@ -330,7 +330,7 @@ substring; a `RegExp` matches as written.
   visibly, else it fails with `LOCATOR_NOT_FOUND`. On a locator, that node
   scrolls instead. On a device, the node can also be dragged to the middle
   of its container
-  ([Mobile visibility](https://e2e.com/docs/reference/mobile#visibility)).
+  ([Mobile scrolling](https://e2e.com/docs/reference/mobile#scrolling)).
 
 ### Actions
 
@@ -353,16 +353,17 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 on a device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, and
 `modifiers`.
 
-A locator swipe crosses the node's box. On the web and on a device, a
-`screen.swipe` scrolls the container under the screen's center:
+`swipe` takes the same options on a locator and on `screen`:
 
-- `distance` is how far the content scrolls, as a share of that box (above
-  0 and at most 1). It's `0.5` by default.
+- `distance` is how far the content scrolls (above 0 and at most 1, `0.5`
+  by default). On a locator, it's a share of the node's box. On `screen`,
+  it's a share of the container under the screen's center (web and
+  device).
 - `speed` is how fast the finger moves: `'slow'` (1500 ms), `'normal'` (400
-  ms, the default), or `'fast'` (150 ms). On the web, `speed` doesn't change
-  anything.
+  ms, the default), or `'fast'` (150 ms). On the web, a swipe is a wheel
+  event, and `speed` doesn't change anything.
 - `momentum` is deprecated. Use `distance` and `speed`.
-- On a device, the content keeps coasting after the finger lifts.
+- On a device, the content keeps moving after the finger lifts.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the
@@ -375,9 +376,8 @@ Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
 `screen.swipe({ from, to, duration? })` swipes along a path (on iOS an
 untimed one must stay above the open soft keyboard; pass `duration` to drag
-across it),
-`screen.swipe({ direction, distance?, speed? })` scrolls the container under the screen's center on the web and on a device. Viewport
-points also take percentages from `'0%'` through `'100%'`, rounded to the
+across it). Viewport points also take percentages from `'0%'` through
+`'100%'`, rounded to the
 nearest pixel: `{ x: '50%', y: '50%' }`. Prefer a locator; a point moves with
 the layout.
 
