@@ -20,7 +20,7 @@ import {
 } from '@e2e-dev/core/engine';
 import { createElectronFixture } from './electron.ts';
 import type { ElectronFixtures } from './fixtures.ts';
-import { resolveOptions, type ElectronOptions } from './options.ts';
+import { resolveOptions, setsUserDataDir, type ElectronOptions } from './options.ts';
 import { ElectronSurface } from './surface.ts';
 
 /**
@@ -95,6 +95,9 @@ function validateApp(app: EngineAppDeclaration, { targetName }: EngineAppCheckIn
   }
   if (app.bundleId !== undefined) throw new ConfigurationError('INVALID_CONFIG', `${where} declares app.bundleId, which an electron() target cannot launch; name the app with app.appPath`);
   if (app.permissions !== undefined) throw new ConfigurationError('INVALID_CONFIG', `${where} declares app.permissions, which an electron() target cannot set`);
+  if (app.launchArguments?.some(setsUserDataDir) === true) {
+    throw new ConfigurationError('INVALID_CONFIG', `${where} app.launchArguments must not set --user-data-dir: the engine gives every attempt an empty one of its own`);
+  }
   if (app.appPath === undefined && executablePath === undefined) {
     throw new ConfigurationError(
       'INVALID_CONFIG',

@@ -58,6 +58,11 @@ export interface ResolvedElectronOptions {
 }
 
 const DEFAULT_LAUNCH_TIMEOUT_MS = 30_000;
+
+/** Whether a launch argument sets Chromium's profile directory, which the engine owns: every attempt gets an empty one. */
+export function setsUserDataDir(argument: string): boolean {
+  return /^--user-data-dir(=|$)/.test(argument);
+}
 const DEFAULT_SETTLE_MS = 100;
 
 /**
@@ -80,7 +85,7 @@ export function resolveOptions(options: ElectronOptions | undefined): ResolvedEl
   if (args !== undefined && (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string'))) {
     throw new ConfigurationError('INVALID_CONFIG', 'electron({ args }) must be an array of strings');
   }
-  if (args?.some((arg) => /^--user-data-dir(=|$)/.test(arg)) === true) {
+  if (args?.some(setsUserDataDir) === true) {
     throw new ConfigurationError('INVALID_CONFIG', 'electron({ args }) must not set --user-data-dir: the engine gives every attempt an empty one of its own');
   }
   if (env !== undefined && (typeof env !== 'object' || env === null || Array.isArray(env) || Object.values(env).some((value) => typeof value !== 'string'))) {

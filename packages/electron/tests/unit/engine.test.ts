@@ -26,6 +26,7 @@ describe('electron()', () => {
     expect(() => electron().validateApp?.({ appPath: '.', url: 'http://localhost:3000' }, info)).toThrow(/loads its own pages/);
     expect(() => electron().validateApp?.({ bundleId: 'com.example.app' }, info)).toThrow(/app\.bundleId/);
     expect(() => electron().validateApp?.({ appPath: '.', permissions: { camera: 'granted' } } as never, info)).toThrow(/app\.permissions/);
+    expect(() => electron().validateApp?.({ appPath: '.', launchArguments: ['--user-data-dir=/tmp/shared'] }, info)).toThrow(/--user-data-dir/);
   });
 });
 
