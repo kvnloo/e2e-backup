@@ -26,6 +26,10 @@ test.describe('sign-in window', () => {
       throw new Error('the dialog has been closed by the user');
     }).then(() => undefined, (error: unknown) => error);
     expect(thrown).toMatchObject({ code: 'EVALUATE_FAILED' });
+    expect(await electron.evaluate((_main, arg: { readonly times: number }) => arg.times * 2, { times: 3 })).toBe(6);
+    // @ts-expect-error A function that takes an argument must be given one.
+    const missingArgument = (): Promise<number> => electron.evaluate((_main, arg: { readonly times: number }) => arg.times);
+    expect(typeof missingArgument).toBe('function');
   });
 
   test('reads controls by test id and placeholder, and refuses an empty password', async ({ screen }) => {

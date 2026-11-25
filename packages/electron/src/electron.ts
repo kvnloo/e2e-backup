@@ -24,7 +24,9 @@ export interface Electron {
    * the test's variables, so pass them as `arg`. Code with the main
    * process's full authority, as trusted as the test itself.
    */
-  evaluate<R, A = undefined>(fn: (electron: ElectronMainModule, arg: A) => R | Promise<R>, arg?: A): Promise<R>;
+  evaluate<R>(fn: (electron: ElectronMainModule) => R | Promise<R>): Promise<R>;
+  /** Runs `fn` in the main process with `arg`, which a function that takes one must be given. */
+  evaluate<R, A>(fn: (electron: ElectronMainModule, arg: A) => R | Promise<R>, arg: A): Promise<R>;
   /** The app's open windows, in the order they opened, the one `screen` reads marked `shown`. */
   windows(): Promise<readonly ElectronWindow[]>;
   /**
@@ -45,8 +47,8 @@ export interface Electron {
 
 export function createElectronFixture(surface: ElectronSurface, context: EngineFixtureContext): Electron {
   const electron: Electron = {
-    async evaluate(fn, arg) {
-      return await surface.evaluate(fn, arg as never, context.operation());
+    async evaluate<R, A>(fn: (electron: ElectronMainModule, arg: A) => R | Promise<R>, arg?: A): Promise<R> {
+      return await surface.evaluate(fn, arg as A, context.operation());
     },
     async windows() {
       return await surface.windows();
