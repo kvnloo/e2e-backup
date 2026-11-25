@@ -2,12 +2,12 @@
  * `e2e cache`: what is in the replay cache, and how to get rid of it.
  *
  * The store is a directory of digest-named files, so a committed cache is
- * unreadable without a reader: `ls` prints each entry's provenance — the test,
- * the target, the instruction digest, its age, and how many actions it would
- * replay — `show` prints one entry's actions and where each ran, `check`
- * names every entry whose flow leaves a screen and comes back with nothing
- * changed (`cache/detours.ts`), `stats` sizes the store, and `clear` empties
- * it.
+ * unreadable without a reader: `ls` prints each entry's digest and provenance
+ * — the test, the target, the instruction digest, its age, and how many
+ * actions it would replay — `show` prints one entry's actions and where each
+ * ran, `check` names every entry whose flow leaves a screen and comes back
+ * with nothing typed, chosen, or set (`cache/detours.ts`), `stats` sizes the
+ * store, and `clear` empties it.
  *
  * Every command works on files only. A project that configures `cache.store`
  * replaced the filesystem with its own store, and this CLI has no way to
