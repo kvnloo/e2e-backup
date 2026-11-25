@@ -1127,6 +1127,20 @@ describe('trace cache: a recording that leaves a screen and comes back', () => {
     const replayed = resultByTitle(second, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
     expect(replayed.cache).toMatchObject({ mode: 'self-finalized', detour });
   }, 240_000);
+
+  it('reports the detour a replay ran before it handed the step to the agent', async () => {
+    // The last recorded tap no longer finds its button: the replay runs the wrong turn, then hands off.
+    rewriteOnlyEntry(project, (payload) => ({
+      ...payload,
+      actions: payload.actions.map((action, index) => (index === 2 && action.name === 'tap' ? { ...action, target: { ...action.target, name: 'No Such Button' } } : action)),
+    }));
+    const handedOff: ExecutorRecord = { calls: 0, prefixes: [] };
+    const outcome = await runExisting(project, { ...options(handedOff), config: { ...options(handedOff).config, cache: 'read-only' as const } });
+    expect(outcome.exitCode).toBe(0);
+    expect(handedOff.calls).toBe(1);
+    const step = resultByTitle(outcome, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(step.cache).toMatchObject({ mode: 'agent-concluded', replayedActions: 2, detour });
+  }, 240_000);
 });
 
 /** Opens another site's home page, goes back, then taps Increment: the same path on two origins. */

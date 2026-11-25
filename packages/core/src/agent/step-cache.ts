@@ -486,7 +486,7 @@ export class StepTraceSession {
       this.info = this.missed(stopReason, outcome.total, outcome.derived, detail);
       return undefined;
     }
-    this.handOff(outcome, stopReason, detail);
+    this.handOff(outcome, stopReason, detail, this.detourOf(trace, outcome.executed));
     return undefined;
   }
 
@@ -573,7 +573,7 @@ export class StepTraceSession {
     return { status: 'passed', summary: replaySummary(outcome.executed, trace.summary) };
   }
 
-  private handOff(outcome: ReplayOutcome, stopReason: HandOffReason, detail: string | undefined): void {
+  private handOff(outcome: ReplayOutcome, stopReason: HandOffReason, detail: string | undefined, detour: string | undefined): void {
     this.handedOffMs = Date.now();
     if (stopReason === 'end-mismatch') this.actionsAfterEndMismatch = 0;
     this.prefix = {
@@ -590,6 +590,7 @@ export class StepTraceSession {
       totalActions: outcome.total,
       entry: this.keyHash,
       ...(detail === undefined ? {} : { detail: this.reportable(detail) }),
+      ...(detour === undefined ? {} : { detour }),
     };
   }
 
@@ -672,11 +673,12 @@ export class StepTraceSession {
 
   /**
    * The recording's detours as the report names them (`cache/detours.ts`),
-   * or undefined when it has none. Joined with commas: the report line
+   * or undefined when it has none; with `executed`, only those whose every
+   * action a replay that handed off ran. Joined with commas: the report line
    * separates its own parts with semicolons (`cacheLine`).
    */
-  private detourOf(trace: ActionTrace): string | undefined {
-    const detours = findDetours(trace);
+  private detourOf(trace: ActionTrace, executed = trace.actions.length): string | undefined {
+    const detours = findDetours(trace).filter((detour) => detour.to <= executed);
     return detours.length === 0 ? undefined : this.reportable(detours.map(describeDetour).join(', '));
   }
 
