@@ -685,9 +685,11 @@ export class StepTraceSession {
    * or undefined when it has none; with `executed`, those of the actions a
    * replay that handed off ran, read as a flow of their own that ends where
    * the next recorded action stood, so a trip the replay completed is not
-   * merged with one it never reached. A stored location reads `:id` for a
-   * record id, so two records' pages read alike there: a trip the prefix
-   * shows counts only inside a span the recording run found.
+   * merged with one it never reached. A span the recording run found that
+   * ends inside the prefix is kept as found: a stored location reads `:id`
+   * for a record id, so comparing again would lose a trip to another
+   * record. Only a span the hand-off cut through is read again, on the
+   * stored locations, and a trip found there counts only inside it.
    * Joined with commas: the report line separates its own parts with
    * semicolons (`cacheLine`).
    */
@@ -699,9 +701,12 @@ export class StepTraceSession {
       ...(trace.startPath === undefined ? {} : { startPath: trace.startPath }),
       ...(next === undefined ? {} : { endPath: next }),
     };
-    const found = findDetours(ran);
     const spans = trace.detours;
-    return this.describeDetours(spans === undefined ? found : found.filter(({ from, to }) => spans.some((span) => span.from <= from && to <= span.to)));
+    if (spans === undefined) return this.describeDetours(findDetours(ran));
+    const finished = findDetours({ ...ran, detours: spans.filter(({ to }) => to <= executed) });
+    const cut = spans.filter(({ from, to }) => from < executed && executed < to);
+    const inCut = cut.length === 0 ? [] : findDetours(ran).filter(({ from, to }) => cut.some((span) => span.from <= from && to <= span.to));
+    return this.describeDetours([...finished, ...inCut].toSorted((a, b) => a.from - b.from));
   }
 
   /** Detours as the report names them, or undefined for none. */
