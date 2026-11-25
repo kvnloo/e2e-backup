@@ -14,13 +14,14 @@
  * enumerate it, so it says so instead of listing an empty directory.
  */
 
-import { readdir, rm, rmdir } from 'node:fs/promises';
+import { readdir, readFile, rm, rmdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { Command } from 'commander';
 import picocolors from 'picocolors';
 import { describeDetour, findDetours, type TraceDetour } from '@e2e-dev/core/lib/cache/detours';
 import { FileCacheStore, MAX_CACHE_WIRE_BYTES } from '@e2e-dev/core/lib/cache/store';
-import { targetLabel, type TraceTargetDescriptor } from '@e2e-dev/core/lib/cache/trace';
+import { targetLabel, type TraceEntry, type TraceTargetDescriptor } from '@e2e-dev/core/lib/cache/trace';
+import { readTraceEntry } from '@e2e-dev/core/lib/cache/trace-read';
 import { discoverConfig, loadConfigModule, missingConfigError } from '../config/load.ts';
 import { resolveConfig } from '../config/resolve-run.ts';
 import { errorMessage, sanitizeText } from '@e2e-dev/core/lib/internal/errors';
@@ -81,21 +82,24 @@ const DIGEST_PREFIX_CHARS = 12;
  * not a failure.
  */
 async function cache(command: CacheCommand | { readonly show: string }, options: CacheOptions = {}): Promise<number> {
-  // A path names its own file, wherever it is: a copied recording or another
-  // package's cache is read from its directory, not looked up in this one.
-  const shownPath = typeof command === 'object' && path.basename(command.show) !== command.show ? command.show : undefined;
+  // A path names its own file, wherever it is and whatever its name: a copied
+  // recording or another package's entry is read as it is, with no config.
+  if (typeof command === 'object' && isFilePath(command.show)) return await showFile(path.resolve(options.cwd ?? process.cwd(), command.show));
   let directory: string;
   try {
-    directory = shownPath === undefined ? await resolveCacheDirectory(options) : path.resolve(options.cwd ?? process.cwd(), path.dirname(shownPath));
+    directory = await resolveCacheDirectory(options);
   } catch (cause) {
     process.stderr.write(`${redactError(errorMessage(cause))}\n`);
     return 2;
   }
 
   try {
-    // Only the commands that print detours pay for reading them.
-    const contents = await readContents(directory, command !== 'stats' && command !== 'clear');
-    if (typeof command === 'object') return await show(contents, command.show);
+    // Only the commands that print every entry's detours pay for reading them.
+    const contents = await readContents(directory, command === 'ls' || command === 'check');
+    if (typeof command === 'object') {
+      const entry = findEntry(contents, command.show);
+      return entry === undefined ? 2 : await showFile(path.join(directory, `${entry.keyHash}.json`));
+    }
     switch (command) {
       case 'ls':
         return list(contents);
@@ -281,13 +285,17 @@ function writeTable(header: readonly string[], rows: readonly (readonly string[]
   for (const row of rows) process.stdout.write(`${line(row)}\n`);
 }
 
+/** Whether `show` was given a file rather than a digest: a name with a directory in it, or one ending in `.json`. */
+function isFilePath(ref: string): boolean {
+  return path.basename(ref) !== ref || ref.endsWith('.json');
+}
+
 /**
- * The entry `ref` names: a digest or its leading characters, or the path of
- * its file. Prints why and returns undefined when no entry or more than one
- * matches.
+ * The entry a digest or its leading characters name in the store. Prints
+ * why and returns undefined when no entry or more than one matches.
  */
 function findEntry(contents: CacheContents, ref: string): CacheEntrySummary | undefined {
-  const prefix = (ENTRY_FILE.exec(path.basename(ref))?.[1] ?? ref).toLowerCase();
+  const prefix = ref.toLowerCase();
   const matches = /^[a-f0-9]+$/u.test(prefix) ? contents.entries.filter((entry) => entry.keyHash.startsWith(prefix)) : [];
   if (matches.length === 1) return matches[0];
   if (matches.length === 0) {
@@ -304,25 +312,25 @@ function findEntry(contents: CacheContents, ref: string): CacheEntrySummary | un
 }
 
 /**
- * Prints one entry the way a reviewer reads it: what it was recorded for,
- * each action numbered from 1 with the screen it ran on, the end state a
- * replay checks, and every detour, whose actions are marked in the list.
+ * Prints one entry file the way a reviewer reads it: what it was recorded
+ * for, each action numbered from 1 with the screen it ran on, the end state
+ * a replay checks, and every detour, whose actions are marked in the list.
+ * The file is read the way the store reads one, by size and through the
+ * trace-1 reader, so what prints is what a run would replay.
  */
-async function show(contents: CacheContents, ref: string): Promise<number> {
-  const entry = findEntry(contents, ref);
-  if (entry === undefined) return 2;
-  // Read again rather than kept from the listing: only this one entry's actions are printed.
-  const read = await new FileCacheStore({ directory: contents.directory, maxBytes: MAX_CACHE_WIRE_BYTES, writable: false }).read(entry.keyHash);
-  if (read.status !== 'hit') {
-    process.stderr.write(`${entry.keyHash}.json in ${contents.directory} changed while it was read; run the command again\n`);
+async function showFile(file: string): Promise<number> {
+  const entry = await readEntryFile(file);
+  if (typeof entry === 'string') {
+    process.stderr.write(`${plain(file)}: ${entry}\n`);
     return 2;
   }
-  const trace = read.entry.payload;
+  const trace = entry.payload;
+  const detours = findDetours(trace);
   const model = trace.recordedBy === undefined ? '' : ` with ${trace.recordedBy.provider}/${trace.recordedBy.model}`;
   const facts: [string, string | undefined][] = [
-    ['entry', path.join(contents.directory, `${entry.keyHash}.json`)],
-    ['test', entry.testId],
-    ['target', entry.targetId],
+    ['entry', file],
+    ['test', trace.recordedFor?.testId],
+    ['target', trace.recordedFor?.targetId],
     ['agent', trace.recordedFor?.agent],
     ['recorded', `${entry.createdAt}${model}`],
     ['summary', trace.summary],
@@ -333,7 +341,7 @@ async function show(contents: CacheContents, ref: string): Promise<number> {
   const width = Math.max(...shown.map(([label]) => label.length));
   for (const [label, value] of shown) process.stdout.write(`${label.padEnd(width)}  ${plain(value)}\n`);
   process.stdout.write('\n');
-  const detoured = new Set(entry.detours.flatMap((detour) => Array.from({ length: detour.to - detour.from }, (_, offset) => detour.from + offset)));
+  const detoured = new Set(detours.flatMap((detour) => Array.from({ length: detour.to - detour.from }, (_, offset) => detour.from + offset)));
   writeTable(
     ['#', 'AT', 'ACTION'],
     trace.actions.map((action, index) => [
@@ -348,9 +356,27 @@ async function show(contents: CacheContents, ref: string): Promise<number> {
   ];
   if (anchors.length > 0) process.stdout.write(`\nend state: ${plain(anchors.join(', '))}\n`);
   if (trace.truncated === true) process.stdout.write('\nnever replays: recording hit a cap or kept a value it could not replay\n');
-  if (entry.detours.length > 0) process.stdout.write('\n');
-  for (const detour of entry.detours) process.stdout.write(`${picocolors.yellow('detour')}: ${plain(describeDetour(detour))}\n`);
+  if (detours.length > 0) process.stdout.write('\n');
+  for (const detour of detours) process.stdout.write(`${picocolors.yellow('detour')}: ${plain(describeDetour(detour))}\n`);
   return 0;
+}
+
+/** One entry file as a trace-1 entry, or why it is not one. */
+async function readEntryFile(file: string): Promise<TraceEntry | string> {
+  let text: string;
+  try {
+    if ((await stat(file)).size > MAX_CACHE_WIRE_BYTES) return `larger than ${formatBytes(MAX_CACHE_WIRE_BYTES)}, which no run reads`;
+    text = await readFile(file, 'utf8');
+  } catch (cause) {
+    return (cause as NodeJS.ErrnoException).code === 'ENOENT' ? 'no such file' : errorMessage(cause);
+  }
+  let document: unknown;
+  try {
+    document = JSON.parse(text);
+  } catch {
+    return 'not JSON, so not a replay cache entry';
+  }
+  return readTraceEntry(document) ?? 'not a readable trace-1 entry; a run treats it as a miss';
 }
 
 /**
