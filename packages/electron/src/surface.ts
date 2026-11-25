@@ -798,12 +798,13 @@ export class ElectronSurface {
           await commit(() => mouse.move(from.x, from.y));
           await commit(() => mouse.down());
           try {
-            const session = await this.session(window.page);
-            await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: target.backendNodeId }).catch(() => undefined);
-            const { quads } = await session.send('DOM.getContentQuads', { backendNodeId: target.backendNodeId });
-            const quad = quads.find((candidate) => area(candidate) > 0);
-            if (quad === undefined) throw notActionable('the drop target has no box on screen');
-            const to = whole(centre(quad));
+            // The target is waited for as the source was: in view, and the topmost element at the point the drop lands on.
+            const to = await this.actionablePoint(window, target.backendNodeId, operation, false, deadline).catch((cause: unknown) => {
+              if (cause instanceof EngineError && cause.code === 'NOT_ACTIONABLE') {
+                throw new EngineError('ACTION_MAY_HAVE_COMMITTED', `the drop target ${cause.message.replace(/^node \d+ /, '')}, and the source was already pressed`, { retryable: false, cause });
+              }
+              throw cause;
+            });
             // An intermediate move, so drag handlers see motion before the drop.
             await commit(() => mouse.move(Math.round((from.x + to.x) / 2), Math.round((from.y + to.y) / 2)));
             await commit(() => mouse.move(to.x, to.y));
@@ -1074,10 +1075,6 @@ function playwrightKey(key: string): string {
     throw new EngineError('UNSUPPORTED_CAPABILITY', `the keyboard cannot press ${JSON.stringify(parsed.key.char)}: only named keys and printable ASCII characters have a key; type other text with fill or pressSequentially`, { retryable: false });
   }
   return key === 'Space' ? ' ' : key.replace(/\+Space$/, '+ ');
-}
-
-function centre(quad: readonly number[]): ViewportPoint {
-  return { x: (quad[0]! + quad[2]! + quad[4]! + quad[6]!) / 4, y: (quad[1]! + quad[3]! + quad[5]! + quad[7]!) / 4 };
 }
 
 /** A box in viewport CSS pixels. */

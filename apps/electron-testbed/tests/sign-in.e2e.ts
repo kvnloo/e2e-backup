@@ -114,6 +114,9 @@ test.describe('sign-in window', () => {
   test('drags to a drop zone below the edge of the window', async ({ screen }) => {
     await screen.getByRole('button', 'Drag me').dragTo(screen.getByRole('button', 'Drop here'));
     await expect(screen.getByTestId('drag-result')).toHaveText('Dropped drag-source on the zone');
+    // A drop target another element covers is not dropped on.
+    const covered = await screen.getByRole('button', 'Drag me').dragTo(screen.getByRole('button', 'Covered zone'), { timeout: 1500 }).then(() => undefined, (error: unknown) => error);
+    expect(String(covered)).toContain('would receive the click');
   });
 
   test('stops typing once pressSequentially has run out of time', async ({ screen }) => {
