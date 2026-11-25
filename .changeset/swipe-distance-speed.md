@@ -6,4 +6,4 @@
 "@e2e-dev/desktop": patch
 ---
 
-`screen.swipe`, `locator.swipe`, and `scrollUntilVisible` take `distance` (a share of the scroll container, or of a locator's node, on the web and on a device) and `speed` (how long each drag takes on a device). On the web, a swipe is a wheel event, so `speed` doesn't change anything there. Code that builds an engine swipe action needs `distance` and `durationMs`, though older clients that send only `momentum` still work over the engine protocol.
+`screen.swipe`, `locator.swipe`, and `scrollUntilVisible` now take `distance` (a share of the scroll container or the locator's node on web and mobile) and `speed` (how fast each drag runs on mobile). On web, a swipe is a wheel event, so `speed` doesn't change anything. Engine swipe actions now need `distance` and `durationMs`, and older clients sending only `momentum` still work over the engine protocol.

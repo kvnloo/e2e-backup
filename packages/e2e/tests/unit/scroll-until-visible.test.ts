@@ -54,15 +54,13 @@ interface ScrollScript {
    */
   readonly hang?: boolean | number;
   /**
-   * How a swipe is refused:
-   * - `unsent`: `OPERATION_TIMEOUT` before any drag, as a device does when
-   *   its drags of at most 0.65 each don't fit the operation budget.
-   * - `part`: `ACTION_MAY_HAVE_COMMITTED` after the first drag went out.
-   * - `always`: `NOT_ACTIONABLE` on every swipe, as a desktop window with
-   *   nothing to scroll does.
+   * Simulates swipe refusals:
+   * - `unsent`: `OPERATION_TIMEOUT` before any drag when drags don't fit the budget.
+   * - `part`: `ACTION_MAY_HAVE_COMMITTED` after the first drag goes out.
+   * - `always`: `NOT_ACTIONABLE` on every swipe, like a desktop window with nothing to scroll.
    */
   readonly refuse?: 'unsent' | 'part' | 'always';
-  /** When true, `scrollIntoView` fails as a device does when its drag won't fit in time. */
+  /** When true, `scrollIntoView` fails as a device does when the drag won't fit in time. */
   readonly intoViewTimesOut?: boolean;
   /** The action timeout of the locator engine; default 1000 ms. */
   readonly actionTimeout?: number;
@@ -159,7 +157,7 @@ describe('screen.scrollUntilVisible', () => {
     expect(broughtIntoView).toEqual(['target to the middle']);
   });
 
-  it('maps the deprecated momentum to a distance and a speed, lets explicit options override it, forwards it to the engine, and warns once per process', async () => {
+  it('maps deprecated momentum to distance and speed, lets explicit options override it, forwards it to the engine, and warns once per process', async () => {
     // The warning is printed once per process, so this is the file's only test that passes momentum.
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
@@ -280,7 +278,7 @@ describe('screen.scrollUntilVisible', () => {
   });
 
   it.each(['unsent', 'part'] as const)(
-    'fails with LOCATOR_NOT_FOUND on the screen and on a locator when a two-drag step no longer fits before the deadline (%s)',
+    'fails with LOCATOR_NOT_FOUND on screen and locator when a two-drag step no longer fits before the deadline (%s)',
     async (refuse) => {
       const { screen, swipes } = scrollScreen({ screens: [[feed()]], refuse });
       const target = screen.getByText('Accept');
@@ -292,7 +290,7 @@ describe('screen.scrollUntilVisible', () => {
     },
   );
 
-  it('keeps a swipe error that is not a timeout, even near the deadline', async () => {
+  it('preserves non-timeout swipe errors even near the deadline', async () => {
     const { screen } = scrollScreen({ screens: [[feed()]], refuse: 'always' });
     const target = screen.getByText('Accept');
     await expect(screen.scrollUntilVisible(target, { timeout: 500 })).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
@@ -308,7 +306,7 @@ describe('screen.scrollUntilVisible', () => {
     expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...STEP }]);
   });
 
-  it("still sends momentum 'slow' on default scroll steps, for engines that read momentum", async () => {
+  it("still sends momentum 'slow' on default scroll steps for engines that read momentum", async () => {
     const { screen, actions } = scrollScreen({ screens: [[], [TARGET]] });
     await screen.scrollUntilVisible(screen.getByText('Accept'), { distance: 0.3 });
     await screen.swipe({ direction: 'up' });

@@ -517,13 +517,13 @@ process prints a warning. It will be removed no earlier than April 1,
 | `'none'` | `0.5` | `'normal'` |
 | `'fast'` | `0.65` | `'fast'` |
 
-Previously, on the web, `'slow'` scrolled 0.75 of the viewport or the node
-and `'fast'` scrolled 1.5. On a device, `'fast'` on a locator swiped 0.8 of
-the node. On the desktop, each value scrolls by the app's scroll units:
-`'slow'` is 3 (it was 2), `'none'` is 5, and `'fast'` is 10, as before.
+Previously, on web, `'slow'` scrolled 0.75 of the viewport or node and
+`'fast'` scrolled 1.5. On mobile locators, `'fast'` swiped 0.8 of the node.
+On desktop, each value uses the app's scroll units: `'slow'` is 3 (was 2),
+`'none'` is 5, and `'fast'` is 10.
 
-A `distance` or `speed` passed with `momentum` overrides the value
-`momentum` maps to.
+If `distance` or `speed` is passed with `momentum`, it overrides the
+`momentum` defaults.
 
 `{ from, to, duration? }` is a swipe along a path between two viewport
 points: a touch swipe on a device, a pointer drag on a document platform.
@@ -576,9 +576,9 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
   takes 800 ms to limit how far the list keeps moving after the finger
   lifts. How much of the previous view stays on screen depends on how far
   it moves.
-- `speed` replaces the 800 ms with a preset from
-  [`screen.swipe`](#screen-swipe). The list keeps moving further after a
-  `'normal'` or `'fast'` drag, so it can skip a short row.
+- Setting `speed` overrides the 800 ms default with a preset from
+  [`screen.swipe`](#screen-swipe). Faster drags coast further, which can
+  skip short rows.
 - `momentum` is deprecated and stands for a `distance` and a `speed`, as
   under [`screen.swipe`](#momentum).
 - `timeout` is its own default, not `config.actionTimeout`. It bounds the
@@ -598,7 +598,7 @@ await screen.getByTestId('feed').scrollUntilVisible(row);
 | --- | --- |
 | `INVALID_LOCATOR` | `target` is not a runner locator, or was made by another target's screen. |
 | `INVALID_ARGUMENT` | An option it doesn't take, a `direction` that isn't `'up'`, `'down'`, `'left'`, or `'right'`, a `distance` that isn't above 0 and at most 1, or a `speed` that isn't a preset. |
-| `LOCATOR_NOT_FOUND` | The deadline expires first, including when the deadline cuts a swipe short, or when a device refuses a step because its drags can't finish in time. |
+| `LOCATOR_NOT_FOUND` | The deadline expires first, including a swipe cut short by the deadline or a step refused on a device because its drags won't finish in time. |
 
 ### Screen reads
 

@@ -357,11 +357,11 @@ export type LocatorAction =
        * Set by `scrollUntilVisible` and the agent's `scroll_to` after a
        * scroll step, for a node already read as visible.
        *
-       * On a device, if a node is more than a fifth of its scroll container
-       * from the middle and the container has content hidden on that side,
-       * it's also dragged toward the center. A node at the edge can sit
-       * under a sticky header or footer. One drag is sent with no check of
-       * what covers the node afterwards, so a sticky view can still cover it.
+       * On a device, if a node is more than a fifth of its container from
+       * the center and content is hidden on that side, it's dragged toward
+       * the middle. Edge nodes can sit under a sticky header or footer. One
+       * drag runs without checking coverage afterward, so a sticky view can
+       * still cover it.
        *
        * On the web, the node is brought in with the browser's minimal
        * scroll, without waiting for it to stop moving.
@@ -398,7 +398,7 @@ export interface SwipeAction {
   /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
   /**
-   * @deprecated Read `distance` and `durationMs`. Core still sends it for
+   * @deprecated Read `distance` and `durationMs`. Core still includes it for
    * engines that read it: the test's `momentum`, or `slow` on core's scroll
    * steps. When an older client sends only `momentum`, the protocol fills in
    * the matching `distance` and `durationMs`. It will be removed no earlier

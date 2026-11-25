@@ -422,7 +422,7 @@ describe('dispatchPointerAction', () => {
       dblclick: async (x: number, y: number) => { calls.push(`dblclick ${x},${y}`); },
       wheel: async (dx: number, dy: number) => { calls.push(`wheel ${dx},${dy}`); },
     };
-    // Reading the container size passes an argument and returns the viewport size here. The frame wait passes no argument.
+    // Reading the container size passes an argument and returns the viewport size here. The frame wait doesn't pass one.
     const evaluate = async (_fn: unknown, along?: { vertical: boolean }) => {
       if (along !== undefined) return along.vertical ? 600 : 800;
       calls.push('frame');

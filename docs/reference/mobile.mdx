@@ -1386,8 +1386,8 @@ so does the focused field.
 ## Scrolling
 
 - A scroll container is a visible node with a non-zero area that
-  agent-device reports as a `scroll-area`, `list`, `collection`, or
-  `table`. A screen
+  agent-device reports as `scroll-area`, `list`, `collection`, or `table`.
+  A screen
   swipe scrolls the smallest one under the screen's center, or the whole
   screen when there isn't one. agent-device doesn't report which way a
   container scrolls, so a vertical swipe is measured against a horizontal
@@ -1399,11 +1399,11 @@ so does the focused field.
   node inside its container doesn't move, and neither does a node outside
   any scroll container. The drag is vertical only, so a node cut off at the
   side stays where it is.
-- After a scroll step, `scrollUntilVisible` and the agent's `scroll_to` also
-  drag the found node toward the middle when it lands more than a fifth of
-  the container's height from the center and the container reports content
-  hidden on that side. A list at its top doesn't report hidden content
-  above, so it isn't pulled to refresh. A node at the list's edge can be
+- After scrolling, `scrollUntilVisible` and the agent's `scroll_to` also drag
+  the found node toward the middle if it lands more than a fifth of the
+  container's height from center with hidden content on that side. A list
+  at its top doesn't report hidden content above, so it isn't pulled to
+  refresh. A node at the list's edge can be
   under a sticky header or footer and still count as visible, since a plain
   React Native `View` isn't in the tree. The drag moves it, and nothing
   checks what covers it afterwards. A node that's visible before any step

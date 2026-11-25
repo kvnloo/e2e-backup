@@ -308,7 +308,7 @@ class ScreenImpl implements Screen {
           // more than a fifth of its container from the middle is dragged
           // toward the center when the container has content hidden on that side,
           // clear of a sticky header or footer at the edge. A node already
-          // visible before any step isn't scrolled, since a list at its top
+          // visible on the first read isn't scrolled, since a list at its top
           // could take a drag as a pull to refresh.
           if (stepped && engine.supports('scrollIntoView')) {
             try {
@@ -333,9 +333,9 @@ class ScreenImpl implements Screen {
           if (deadline.expired() || (isOperationTimeout(cause) && deadline.remaining() < POLL_INTERVAL_MS)) {
             throw notVisible(cause);
           }
-          // On a device, a step fails before any drag is sent when there isn't
-          // time for every drag (`OPERATION_TIMEOUT`). If an earlier drag
-          // answers late and leaves too little time for the next one, it fails
+          // On a device, a step fails before sending any drag when there isn't
+          // enough time for all drags (`OPERATION_TIMEOUT`). If an earlier drag
+          // finishes late and leaves too little time for the next, it fails
           // with `ACTION_MAY_HAVE_COMMITTED`. Both count as the scroll timing
           // out.
           const code = engineErrorCode(cause);

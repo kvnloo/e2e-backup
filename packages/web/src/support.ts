@@ -491,8 +491,8 @@ export function staleOr(cause: unknown, operation: string): Error {
 /**
  * Sends a wheel event at `point` for `distance` of the scroll container
  * under it. The container is the nearest element there that scrolls on the
- * swipe's axis, or the viewport if none does. The event lands on that
- * container, so it scrolls the same element a person's wheel would.
+ * swipe axis, or the viewport if none does. The event lands on that
+ * container, scrolling the same element a user's wheel would.
  */
 export async function performPointSwipe(page: Page, point: ViewportPoint, direction: ScrollDirection, distance: number): Promise<void> {
   const extent = await page.evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
@@ -610,10 +610,10 @@ function wheelAim(element: Element): WheelAim {
 }
 
 /**
- * Runs in the page and returns the client size, on the swipe's axis, of the
- * container a wheel event at `at` scrolls. Starting at the element at that
- * point, it finds the nearest one, itself included, whose content overflows
- * on that axis and whose style lets it scroll.
+ * Runs in the page and returns the client size along the swipe axis of the
+ * container scrolled by a wheel event at `at`. Starting at the element at
+ * that point, it finds the nearest ancestor (or itself) that overflows and
+ * scrolls on that axis.
  *
  * The element at the point is found inside open shadow roots. On the way up,
  * the walk goes from a slotted element to its slot, and from a shadow root
@@ -628,7 +628,7 @@ function scrollExtent({ vertical, at }: { vertical: boolean; at: ViewportPoint }
     if (inner === null || inner === node) break;
     node = inner;
   }
-  // The root element scrolls the viewport. `body` does too, unless the root
+  // The root element scrolls the viewport. `body` does too unless the root
   // element sets an `overflow` other than `visible` (CSS Overflow 3, section
   // 3.3), in which case `body` scrolls independently.
   const bodyScrollsViewport = getComputedStyle(document.documentElement)[axis] === 'visible';

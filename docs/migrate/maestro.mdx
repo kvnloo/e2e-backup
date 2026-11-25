@@ -128,7 +128,7 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `copyTextFrom`, `pasteText` | `await locator.textContent()`, then `.fill(text)` |
 | `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`. Maestro uses the finger's direction, while e2e uses the content's. A Maestro `scroll` is 0.4 of the screen. Use `distance: 0.4` to match it when the list fills the screen |
 | `swipe: { start, end }` | `screen.swipe({ from, to })` in pixels or percentages. Set `duration` in milliseconds to change how long the drag takes |
-| `scrollUntilVisible` | `screen.scrollUntilVisible(locator, { direction })`. Maestro's `speed` (0 to 100) becomes `speed: 'slow'`, `'normal'`, or `'fast'`. After a step on a device, a node far from its container's center is dragged toward the center when the container has content hidden on that side, as with `centerElement: true` ([Mobile scrolling](/reference/mobile#scrolling)) |
+| `scrollUntilVisible` | `screen.scrollUntilVisible(locator, { direction })`. Maestro's `speed` (0 to 100) becomes `speed: 'slow'`, `'normal'`, or `'fast'`. After scrolling on a device, nodes far from their container's center are dragged toward the middle when content is hidden on that side, like `centerElement: true` ([Mobile scrolling](/reference/mobile#scrolling)) |
 
 </Accordion>
 <Accordion title="Assertions and flows">

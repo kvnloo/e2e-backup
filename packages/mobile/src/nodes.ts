@@ -854,11 +854,10 @@ const SCROLL_KINDS: ReadonlySet<string> = new Set(['scroll-area', 'list', 'colle
 
 /**
  * Returns the node's box if it's a visible scroll container with a non-zero
- * area. It matches the kinds agent-device treats as scrolling: `scroll-area`
- * (an iOS or Android `ScrollView`, including React Native lists), `list` (an
- * Android `RecyclerView` or `ListView`), `collection` (an iOS
- * `CollectionView`, including SwiftUI lists), and `table` (an iOS
- * `TableView`).
+ * area. Matches agent-device kinds: `scroll-area` (iOS/Android `ScrollView`,
+ * including React Native lists), `list` (Android `RecyclerView` or
+ * `ListView`), `collection` (iOS `CollectionView`, including SwiftUI lists),
+ * and `table` (iOS `TableView`).
  */
 function scrollBox(entry: ProjectedNode): ScrollBox | undefined {
   const rect = entry.node.rect;

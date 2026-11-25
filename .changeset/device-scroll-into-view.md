@@ -5,4 +5,4 @@
 "@e2e-dev/mobile": patch
 ---
 
-On a device, `locator.scrollIntoView()` is supported and drags a node cut off at its scroll container's edge toward the middle. After a step, `scrollUntilVisible` brings the found node into view. On a device, a node that lands far from its container's middle is also dragged there when the container has content hidden on that side.
+On a device, `locator.scrollIntoView()` is now supported and drags nodes cut off at their scroll container's edge toward the middle. After scrolling, `scrollUntilVisible` brings the found node into view. On a device, it also drags nodes that land far from the middle toward the center when content is hidden on that side.

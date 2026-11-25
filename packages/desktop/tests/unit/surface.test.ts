@@ -355,7 +355,7 @@ describe('DesktopSurface', () => {
     expect(fake.calls().at(-1)?.args.slice(0, 2)).toEqual(['scroll', '@s9:e1']);
   });
 
-  it('scrolls 10 app units for a distance of 1 or the deprecated fast momentum, and 2 for a scroll step at any speed', async () => {
+  it('scrolls 10 app units for distance 1 or deprecated fast momentum, and 2 for a scroll step at any speed', async () => {
     const scrollable = { ok: true, data: { snapshot_id: 's9', window: { id: 'w-mine' }, tree: { role: 'window', name: 'List', bounds: { x: 0, y: 0, width: 100, height: 100 }, children: [{ role: 'scrollarea', ref_id: '@s9:e1', available_actions: ['Scroll'] }] } } };
     const { surface, fake } = await launched({ snapshot: [scrollable] }, { observe: false });
     await surface.restart(operation());

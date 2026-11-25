@@ -1277,7 +1277,7 @@ honors in `actions` and `pointerActions`.
 
 The grammar is closed. Anything beyond it is an agent-side `defineTool`.
 
-`distance` is a share of the box's size along the swipe:
+`distance` is a share of the box's size along the swipe axis:
 
 - On the root, the box is the scroll container under the viewport's
   center, or the whole viewport when there isn't one.
@@ -1287,9 +1287,9 @@ Each drag takes `durationMs`. It's ignored where the scroll is a wheel
 event instead of a drag. `SCROLL_STEP` in `e2e/engine` is the step
 used by `scrollUntilVisible` and the agent's `scroll_to` (0.65 of the
 container over 800 ms). Code that builds a swipe action needs `distance`
-and `durationMs`. Older clients that send only `momentum` still work over
-the protocol, which fills in `distance` and `durationMs`. Core also sends
-the deprecated `momentum` for engines that still read it.
+and `durationMs`. Older clients sending only `momentum` still work over the
+protocol, which fills in `distance` and `durationMs`. Core also includes
+`momentum` for engines that still read it.
 
 #### Locator actions
 
@@ -1342,11 +1342,11 @@ export type LocatorAction =
        * Set by `scrollUntilVisible` and the agent's `scroll_to` after a
        * scroll step, for a node already read as visible.
        *
-       * On a device, if a node is more than a fifth of its scroll container
-       * from the middle and the container has content hidden on that side,
-       * it's also dragged toward the center. A node at the edge can sit
-       * under a sticky header or footer. One drag is sent with no check of
-       * what covers the node afterwards, so a sticky view can still cover it.
+       * On a device, if a node is more than a fifth of its container from
+       * the center and content is hidden on that side, it's dragged toward
+       * the middle. Edge nodes can sit under a sticky header or footer. One
+       * drag runs without checking coverage afterward, so a sticky view can
+       * still cover it.
        *
        * On the web, the node is brought in with the browser's minimal
        * scroll, without waiting for it to stop moving.
@@ -1383,7 +1383,7 @@ export interface SwipeAction {
   /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
   /**
-   * @deprecated Read `distance` and `durationMs`. Core still sends it for
+   * @deprecated Read `distance` and `durationMs`. Core still includes it for
    * engines that read it: the test's `momentum`, or `slow` on core's scroll
    * steps. When an older client sends only `momentum`, the protocol fills in
    * the matching `distance` and `durationMs`. It will be removed no earlier

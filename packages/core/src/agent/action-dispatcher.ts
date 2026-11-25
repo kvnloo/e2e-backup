@@ -617,11 +617,11 @@ export class ActionDispatcher {
         const found = observation.kind === 'semantic' ? nodeReading(observation, needle, scope) : undefined;
         if (found !== undefined) {
           // An engine that can bring a node in does, whatever the box says: a
-          // windowed list renders a row a little before it is visible. After a
-          // page, the call passes `center`, as `scrollUntilVisible` does, so a
-          // device can drag a row far from its list's center toward the center.
-          // If the engine doesn't support `scrollIntoView`, the loop pages once
-          // more when the row is still past the edge.
+          // windowed list renders a row a little before it is visible. After
+          // paging, `center` is passed like `scrollUntilVisible` does, so a
+          // device can center rows that land far from the middle. If the
+          // engine doesn't support `scrollIntoView`, the loop pages once more
+          // when the row is still past the edge.
           if (this.verbs.has('scrollTo')) {
             await this.session.perform(found.ref, { kind: 'scrollIntoView', ...(screens > 0 ? { center: true } : {}) }, this.accounting.actionOperation());
             return { name: 'scrollUntil', text, direction, screens, ...paged };
