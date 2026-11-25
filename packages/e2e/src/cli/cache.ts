@@ -264,11 +264,26 @@ function list(contents: CacheContents): number {
       entry.targetId ?? '-',
       entry.instructionDigest?.slice(0, DIGEST_PREFIX_CHARS) ?? '-',
       formatAge(entry.createdAt, now),
-      `${entry.actions}${entry.truncated ? ' (truncated)' : ''}${entry.detours.length > 0 ? picocolors.yellow(' (detour)') : ''}`,
+      `${entry.actions}${entry.truncated ? ' (truncated)' : ''}${detourMark(entry.detours)}`,
     ]);
   writeTable(['ENTRY', 'TEST', 'TARGET', 'INSTRUCTION', 'AGE', 'ACTIONS'], rows);
   warnAboutSkipped(contents);
   return 0;
+}
+
+/**
+ * How `ls` marks an entry's detours: `(detour)` when its recorded screens
+ * show one, which fails `check`; `(detour hint)` when only the shape of an
+ * entry without locations suggests one, which fails nothing.
+ */
+function detourMark(detours: readonly TraceDetour[]): string {
+  if (detours.length === 0) return '';
+  return picocolors.yellow(detours.some((detour) => detour.evidence === 'locations') ? ' (detour)' : ' (detour hint)');
+}
+
+/** The note a detour read from an entry's shape alone carries wherever it is printed. */
+function hintOnly(detour: TraceDetour): string {
+  return detour.evidence === 'actions' ? ' (recorded without locations: a hint only)' : '';
 }
 
 /** Prints a header and rows in columns two spaces apart, aligned by displayed width; the last column is not padded. */
@@ -357,7 +372,7 @@ async function showFile(file: string): Promise<number> {
   if (anchors.length > 0) process.stdout.write(`\nend state: ${plain(anchors.join(', '))}\n`);
   if (trace.truncated === true) process.stdout.write('\nnever replays: recording hit a cap or kept a value it could not replay\n');
   if (detours.length > 0) process.stdout.write('\n');
-  for (const detour of detours) process.stdout.write(`${picocolors.yellow('detour')}: ${plain(describeDetour(detour))}\n`);
+  for (const detour of detours) process.stdout.write(`${picocolors.yellow('detour')}: ${plain(describeDetour(detour))}${hintOnly(detour)}\n`);
   return 0;
 }
 
@@ -414,8 +429,7 @@ function check(contents: CacheContents): number {
   for (const entry of detoured) {
     const who = entry.testId === undefined ? '' : ` ${entry.testId}${entry.targetId === undefined ? '' : ` (${entry.targetId})`}`;
     for (const detour of entry.detours) {
-      const hint = detour.evidence === 'actions' ? ' (recorded without locations: a hint only)' : '';
-      process.stdout.write(`${entry.keyHash.slice(0, DIGEST_PREFIX_CHARS)}${plain(`${who}: ${describeDetour(detour)}`)}${hint}\n`);
+      process.stdout.write(`${entry.keyHash.slice(0, DIGEST_PREFIX_CHARS)}${plain(`${who}: ${describeDetour(detour)}`)}${hintOnly(detour)}\n`);
     }
   }
   const total = contents.entries.length;

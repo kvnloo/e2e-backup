@@ -276,6 +276,11 @@ describe('e2e cache check', () => {
       ],
     };
     await seed([{ keyHash: 'e'.repeat(64), trace: legacy }]);
+    await invoke('cache', 'ls');
+    expect(written(stdoutSpy).trimEnd().split('\n')[1]).toMatch(/ 3 \(detour hint\)$/);
+    await invoke('cache', 'show', 'e'.repeat(12));
+    expect(written(stdoutSpy)).toContain('detour: actions 1-2 left a screen, only looked around, and went back (recorded without locations: a hint only)');
+    stdoutSpy.mockClear();
     await invoke('cache', 'check');
     // The shape alone cannot tell a wrong turn from a step that asks to go back: a hint, never a failure.
     expect(process.exitCode).toBe(0);
