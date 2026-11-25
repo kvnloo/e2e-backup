@@ -236,10 +236,6 @@ writes.
 - A new app can start from the example:
   `npx create-next-app --example https://github.com/e2e-inc/e2e/tree/main/examples/with-next my-app`.
 
-There is no `services` key in this version: it is an unknown key wherever it
-appears. Start dependency processes before the run, or have `app.command`
-start a script that brings them up and serves the app.
-
 `web()` options:
 
 | Option | Meaning |
@@ -337,6 +333,64 @@ For an app started elsewhere, point `app.url` at it, literally or via
 `process.env.APP_URL ?? 'http://localhost:3000'`; the runner reads no
 `APP_URL` and loads no `.env`, so put `process.loadEnvFile('.env')` atop
 `e2e.config.ts` (workers re-import it).
+
+### Start the app's dependencies as services
+
+Define any dependency your app needs (like an email API, an OAuth provider,
+or a database) as a service, and pass its address to the app in
+`command.env`:
+
+```ts
+import { createEmulator } from 'emulate';
+import { defineConfig, defineService } from 'e2e';
+import { web } from '@e2e-dev/web';
+
+const resend = defineService({
+  async *start() {
+    const emulator = await createEmulator({ service: 'resend', port: 4008 });
+    yield { url: emulator.url };
+    await emulator.close();
+  },
+});
+
+export default defineConfig({
+  services: { resend },
+  targets: [
+    {
+      engine: web(),
+      app: {
+        url: 'http://127.0.0.1:0',
+        command: {
+          executable: 'node',
+          args: ['app/server.mjs'],
+          env: { PORT: '{port}', RESEND_BASE_URL: 'http://localhost:4008' },
+        },
+      },
+    },
+  ],
+});
+```
+
+- Start the dependency, `yield` a plain object as the service value, and stop
+  it when the run ends.
+- Keep yielded data and functions in plain objects and arrays. Yielding a
+  custom class instance fails with `INVALID_SERVICE_VALUE`.
+- Pass `signal` from `start({ signal })` to everything you start and stop in
+  the service. It aborts if startup is cancelled or takes over 60 s, or if
+  shutdown takes over 10 s. A second Ctrl+C while services are stopping aborts
+  it too.
+- During `e2e run` and `e2e explore`, services start in key order before app
+  commands and stop in reverse order afterward.
+- Run tests on configs with services using `e2e run`. `e2e mcp` and `openHost`
+  don't start services and fail with `INVALID_CONFIG` if the config defines
+  any.
+
+Tests read service values through the `services` fixture. Every yielded
+function becomes async and runs in the runner process, so call it with
+`await services.email.sent()`. Each worker gets a copy of the data, and all
+workers share the same service instance. Filter for data your test created,
+like emails sent to a unique address your test signed up with. See
+https://e2e.com/docs/services.
 
 ## Environment variables the runner reads
 

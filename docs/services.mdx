@@ -1,0 +1,276 @@
+---
+title: Services
+description: Start dependencies like an email API before your app runs and use them in tests.
+---
+
+A service is a dependency your app needs, like an email API, an OAuth
+provider, or a database. When you run `e2e run` or `e2e explore`, each
+service starts before the app commands and stops at the end of the run.
+
+## Define a service
+
+Call `defineService` with an object whose `start` property is an async
+generator. The generator starts the dependency before `yield`, and tests
+receive the yielded object as the service's value. When the run ends,
+everything after `yield` stops the dependency:
+
+```ts title="services/email.ts" expandable
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import { text } from 'node:stream/consumers';
+import { defineService } from 'e2e';
+
+type Email = {
+  to: string;
+  subject: string;
+};
+
+export const email = defineService({
+  async *start({ signal }) {
+    const emails: Email[] = [];
+
+    const server = createServer(async (request, response) => {
+      emails.push(JSON.parse(await text(request)));
+      response.end();
+    });
+
+    server.listen({ port: 4010, host: '127.0.0.1', signal });
+
+    await once(server, 'listening', { signal });
+
+    yield {
+      url: 'http://127.0.0.1:4010',
+      sent: () => emails,
+    };
+
+    server.close();
+
+    await once(server, 'close');
+  },
+});
+```
+
+Pass `signal` to anything you start and stop in the service. The signal
+aborts in these cases:
+
+- Startup is cancelled (for example, with Ctrl+C), or the service doesn't
+  yield within 60 seconds.
+- The code after `yield` doesn't finish within 10 seconds.
+- You press Ctrl+C a second time while services are stopping.
+
+## Pass the service to the app
+
+Add the service under `services` in your config and pass its address to the
+app in `env`:
+
+```ts title="e2e.config.ts"
+import { defineConfig } from 'e2e';
+import { web } from '@e2e-dev/web';
+import { email } from './services/email.ts';
+
+export default defineConfig({
+  projectId: 'dev.example.signup',
+  services: { email },
+  targets: [
+    {
+      name: 'web',
+      engine: web(),
+      app: {
+        url: 'http://127.0.0.1:0',
+        command: {
+          executable: 'node',
+          args: ['app/server.mjs'],
+          env: {
+            PORT: '{port}',
+            EMAIL_API_URL: 'http://127.0.0.1:4010',
+          },
+        },
+      },
+    },
+  ],
+});
+```
+
+Services start in key order before any app commands, and stop in reverse order
+after the app commands finish.
+
+Because the service listens on a fixed port, you can write its address
+directly in `env`.
+
+## Use the service in tests
+
+Pass your config's type to `test.extend` to type the `services` fixture:
+
+```ts title="tests/fixtures.ts"
+import { test as base } from 'e2e';
+import type config from '../e2e.config.ts';
+
+export const test = base.extend<{}, {}, typeof config>({});
+```
+
+You can use `services` in tests, hooks, and fixtures of either scope:
+
+```ts title="tests/signup.e2e.ts"
+import { randomUUID } from 'node:crypto';
+import { expect } from 'e2e';
+import { test } from './fixtures.ts';
+
+test('signing up sends one welcome email', async ({ app, screen, services }) => {
+  const address = `ada+${randomUUID()}@example.com`;
+
+  await app.open('/');
+  await screen.getByRole('textbox', { name: 'Email' }).fill(address);
+  await screen.getByRole('button', { name: 'Sign up' }).click();
+  await expect(screen.getByRole('heading', { name: 'Check your inbox' })).toBeVisible();
+
+  const sent = await services.email.sent();
+
+  expect(sent.filter((email) => email.to === address)).toEqual([{ to: address, subject: 'Welcome' }]);
+});
+```
+
+Each worker gets a copy of the yielded data. Any function you yield becomes
+an async function in tests, so `services.email.sent()` returns a promise.
+When a test calls it, the runner process runs the real function and sends
+back a copy of the result.
+
+All workers share the same service instance, so one test can see emails
+sent by other tests. To stay isolated, the example above signs up with a
+unique address and filters for emails sent to it.
+
+## What a service can yield
+
+A service must yield a plain object of any shape, and its data is copied with
+[`v8.serialize`](https://nodejs.org/api/v8.html#v8serializevalue). You can
+nest plain objects, arrays, maps, and sets at any depth. Strings, numbers,
+booleans, bigints, `null`, `undefined`, dates, and regular expressions keep
+their type. So do built-in errors like `TypeError`, `ArrayBuffer`, and typed
+arrays like `Buffer`. Any other value is rejected. For a custom class
+instance, put the data and functions your tests need into a plain object.
+
+You can place functions at any depth in plain objects and arrays, though not
+inside a map or a set. Yielded functions run with `this` set to `undefined`.
+If a method relies on `this`, wrap it in an arrow function, such as `sent: ()
+=> inbox.sent()`. When a test calls a service function, its arguments and
+return value can use any of those data types. They can't contain functions.
+
+## When a service fails
+
+| Code | When |
+| --- | --- |
+| [`SERVICE_START_FAILED`](/reference/errors#runner-codes) | `start` throws, finishes without yielding, isn't an async generator, or doesn't yield within 60 seconds. Any services that already started are stopped, and the run fails. |
+| [`INVALID_SERVICE_VALUE`](/reference/errors#runner-codes) | The yielded value isn't a plain object, or it contains a value that can't be copied. The error message names the service and the path to the value. |
+| [`SERVICE_STOP_FAILED`](/reference/errors#runner-codes) | The code after `yield` throws, yields a second time, or doesn't finish within 10 seconds. The run fails with a cleanup error. |
+
+## Run a local API emulator
+
+A service can run any package that emulates a third-party API. One option is
+[emulate](https://emulate.dev), which runs local emulators for APIs like
+GitHub, Resend, and Stripe. The example below uses its Resend emulator, so
+install emulate as a dev dependency:
+
+<CodeGroup>
+```bash npm
+npm install --save-dev emulate
+```
+
+```bash pnpm
+pnpm add -D emulate
+```
+
+```bash bun
+bun add -d emulate
+```
+</CodeGroup>
+
+Start an emulator with `createEmulator` and yield the values your tests need:
+
+```ts title="services/resend.ts"
+import { createEmulator } from 'emulate';
+import { defineService } from 'e2e';
+
+export const resend = defineService({
+  async *start() {
+    const emulator = await createEmulator({ service: 'resend', port: 4008 });
+
+    yield { url: emulator.url };
+
+    await emulator.close();
+  },
+});
+```
+
+<Accordion title="Config and test for the Resend emulator">
+
+```ts title="e2e.config.ts"
+import { defineConfig } from 'e2e';
+import { web } from '@e2e-dev/web';
+import { resend } from './services/resend.ts';
+
+export default defineConfig({
+  projectId: 'dev.example.signup',
+  services: { resend },
+  targets: [
+    {
+      name: 'web',
+      engine: web(),
+      app: {
+        url: 'http://127.0.0.1:0',
+        command: {
+          executable: 'node',
+          args: ['app/server.mjs'],
+          env: {
+            PORT: '{port}',
+            RESEND_API_KEY: 're_test',
+            RESEND_BASE_URL: 'http://localhost:4008',
+          },
+        },
+      },
+    },
+  ],
+});
+```
+
+```ts title="tests/fixtures.ts"
+import { test as base } from 'e2e';
+import type config from '../e2e.config.ts';
+
+export const test = base.extend<{}, {}, typeof config>({});
+```
+
+The test reads the sent emails from the emulator's Resend API:
+
+```ts title="tests/signup.e2e.ts"
+import { randomUUID } from 'node:crypto';
+import { expect } from 'e2e';
+import { test } from './fixtures.ts';
+
+test('signing up sends a welcome email through Resend', async ({ app, screen, services }) => {
+  const address = `ada+${randomUUID()}@example.com`;
+
+  await app.open('/');
+  await screen.getByRole('textbox', { name: 'Email' }).fill(address);
+  await screen.getByRole('button', { name: 'Sign up' }).click();
+  await expect(screen.getByRole('heading', { name: 'Check your inbox' })).toBeVisible();
+
+  const response = await fetch(`${services.resend.url}/emails`);
+  const { data } = await response.json();
+
+  expect(data.filter((email: { to: string[] }) => email.to.includes(address))).toEqual([
+    expect.objectContaining({ to: [address], subject: 'Welcome' }),
+  ]);
+});
+```
+
+</Accordion>
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Writing fixtures" icon="puzzle-piece" href="/fixtures">
+    Set up test data before each test and clean it up after.
+  </Card>
+  <Card title="Config reference" icon="code" href="/reference/config#services">
+    The `services` key and its rules.
+  </Card>
+</CardGroup>

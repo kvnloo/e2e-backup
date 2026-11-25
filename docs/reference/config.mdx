@@ -80,6 +80,7 @@ export function defineConfig<const Config extends E2EConfig>(
 | [`video`](#video) | `RecordingMode` | `'off'` |
 | [`agents`](#agents) | `Record<string, AgentConfig>` | `default`, no model |
 | [`filters`](#filters) | `TestFilter[]` | - |
+| [`services`](#services) | `Record<string, Service>` | - |
 | [`cache`](#cache) | `CacheMode \| CacheConfig` | `'read-write'`, `'read-only'` in CI |
 | [`credentials`](#credentials) | `Record<string, CredentialConfig>` | - |
 | [`secrets`](#secrets) | `Record<string, SecretConfig>` | - |
@@ -456,7 +457,7 @@ target. A target with `app` needs an [engine](#engine).
 The old spellings are unknown keys and fail at config load with
 `INVALID_CONFIG`: `web({ url })` and the other app options of `web()` and
 `mobile()`, `mobile({ app })` (now `app.bundleId`), an app key directly on the
-target, a top-level `app` or `url`, and [`services`](#services) anywhere.
+target, and a top-level `app` or `url`.
 </Note>
 
 #### `url`
@@ -779,15 +780,6 @@ app: {
   targets that declare the same command on a fixed port share one.
 - The default [`identity`](#identity) derives from the declared `:0`.
 - Tests read the allocated URL from [`app.baseUrl`](/reference/app).
-
-#### services
-
-<Note>
-This version starts no dependency processes (a database, an API mock, a dev
-server several targets share), and `services` is an unknown key wherever it
-appears. Start them before the run, or have `app.command` start a script that
-brings them up and serves the app. A services API returns in a later release.
-</Note>
 
 ### output
 
@@ -1305,6 +1297,57 @@ rules, is at most 256 characters, and is unique among `filters`.
 
 The declarations are under [`TestFilter`](#testfilter), exported from `e2e`.
 
+### services
+
+`services` holds dependencies of the app under test, such as an email API or a
+database, keyed by name. Each entry is defined with `defineService`:
+
+```ts title="e2e.config.ts"
+import { defineConfig, defineService } from 'e2e';
+import { web } from '@e2e-dev/web';
+
+const inbox = defineService({
+  async *start({ signal }) {
+    const server = await startInbox({ signal });
+
+    yield { url: server.url };
+
+    await server.close();
+  },
+});
+
+export default defineConfig({
+  services: { inbox },
+  targets: [{ engine: web(), app: { url: 'http://localhost:3000' } }],
+});
+```
+
+`start` is an async generator that yields one time. Code before `yield` starts
+the service, and the yielded object becomes its value. Code after `yield`
+stops the service when the run ends. `start` receives `{ signal }`, which
+aborts if starting or stopping takes too long. See
+[`ServiceStartContext`](#service) for details.
+
+`e2e run` and `e2e explore` start services in key order before any app
+commands. They stop services in reverse order after the app commands stop. If
+a service fails to start, any services already started are stopped. `e2e mcp`
+and `openHost` don't start services and fail with `INVALID_CONFIG` when the
+config defines services.
+
+All workers share one instance of each service. Tests read the values through
+the [`services` fixture](/reference/test#services). See [Services](/services)
+for a full example.
+
+| Throws | When |
+| --- | --- |
+| `INVALID_CONFIG` | At config load, `services` isn't a plain object, an entry isn't a plain object with a `start` function, or an entry has an unknown key. |
+| `INVALID_CONFIG` | `open_session` in `e2e mcp`, or `openHost`, is called with a config that defines services. |
+| `SERVICE_START_FAILED` | `start` throws, finishes without yielding, isn't an async generator, or doesn't yield within 60 seconds. |
+| `INVALID_SERVICE_VALUE` | The yielded value isn't a plain object, contains a value that can't be copied, like a custom class instance, or contains a function inside a map or a set. See [What a service can yield](/services#what-a-service-can-yield). |
+| `SERVICE_STOP_FAILED` | The code after `yield` throws, yields a second time, or doesn't finish within 10 seconds. |
+
+The declarations are under [`Service`](#service), exported from `e2e`.
+
 ### credentials
 
 Named accounts. Each entry is a username and a password the model never sees.
@@ -1754,6 +1797,8 @@ export interface E2EConfig {
   agents?: Readonly<Record<string, AgentConfig>>;
   /** Test filters, in order, run with `--changed-since`: each judges the tests the one before it kept. */
   filters?: readonly TestFilter[];
+  /** Dependencies of the app under test, keyed by name and defined with `defineService`, started before the app commands. */
+  services?: Readonly<Record<string, Service>>;
   /** Replay cache mode or options; default `read-write`, `read-only` in CI. */
   cache?: CacheMode | CacheConfig;
   /** Named accounts: a username and a password the model never sees. */
@@ -1812,6 +1857,44 @@ export interface CommandConfig {
   reuseExisting?: boolean;
 }
 ```
+
+### `Service`
+
+```ts
+/**
+ * A dependency of the app under test (like an email API, an OAuth provider,
+ * or a database) started before the app commands and stopped at the end of
+ * the run. One instance is shared across all workers.
+ */
+export type Service<Value extends object = object> = {
+  /**
+   * Starts the dependency and stops it when the run ends. This async generator
+   * yields the service value once, and tests receive it.
+   */
+  start(context: ServiceStartContext): AsyncGenerator<Value, void, undefined>;
+};
+
+/** Context passed to a service's `start` function. */
+export type ServiceStartContext = {
+  /**
+   * Aborts in these cases:
+   *
+   * - Startup is cancelled, or the service doesn't yield within 60 seconds.
+   * - The code after `yield` doesn't finish within 10 seconds.
+   * - A second Ctrl+C arrives while services are stopping.
+   */
+  readonly signal: AbortSignal;
+};
+
+/**
+ * Returns `service` unchanged, preserving the inferred type that `start` yields
+ * for tests.
+ */
+export function defineService<Value extends object>(service: Service<Value>): Service<Value>;
+```
+
+Each function on a yielded value becomes an async function in tests
+(`ServiceValue<Value>`), and every other value is copied.
 
 ### `ArtifactsConfig`
 

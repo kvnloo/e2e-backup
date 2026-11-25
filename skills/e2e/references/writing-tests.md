@@ -174,7 +174,7 @@ Hooks nest: outer `beforeEach` first, inner `afterEach` first. `beforeAll`
 reruns per retry and per serial group (each a fresh module realm) on the
 test timeout; `afterAll` runs on `config.cleanupTimeout`. A failing
 `beforeAll` is a `HOOK_FAILED` run error skipping every test in its scope.
-`beforeAll` and `afterAll` get worker fixtures only: `platform`, worker
+`beforeAll` and `afterAll` get worker fixtures only: `platform`, `services`, worker
 fixtures from `test.extend`, and on mobile `device`, `app`, and `screen`
 (a device keeps its state between tests). On web, `browser`, `app`, and
 `screen` are test fixtures, so UI setup goes in `beforeEach`. Naming a test
@@ -214,6 +214,8 @@ To type fixtures across targets:
 
 Check `platform` or the fixture value to narrow the fixture type. With
 `platforms` on a test, it's narrowed too. On a `describe`, it isn't.
+
+Passing `typeof config` also types the `services` fixture (topic `setup`).
 
 An `afterEach` that names a fixture whose setup failed is skipped. A fixture
 named like one the `test` already has, built-in ones included, extends it

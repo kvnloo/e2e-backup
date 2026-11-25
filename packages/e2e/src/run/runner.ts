@@ -61,6 +61,7 @@ import { nextRerunDir, pruneArtifacts } from '@e2e-dev/core/lib/run/artifacts';
 import { carryForward, fileDurationKey, lastFailedIds, readLastRun, readWithReruns, reportArtifactPaths, retainCollectedHistory, type RerunCollection } from './last-run.ts';
 import { loadTimings, writeTimings } from './timings.ts';
 import { childProcessSpawner } from './worker/handle.ts';
+import { NO_SERVICES, startServices, type RunServices } from './services.ts';
 import { setSecretRegistry } from '@e2e-dev/core/lib/secrets';
 import type { RecordingMode } from '@e2e-dev/core/lib/types';
 import type { BuiltinReporter, E2EConfig, Reporter } from '../run-types.ts';
@@ -269,6 +270,10 @@ export interface RunOptions {
   reporterTimeout?: number | undefined;
   /** Budget for each test filter's call, in ms; 5 minutes unless set. Only the test harness sets it; there is no flag. */
   filterTimeout?: number | undefined;
+  /** Timeout in milliseconds for a service to yield. Defaults to 60 seconds. Internal option for the test harness, with no CLI flag. */
+  serviceStartTimeout?: number | undefined;
+  /** Timeout in milliseconds for a service's code after `yield` to finish. Defaults to 10 seconds. Internal option for the test harness, with no CLI flag. */
+  serviceStopTimeout?: number | undefined;
   /**
    * The process's stdout and stderr, when the caller claimed them (the CLI):
    * what user code in this process prints is held while the config loads
@@ -494,8 +499,10 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
   const results: ResultRecord[] = [];
   const serialGroups: SerialGroupRecord[] = [];
   const targetProvenance = new Map<string, TargetProvenance>();
-  /** The services and app commands the targets' engines declared, once started. */
+  /** The app commands the targets declare, once started. */
   let processes: AppProcesses | undefined;
+  /** The config's services, once started. */
+  let services: RunServices = NO_SERVICES;
   let sessionStore: SessionStore | undefined;
   /** The engines' prepare/finish pairing: every prepared target is finished at teardown. */
   const engines = new PreparedEngines();
@@ -1141,6 +1148,31 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
           ...(reused ? { outcome: 'reused' as const } : {}),
         }),
     };
+
+    // Start configured services before app commands so they're ready when the
+    // app boots. Each service runs as a setup step.
+    const serviceStep = (name: string) => ({ kind: 'service' as const, label: `service "${name}"` });
+
+    if (hasWork) {
+      services = await debug.time('services.start', () =>
+        startServices(
+          config.services,
+          interrupted,
+          forceController.signal,
+          {
+            starting: (name) => emit({ type: 'setup', step: serviceStep(name), state: 'started' }),
+            ready: (name, durationMs) => emit({ type: 'setup', step: serviceStep(name), state: 'finished', durationMs }),
+            stopFailed: (cause) => recordFailure(cause, 'cleanup'),
+          },
+          { startMs: options.serviceStartTimeout, stopMs: options.serviceStopTimeout },
+        ),
+      );
+    }
+
+    if (interrupted.aborted) {
+      return;
+    }
+
     processes = hasWork ? await startDeclaredProcesses(targets, config.projectRoot, processHooks, interrupted, debug) : undefined;
     // A run cancelled while the app was starting runs no test: the interrupt
     // alone decides the outcome.
@@ -1201,6 +1233,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
             headed: options.headed ?? false,
             debug,
             holdSteps,
+            services,
             envFor: workerEnvFor(plans, env),
           })
         : childProcessSpawner({
@@ -1218,6 +1251,8 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
             debug: debug.enabled,
             aiTrace: aiTrace !== undefined,
             holdSteps,
+            services: services.wire,
+            callService: services.call,
             envFor: workerEnvFor(plans, env),
           });
 
@@ -1306,12 +1341,13 @@ export async function run(options: RunOptions = {}): Promise<RunOutcome> {
     // Engines finish first: every worker is gone, and what `prepare` leased
     // (a cloud device billed by the minute) should not wait on the app's
     // shutdown. Services go down after the apps that depended on them; a
-    // failing service teardown command is a cleanup error of the run, not a
+    // service that fails to stop is a cleanup error of the run, not a
     // crash.
     for (const teardown of [
       () => engines.finish({ runId, env, timeoutMs: config.cleanupTimeout, notice, onFailure: (cause) => recordFailure(cause, 'cleanup') }),
       () => sessionStore?.cleanup(),
       () => processes?.stop((cause) => recordFailure(cause, 'cleanup')),
+      () => services.stop((cause) => recordFailure(cause, 'cleanup')),
     ]) {
       try {
         await teardown();

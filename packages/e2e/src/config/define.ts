@@ -1,5 +1,9 @@
-/** The helper a config file calls: `defineConfig`, which keeps the config's inferred type. */
+/**
+ * Config file helpers: `defineConfig` preserves the config's inferred type,
+ * and `defineService` defines a single service.
+ */
 
+import type { Service } from '@e2e-dev/core/lib/types';
 import type { E2EConfig } from '../run-types.ts';
 
 /**
@@ -11,4 +15,12 @@ export function defineConfig<const Config extends E2EConfig>(
   config: Config & { readonly [Key in Exclude<keyof Config, keyof E2EConfig>]: never },
 ): Config {
   return config;
+}
+
+/**
+ * Returns `service` unchanged, preserving the inferred type that `start` yields
+ * for tests.
+ */
+export function defineService<Value extends object>(service: Service<Value>): Service<Value> {
+  return service;
 }

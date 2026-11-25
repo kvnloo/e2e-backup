@@ -68,9 +68,8 @@ variables, `inheritEnv`, and `env`.
 See the [command reference](/reference/config#command) for all options.
 
 <Note>
-The runner starts only `app.command`. Start databases, mocks, and other
-services before the run, or make `app.command` a script that starts them
-and serves the app. A services API returns in a later release.
+To start a database, an API mock, or another dependency before the app, add
+it as a [service](/services).
 </Note>
 
 ### Let the runner pick the port

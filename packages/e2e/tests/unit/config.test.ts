@@ -1543,3 +1543,39 @@ describe('discoverConfig', () => {
     });
   });
 });
+
+describe('services', () => {
+  it.each([
+    { services: [], message: 'services must be a plain object keyed by name, like services: { email: defineService({ ... }) }' },
+    { services: 'email', message: 'services must be a plain object keyed by name, like services: { email: defineService({ ... }) }' },
+    { services: { email: {} }, message: 'services.email must be a service from defineService({ async *start() { ... } })' },
+    { services: { email: { start: 'http://email.test' } }, message: 'services.email must be a service from defineService({ async *start() { ... } })' },
+    { services: { email: null }, message: 'services.email must be a service from defineService({ async *start() { ... } })' },
+    {
+      services: {
+        email: {
+          async *start() {
+            yield {};
+          },
+          stop: () => undefined,
+        },
+      },
+      message: 'services.email has unknown key "stop"',
+    },
+  ])('refuses $message', ({ services, message }) => {
+    expect(() => resolve(invalid({ services }))).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG', message: expect.stringContaining(message) }));
+  });
+
+  it('keeps the services in key order', () => {
+    const service = {
+      async *start() {
+        yield {};
+      },
+    };
+
+    expect(resolve({ services: { beta: service, alpha: service } }).services).toEqual([
+      ['beta', service],
+      ['alpha', service],
+    ]);
+  });
+});
