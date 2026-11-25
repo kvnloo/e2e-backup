@@ -115,6 +115,9 @@ test.describe('sign-in window', () => {
     await expect(electron.locator('#sign-in > label')).toHaveCount(4);
     // A web component's content is in an open shadow root.
     await expect(electron.locator('.badge')).toHaveText('Beta');
+    // A hidden element is still there for a selector to count.
+    await expect(electron.locator('#spinner')).toHaveCount(1);
+    await expect(electron.locator('#spinner')).toBeHidden();
     // Reads at the same time keep their own handles.
     expect(await Promise.all([electron.locator('#increment').count(), electron.locator('#items li').count()])).toEqual([1, 40]);
   });

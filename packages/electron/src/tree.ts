@@ -302,6 +302,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
   const maxNodes = options.maxNodes ?? (mode === 'tree' ? DEFAULT_MAX_NODES : Number.POSITIVE_INFINITY);
   let kept = 0;
   let truncated = false;
+  const drafted = new Map<number, Draft>();
 
   const rectOf = (facts: DomFacts | undefined): Draft['rect'] => {
     const box = facts?.bounds;
@@ -329,7 +330,9 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       }
       kept += 1;
       const rect = rectOf(facts);
-      return [{ id: options.idOf(backend), text: bound(text, OBSERVED_TEXT_LIMIT, mode), states: rect === undefined || rect.width === 0 || rect.height === 0 ? { hidden: true } : {}, ...(rect === undefined ? {} : { rect }), children: [], isText: true }];
+      const run: Draft = { id: options.idOf(backend), text: bound(text, OBSERVED_TEXT_LIMIT, mode), states: rect === undefined || rect.width === 0 || rect.height === 0 ? { hidden: true } : {}, ...(rect === undefined ? {} : { rect }), children: [], isText: true };
+      drafted.set(backend, run);
+      return [run];
     }
     const testId = facts?.attributes[testIdAttribute.toLowerCase()];
     const name = collapse(stringOf(node.name) ?? '');
@@ -347,6 +350,7 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     }
     kept += 1;
     const draft: Draft = { id: options.idOf(backend), role: silent ? 'generic' : role, states: {}, children: [], isText: false };
+    drafted.set(backend, draft);
     if (name !== '') draft.name = bound(name, OBSERVED_NAME_LIMIT, mode);
     if (testId !== undefined) draft.testId = testId;
     const attributes = facts?.attributes ?? {};
@@ -424,6 +428,26 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     const child = byId.get(id);
     return child === undefined ? [] : build(child);
   });
+  // An element a locator's selector matched that the tree leaves out (`hidden`, `display: none`) is still there to
+  // count: it joins the tree as a hidden node under its nearest ancestor that did.
+  for (const backend of options.keep ?? []) {
+    if (drafted.has(backend)) continue;
+    const facts = dom.get(backend);
+    if (facts === undefined) continue;
+    const testId = facts.attributes[testIdAttribute.toLowerCase()];
+    const absent: Draft = {
+      id: options.idOf(backend),
+      role: 'generic',
+      states: { hidden: true },
+      children: [],
+      isText: false,
+      ...(testId === undefined ? {} : { testId }),
+      ...(Object.keys(facts.attributes).length === 0 ? {} : { attributes: { ...facts.attributes } }),
+    };
+    const parent = ancestorOf(backend, drafted, document);
+    (parent === undefined ? children : parent.children).push(absent);
+    drafted.set(backend, absent);
+  }
   const rootName = options.title ?? stringOf(rootNode?.name);
   const root: SemanticNode = {
     ref: { id: options.rootId, revision: '' },
@@ -475,6 +499,17 @@ export function unmaskableCount(document: SnapshotDocument, strings: readonly st
     }
   });
   return count;
+}
+
+/** The nearest DOM ancestor of a node that has a draft, or undefined when none does (the node sits under the root). */
+function ancestorOf(backend: number, drafted: ReadonlyMap<number, Draft>, document: SnapshotDocument): Draft | undefined {
+  const ids = document.nodes.backendNodeId ?? [];
+  const parents = document.nodes.parentIndex ?? [];
+  for (let at = parents[ids.indexOf(backend)] ?? -1; at >= 0; at = parents[at] ?? -1) {
+    const draft = drafted.get(ids[at]!);
+    if (draft !== undefined && !draft.isText) return draft;
+  }
+  return undefined;
 }
 
 /** A draft as a contract node, empty fields left out. */
