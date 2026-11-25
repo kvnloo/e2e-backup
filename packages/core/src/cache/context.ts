@@ -254,11 +254,12 @@ export async function settleStagedTraces(context: AgentCacheContext, settlement:
         await completeProvenance(context.store, entry.keyHash, entry.recordedFor);
         continue;
       }
-      const trace = entry.redact === undefined ? entry.trace : redactLocations(entry.trace, entry.redact);
-      if (await holdsSameFlow(context.store, entry.keyHash, trace)) {
+      if (await holdsSameFlow(context.store, entry.keyHash, entry.trace)) {
         outcomes.set(entry.stepIndex, 'kept');
         continue;
       }
+      // Masked right before the write, so a value learned while the store read ran is masked too; the flow ignores locations.
+      const trace = entry.redact === undefined ? entry.trace : redactLocations(entry.trace, entry.redact);
       const written = await context.store.write(entry.keyHash, trace);
       outcomes.set(entry.stepIndex, written === undefined ? 'not-written' : 'saved');
     } catch {
