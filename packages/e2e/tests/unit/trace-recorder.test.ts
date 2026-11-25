@@ -251,6 +251,19 @@ describe('TraceRecorder', () => {
     expect(read?.payload.actions[0]).toMatchObject({ name: 'scroll', direction: 'down', times: 5 });
   });
 
+  it('folds repeated scrolls on one route, and keeps a scroll seen on another route its own', () => {
+    const recorder = makeRecorder();
+    recorder.record({ name: 'scroll', direction: 'down' }, '/feed?page=1');
+    recorder.record({ name: 'scroll', direction: 'down' }, '/feed?page=2');
+    recorder.record({ name: 'scroll', direction: 'down' });
+    recorder.record({ name: 'scroll', direction: 'down' }, '/articles/next-story');
+    const trace = recorder.finalize(conclusion);
+    expect(trace?.actions.map((action) => [action.name === 'scroll' ? action.times : undefined, action.at])).toEqual([
+      [3, '/feed?page=1'],
+      [undefined, '/articles/next-story'],
+    ]);
+  });
+
   it('marks a gap that ends replay for a mutating project tool', () => {
     const recorder = makeRecorder();
     recorder.record({ name: 'tap', node: upgradeButton });
