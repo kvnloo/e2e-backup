@@ -93,6 +93,8 @@ test('signs in and opens settings', async ({ app, screen, electron }) => {
 
 Roles and names are the ones Chromium computes, so `getByRole`, `getByLabel`,
 `getByText`, `getByPlaceholder`, and `getByTestId` work as on the web.
+`getByLabel` matches a field's accessible name: a field whose `aria-label`
+overrides its `<label>` is found by the `aria-label` only.
 `getByTestId` reads `data-testid`; set another attribute with
 `electron({ testIdAttribute })`.
 
@@ -109,7 +111,7 @@ The `electron` fixture has these methods:
 
 | Area | On an Electron target |
 | --- | --- |
-| Windows | `screen` reads one window: the one `useWindow()` picked, else the first. A window the app opens does not take over. The agent sees the windows as tabs and switches between them |
+| Windows | `screen` reads one window: the one `useWindow()` picked, else the first. When that window closes, it reads the newest still open. A window the app opens does not take over. The agent sees the windows as tabs and switches between them |
 | Headed | Electron has no headless mode. Windows show unless the app hides them, and `--headed` changes nothing. On Linux CI, run under a virtual display such as `xvfb-run` |
 | Reading | Content under `aria-hidden` or `inert` is not read. Nested documents (`iframe`, `webview`) are not read, and the agent is told its screen is incomplete |
 | Selectors | `electron.locator()` matches in the window's document and in each open shadow root, one root at a time: a selector does not cross a shadow boundary. It never enters a frame |
