@@ -1,7 +1,7 @@
 /** Routes: a location reduced to the screen it names, across the URL shapes apps use. */
 
 import { describe, expect, it } from 'vitest';
-import { appLocation, appNavigation, routeLocation, sameRoute } from '@e2e-dev/core/lib/cache/route';
+import { appLocation, appNavigation, routeLocation, sameRoute, spelledAsRoute } from '@e2e-dev/core/lib/cache/route';
 
 /** Whether every location names the same screen as the first. */
 const alike = (first: string, ...others: string[]) => others.every((other) => sameRoute(first, other));
@@ -96,6 +96,14 @@ describe('routeLocation', () => {
     expect(routeLocation('/#/companies/1?view=list')).toBe('/companies/:id?view=list');
     expect(routeLocation('https://idp.test/authorize?client_id=app&nonce=n0nce4c0ffee99')).toBe('https://idp.test/authorize?client_id=app&nonce=:id');
     expect(routeLocation('/files/a%2Fb/caf%C3%A9')).toBe('/files/a%2Fb/caf%C3%A9');
+  });
+
+  it('tells a location spelled as a route from one the app showed', () => {
+    expect(spelledAsRoute(routeLocation('/orders/123/edit'))).toBe(true);
+    expect(spelledAsRoute(routeLocation('/callback?code=482913'))).toBe(true);
+    expect(spelledAsRoute('/orders/123/edit')).toBe(false);
+    expect(spelledAsRoute(routeLocation('/settings?tab=notes'))).toBe(false);
+    expect(spelledAsRoute('com.example / :id')).toBe(false);
   });
 
   it('keeps a location that is not a web address as it is', () => {
