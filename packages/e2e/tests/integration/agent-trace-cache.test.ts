@@ -696,7 +696,7 @@ describe('trace cache: a bare-point tap replays like a coordinate-driven tool', 
     expect(first.exitCode).toBe(0);
     const { entry } = readOnlyEntry(project);
     expect(entry.payload.actions).toEqual([
-      { name: 'tapAt', summary: 'tap the point (300, 60)', point: { x: 300, y: 60 }, viewport: { width: 1280, height: 720 } },
+      { name: 'tapAt', summary: 'tap the point (300, 60)', point: { x: 300, y: 60 }, viewport: { width: 1280, height: 720 }, at: '/canvas' },
     ]);
     expect(entry.payload.endAnchors).toContainEqual({ role: 'status', name: 'Hit', text: 'red' });
 
@@ -1039,7 +1039,8 @@ describe('trace cache: a navigate on the app replays where the app runs now', ()
     expect(first.exitCode).toBe(0);
     expect(recording.calls).toBe(1);
     const { entry } = readOnlyEntry(project);
-    expect(entry.payload.actions).toEqual([{ name: 'navigate', summary: 'navigate to "/about"', url: '/about' }]);
+    // The executor looked at the home page before it navigated, so the action records that it ran there.
+    expect(entry.payload.actions).toEqual([{ name: 'navigate', summary: 'navigate to "/about"', url: '/about', at: '/' }]);
     expect(entry.payload).toMatchObject({ startPath: '/', endPath: '/about' });
 
     await recordedOn!.close();

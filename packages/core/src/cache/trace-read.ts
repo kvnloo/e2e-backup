@@ -180,7 +180,19 @@ function readModifiers(document: unknown): readonly KeyModifier[] | undefined {
   return modifiers;
 }
 
+/**
+ * One stored action, with the location it ran at when the entry has a
+ * readable one. The location is provenance, never replay input: a malformed
+ * one is dropped, and the action still replays.
+ */
 function readRecordedAction(document: unknown): RecordedAction | undefined {
+  const action = readActionBody(document);
+  if (action === undefined) return undefined;
+  const at = readInputText((document as Record<string, unknown>)['at']);
+  return at === undefined ? action : { ...action, at };
+}
+
+function readActionBody(document: unknown): RecordedAction | undefined {
   if (typeof document !== 'object' || document === null || Array.isArray(document)) {
     return undefined;
   }

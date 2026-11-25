@@ -238,6 +238,18 @@ describe('templateTrace and expandTrace', () => {
     expect(templateText('/tags/vip?q=vip', [{ pointer: '/tag', value: 'vip' }])).toBe('/tags/{{param:/tag}}?q={{param:/tag}}');
   });
 
+  it('templates the location each action ran at, and leaves an action without one as it was', () => {
+    const base = trace('Acme & Co');
+    const located: ActionTrace = {
+      ...base,
+      actions: base.actions.map((action, index) => (index === 3 ? { ...action, at: '/companies/Acme%20%26%20Co' } : action)),
+    };
+    const recorded = templateTrace(located, name('Acme & Co'))!;
+    expect(recorded.actions[3]?.at).toBe('/companies/{{param:/name|uri}}');
+    expect(recorded.actions[0]).not.toHaveProperty('at');
+    expect(expandTrace(recorded, name('Globex Inc'))?.actions[3]?.at).toBe('/companies/Globex%20Inc');
+  });
+
   it('spells a value as the slug an app derives for a record path, and fills it back the same way', () => {
     const templates = [{ pointer: '/name', value: 'E2E abc Company' }];
     expect(templateText('/companies/e2e-abc-company?q=E2E%20abc%20Company', templates)).toBe('/companies/{{param:/name|slug}}?q={{param:/name|uri}}');

@@ -171,6 +171,8 @@ export class ActionDispatcher {
    * of is still judged whole. A mutating project tool ends the run.
    */
   private typedRun: TypedValue[] = [];
+  /** The look the previous recorded action ran on; an action on the same look records no location. */
+  private tracedOn: AgentObservation | undefined;
 
   /** The newest look when the last action ran: a later action addressed from it acts on a screen that action may have changed (`placementOf`). */
   private actedFrom: AgentObservation | undefined;
@@ -802,6 +804,13 @@ export class ActionDispatcher {
   private recordTrace(action: RecordableAction): void {
     const trace = this.options.trace();
     if (trace === undefined) return;
+    // Where the action ran: the newest look's location, kept only when the
+    // step looked again since its previous action. Two actions on one look
+    // may stand on different screens (a link tapped, then back), and a
+    // location the step never saw would invent a route the flow did not take.
+    const observed = this.feed.latest;
+    const at = observed !== undefined && observed !== this.tracedOn ? observed.path : undefined;
+    this.tracedOn = observed;
     // A typed value the step read off the screen (its tree, or a screenshot
     // it was shown) or reckoned from the date is this run's data, not the
     // flow's: it is recorded as a gap so replay hands over before it rather
@@ -818,13 +827,13 @@ export class ActionDispatcher {
           : this.feed.oneTimeCodeShown ? { inputPurpose: 'one-time-code' as const } : {}),
       });
       const index = trace.recordedCount;
-      if (derived === undefined) trace.record(action);
+      if (derived === undefined) trace.record(action, at);
       else trace.recordDerivedGap(derived);
       this.joinTyped(trace, index, action.value);
       return;
     }
     if (!keepsTypedRun(action)) this.typedRun = [];
-    trace.record(action);
+    trace.record(action, at);
   }
 
   /**
