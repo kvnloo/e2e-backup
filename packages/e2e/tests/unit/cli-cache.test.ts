@@ -187,9 +187,19 @@ describe('e2e cache show', () => {
 
   it('takes the path of the entry file too', async () => {
     await seed([{ keyHash: 'c'.repeat(64), trace: detouredTrace() }]);
-    await invoke('cache', 'show', path.join(CACHE_DIR, `${'c'.repeat(64)}.json`));
+    await invoke('cache', 'show', path.join(root, CACHE_DIR, `${'c'.repeat(64)}.json`));
     expect(process.exitCode).toBe(0);
     expect(written(stdoutSpy)).toContain('tests/settings.e2e.ts::opens privacy');
+  });
+
+  it('reads a path from its own directory, not from the configured store', async () => {
+    await seed([{ keyHash: 'c'.repeat(64), trace: detouredTrace() }]);
+    const copy = new FileCacheStore({ directory: path.join(root, 'copied'), maxBytes: MAX_CACHE_WIRE_BYTES, writable: true });
+    await copy.write('c'.repeat(64), { ...detouredTrace(), summary: 'the copied recording' });
+    await invoke('cache', 'show', path.join(root, 'copied', `${'c'.repeat(64)}.json`));
+    expect(process.exitCode).toBe(0);
+    expect(written(stdoutSpy)).toContain('summary    the copied recording');
+    expect(written(stdoutSpy)).toContain(`entry      ${path.join(root, 'copied', `${'c'.repeat(64)}.json`)}`);
   });
 
   it('strips terminal controls the recorded text carries', async () => {
