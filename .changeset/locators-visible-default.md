@@ -3,4 +3,4 @@
 'e2e': patch
 ---
 
-Add the `locators` config option, at the top level or on a target, to set the default `visible` option of text, label, placeholder, display value, and test ID queries.
+With `locators: { visible: true }` in the config or on a target, hidden nodes are skipped by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and `getByTestId` without `{ visible: true }` on each query. A `visible` passed to a query takes precedence, and `getByRole` doesn't use the default.

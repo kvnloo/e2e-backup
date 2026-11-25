@@ -253,9 +253,9 @@ screen.getByTestId(/total-budgeted$/);
 Every query accepts `visible: true`, which drops nodes the platform reports
 as hidden before the exactly-one rule runs. Frameworks often keep a hidden
 copy of content in the document, such as a closed drawer or an inactive tab
-panel. With the default config, a text or test ID query matches both copies.
-Set `visible: true` on the query or in
-[`locators`](/reference/config#locators) to skip the hidden copy.
+panel. By default, every query except `getByRole` matches both copies. Set
+`visible: true` on the query or in [`locators`](/reference/config#locators)
+to skip the hidden copy.
 
 ```ts
 await browser.reload();
@@ -265,9 +265,11 @@ await screen.getByPlaceholder('Search memory...', { visible: true }).fill('launc
 await screen.getByTestId('memory-list', { visible: true }).getByRole('listitem').first().tap();
 ```
 
-`getByRole` skips nodes hidden from the accessibility tree and doesn't use
-the `locators` default. Pass `{ visible: true }` to a role query that must
-also skip a node that doesn't render.
+`getByRole` doesn't use the `locators` default, since a role query already
+skips nodes hidden from the accessibility tree. On the web,
+`{ visible: true }` on a role query also skips a node that is in that tree
+and has a box with no size. On a device, it changes nothing for a role
+query.
 
 `visible` uses the same visibility check as `toBeVisible()`, `isVisible()`,
 and `waitFor()`: what renders, as Playwright reads it.
@@ -1411,7 +1413,9 @@ export interface TextMatchOptions {
    * exactly-one rule is applied, so a visible node with a hidden twin (a
    * prerendered copy kept after navigation, a closed drawer) still resolves.
    * When false, every match is kept, hidden ones included. When omitted,
-   * the target's `locators.visible` is used, except by `getByRole`.
+   * the target's `locators.visible` is used. For `getByRole`, omitted is the
+   * same as false, and a role query skips nodes hidden from the
+   * accessibility tree either way.
    */
   visible?: boolean;
 }

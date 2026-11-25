@@ -1377,8 +1377,10 @@ describe('resolveConfig', () => {
       expect(visibleOf({ targets, locators: { visible: true } })).toEqual([true, false, true]);
     });
 
-    it('keeps the digest without the key, and changes it when a target sets visible: true', () => {
+    it('keeps the digest for visible: false, and changes it for visible: true', () => {
       const plain = resolve({}).configDigest;
+      expect(resolve({ locators: {} }).configDigest).toBe(plain);
+      expect(resolve({ locators: { visible: false } }).configDigest).toBe(plain);
       expect(resolve({ targets: [{ ...WEB, locators: { visible: false } }] }).configDigest).toBe(plain);
       expect(resolve({ targets: [{ ...WEB, locators: { visible: true } }] }).configDigest).not.toBe(plain);
     });

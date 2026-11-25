@@ -705,11 +705,7 @@ function locatorsVisible(value: unknown, where: string): boolean | undefined {
     throw new ConfigurationError('INVALID_CONFIG', `${where} must be a plain object, got ${describeValue(value)}`);
   }
   rejectUnknownKeys(where, value, ['visible']);
-  const { visible } = value;
-  if (visible !== undefined && typeof visible !== 'boolean') {
-    throw new ConfigurationError('INVALID_CONFIG', `${where}.visible must be a boolean, got ${describeValue(visible)}`);
-  }
-  return visible;
+  return optionalBoolean(value.visible, `${where}.visible`);
 }
 
 function isArtifactStore(value: unknown): value is ArtifactStore {
@@ -1037,6 +1033,7 @@ function computeConfigDigest(
   // a reporter.
   // `targets` digest by declaration below and never enter the clone: an
   // engine holds `secrets.get()` handles, which refuse to serialize.
+  // `locators` digests per target as resolved: see `digestTargets`.
   const {
     failOnSkippedFailure: _failOnSkippedFailure,
     maxDuration: _maxDuration,
@@ -1046,6 +1043,7 @@ function computeConfigDigest(
     output: _output,
     trace: _trace,
     video: _video,
+    locators: _locators,
     targets: _targets,
     credentials: _credentials,
     secrets: _secrets,

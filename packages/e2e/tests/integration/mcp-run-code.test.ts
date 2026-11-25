@@ -42,6 +42,19 @@ export default {
 } satisfies E2EConfig;
 `;
 
+/** Connects `client` to the built CLI's `e2e mcp`, served from `project` against `app`. */
+async function connect(client: Client, project: FixtureProject, app: FixtureApp): Promise<void> {
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [CLI, 'mcp'],
+      cwd: project.dir,
+      env: { ...(process.env as Record<string, string>), APP_URL: app.url, CI: '' },
+      stderr: 'ignore',
+    }),
+  );
+}
+
 interface ToolText {
   readonly text: string;
   readonly isError: boolean;
@@ -78,15 +91,7 @@ describe('e2e mcp run_code', { timeout: 120_000 }, () => {
     app = await startFixtureApp();
     project = createProject({ 'e2e.config.ts': CONFIG });
     client = new Client({ name: 'e2e-mcp-run-code-test', version: '0.0.0' });
-    await client.connect(
-      new StdioClientTransport({
-        command: process.execPath,
-        args: [CLI, 'mcp'],
-        cwd: project.dir,
-        env: { ...(process.env as Record<string, string>), APP_URL: app.url, CI: '' },
-        stderr: 'ignore',
-      }),
-    );
+    await connect(client, project, app);
     const opened = await invoke('open_session');
     expect(opened.isError, opened.text).toBe(false);
     sessionId = /Session (\S+) open/.exec(opened.text)?.[1];
@@ -500,20 +505,12 @@ return await screen.getByDisplayValue(/^sk-l/).count();`);
 });
 
 describe('e2e mcp run_code with locators.visible', { timeout: 120_000 }, () => {
-  it("skips hidden nodes in a text query by the target's locators.visible, unless the query sets visible", async () => {
+  it("skips hidden nodes when the target's locators.visible is true, unless the query passes visible: false", async () => {
     const app = await startFixtureApp();
     const project = createProject({ 'e2e.config.ts': VISIBLE_CONFIG });
     const client = new Client({ name: 'e2e-mcp-run-code-visible-test', version: '0.0.0' });
     try {
-      await client.connect(
-        new StdioClientTransport({
-          command: process.execPath,
-          args: [CLI, 'mcp'],
-          cwd: project.dir,
-          env: { ...(process.env as Record<string, string>), APP_URL: app.url, CI: '' },
-          stderr: 'ignore',
-        }),
-      );
+      await connect(client, project, app);
       await client.callTool({ name: 'open_session', arguments: {} }, { timeout: 110_000 });
       const code = "await app.open('/');\nreturn [await screen.getByText('Hidden content').count(), await screen.getByText('Hidden content', { visible: false }).count()];";
       const result = (await client.callTool({ name: 'call', arguments: { tool: 'run_code', args: { code } } }, { timeout: 110_000 })) as { content: { type: string; text?: string }[] };

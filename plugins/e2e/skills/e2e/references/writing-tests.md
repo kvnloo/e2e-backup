@@ -321,11 +321,10 @@ substring; a `RegExp` matches as written.
   `content-visibility: hidden` are hidden through shadow roots and slots too,
   unless the page's CSS still shows them.
 - To make `visible: true` the default of every query except `getByRole`, set
-  `locators: { visible: true }` in the config or on a target. Hidden nodes
-  are still kept with `{ visible: false }` on a query. `getByRole` skips
-  nodes hidden from the accessibility tree and doesn't use this default.
-  Pass `{ visible: true }` to a role query that must also skip a node that
-  doesn't render.
+  `locators: { visible: true }` in the config or on a target. Pass
+  `{ visible: false }` to a query that must match hidden nodes. `getByRole`
+  doesn't use this default, since a role query already skips nodes hidden
+  from the accessibility tree.
 - On the web, queries reach open shadow roots and closed roots attached with
   `attachShadow`, not declarative closed roots. `browser.locator(css)`,
   `frameLocator`, and `filter({ hasText })` stop at a closed root; query the

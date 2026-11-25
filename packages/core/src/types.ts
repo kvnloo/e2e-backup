@@ -426,7 +426,9 @@ export interface TextMatchOptions {
    * exactly-one rule is applied, so a visible node with a hidden twin (a
    * prerendered copy kept after navigation, a closed drawer) still resolves.
    * When false, every match is kept, hidden ones included. When omitted,
-   * the target's `locators.visible` is used, except by `getByRole`.
+   * the target's `locators.visible` is used. For `getByRole`, omitted is the
+   * same as false, and a role query skips nodes hidden from the
+   * accessibility tree either way.
    */
   visible?: boolean;
 }
@@ -1720,9 +1722,9 @@ export interface Target {
 /** Defaults for screen queries. An option passed to a query takes precedence. */
 export interface LocatorsConfig {
   /**
-   * The default `visible` option of every query except `getByRole`. An
-   * omitted target value inherits the project value, which defaults to
-   * `false`. Set it to true when most queries need `{ visible: true }`.
+   * The default `visible` option of every query except `getByRole`. Set it
+   * to true when most queries need `{ visible: true }`. A target without one
+   * uses the config's, and the default is `false`.
    */
   visible?: boolean;
 }

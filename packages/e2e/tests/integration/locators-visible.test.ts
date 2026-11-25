@@ -23,15 +23,27 @@ export default {
 `;
 }
 
-/** Returns a test that expects `count` matches of each hidden node, and the other count when the query sets `visible`. */
-function suite(count: number): string {
+/**
+ * Returns a test for a target whose `locators.visible` resolves to `visible`.
+ * A zero-size checkbox stays in the accessibility tree, so a role query
+ * matches it unless the query itself sets `visible: true`.
+ */
+function suite(visible: boolean): string {
+  const byDefault = visible ? 0 : 1;
+
   return `import { test, expect } from 'e2e';
 
-test('counts hidden nodes', async ({ app, screen }) => {
+test('counts hidden nodes', async ({ app, browser, screen }) => {
   await app.open();
-  await expect(screen.getByText('Hidden content')).toHaveCount(${String(count)});
-  await expect(screen.getByTestId('hidden-svg')).toHaveCount(${String(count)});
-  await expect(screen.getByText('Hidden content', { visible: ${String(count === 1)} })).toHaveCount(${String(1 - count)});
+  await expect(screen.getByText('Hidden content')).toHaveCount(${String(byDefault)});
+  await expect(screen.getByTestId('hidden-svg')).toHaveCount(${String(byDefault)});
+  await expect(screen.getByText('Hidden content', { visible: ${String(!visible)} })).toHaveCount(${String(1 - byDefault)});
+
+  await browser.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend', '<label><input type="checkbox" style="opacity:0;width:0;height:0;margin:0;position:absolute">Agree</label>');
+  });
+  await expect(screen.getByRole('checkbox', 'Agree')).toHaveCount(1);
+  await expect(screen.getByRole('checkbox', 'Agree', { visible: true })).toHaveCount(0);
 });
 `;
 }
@@ -50,10 +62,10 @@ describe('locators.visible', () => {
   });
 
   it.each([
-    ['skips hidden nodes on a target that inherits visible: true', '', 0],
-    ['keeps hidden nodes on a target that sets visible: false', ', locators: { visible: false }', 1],
-  ])('%s', async (_title, target, count) => {
-    const { outcome, project } = await runProjectWithConfigFile({ 'tests/hidden.e2e.ts': suite(count) }, { appUrl: app.url, configSource: config(target) });
+    ['skips hidden nodes on a target that inherits visible: true', '', true],
+    ['keeps hidden nodes on a target that sets visible: false', ', locators: { visible: false }', false],
+  ])('%s', async (_title, target, visible) => {
+    const { outcome, project } = await runProjectWithConfigFile({ 'tests/hidden.e2e.ts': suite(visible) }, { appUrl: app.url, configSource: config(target) });
     projects.push(project);
     expect(outcome.results).toHaveLength(1);
     expect(outcome.results[0]?.status, JSON.stringify(outcome.results[0]?.attempts[0]?.error)).toBe('passed');

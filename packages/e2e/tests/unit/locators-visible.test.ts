@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { resolveExpression, type SemanticNode } from '@e2e-dev/core/lib/engine/index';
+import { resolveExpression, type LocatorExpression, type SemanticNode } from '@e2e-dev/core/lib/engine/index';
 import type { Locator, Screen } from '@e2e-dev/core/lib/types';
 import { screenOver } from '../helpers/screen-over.ts';
 import { snapshot } from '../helpers/snapshot.ts';
@@ -55,6 +55,24 @@ describe('locators.visible', () => {
 
     expect(await query(screen).count()).toBe(2);
     expect(await query(screen, { visible: true }).count()).toBe(1);
+  });
+
+  it("doesn't add visible to a role query", async () => {
+    const seen: LocatorExpression[] = [];
+    const { screen } = screenOver({
+      observe: () => snapshot(NODES),
+      locate: (expression) => {
+        seen.push(expression);
+
+        return resolveExpression(expression, NODES);
+      },
+      timeoutMs: 300,
+      locators: { visible: true },
+    });
+
+    await screen.getByRole('textbox', 'Email').count();
+
+    expect(seen.at(-1)).not.toHaveProperty('query.visible');
   });
 
   it('applies to a query chained under another locator', async () => {

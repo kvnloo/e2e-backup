@@ -39,7 +39,7 @@ export function roleQuery(
 
 /** The `visible` predicate, from the option or else `defaultVisible`. A false one is dropped. */
 function visibility(options: { visible?: boolean } | undefined, defaultVisible: boolean): { visible: true } | Record<never, never> {
-  return (options?.visible ?? defaultVisible) ? { visible: true } : {};
+  return (options?.visible ?? defaultVisible) === true ? { visible: true } : {};
 }
 
 /** Builds a text-family query expression (label, placeholder, text, displayValue). */

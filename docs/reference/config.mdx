@@ -310,23 +310,24 @@ An id is its factory called with no options. An unknown id is
 Defaults for screen queries. With `visible: true`, hidden nodes are skipped
 by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
 `getByTestId`, as if `{ visible: true }` were passed to each query.
-`getByRole` skips nodes hidden from the accessibility tree and doesn't use
-this default. Pass `{ visible: true }` to a role query that must also skip a
-node that doesn't render.
 
 ```ts
 locators: { visible: true }, // default: { visible: false }
 ```
 
-- A `locators.visible` set on a target is used in place of the config's for
-  that target. Without one, the config's value is used.
-- A `visible` passed to a query takes precedence over both, so hidden
-  matches are kept with `screen.getByText('Saved', { visible: false })`.
-- The same default is used by `run_code`, `locate`, and the test lines of an
-  [`e2e mcp`](/reference/mcp) session.
-- A value that isn't a plain object or a `visible` that isn't a boolean is
-  `INVALID_CONFIG`.
-- See [Hidden duplicates](/reference/screen#hidden-duplicates).
+Three places set `visible`, lowest first. Each replaces the one before it:
+
+1. `locators.visible` at the top of the config.
+2. A target's `locators.visible`.
+3. The `visible` option of a query. With
+   `screen.getByText('Saved', { visible: false })`, hidden matches are kept.
+
+- `getByRole` doesn't use this default. See
+  [Hidden duplicates](/reference/screen#hidden-duplicates).
+- In an [`e2e mcp`](/reference/mcp) session, `run_code`, `locate`, and the
+  test lines use the target's value.
+- `locators` must be a plain object whose only key is `visible`, an optional
+  boolean. Any other value is `INVALID_CONFIG`.
 
 ### targets
 
@@ -1797,9 +1798,9 @@ export interface Target {
 /** Defaults for screen queries. An option passed to a query takes precedence. */
 export interface LocatorsConfig {
   /**
-   * The default `visible` option of every query except `getByRole`. An
-   * omitted target value inherits the project value, which defaults to
-   * `false`. Set it to true when most queries need `{ visible: true }`.
+   * The default `visible` option of every query except `getByRole`. Set it
+   * to true when most queries need `{ visible: true }`. A target without one
+   * uses the config's, and the default is `false`.
    */
   visible?: boolean;
 }

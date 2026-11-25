@@ -249,7 +249,7 @@ describe('SessionTestLines', () => {
     expect(noteOf(await session.run('tap', { target: 'n6' }))).toBe('Test line: await screen.getByText("Sale", { visible: true }).tap();');
   });
 
-  it("counts only the nodes that render under the target's visible default, and doesn't write an option for it", async () => {
+  it("counts only the nodes that render when the target's locators.visible is true, and writes no { visible: true } on the line", async () => {
     const hidden: Fake = { id: 'n5', text: 'Sale', y: 500 };
     const sale: Fake = { id: 'n6', text: 'Sale', y: 120 };
     const unique = await harness({ visible: true, screen: [hidden, sale], matches: { 'getByText("Sale", visible: true)': [sale] } });

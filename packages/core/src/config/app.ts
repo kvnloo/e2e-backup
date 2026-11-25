@@ -102,7 +102,7 @@ export const TARGET_KEYS: ReadonlySet<string> = new Set(['name', 'platform', 'en
 export function unknownTargetKey(where: string, key: string): ConfigurationError {
   return new ConfigurationError(
     'INVALID_CONFIG',
-    `${where} has unknown key "${key}"; a target is { name?, platform?, engine?, app?, trace?, video?, fullyParallel?, locators? }${didYouMean(key, [...TARGET_KEYS])}`,
+    `${where} has unknown key "${key}"; a target is { ${[...TARGET_KEYS].map((name) => `${name}?`).join(', ')} }${didYouMean(key, [...TARGET_KEYS])}`,
   );
 }
 
