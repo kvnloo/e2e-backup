@@ -857,13 +857,16 @@ export class ElectronSurface {
     await this.evaluateIn(window, NEXT_FRAME);
   }
 
-  private async drag(window: AppWindow, from: ViewportPoint, to: ViewportPoint, durationMs?: number, signal?: AbortSignal): Promise<void> {
+  /** A pointer drag between two points, paced over `durationMs` when given; every move passes `open`, the operation's input gate. */
+  private async drag(window: AppWindow, from: ViewportPoint, to: ViewportPoint, open: () => void, durationMs?: number, signal?: AbortSignal): Promise<void> {
     const { mouse } = window.page;
+    open();
     await mouse.move(from.x, from.y);
     await mouse.down();
     try {
       const steps = durationMs === undefined ? 2 : Math.max(2, Math.round(durationMs / 16));
       for (let step = 1; step <= steps; step += 1) {
+        open();
         await mouse.move(Math.round(from.x + ((to.x - from.x) * step) / steps), Math.round(from.y + ((to.y - from.y) * step) / steps));
         if (durationMs !== undefined) await sleep(durationMs / steps, signal);
       }
@@ -876,6 +879,7 @@ export class ElectronSurface {
     const window = this.requireWindow();
     const at = whole(point);
     const { mouse } = window.page;
+    const open = inputGate(operation, action.kind);
     await this.bounded(operation, action.kind, true, async () => {
       switch (action.kind) {
         case 'tap':
@@ -897,10 +901,10 @@ export class ElectronSurface {
           await mouse.up();
           return;
         case 'dragTo':
-          await this.drag(window, at, whole(action.target));
+          await this.drag(window, at, whole(action.target), open);
           return;
         case 'swipeTo':
-          await this.drag(window, at, whole(action.target), action.durationMs ?? 300, operation.signal);
+          await this.drag(window, at, whole(action.target), open, action.durationMs ?? 300, operation.signal);
           return;
         case 'swipe': {
           await mouse.move(at.x, at.y);
