@@ -31,6 +31,7 @@ import {
   type DerivedReason,
   type RecordedAction,
   type TraceAnchorState,
+  type TraceDetourSpan,
   type TraceEntry,
   type TraceKeyContext,
   type TracePointEnd,
@@ -142,6 +143,7 @@ function readActionTrace(document: unknown): ActionTrace | undefined {
   const actions = each(actionsRaw, readRecordedAction);
   if (actions === undefined) return undefined;
   const keyedBy = readKeyContext(raw['keyedBy']);
+  const detours = readDetourSpans(raw['detours'], actions.length);
 
   return {
     actions,
@@ -159,7 +161,28 @@ function readActionTrace(document: unknown): ActionTrace | undefined {
     ...(endWaitMs === undefined ? {} : { endWaitMs }),
     ...(truncated === undefined ? {} : { truncated }),
     ...(keyedBy === undefined ? {} : { keyedBy }),
+    ...(detours === undefined ? {} : { detours }),
   };
+}
+
+/**
+ * Stored detour spans, each inside the trace and in order, or undefined for
+ * anything else: provenance, so a malformed list is dropped and the trace
+ * is read for detours afresh.
+ */
+function readDetourSpans(document: unknown, actions: number): TraceDetourSpan[] | undefined {
+  if (!Array.isArray(document) || document.length > MAX_TRACE_ACTIONS) return undefined;
+  const spans: TraceDetourSpan[] = [];
+  for (const item of document) {
+    if (typeof item !== 'object' || item === null) return undefined;
+    const { from, to } = item as Record<string, unknown>;
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return undefined;
+    const start = from as number;
+    const end = to as number;
+    if (start < (spans.at(-1)?.to ?? 0) || end <= start || end > actions) return undefined;
+    spans.push({ from: start, to: end });
+  }
+  return spans;
 }
 
 /** One side of the recorded delta: absent reads as empty, anything malformed or over the cap as undefined. */

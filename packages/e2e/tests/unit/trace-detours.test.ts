@@ -20,7 +20,7 @@ function type(name: string, value: string, at?: string): RecordedAction {
   return { name: 'type', summary: `type "${value}" into textbox "${name}"`, target: { role: 'textbox', name }, value, ...(at === undefined ? {} : { at }) };
 }
 
-function flow(actions: readonly RecordedAction[], ends: { startPath?: string; endPath?: string; truncated?: boolean } = {}): Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'> {
+function flow(actions: readonly RecordedAction[], ends: { startPath?: string; endPath?: string; truncated?: boolean } = {}): Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated' | 'detours'> {
   return { actions, ...ends };
 }
 
@@ -108,9 +108,15 @@ describe('findDetours by recorded locations', () => {
     expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/123', via: '/invoices', evidence: 'locations' }]);
   });
 
-  it('reads a unique() placeholder in a stored location as the record id it stood for', () => {
-    // Stored with /items/123 templated: the live run saw /items/456, /items/123, /items/456, one route.
-    expect(findDetours(flow([tap('Next', '/items/456'), tap('Back', '/items/{{param:/id}}'), tap('Save', '/items/456')], { endPath: '/items/456' }))).toEqual([]);
+  it('uses the detours the recording run found, since stored placeholders no longer compare like their values', () => {
+    // Recorded as /items/456 -> /items/123 -> /items/456 with 123 a unique() id: one route to the run, no detour.
+    const stored = flow([tap('Next', '/items/456'), tap('Back', '/items/{{param:/id}}'), tap('Save', '/items/456')], { endPath: '/items/456' });
+    expect(findDetours({ ...stored, detours: [] })).toEqual([]);
+    // A slug and a record id: two routes to the run, a detour it kept.
+    const kept = flow([tap('Open', '/records/{{param:/slug}}'), back('/records/123'), tap('Save', '/records/{{param:/slug}}')], { endPath: '/done' });
+    expect(findDetours({ ...kept, detours: [{ from: 0, to: 2 }] })).toEqual([
+      { from: 0, to: 2, at: '/records/{{param:/slug}}', via: '/records/123', evidence: 'locations' },
+    ]);
   });
 
   it('does not read a cut recording\'s end location as where its last kept action led', () => {

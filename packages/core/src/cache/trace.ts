@@ -498,6 +498,21 @@ export interface ActionTrace {
    * entries.
    */
   readonly keyedBy?: TraceKeyContext;
+  /**
+   * The detours the recording run found (`cache/detours.ts`), by the
+   * actions each spans; empty when it found none. Provenance, never read by
+   * a replay: the run compared the locations it saw, before `unique()`
+   * values became placeholders, which a stored entry can no longer compare
+   * (a slug and a record id both become a placeholder). Absent on entries
+   * recorded without locations, and on older ones.
+   */
+  readonly detours?: readonly TraceDetourSpan[];
+}
+
+/** A detour as an entry keeps it: the first action of it, and the action the flow went on with once it was back. */
+export interface TraceDetourSpan {
+  readonly from: number;
+  readonly to: number;
 }
 
 /**

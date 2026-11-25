@@ -129,6 +129,21 @@ describe('TraceRecorder', () => {
     expect(trace?.actions[0]?.at).toBeUndefined();
   });
 
+  it('reads stored detour spans back, and drops a malformed list without failing the entry', () => {
+    const recorder = makeRecorder();
+    recorder.record({ name: 'tap', node: upgradeButton }, '/a');
+    recorder.record({ name: 'back' }, '/b');
+    const trace = recorder.finalize(conclusion)!;
+    const stored = (detours: unknown) => readTraceEntry(JSON.parse(JSON.stringify({ ...buildTraceEntry(trace), payload: { ...trace, detours } })));
+    expect(stored([{ from: 0, to: 2 }])?.payload.detours).toEqual([{ from: 0, to: 2 }]);
+    expect(stored([])?.payload.detours).toEqual([]);
+    for (const malformed of [[{ from: 1, to: 1 }], [{ from: 0, to: 3 }], [{ from: 0, to: 2 }, { from: 1, to: 2 }], [{ from: '0', to: 2 }], 'none']) {
+      const read = stored(malformed);
+      expect(read).toBeDefined();
+      expect(read?.payload).not.toHaveProperty('detours');
+    }
+  });
+
   it('reads an entry whose action location is malformed, without the location', () => {
     const recorder = makeRecorder();
     recorder.record({ name: 'tap', node: upgradeButton });

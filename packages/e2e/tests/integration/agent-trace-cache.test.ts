@@ -1118,6 +1118,8 @@ describe('trace cache: a recording that leaves a screen and comes back', () => {
       ['back', '/about'],
       ['tap', '/'],
     ]);
+    // Kept as the run found it, for a reader of the stored entry.
+    expect(entry.payload.detours).toEqual([{ from: 0, to: 2 }]);
     const recorded = resultByTitle(first, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
     expect(recorded.cache).toMatchObject({ mode: 'missed', reason: 'no-entry', detour, write: 'saved' });
 
