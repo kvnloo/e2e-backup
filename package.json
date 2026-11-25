@@ -37,6 +37,7 @@
     "test:testbed": "pnpm run build && pnpm --filter @e2e-dev/testbed test",
     "test:web-benchmark": "pnpm run build && pnpm --filter @e2e-dev/web-benchmark test",
     "test:mobile-benchmark": "pnpm run build && pnpm --filter @e2e-dev/mobile-benchmark test",
+    "test:electron-testbed": "pnpm run build && pnpm --filter @e2e-dev/electron-testbed test",
     "test:desktop-testbed": "pnpm run build && pnpm --filter @e2e-dev/desktop-testbed run build:app && pnpm --filter @e2e-dev/desktop-testbed test",
     "test:agent": "pnpm run build && pnpm --filter @e2e-dev/testbed test:agent",
     "test:scripts": "node --test \"scripts/**/*.test.ts\"",

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Sign In</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 24px; }
+      form { display: grid; gap: 12px; max-width: 320px; }
+      label { display: grid; gap: 4px; }
+      #items { height: 160px; overflow: auto; border: 1px solid #ccc; margin: 0; padding: 0 16px; }
+      #items li { padding: 6px 0; }
+    </style>
+  </head>
+  <body>
+    <h1 id="greeting">Welcome</h1>
+    <form id="sign-in">
+      <label>Username <input name="username" data-testid="username" autocomplete="username" placeholder="ada" /></label>
+      <label>Password <input name="password" type="password" data-testid="password" autocomplete="current-password" /></label>
+      <label><input type="checkbox" name="remember" /> Remember me</label>
+      <label>Plan
+        <select name="plan" data-testid="plan">
+          <option>Free</option>
+          <option selected>Pro</option>
+          <option>Team</option>
+        </select>
+      </label>
+      <button type="submit" data-testid="sign-in">Sign in</button>
+    </form>
+    <p role="status" data-testid="status">Not signed in</p>
+    <section aria-labelledby="counter-heading">
+      <h2 id="counter-heading">Counter</h2>
+      <button type="button" id="increment">Add one</button>
+      <output data-testid="count">0</output>
+    </section>
+    <section aria-labelledby="settings-heading">
+      <h2 id="settings-heading">Windows</h2>
+      <button type="button" id="open-settings">Open settings</button>
+    </section>
+    <section aria-labelledby="items-heading">
+      <h2 id="items-heading">Items</h2>
+      <ul id="items" aria-label="Items" tabindex="0"></ul>
+    </section>
+    <script src="index.js"></script>
+  </body>
+</html>

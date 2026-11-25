@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Settings</title>
+    <style>body { font: 14px system-ui, sans-serif; margin: 24px; }</style>
+  </head>
+  <body>
+    <h1>Settings</h1>
+    <label><input type="checkbox" id="dark" role="switch" /> Dark mode</label>
+    <p data-testid="theme">Theme: light</p>
+    <section aria-label="Vault"><div id="vault"></div></section>
+    <script src="settings.js"></script>
+  </body>
+</html>
