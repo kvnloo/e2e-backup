@@ -41,6 +41,7 @@ import {
   type OperationContext,
   type PointerAction,
   type ProviderRecording,
+  type ScrollEdge,
   type VideoSegment,
   type SemanticNode,
   type ViewportIntersection,
@@ -69,6 +70,7 @@ import {
 import { keyboardDragStart, keyboardShownIn, type KeyboardUnknown } from './keyboard.ts';
 import { DEVICE_PERMISSIONS, type AgentDeviceClient, type ClientFactory, type DevicePermission, type LaunchPermissions, type MobileOptions, type MobilePlatform, type PermissionState } from './options.ts';
 import { maskPng } from './png.ts';
+import { above, clipTo, edgeDrag, regionSignature } from './scroll-to.ts';
 import { mobileDoctor } from './doctor.ts';
 import { deviceLabel, deviceSelection, pinnedApp, type DeviceSelection, type SlotBinding } from './bindings.ts';
 import { assertAppId } from './links.ts';
@@ -231,6 +233,9 @@ interface NodeBinding {
   readonly takesText: boolean;
 }
 
+
+/** The most drags `scrollTo` sends between two reads of the container. */
+const MAX_EDGE_DRAGS = 3;
 
 /**
  * How long a control that appeared or moved with the last action is given to
@@ -1563,16 +1568,26 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
     // live iOS run lost every `slow` scroll of the mobile benchmark's sticky
     // chrome flow that way.
     if (ref.id === ROOT_ID) {
-      if (action.kind !== 'swipe') throw notActionable(`the screen root takes swipe only, not ${action.kind}; act on a node`);
+      if (action.kind !== 'swipe' && action.kind !== 'scrollTo') {
+        throw notActionable(`the screen root takes swipe and scrollTo only, not ${action.kind}; act on a node`);
+      }
       if (deterministic) await this.waitOutTransition(operation, input);
       const before = this.latestScreen;
-      const stabilization = gestureStabilization(operation);
-      await this.command(
-        'swipe',
-        (client) => input.send(() => client.interactions.scroll({ direction: action.direction, ...settle, ...stabilization })),
-        operation.signal,
-      );
-      this.noteGesture(operation);
+      if (action.kind === 'scrollTo') {
+        try {
+          await raceAbort(() => this.track(this.scrollToEdge(undefined, action.edge, operation, input)), operation.signal, 'perform scrollTo');
+        } catch (cause) {
+          throw staleOr(cause, 'perform scrollTo', this.where);
+        }
+      } else {
+        const stabilization = gestureStabilization(operation);
+        await this.command(
+          'swipe',
+          (client) => input.send(() => client.interactions.scroll({ direction: action.direction, ...settle, ...stabilization })),
+          operation.signal,
+        );
+        this.noteGesture(operation);
+      }
       this.markAction(before);
       return;
     }
@@ -1660,6 +1675,8 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
           this.noteGesture(operation);
           return sent;
         }
+        case 'scrollTo':
+          return this.scrollToEdge(target, action.edge, operation, input);
         case 'dragTo': {
           // A test locates the drop target in a capture of its own, after the
           // source's; agent-device takes both refs from the newest one only.
@@ -1687,6 +1704,78 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       throw staleOr(cause, label, this.where);
     }
     this.markAction(before);
+  }
+
+  /**
+   * `scrollTo` on a device: drags toward `edge` inside a region (the node's
+   * box, else the screen, clipped to the screen and cut off above the soft
+   * keyboard) until a drag leaves what the region shows unchanged, on two
+   * captures that left no node out. The region
+   * is measured once, before the first drag: a list's own label can change
+   * as it scrolls, and the node is never looked up again once input went out.
+   * Each drag keeps agent-device's post-gesture stabilization, which holds the
+   * next read until the content rests, so a list still coasting is never read
+   * as at its edge. A container already there costs one drag. No drag starts
+   * once what is left of the budget is shorter than the last drag and its read.
+   */
+  private async scrollToEdge(entry: NodeBinding | undefined, edge: ScrollEdge, operation: OperationContext, input: InputBudget): Promise<void> {
+    const client = this.requireClient();
+    const capture = async (): Promise<{ raw: RawSnapshot; projected: ProjectedScreen }> => {
+      const raw = await this.snapshotOrEmpty(operation, false, input);
+      return { raw, projected: this.project(raw) };
+    };
+    // A capture that leaves nodes out never reads as unchanged, so it never ends the scroll.
+    const signature = ({ raw, projected }: { raw: RawSnapshot; projected: ProjectedScreen }, region: Rect): string | undefined =>
+      isTruncated(raw) ? undefined : regionSignature(projected.index, region);
+    const first = await capture();
+    const region = this.scrollRegion(entry, first.raw, first.projected);
+    let before = signature(first, region);
+    let passMs = 0;
+    for (let drags = 0; ; drags += 1) {
+      if (drags > 0 && input.remainingMs() < passMs) {
+        throw new EngineError('OPERATION_TIMEOUT', `the content was still moving after ${drags} drags when the budget ran out`, { retryable: false });
+      }
+      const startedMs = Date.now();
+      // The first drag is one, since a container at its edge already needs no
+      // more; one that moves gets up to three per read, as reads cost more than drags.
+      const count = Math.min(drags + 1, MAX_EDGE_DRAGS);
+      await input.send(() => client.interactions.swipe({ ...edgeDrag(region, edge), count, pauseMs: 0 }));
+      const after = signature(await capture(), region);
+      passMs = Date.now() - startedMs;
+      if (after !== undefined && after === before) return;
+      before = after;
+    }
+  }
+
+  /**
+   * Where `scrollTo` drags: the node's box, or the screen for the root,
+   * clipped to the screen and cut off above the soft keyboard. Refuses, with
+   * nothing sent, a node whose bounds may be window-local, a region with no
+   * area, and a keyboard that is up with bounds the capture does not give.
+   */
+  private scrollRegion(entry: NodeBinding | undefined, raw: RawSnapshot, projected: ProjectedScreen): Rect {
+    const viewport = projected.viewport ?? this.knownViewport;
+    let rect: Rect | undefined;
+    if (entry === undefined) {
+      rect = viewport === undefined ? undefined : { x: 0, y: 0, width: viewport.width, height: viewport.height };
+    } else {
+      const found = this.refind(entry, projected.index);
+      if (found === undefined) throw new EngineError('NODE_STALE', `node ${entry.id} is gone from the screen; re-resolve`, { retryable: true });
+      if (projected.originUnknown) {
+        throw notActionable(`perform scrollTo failed: the ${ORIGIN_UNKNOWN_BOUNDS} Nothing was sent. Scroll the screen with screen.scrollTo(edge).`);
+      }
+      rect = found.node.rect;
+    }
+    const target = entry === undefined ? 'the screen' : `node ${entry.id}`;
+    if (rect !== undefined && viewport !== undefined) rect = clipTo(rect, viewport);
+    if (rect === undefined || rect.width < 1 || rect.height < 1) throw notActionable(`${target} has no bounds on screen to scroll within`);
+    const keyboard = viewport === undefined ? undefined : keyboardTop(raw, viewport);
+    if (keyboard === undefined && keyboardShowing(raw)) {
+      throw notActionable('the soft keyboard is up and its bounds are unknown, so a drag could land on it; dismiss it first');
+    }
+    const region = above(rect, keyboard);
+    if (region.height < 1) throw notActionable(`the soft keyboard covers ${target}; dismiss it first`);
+    return region;
   }
 
   /**

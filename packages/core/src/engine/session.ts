@@ -488,6 +488,11 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
       const target = root ?? (await session.observe(operation)).root;
       await performRaw(target, { kind: 'swipe', direction, ...(momentum === undefined ? {} : { momentum }) }, operation);
     },
+    async scrollTo(edge, operation) {
+      if (!actions.has('scrollTo')) unsupported('the "scrollTo" action');
+      const target = root ?? (await session.observe(operation)).root;
+      await performRaw(target, { kind: 'scrollTo', edge }, operation);
+    },
     async performAt(point, action, operation) {
       if (!pointerActions.has(action.kind)) unsupported(`the "${action.kind}" action at a point`);
       await performAtRaw(point, action, operation);

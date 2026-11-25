@@ -7,6 +7,7 @@ import {
   type NodeRef,
   type OperationContext,
   type PointerAction,
+  type ScrollEdge,
   type SemanticNode,
   type ViewportIntersection,
   type ViewportPoint,
@@ -559,6 +560,60 @@ const ref = await this.singleOf(await this.resolveOnce(expression, reads, missin
       },
       this.deadline(timeoutMs),
     );
+  }
+
+  /**
+   * Scrolls a container to an edge within one deadline: the node `expression`
+   * names, or the screen's container when there is none. Once the scroll is
+   * sent, an engine that ran out of budget (reported as a timeout, or as input
+   * that may have landed) did not reach the edge; an engine stops a little
+   * before the deadline, so that is said whether or not it has passed, with
+   * the engine's reason, which tells a list still moving from a stuck read. A
+   * locate that timed out before the scroll was sent stays what it was.
+   */
+  async scrollTo(expression: LocatorExpression | undefined, edge: ScrollEdge, timeoutMs?: number): Promise<void> {
+    const action = { kind: 'scrollTo', edge } as const;
+    this.checkAction(action);
+    const deadline = this.deadline(timeoutMs);
+    let sent = expression === undefined;
+    try {
+      if (expression === undefined) await this.scrollScreenTo(action, deadline);
+      else {
+        await this.performUntil(expression, async () => {
+          sent = true;
+          return action;
+        }, deadline);
+      }
+    } catch (cause) {
+      const engineError = isE2EError(cause) ? asEngineError(cause.cause) : undefined;
+      if (!sent || (engineError?.code !== 'OPERATION_TIMEOUT' && engineError?.code !== 'ACTION_MAY_HAVE_COMMITTED')) throw cause;
+      const target = expression === undefined ? '' : `: ${describeExpression(expression)}`;
+      throw new TestError('ACTION_FAILED', `scrollTo('${edge}') did not reach the edge within ${deadline.elapsed()}ms (${engineError.message})${target}`, { cause });
+    }
+  }
+
+  /** The screen's `scrollTo`, on the observation root, recorded as an engine event like a node action. */
+  private async scrollScreenTo(action: Extract<LocatorAction, { kind: 'scrollTo' }>, deadline: Deadline): Promise<void> {
+    const startedAt = timestamp();
+    const startedMs = Date.now();
+    const record = (status: StepEvent['status'], code?: string): void =>
+      this.recordEvent({
+        kind: 'engine',
+        name: action.kind,
+        startedAt,
+        durationMs: Date.now() - startedMs,
+        status,
+        ...(code === undefined ? {} : { code }),
+        detail: `scrollTo ${action.edge} on the screen`,
+      });
+    try {
+      await this.session.scrollTo(action.edge, this.operationWithin(deadline));
+    } catch (cause) {
+      const failure = translateLocatorError(cause);
+      record(this.signal.aborted ? 'cancelled' : 'failed', failure.code);
+      throw failure;
+    }
+    record('passed');
   }
 
   /** Performs one pointer action at a viewport point, with no node behind it. */

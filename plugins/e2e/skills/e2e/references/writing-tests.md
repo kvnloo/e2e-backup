@@ -327,6 +327,16 @@ substring; a `RegExp` matches as written.
 - `screen.scrollUntilVisible(locator, { direction?, momentum?, timeout? })`
   scrolls the viewport (`down`, `slow` by default) until the locator resolves
   visibly, else `LOCATOR_NOT_FOUND`; on a locator it scrolls that node.
+- `screen.scrollTo('top' | 'bottom' | 'left' | 'right', { timeout? })`
+  scrolls to an edge, as far as it goes: the page on the web (or the pane
+  under the viewport's center when the page does not scroll), the content
+  under the screen's center on a device. On a locator it scrolls that node,
+  or its nearest ancestor that scrolls; on a device locate the list, not a
+  row. It resolves at once when nothing scrolls. An edge, never a position:
+  for `cy.scrollTo(0, 500)` use `browser.evaluate`. A device drags until a
+  drag moves nothing, about 25 s (Android) to 50 s (iOS) for a 45-screen
+  list, so pass a longer `timeout` for a very long one. Desktop:
+  `UNSUPPORTED_CAPABILITY`.
 
 ### Actions
 

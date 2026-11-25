@@ -11,11 +11,11 @@ import type { RecordedAction } from './cache/trace.ts';
 import type { PROJECT_TOOL_EVENT_PREFIX } from './agent/action-names.ts';
 import type { StepCacheInfo } from './run/steps.ts';
 import type { EngineHandle } from './engine/index.ts';
-import type { KeyModifier, Momentum, ScrollDirection, SelectOption, ViewportPoint } from './engine/contract.ts';
+import type { KeyModifier, Momentum, ScrollDirection, ScrollEdge, SelectOption, ViewportPoint } from './engine/contract.ts';
 import type { CacheStore } from './cache/store.ts';
 import type { ConfigBase, ConfigFixtures, FixtureDefinitions, FixtureOverrides, OmitEach, PickEach, SelectedFixtures, TestOverrides, WorkerFixtures } from './types/fixtures.ts';
 
-export type { KeyModifier, Momentum, ScrollDirection, SelectOption } from './engine/contract.ts';
+export type { KeyModifier, Momentum, ScrollDirection, ScrollEdge, SelectOption } from './engine/contract.ts';
 export type { CacheReadResult, CacheStore } from './cache/store.ts';
 export type { DerivedReason } from './cache/trace.ts';
 export type { StepCacheInfo } from './run/steps.ts';
@@ -570,6 +570,16 @@ export interface Screen {
     target: Locator,
     options?: { direction?: ScrollDirection; momentum?: Momentum; timeout?: number },
   ): Promise<void>;
+  /**
+   * Scrolls a container to an edge, as far as it goes: on `screen` the
+   * screen's main scrolling content, else the content under its center; on
+   * a locator the node, or its nearest ancestor that scrolls along that axis
+   * (on a device, whatever scrolls under a drag inside the node's box, so
+   * locate the list, not a row). Resolves at
+   * once when it is there already or nothing scrolls. `timeout` bounds the
+   * whole scroll.
+   */
+  scrollTo(edge: ScrollEdge, options?: ActionOptions): Promise<void>;
   /**
    * Reads the whole screen once, without waiting, as the agent reads it: one
    * node per line, `#id role "name" text="…" [states]`, children indented,

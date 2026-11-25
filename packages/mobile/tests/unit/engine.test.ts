@@ -107,7 +107,7 @@ describe('manifest', () => {
     expect(Object.keys(pinned.session!).toSorted()).toEqual(['back', 'openLink', 'reset', 'restart']);
     // No `open`: a device app has no URL. No select verb either: the touch surface has no option lists to pick from.
     expect(pinned.session!.open).toBeUndefined();
-    expect(pinned.actions).toEqual(['tap', 'doubleTap', 'multiTap', 'longPress', 'fill', 'clear', 'press', 'check', 'uncheck', 'focus', 'hover', 'dragTo', 'swipe']);
+    expect(pinned.actions).toEqual(['tap', 'doubleTap', 'multiTap', 'longPress', 'fill', 'clear', 'press', 'check', 'uncheck', 'focus', 'hover', 'dragTo', 'swipe', 'scrollTo']);
     expect(pinned.state).toBeUndefined();
   });
 

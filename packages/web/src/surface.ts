@@ -66,6 +66,7 @@ import { SHOWN_SELECTOR } from './shown-selector.ts';
 import { withHiddenCaret } from './screenshot-caret.ts';
 import { connectionAbort, withOperationDeadline, type OperationBound } from './operation-budget.ts';
 import { CLOSED_SHADOW_ROOTS_INIT_SCRIPT, CLOSED_SHADOW_ROOTS_KEY } from './closed-shadow.ts';
+import { scrollToEdge } from './scroll-to.ts';
 import { MODAL_ORDER_INIT_SCRIPT } from './modal-dialogs.ts';
 import { ConfiguredInitScripts, type WebInitScript } from './init-scripts.ts';
 import type { WebMedia } from './media.ts';
@@ -1173,7 +1174,8 @@ export class PlaywrightSurface {
   /**
    * One action on a located or observed node. A `swipe` on the observation
    * root is the viewport swipe: a wheel gesture sized by the viewport, with no
-   * element resolved behind it, so it needs only the page. Every other action
+   * element resolved behind it, so it needs only the page; so is a `scrollTo`
+   * on the root, which scrolls the page, else the container under the viewport's center. Every other action
    * on the root acts on the document element the root stands for.
    */
   perform(ref: NodeRef, action: LocatorAction, operation: OperationContext): Promise<void> {
@@ -1185,6 +1187,10 @@ export class PlaywrightSurface {
         if (action.kind === 'swipe' && ref.id === ROOT_NODE_ID) {
           this.requireSession().requireObservation();
           return performViewportSwipe(page, action.direction, action.momentum ?? 'none');
+        }
+        if (action.kind === 'scrollTo' && ref.id === ROOT_NODE_ID) {
+          this.requireSession().requireObservation();
+          return scrollToEdge(page, undefined, action.edge, currentOperation);
         }
         const session = this.requireSession();
         const { refs } = session;

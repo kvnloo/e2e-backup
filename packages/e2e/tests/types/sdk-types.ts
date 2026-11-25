@@ -887,6 +887,14 @@ void screen.getByRole('button').doubleTap({ count: 3 });
 declare const multiTapAction: Extract<import('../../src/engine/index.ts').LocatorAction, { kind: 'multiTap' }>;
 void (multiTapAction.count satisfies number);
 void (multiTapAction.modifiers satisfies readonly KeyModifier[] | undefined);
+void screen.scrollTo('bottom');
+void screen.getByTestId('feed').scrollTo('left', { timeout: 1_000 });
+// @ts-expect-error scrollTo takes an edge, not a position: positions are web-only, through browser.evaluate.
+void screen.scrollTo({ x: 0, y: 500 });
+// @ts-expect-error an edge is top, bottom, left, or right; corners are two calls.
+void screen.scrollTo('bottomRight');
+declare const scrollToAction: Extract<import('../../src/engine/index.ts').LocatorAction, { kind: 'scrollTo' }>;
+void (scrollToAction.edge satisfies import('../../src/index.ts').ScrollEdge);
 // @ts-expect-error a point has both coordinates.
 void screen.tapAt({ x: 1 });
 // @ts-expect-error a path swipe names both ends.
