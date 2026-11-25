@@ -200,7 +200,8 @@ function byLocations(trace: DetourInput): TraceDetour[] {
       from += 1;
       continue;
     }
-    detours.push({ from: left, to: back, at: home, via, evidence: 'locations' });
+    // Named by the place the leaving action stood on, as a stored span is (`recorded`): the same route, maybe spelled otherwise.
+    detours.push({ from: left, to: back, at: where[left] ?? home, via, evidence: 'locations' });
     from = back;
   }
   return detours;
