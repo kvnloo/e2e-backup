@@ -293,7 +293,7 @@ describe('e2e cache check', () => {
     expect(process.exitCode).toBe(0);
     expect(written(stdoutSpy).trimEnd().split('\n')).toEqual([
       'eeeeeeeeeeee: actions 1-2 left a screen, only looked around, and went back (recorded without locations: a hint only)',
-      `no detours in 1 replay cache entry in ${path.join(root, CACHE_DIR)}`,
+      `no detours the recorded screens show in 1 replay cache entry in ${path.join(root, CACHE_DIR)}`,
       '1 entry recorded without locations only looks like one; delete it and run the test again to record the locations',
     ]);
   });

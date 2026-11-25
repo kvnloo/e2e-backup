@@ -438,7 +438,7 @@ function check(contents: CacheContents): number {
   const hinted = detoured.length - failing;
   process.stdout.write(
     failing === 0
-      ? `no detours in ${total} replay cache ${entries(total)} in ${contents.directory}\n`
+      ? `no detours ${hinted > 0 ? 'the recorded screens show ' : ''}in ${total} replay cache ${entries(total)} in ${contents.directory}\n`
       : `${failing} of ${total} replay cache ${total === 1 ? 'entry takes' : 'entries take'} a detour; e2e cache show <entry> prints its actions\n`,
   );
   if (hinted > 0) {
