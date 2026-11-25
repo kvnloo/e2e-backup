@@ -439,13 +439,18 @@ with nothing typed, chosen, or set on the way. An agent that opens the wrong
 page and backs out records one, and every replay repeats it. The step still
 passes.
 
-A step whose recording has a detour reports it in `step.cache.detour`, on
-its [trace page](/debugging#traces), and in the HTML report. The run summary
-counts it as `detoured`:
+A step whose recording has a detour reports it in `step.cache.detour` and
+in the HTML report. The run summary counts these steps as `detoured`. The
+step's [trace page](/debugging#traces) names the actions:
 
 ```text
 cache: replayed all 4 recorded actions, no model call; detour: actions 1-3 left /settings for /settings/notifications and came back with nothing changed
 ```
+
+To check a whole cache before you commit recordings, run
+[`e2e cache check`](#inspect-the-cache). It lists every entry with a
+detour and exits 1 when it finds one. `e2e cache show <entry>` prints an
+entry's actions with the screen each ran on.
 
 To remove a detour, delete the entry file and run the test again in
 `read-write` mode. If the agent takes the same wrong turn, name the
@@ -469,21 +474,27 @@ destination in the instruction.
 
 <CodeGroup>
 ```bash npm
-npx e2e cache ls      # one row per entry: test, target, instruction digest, age, actions
-npx e2e cache stats   # entry count and size
-npx e2e cache clear   # delete every entry
+npx e2e cache ls                  # one row per entry: entry, test, target, instruction digest, age, actions
+npx e2e cache show 4f1c0a9d3b62   # one entry, action by action
+npx e2e cache check               # every detour; exits 1 when there is one
+npx e2e cache stats               # entry count and size
+npx e2e cache clear               # delete every entry
 ```
 
 ```bash pnpm
-pnpm exec e2e cache ls      # one row per entry: test, target, instruction digest, age, actions
-pnpm exec e2e cache stats   # entry count and size
-pnpm exec e2e cache clear   # delete every entry
+pnpm exec e2e cache ls                  # one row per entry: entry, test, target, instruction digest, age, actions
+pnpm exec e2e cache show 4f1c0a9d3b62   # one entry, action by action
+pnpm exec e2e cache check               # every detour; exits 1 when there is one
+pnpm exec e2e cache stats               # entry count and size
+pnpm exec e2e cache clear               # delete every entry
 ```
 
 ```bash bun
-bunx e2e cache ls      # one row per entry: test, target, instruction digest, age, actions
-bunx e2e cache stats   # entry count and size
-bunx e2e cache clear   # delete every entry
+bunx e2e cache ls                  # one row per entry: entry, test, target, instruction digest, age, actions
+bunx e2e cache show 4f1c0a9d3b62   # one entry, action by action
+bunx e2e cache check               # every detour; exits 1 when there is one
+bunx e2e cache stats               # entry count and size
+bunx e2e cache clear               # delete every entry
 ```
 </CodeGroup>
 
@@ -499,6 +510,6 @@ lowers the cost of a model call. The replay cache skips the call.
     `mode`, `store`, `dir`.
   </Card>
   <Card title="CLI reference" icon="terminal" href="/reference/cli#e2e-cache">
-    `e2e cache ls`, `stats`, `clear`.
+    `e2e cache ls`, `show`, `check`, `stats`, `clear`.
   </Card>
 </CardGroup>

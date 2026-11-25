@@ -4,7 +4,10 @@
  * The store is a directory of digest-named files, so a committed cache is
  * unreadable without a reader: `ls` prints each entry's provenance — the test,
  * the target, the instruction digest, its age, and how many actions it would
- * replay — `stats` sizes the store, and `clear` empties it.
+ * replay — `show` prints one entry's actions and where each ran, `check`
+ * names every entry whose flow leaves a screen and comes back with nothing
+ * changed (`cache/detours.ts`), `stats` sizes the store, and `clear` empties
+ * it.
  *
  * Every command works on files only. A project that configures `cache.store`
  * replaced the filesystem with its own store, and this CLI has no way to
@@ -15,16 +18,18 @@ import { readdir, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { Command } from 'commander';
 import picocolors from 'picocolors';
+import { describeDetour, findDetours, type TraceDetour } from '@e2e-dev/core/lib/cache/detours';
 import { FileCacheStore, MAX_CACHE_WIRE_BYTES } from '@e2e-dev/core/lib/cache/store';
+import { targetLabel, type ActionTrace } from '@e2e-dev/core/lib/cache/trace';
 import { discoverConfig, loadConfigModule, missingConfigError } from '../config/load.ts';
 import { resolveConfig } from '../config/resolve-run.ts';
-import { errorMessage } from '@e2e-dev/core/lib/internal/errors';
+import { errorMessage, sanitizeText } from '@e2e-dev/core/lib/internal/errors';
 import { redactError } from '@e2e-dev/core/lib/run/secrecy';
 import { visibleWidth } from '../report/format.ts';
 import { formatBytes } from './format-bytes.ts';
 import { docsLine, examples } from './help.ts';
 
-type CacheCommand = 'ls' | 'clear' | 'stats';
+type CacheCommand = 'ls' | 'clear' | 'stats' | 'check';
 
 /** The `--cache-dir` help line `e2e run` and every `e2e cache` command share. */
 export const CACHE_DIR_DESCRIPTION =
@@ -48,6 +53,10 @@ interface CacheEntrySummary {
   readonly testId: string | undefined;
   readonly targetId: string | undefined;
   readonly instructionDigest: string | undefined;
+  /** The recording itself, as a run would read it. */
+  readonly trace: ActionTrace;
+  /** Where its flow leaves a screen and comes back with nothing changed. */
+  readonly detours: readonly TraceDetour[];
 }
 
 interface CacheContents {
@@ -69,10 +78,11 @@ const DIGEST_PREFIX_CHARS = 12;
 
 /**
  * Runs one `e2e cache` command against the configured store directory.
- * Returns the process exit code: 2 for a config or filesystem error, 0
- * otherwise — an empty or absent cache is a fact, not a failure.
+ * Returns the process exit code: 2 for a config or filesystem error, 1 when
+ * `check` finds a detour, 0 otherwise — an empty or absent cache is a fact,
+ * not a failure.
  */
-async function cache(command: CacheCommand, options: CacheOptions = {}): Promise<number> {
+async function cache(command: CacheCommand | { readonly show: string }, options: CacheOptions = {}): Promise<number> {
   let directory: string;
   try {
     directory = await resolveCacheDirectory(options);
@@ -83,6 +93,7 @@ async function cache(command: CacheCommand, options: CacheOptions = {}): Promise
 
   try {
     const contents = await readContents(directory);
+    if (typeof command === 'object') return show(contents, command.show);
     switch (command) {
       case 'ls':
         return list(contents);
@@ -90,6 +101,8 @@ async function cache(command: CacheCommand, options: CacheOptions = {}): Promise
         return stats(contents);
       case 'clear':
         return await clear(contents);
+      case 'check':
+        return check(contents);
     }
   } catch (cause) {
     process.stderr.write(`replay cache at ${directory} could not be read: ${errorMessage(cause)}\n`);
@@ -97,7 +110,7 @@ async function cache(command: CacheCommand, options: CacheOptions = {}): Promise
   }
 }
 
-/** Registers `e2e cache` and its `ls`, `clear`, and `stats` subcommands on `program`. */
+/** Registers `e2e cache` and its `ls`, `show`, `check`, `clear`, and `stats` subcommands on `program`. */
 export function registerCacheCommand(program: Command): void {
   const cacheCommand = program
     .command('cache')
@@ -107,7 +120,7 @@ export function registerCacheCommand(program: Command): void {
     )
     .addHelpText(
       'after',
-      ['', examples(['e2e cache ls', 'e2e cache stats', 'e2e cache clear']), '', docsLine('/reference/cli#e2e-cache')].join('\n'),
+      ['', examples(['e2e cache ls', 'e2e cache show 4f1c0a9d3b62', 'e2e cache check', 'e2e cache stats', 'e2e cache clear']), '', docsLine('/reference/cli#e2e-cache')].join('\n'),
     );
 
   const cacheSubcommand = (name: CacheCommand, summary: string, description: string): void => {
@@ -125,7 +138,24 @@ export function registerCacheCommand(program: Command): void {
   cacheSubcommand(
     'ls',
     'list the cached traces',
-    'Print one row per cached trace: the test and target it was recorded for, the digest of its instruction, its age, and how many actions a replay would run.',
+    'Print one row per cached trace: the first characters of its entry digest, the test and target it was recorded for, the digest of its instruction, its age, and how many actions a replay would run.',
+  );
+  cacheCommand
+    .command('show')
+    .argument('<entry>', 'the entry digest, as many leading characters as tell it apart (ls prints 12), or its file path')
+    .summary('print one cached trace action by action')
+    .description(
+      'Print one cached trace: what it was recorded for, where it starts and ends, each action with the screen it ran on, the end state a replay checks, and any detour, a stretch that leaves a screen and comes back with nothing changed.',
+    )
+    .option('--config <path>', 'config file (default: the nearest e2e.config.ts, .mts, .js, or .mjs)')
+    .option('--cache-dir <dir>', CACHE_DIR_DESCRIPTION)
+    .action(async (entry: string, options: { config?: string; cacheDir?: string }) => {
+      process.exitCode = await cache({ show: entry }, options);
+    });
+  cacheSubcommand(
+    'check',
+    'find recordings that take a detour',
+    'Read every cached trace for a detour: a stretch that leaves a screen and comes back to it with nothing typed, chosen, or set on the way, as an agent does when it opens the wrong page and backs out. Exits 1 when any trace has one, so a pipeline can stop a recording with a wrong turn before it is committed.',
   );
   cacheSubcommand('clear', 'delete every cached trace', 'Delete the cache files and the directory itself; files the runner never wrote are left alone.');
   cacheSubcommand('stats', 'print the entry count and size', 'Print the store directory, how many readable entries it holds, and how many bytes they take.');
@@ -197,6 +227,8 @@ async function readContents(directory: string): Promise<CacheContents> {
       testId: trace.recordedFor?.testId,
       targetId: trace.recordedFor?.targetId,
       instructionDigest: trace.recordedFor?.instructionDigest,
+      trace,
+      detours: findDetours(trace),
     });
   }
   return { directory, entries, unreadable, foreign };
@@ -222,13 +254,20 @@ function list(contents: CacheContents): number {
         left.createdAt.localeCompare(right.createdAt),
     )
     .map((entry) => [
+      entry.keyHash.slice(0, DIGEST_PREFIX_CHARS),
       entry.testId ?? '-',
       entry.targetId ?? '-',
       entry.instructionDigest?.slice(0, DIGEST_PREFIX_CHARS) ?? '-',
       formatAge(entry.createdAt, now),
-      `${entry.actions}${entry.truncated ? ' (truncated)' : ''}`,
+      `${entry.actions}${entry.truncated ? ' (truncated)' : ''}${entry.detours.length > 0 ? picocolors.yellow(' (detour)') : ''}`,
     ]);
-  const header = ['TEST', 'TARGET', 'INSTRUCTION', 'AGE', 'ACTIONS'];
+  writeTable(['ENTRY', 'TEST', 'TARGET', 'INSTRUCTION', 'AGE', 'ACTIONS'], rows);
+  warnAboutSkipped(contents);
+  return 0;
+}
+
+/** Prints a header and rows in columns two spaces apart, aligned by displayed width; the last column is not padded. */
+function writeTable(header: readonly string[], rows: readonly (readonly string[])[]): void {
   const widths = header.map((title, column) =>
     Math.max(visibleWidth(title), ...rows.map((row) => visibleWidth(row[column]!))),
   );
@@ -239,8 +278,104 @@ function list(contents: CacheContents): number {
       .trimEnd();
   process.stdout.write(`${picocolors.bold(line(header))}\n`);
   for (const row of rows) process.stdout.write(`${line(row)}\n`);
-  warnAboutSkipped(contents);
+}
+
+/**
+ * The entry `ref` names: a digest or its leading characters, or the path of
+ * its file. Prints why and returns undefined when no entry or more than one
+ * matches.
+ */
+function findEntry(contents: CacheContents, ref: string): CacheEntrySummary | undefined {
+  const prefix = (ENTRY_FILE.exec(path.basename(ref))?.[1] ?? ref).toLowerCase();
+  const matches = /^[a-f0-9]+$/u.test(prefix) ? contents.entries.filter((entry) => entry.keyHash.startsWith(prefix)) : [];
+  if (matches.length === 1) return matches[0];
+  if (matches.length === 0) {
+    const unreadable = contents.unreadable.some((file) => file.name.startsWith(prefix));
+    process.stderr.write(
+      unreadable
+        ? `${ref} names a file in ${contents.directory} that is not a readable trace-1 entry; a run treats it as a miss\n`
+        : `no replay cache entry ${ref} in ${contents.directory}; e2e cache ls lists them\n`,
+    );
+    return undefined;
+  }
+  process.stderr.write(`${ref} matches ${matches.length} entries in ${contents.directory}; give more of the digest\n`);
+  return undefined;
+}
+
+/**
+ * Prints one entry the way a reviewer reads it: what it was recorded for,
+ * each action numbered from 1 with the screen it ran on, the end state a
+ * replay checks, and every detour, whose actions are marked in the list.
+ */
+function show(contents: CacheContents, ref: string): number {
+  const entry = findEntry(contents, ref);
+  if (entry === undefined) return 2;
+  const { trace } = entry;
+  const model = trace.recordedBy === undefined ? '' : ` with ${trace.recordedBy.provider}/${trace.recordedBy.model}`;
+  const facts: [string, string | undefined][] = [
+    ['entry', path.join(contents.directory, `${entry.keyHash}.json`)],
+    ['test', entry.testId],
+    ['target', entry.targetId],
+    ['agent', trace.recordedFor?.agent],
+    ['recorded', `${entry.createdAt}${model}`],
+    ['summary', trace.summary],
+    ['starts on', trace.startPath],
+    ['ends on', trace.endPath],
+  ];
+  const shown = facts.filter((fact): fact is [string, string] => fact[1] !== undefined);
+  const width = Math.max(...shown.map(([label]) => label.length));
+  for (const [label, value] of shown) process.stdout.write(`${label.padEnd(width)}  ${plain(value)}\n`);
+  process.stdout.write('\n');
+  const detoured = new Set(entry.detours.flatMap((detour) => Array.from({ length: detour.to - detour.from }, (_, offset) => detour.from + offset)));
+  writeTable(
+    ['#', 'AT', 'ACTION'],
+    trace.actions.map((action, index) => [
+      String(index + 1),
+      action.at === undefined ? '-' : plain(action.at),
+      `${plain(action.summary)}${detoured.has(index) ? picocolors.yellow(' (detour)') : ''}`,
+    ]),
+  );
+  const anchors = [
+    ...(trace.endAnchors ?? []).map((anchor) => `shows ${targetLabel(anchor)}`),
+    ...(trace.goneAnchors ?? []).map((anchor) => `no longer shows ${targetLabel(anchor)}`),
+  ];
+  if (anchors.length > 0) process.stdout.write(`\nend state: ${plain(anchors.join(', '))}\n`);
+  if (trace.truncated === true) process.stdout.write('\nnever replays: recording hit a cap or kept a value it could not replay\n');
+  if (entry.detours.length > 0) process.stdout.write('\n');
+  for (const detour of entry.detours) process.stdout.write(`${picocolors.yellow('detour')}: ${plain(describeDetour(detour))}\n`);
   return 0;
+}
+
+/** Text from an entry as one terminal line: control sequences stripped, line breaks and tabs as spaces. */
+function plain(text: string): string {
+  return sanitizeText(text).replaceAll(/[\n\t]/gu, ' ');
+}
+
+/**
+ * Prints every entry with a detour, one line per detour, and exits 1 when
+ * there is any: a recording that took a wrong turn replays it on every run,
+ * and a pipeline that commits recordings is where to stop it.
+ */
+function check(contents: CacheContents): number {
+  const detoured = contents.entries
+    .filter((entry) => entry.detours.length > 0)
+    .toSorted((left, right) => (left.testId ?? '').localeCompare(right.testId ?? '') || left.keyHash.localeCompare(right.keyHash));
+  for (const entry of detoured) {
+    const who = entry.testId === undefined ? '' : ` ${entry.testId}${entry.targetId === undefined ? '' : ` (${entry.targetId})`}`;
+    for (const detour of entry.detours) {
+      process.stdout.write(`${entry.keyHash.slice(0, DIGEST_PREFIX_CHARS)}${plain(`${who}: ${describeDetour(detour)}`)}\n`);
+    }
+  }
+  const total = contents.entries.length;
+  if (detoured.length === 0) {
+    process.stdout.write(`no detours in ${total} replay cache ${total === 1 ? 'entry' : 'entries'} in ${contents.directory}\n`);
+  } else {
+    process.stdout.write(
+      `${detoured.length} of ${total} replay cache ${total === 1 ? 'entry takes' : 'entries take'} a detour; e2e cache show <entry> prints its actions\n`,
+    );
+  }
+  warnAboutSkipped(contents);
+  return detoured.length === 0 ? 0 : 1;
 }
 
 /** Prints the store's size: where it is, how many entries, how many bytes. */
