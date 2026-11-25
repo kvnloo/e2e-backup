@@ -106,6 +106,21 @@ describe('projectTree', () => {
     expect(counter.text).toBe('Counter Add one 0');
   });
 
+  it('keeps attribute values whole for the harness to redact, however long', () => {
+    const long = `${'x'.repeat(500)}secret-value-crossing-the-limit`;
+    const strings = ['#document', 'BODY', 'INPUT', 'placeholder', long];
+    const document: SnapshotDocument = {
+      nodes: { backendNodeId: [1, 2, 3], nodeName: [0, 1, 2], parentIndex: [-1, 0, 1], attributes: [[], [], [3, 4]] },
+      layout: { nodeIndex: [2], bounds: [[0, 0, 100, 20]] },
+    };
+    const ax: AXNode[] = [
+      { nodeId: '1', ignored: false, role: { value: 'RootWebArea' }, childIds: ['3'], backendDOMNodeId: 1 },
+      { nodeId: '3', ignored: false, role: { value: 'textbox' }, name: { value: 'Field' }, parentId: '1', backendDOMNodeId: 3 },
+    ];
+    const { root } = projectTree(ax, document, strings, { scale: 1, scrollX: 0, scrollY: 0, width: 640, height: 480 }, { mode: 'tree', testIdAttribute: 'data-testid', idOf: (id) => `1.${id}`, rootId: 'window' });
+    expect(root.children?.[0]?.attributes?.['placeholder']).toBe(long);
+  });
+
   it('keeps every attribute for a locator and only the model-facing ones in an observation', () => {
     const tree = find(project('tree').root, (node) => node.testId === 'username');
     const node = find(project('node').root, (candidate) => candidate.testId === 'username');

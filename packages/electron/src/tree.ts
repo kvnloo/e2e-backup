@@ -397,7 +397,9 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     for (const [key, value] of Object.entries(attributes)) {
       if (secure && key === 'value') continue;
       if (mode === 'tree' && !TREE_ATTRIBUTES.has(key) && !key.startsWith('aria-')) continue;
-      shown[key] = mode === 'tree' && key === 'href' ? originAndPath(value) : bound(value, OBSERVED_TEXT_LIMIT, mode);
+      // Whole, as the web engine keeps them: the harness redacts an attribute by whole values only, so a cut here could
+      // leave the start of a secret behind; it bounds what it renders after redaction.
+      shown[key] = mode === 'tree' && key === 'href' ? originAndPath(value) : value;
     }
     if (Object.keys(shown).length > 0) draft.attributes = shown;
     const rect = rectOf(facts);
