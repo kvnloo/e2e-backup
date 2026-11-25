@@ -352,9 +352,10 @@ export interface PointAction extends ActionBase, TracePointEnd {
   readonly viewport: TraceViewport;
   /**
    * The role of the control the point was on, the innermost interactive
-   * node containing it, when that is not the node `within` names (a switch
-   * whose icon is the innermost node). Provenance only, never replay input:
-   * a tap on a switch's icon sets the switch (`cache/detours.ts`).
+   * node containing it, unless `within` already names a node of that role:
+   * a switch whose icon is the innermost node, or an unnamed switch, which
+   * keeps no anchor. Provenance only, never replay input: a tap on a
+   * switch's icon sets the switch (`cache/detours.ts`).
    */
   readonly controlRole?: string;
 }

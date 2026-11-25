@@ -292,7 +292,9 @@ export class TraceRecorder {
       case 'tapAt':
       case 'hoverAt': {
         const within = withinOf(target, action.under, action.point);
-        const controlRole = action.control === undefined || action.control === action.under ? undefined : action.control.role;
+        // Left out only when the stored anchor already names the control's role: an unnamed switch keeps no anchor at all.
+        const role = action.control?.role;
+        const controlRole = role === undefined || within?.target.role === role ? undefined : role;
         return {
           name: action.name,
           summary,

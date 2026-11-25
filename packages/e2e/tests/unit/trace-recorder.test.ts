@@ -447,6 +447,15 @@ describe('TraceRecorder: bare-point taps', () => {
     expect(read?.payload.actions[0]).toMatchObject({ name: 'tapAt', controlRole: 'switch', within: { target: { role: 'img', name: 'Moon' } } });
   });
 
+  it('records the role of an unnamed control a point was on, which keeps no anchor', () => {
+    const unnamed = redacted({ ref: { id: 's2', revision: 'r1' }, role: 'switch', rect: { x: 0, y: 0, width: 12, height: 12 } });
+    const recorder = makeRecorder();
+    recorder.record({ name: 'tapAt', point: { x: 6, y: 6 }, viewport, under: unnamed, control: unnamed });
+    const action = recorder.finalize({ ...conclusion, startPath: '/settings' })?.actions[0];
+    expect(action).not.toHaveProperty('within');
+    expect(action).toMatchObject({ name: 'tapAt', controlRole: 'switch' });
+  });
+
   it('records a point under an anonymous container by the viewport alone, since a group among groups cannot be re-found', () => {
     const recorder = makeRecorder();
     const merged = redacted({ ref: { id: 'g1', revision: 'r1' }, role: 'group', rect: { x: 0, y: 0, width: 1280, height: 720 } });
