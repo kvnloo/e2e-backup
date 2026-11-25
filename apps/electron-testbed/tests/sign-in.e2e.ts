@@ -70,6 +70,11 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('wide-result')).toHaveText('Wide action ran');
   });
 
+  test('drags to a drop zone below the edge of the window', async ({ screen }) => {
+    await screen.getByRole('button', 'Drag me').dragTo(screen.getByRole('button', 'Drop here'));
+    await expect(screen.getByTestId('drag-result')).toHaveText('Dropped drag-source on the zone');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });

@@ -59,6 +59,16 @@ document.getElementById('wide').addEventListener('click', () => {
   document.querySelector('[data-testid="wide-result"]').textContent = 'Wide action ran';
 });
 
+// A drop counts only when the press started on the source and the release lands on the zone, far below it.
+let pressed;
+document.addEventListener('mousedown', (event) => {
+  pressed = event.target.id;
+});
+document.addEventListener('mouseup', (event) => {
+  if (event.target.id !== 'drop-zone') return;
+  document.querySelector('[data-testid="drag-result"]').textContent = `Dropped ${pressed || 'nothing'} on the zone`;
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');

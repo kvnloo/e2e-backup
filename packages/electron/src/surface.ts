@@ -747,13 +747,23 @@ export class ElectronSurface {
           }
           case 'dragTo': {
             const target = this.bind(action.target);
+            // The source is pressed where it is now; only then does the target scroll into view, under the held pointer.
             const from = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            const session = await this.session(window.page);
-            await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: target.backendNodeId }).catch(() => undefined);
-            const { quads } = await session.send('DOM.getContentQuads', { backendNodeId: target.backendNodeId });
-            const quad = quads.find((candidate) => area(candidate) > 0);
-            if (quad === undefined) throw notActionable('the drop target has no box on screen');
-            await commit(() => this.drag(window, from, whole(centre(quad))));
+            await commit(() => mouse.move(from.x, from.y));
+            await commit(() => mouse.down());
+            try {
+              const session = await this.session(window.page);
+              await session.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: target.backendNodeId }).catch(() => undefined);
+              const { quads } = await session.send('DOM.getContentQuads', { backendNodeId: target.backendNodeId });
+              const quad = quads.find((candidate) => area(candidate) > 0);
+              if (quad === undefined) throw notActionable('the drop target has no box on screen');
+              const to = whole(centre(quad));
+              // An intermediate move, so drag handlers see motion before the drop.
+              await commit(() => mouse.move(Math.round((from.x + to.x) / 2), Math.round((from.y + to.y) / 2)));
+              await commit(() => mouse.move(to.x, to.y));
+            } finally {
+              await mouse.up();
+            }
             return;
           }
           case 'swipe': {
