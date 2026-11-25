@@ -10,9 +10,11 @@
  * anything. Going back after a change (a detail page edited, then left) is
  * ordinary navigation and is not one.
  *
- * Routes compare as the cache compares them (`sameRoute`), so a record id in
- * the path is not a new screen. Each action carries the location it ran at
- * (`RecordedAction.at`) on entries recorded since that was added; for older
+ * A return is to the same address, record ids and query included
+ * (`addressKey`): from one order's page to another's and back is a visit to
+ * another record, and from one order to another is no return at all. Each
+ * action carries the location it ran at (`RecordedAction.at`) on entries
+ * recorded since that was added; for older
  * entries, which have none, the actions alone are read for the narrowest
  * shape of the same thing: a tap or a navigate, nothing but looking around
  * after it, then `back`.
@@ -23,7 +25,7 @@
  */
 
 import { bound } from '../internal/text.ts';
-import { routeKey } from './route.ts';
+import { addressKey } from './route.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
 /** What the detour check reads of a trace. */
@@ -151,18 +153,18 @@ function places(trace: DetourInput): (string | undefined)[] {
 
 /**
  * For each action that stood on a known place, the last return to the same
- * route that followed a departure from it, with nothing typed, chosen, or set on the way.
+ * address that followed a departure from it, with nothing typed, chosen, or set on the way.
  * The last, so a flow that tried two wrong pages from one menu reads as one
  * detour; a return, so actions that stay home after it are not part of it.
  */
 function byLocations(trace: DetourInput): TraceDetour[] {
   const where = places(trace);
-  // Each route read once: the scan compares every place with many others.
+  // Each address read once: the scan compares every place with many others.
   const keys = new Map<string, string>();
-  const route = (place: string): string => {
+  const address = (place: string): string => {
     let key = keys.get(place);
     if (key === undefined) {
-      key = routeKey(place);
+      key = addressKey(place);
       keys.set(place, key);
     }
     return key;
@@ -185,7 +187,7 @@ function byLocations(trace: DetourInput): TraceDetour[] {
       if (changesState(actions[to - 1]!)) break;
       const place = where[to];
       if (place === undefined) continue;
-      if (route(home) !== route(place)) {
+      if (address(home) !== address(place)) {
         via ??= place;
         away = true;
       } else if (via === undefined) {
@@ -200,7 +202,7 @@ function byLocations(trace: DetourInput): TraceDetour[] {
       from += 1;
       continue;
     }
-    // Named by the place the leaving action stood on, as a stored span is (`recorded`): the same route, maybe spelled otherwise.
+    // Named by the place the leaving action stood on, as a stored span is (`recorded`): the same address, maybe spelled otherwise.
     detours.push({ from: left, to: back, at: where[left] ?? home, via, evidence: 'locations' });
     from = back;
   }

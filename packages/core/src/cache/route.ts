@@ -41,8 +41,8 @@ type Route =
       /** The origin, absent for a location on the app's own origin (`appLocation`). */
       readonly origin?: string;
       readonly segments: readonly string[];
-      /** One `key=value` term per query parameter, minted keys and values as `:id`, sorted. */
-      readonly query: readonly string[];
+      /** One `[key, value]` pair per query parameter, minted keys and values as `:id`, sorted. */
+      readonly query: readonly (readonly [string, string])[];
     }
   | { readonly kind: 'opaque'; readonly location: string };
 
@@ -151,18 +151,28 @@ function splitOnce(text: string, separator: string): readonly [string, string] {
   return at === -1 ? [text, ''] : [text.slice(0, at), text.slice(at + 1)];
 }
 
-/** A query's parameters as route terms, `key=value` with a minted key or value as `:id`, sorted. */
-function queryTerms(search: string): string[] {
-  const terms: string[] = [];
-  for (const [key, value] of new URLSearchParams(search)) {
-    const minted = (text: string) => text !== '' && MINTED_VALUE.some((pattern) => pattern.test(text));
-    terms.push(`${minted(key) ? PARAM : key}=${minted(value) ? PARAM : value}`);
-  }
-  return terms.toSorted();
+/**
+ * A query's parameters as `[key, value]` pairs, sorted; with `mint`, a
+ * minted key or value as `:id`.
+ */
+function queryPairs(search: string, mint: boolean): (readonly [string, string])[] {
+  const minted = (text: string) => mint && text !== '' && MINTED_VALUE.some((pattern) => pattern.test(text));
+  const pairs: (readonly [string, string])[] = [];
+  for (const [key, value] of new URLSearchParams(search)) pairs.push([minted(key) ? PARAM : key, minted(value) ? PARAM : value]);
+  return pairs.toSorted(([a, x], [b, y]) => (a === b ? compareText(x, y) : compareText(a, b)));
 }
 
-/** The route of a location. */
-function routeOf(location: string): Route {
+function compareText(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+/**
+ * The route of a location. With `mint`, every segment and query value
+ * shaped like one the app mints per record reads `:id`; without, the
+ * location's own words are kept, decoded, its fragment dropped as above.
+ */
+function routeOf(location: string, mint = true): Route {
   const parts = locationParts(location);
   if (parts === undefined) return { kind: 'opaque', location };
   const segments = parts.pathname
@@ -170,19 +180,24 @@ function routeOf(location: string): Route {
     .filter((raw) => raw !== '')
     .map((raw) => {
       const text = decodeSegment(raw);
-      return MINTED_SEGMENT.some((pattern) => pattern.test(text)) ? PARAM : text;
+      return mint && MINTED_SEGMENT.some((pattern) => pattern.test(text)) ? PARAM : text;
     });
-  return { kind: 'url', ...(parts.origin === undefined ? {} : { origin: parts.origin }), segments, query: queryTerms(parts.search) };
+  return { kind: 'url', ...(parts.origin === undefined ? {} : { origin: parts.origin }), segments, query: queryPairs(parts.search, mint) };
 }
 
 /** Whether two locations name the same screen: one origin, and segments and query that read alike. */
 export function sameRoute(recorded: string, live: string): boolean {
-  return routeKey(recorded) === routeKey(live);
+  return routeIdentity(routeOf(recorded)) === routeIdentity(routeOf(live));
 }
 
-/** A location's route as one string: two locations are one screen exactly when their keys are equal (`sameRoute`). */
-export function routeKey(location: string): string {
-  return routeIdentity(routeOf(location));
+/**
+ * A location's address as one string, nothing read as minted: two
+ * locations have equal keys only when they name the same record too
+ * (`/orders/123/edit` is not `/orders/456/edit`). The fragment is dropped
+ * as a route drops it, and the query's order does not count.
+ */
+export function addressKey(location: string): string {
+  return routeIdentity(routeOf(location, false));
 }
 
 /** A route's parts as one comparable string, a slash inside a segment kept inside it. */

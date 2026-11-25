@@ -453,10 +453,13 @@ delete the entry file and run the test again in `read-write` mode. If the
 agent takes the same wrong turn, name the destination in the instruction.
 
 <Accordion title="What counts as a detour">
-- Each action records the screen it ran on: its route, as in
-  [What counts as the same route](#how-a-replay-works), or the screen title
-  on a device. Two screens with the same route or title count as one. An
-  action taken on the same look as the one before it records no screen
+- A detour comes back to the same address, record id and query included:
+  `/orders/7` to `/orders/8` and back to `/orders/7` is one, `/orders/7`
+  to `/orders/8` is not. A fragment doesn't count, as in
+  [What counts as the same route](#how-a-replay-works).
+- On a device, the address is the screen title. Two screens with the same
+  title count as one.
+- An action taken on the same look as the one before it records no screen
   (`-` in `e2e cache show`). Repeated scrolls are one action, so a route the
   page moves to while it scrolls doesn't count.
 - A typed value, a secret fill, a select, a check, an upload, a drag, a key
