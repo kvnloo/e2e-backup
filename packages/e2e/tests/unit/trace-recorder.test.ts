@@ -411,6 +411,18 @@ describe('TraceRecorder: bare-point taps', () => {
     expect(trace?.truncated).toBeUndefined();
   });
 
+  it('records the role of the control a point was on when an inner node holds the point, and reads it back', () => {
+    const toggle = redacted({ ref: { id: 's1', revision: 'r1' }, role: 'switch', name: 'Dark mode', rect: { x: 100, y: 200, width: 60, height: 30 } });
+    const icon = redacted({ ref: { id: 'i1', revision: 'r1' }, role: 'img', name: 'Moon', rect: { x: 110, y: 205, width: 20, height: 20 } });
+    const recorder = makeRecorder();
+    recorder.record({ name: 'tapAt', point: { x: 120, y: 215 }, viewport, under: icon, control: toggle });
+    recorder.record({ name: 'tapAt', point: { x: 130, y: 210 }, viewport, under: toggle, control: toggle });
+    const trace = recorder.finalize({ ...conclusion, startPath: '/settings' });
+    expect(trace?.actions.map((action) => (action.name === 'tapAt' ? action.controlRole : undefined))).toEqual(['switch', undefined]);
+    const read = readTraceEntry(JSON.parse(JSON.stringify(buildTraceEntry(trace!))));
+    expect(read?.payload.actions[0]).toMatchObject({ name: 'tapAt', controlRole: 'switch', within: { target: { role: 'img', name: 'Moon' } } });
+  });
+
   it('records a point under an anonymous container by the viewport alone, since a group among groups cannot be re-found', () => {
     const recorder = makeRecorder();
     const merged = redacted({ ref: { id: 'g1', revision: 'r1' }, role: 'group', rect: { x: 0, y: 0, width: 1280, height: 720 } });

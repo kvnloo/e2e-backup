@@ -270,12 +270,14 @@ export class TraceRecorder {
       case 'tapAt':
       case 'hoverAt': {
         const within = withinOf(target, action.under, action.point);
+        const controlRole = action.control === undefined || action.control === action.under ? undefined : action.control.role;
         return {
           name: action.name,
           summary,
           point: action.point,
           viewport: { width: action.viewport.width, height: action.viewport.height },
           ...(within === undefined ? {} : { within }),
+          ...(controlRole === undefined ? {} : { controlRole }),
         };
       }
       case 'dragAt': {

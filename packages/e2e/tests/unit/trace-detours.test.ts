@@ -70,6 +70,9 @@ describe('findDetours by recorded locations', () => {
       at: '/settings/display',
     };
     expect(findDetours(flow([tap('Display', '/settings'), toggled, back('/settings/display')], { endPath: '/settings' }))).toEqual([]);
+    // The icon inside the switch held the point; the switch is the control it set.
+    const onIcon: RecordedAction = { ...toggled, within: { target: { role: 'img', name: 'Moon' }, fx: 0.5, fy: 0.5 }, controlRole: 'switch' } as RecordedAction;
+    expect(findDetours(flow([tap('Display', '/settings'), onIcon, back('/settings/display')], { endPath: '/settings' }))).toEqual([]);
     const hovered: RecordedAction = { name: 'hover', summary: 'hover checkbox "Beta"', target: { role: 'checkbox', name: 'Beta' }, at: '/settings/labs' };
     expect(findDetours(flow([tap('Labs', '/settings'), hovered, back('/settings/labs')], { endPath: '/settings' }))).toEqual([
       { from: 0, to: 3, at: '/settings', via: '/settings/labs', evidence: 'locations' },
