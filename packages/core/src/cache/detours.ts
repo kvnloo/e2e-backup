@@ -113,7 +113,7 @@ function tappedRole(action: RecordedAction): string | undefined {
  * Every detour in a recording, in order and never overlapping. Read by
  * locations when any action carries one, else by the actions' shape alone.
  */
-export function findDetours(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): TraceDetour[] {
+export function findDetours(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'>): TraceDetour[] {
   return trace.actions.some((action) => action.at !== undefined) ? byLocations(trace) : byActions(trace.actions);
 }
 
@@ -121,9 +121,12 @@ export function findDetours(trace: Pick<ActionTrace, 'actions' | 'startPath' | '
  * Where the flow stood before each action, then where it ended: the first
  * action falls back to the step's start location, the last place is the
  * step's end location. An unknown place is undefined and matches nothing.
+ * A recording cut at the action cap ran actions it did not keep, so its end
+ * location is not where its last kept action led.
  */
-function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): (string | undefined)[] {
-  return [...trace.actions.map((action, index) => action.at ?? (index === 0 ? trace.startPath : undefined)), trace.endPath];
+function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'>): (string | undefined)[] {
+  const end = trace.truncated === true ? undefined : trace.endPath;
+  return [...trace.actions.map((action, index) => action.at ?? (index === 0 ? trace.startPath : undefined)), end];
 }
 
 /**
@@ -132,7 +135,7 @@ function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): 
  * The last, so a flow that tried two wrong pages from one menu reads as one
  * detour; a return, so actions that stay home after it are not part of it.
  */
-function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): TraceDetour[] {
+function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath' | 'truncated'>): TraceDetour[] {
   const where = places(trace);
   // Each route read once: the scan compares every place with many others.
   const keys = new Map<string, string>();
