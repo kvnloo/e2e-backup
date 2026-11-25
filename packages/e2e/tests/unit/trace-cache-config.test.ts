@@ -360,6 +360,20 @@ describe('settleStagedTraces', () => {
     expect(readTraceEntry(JSON.parse(store.entries.get(KEY_A)!))?.payload).toEqual({ ...recorded, recordedFor: STEP });
   });
 
+  it('masks a secret a later step resolved in the locations it writes', async () => {
+    const store = memoryStore();
+    const ledger = new SecretLedger();
+    const context = contextWith(store);
+    const located: ActionTrace = { ...trace('invited'), actions: [{ name: 'tap', summary: 'tap button "X"', target: { role: 'button', name: 'X' }, at: '/invite?code=token-2718-value' }] };
+    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: located, stepIndex: 1, redact: ledger.redact });
+    // A provider-backed secret resolves in a later step, before the attempt settles.
+    ledger.register('token', 'token-2718-value');
+    await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
+    const stored = store.entries.get(KEY_A)!;
+    expect(stored).not.toContain('token-2718-value');
+    expect(readTraceEntry(JSON.parse(stored))?.payload.actions[0]?.at).toBe('/invite?code=<secret:token>');
+  });
+
   it('keeps an entry whose flow differs from the new recording only in where each action ran', async () => {
     const store = memoryStore();
     const located = (at: string): ActionTrace => ({ ...trace('same flow'), actions: [{ name: 'tap', summary: 'tap button "X"', target: { role: 'button', name: 'X' }, at }] });
