@@ -115,8 +115,8 @@ export class TraceRecorder {
    * than skipping it: the grammar cannot reproduce the mutation, and a replay
    * that silently dropped a state change would prove nothing.
    */
-  recordGap(toolName: string): void {
-    this.push({ name: 'tool', summary: bound(`tool ${this.redact(toolName)}`, MAX_TRACE_SUMMARY_CHARS) });
+  recordGap(toolName: string, at?: string): void {
+    this.push(this.located({ name: 'tool', summary: bound(`tool ${this.redact(toolName)}`, MAX_TRACE_SUMMARY_CHARS) }, at));
     this.lastActionAt = Date.now();
   }
 

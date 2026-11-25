@@ -229,8 +229,8 @@ export class StepTraceSession {
   }
 
   /** Records one mutating project-tool call as a replay-ending gap. */
-  recordGap(toolName: string): void {
-    this.recorder?.recordGap(toolName);
+  recordGap(toolName: string, at?: string): void {
+    this.recorder?.recordGap(toolName, at);
     this.countAfterEndMismatch();
   }
 
