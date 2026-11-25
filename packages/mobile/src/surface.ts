@@ -1178,11 +1178,11 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    * 411 dp, so one dp is 2.6277 pixels wide). A point on the viewport's edge
    * then converts back to the screen's edge.
    *
-   * A capture without screen geometry is returned unchanged and sets no
-   * scale. A capture without a density (agent-device's older Android
-   * snapshot helper) stays in physical pixels. When the density changes,
-   * including to or from a capture without one, the learned viewport is
-   * dropped, since it's in the old unit.
+   * A capture without screen geometry is returned unchanged and doesn't set
+   * a scale. A capture without a density (agent-device's older Android
+   * snapshot helper) stays in physical pixels. The learned viewport is in
+   * the old unit, so it's dropped when the density changes, including to or
+   * from a capture without one.
    */
   private inDp(raw: RawSnapshot): RawSnapshot {
     if (this.options.platform !== 'android') return raw;
@@ -1219,12 +1219,12 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   }
 
   /**
-   * Reads the Android pixel scale before a point action when no capture has
-   * set it (see `inDp`). A test or the agent can name a point before the
-   * screen is captured, and the scale comes from a capture, so one is taken
-   * first. When the screen can't be read yet (a splash screen, an app still
-   * launching), or the capture has no screen geometry, the screen is
-   * captured again until the budget runs out. Then the action fails with
+   * Reads the Android pixel scale before a point action when it isn't set
+   * yet (see `inDp`). A test or the agent can pass a point before the screen
+   * is captured, and the scale comes from a capture, so one is taken first.
+   * The screen is captured again until the budget runs out when it can't be
+   * read yet (a splash screen, an app still launching) or the capture
+   * doesn't have screen geometry. Then the action fails with
    * `OPERATION_TIMEOUT`, and no input is sent.
    */
   async readPixelScale(signal: AbortSignal, input: InputBudget): Promise<void> {
@@ -1239,7 +1239,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       if (input.remainingMs() <= SCALE_READ_RETRY_MS) {
         throw new EngineError(
           'OPERATION_TIMEOUT',
-          'the Android screen could not be read in time to convert the point to physical pixels; nothing was sent. Wait for the first screen before a point action.',
+          'the Android screen could not be read in time to convert the point to physical pixels. Nothing was sent. Wait for the first screen before a point action.',
           { retryable: false },
         );
       }
@@ -1248,9 +1248,9 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   }
 
   /**
-   * Drops the pixel scale, so the next point action reads it again. A
-   * rotation or a fold changes the screen, and a test's point action has no
-   * capture of its own.
+   * Drops the pixel scale, so the next point action reads it again. The
+   * screen can change after a rotation or a fold. A test's point action
+   * doesn't capture the screen first.
    */
   forgetPixelScale(): void {
     this.pixelScale = undefined;
@@ -1834,8 +1834,8 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    */
   async performAt(point: ViewportPoint, action: PointerAction, operation: OperationContext, input: InputBudget): Promise<void> {
     const settle = operation.origin === 'test' ? {} : this.settleOptions;
-    // A test's point comes with no capture of its own, and the display's
-    // density can change between two actions, so the scale is read again.
+    // A test's point action doesn't capture the screen first, and the display
+    // density can change between actions, so the scale is read again.
     // The agent reads the screen on every turn.
     if (operation.origin === 'test') this.forgetPixelScale();
     await this.readPixelScale(operation.signal, input);
@@ -1844,9 +1844,9 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
     const toDevice = (at: ViewportPoint): ViewportPoint => this.toDevicePoint(at);
     await this.command(label, (client) => pointerInteraction(client, point, action, settle, gestureStabilization(operation), input, toDevice).catch(async (cause: unknown) => {
       if (action.kind !== 'swipeTo') throw cause;
-      // agent-device reports the refused path and the viewport it checked in
-      // physical pixels on Android, so the screen size it's compared with is
-      // too.
+      // On Android, agent-device reports the refused path and the viewport it
+      // checked in physical pixels, so the screen size they're compared with
+      // is converted to physical pixels.
       throw await refusedSwipePath(cause, label, action.durationMs !== undefined, async () => {
         const { width, height } = await this.viewport(operation, input);
         const corner = this.toDevicePoint({ x: width, y: height });
@@ -2143,8 +2143,8 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
     if (secure === undefined) {
       throw new ConfigurationError('POLICY_DENIED', 'a secure field on screen has no bounds to mask, so the screenshot is withheld');
     }
-    // The masks scale each axis by its own ratio, so they need the viewport
-    // of this capture, not one learned before the screen changed size.
+    // Each axis is scaled by a separate ratio, so the viewport has to come
+    // from this capture, not one learned before the screen changed size.
     const viewport = secure.length === 0 ? undefined : await this.viewportFor(projected.viewport, operation.signal, budget);
     const data = await this.rawScreenshot(operation.signal, {}, budget);
     const masked = redactSecure(data, secure, viewport);
@@ -2194,8 +2194,8 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
 /**
  * Returns the image pixels per viewport unit for `ObservationPixels.scale`.
  * On Android the viewport is whole dp, so the two axes have slightly
- * different factors (see `inDp`), and the contract has one number. The
- * image's width plus height over the viewport's width plus height splits
+ * different factors (see `inDp`), but the contract takes one number.
+ * `(size.width + size.height) / (viewport.width + viewport.height)` splits
  * the rounding between the axes, so the image divided by it rounds back to
  * the viewport on both (411 by 914 for 1080 by 2400 at density 2.625).
  */

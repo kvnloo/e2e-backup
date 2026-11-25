@@ -407,8 +407,8 @@ await screen.tapAt({ x: map.x + 360, y: map.y + 70 });
 await screen.tapAt({ x: '50%', y: '50%' });
 ```
 
-- Each coordinate is a number in the unit [`boundingBox()`](#boundingbox)
-  reports in, or a percentage of the viewport from `'0%'` through `'100%'`,
+- Each coordinate is a number in the same unit as [`boundingBox()`](#boundingbox),
+  or a percentage of the viewport from `'0%'` through `'100%'`,
   rounded to a whole unit (`'100%'` is the last one). They may mix: `{ x: '50%', y: 120 }`.
 - A percentage reads the screen once for its size.
 - Nothing is resolved or waited for; the page decides what the tap lands on.
@@ -708,7 +708,7 @@ The options are [`TapOptions`](#types):
   engines both do.
 - `modifiers`: the browser engine holds them.
 - `position`: an offset from the node's top-left corner, inside its border,
-  in the unit [`boundingBox()`](#boundingbox) reports in. The engine
+  in the same unit as [`boundingBox()`](#boundingbox). The engine
   scrolls the node into view when it lists
   `scrollIntoView`. Then it reads the node's box and dispatches the pointer at
   the point. No node is behind the gesture, so the platform's other

@@ -2042,7 +2042,7 @@ describe('Android density', () => {
     expect(await viewportAt(2)).toEqual({ width: 600, height: 1200 });
   });
 
-  it('masks an app screenshot with the viewport of its own capture after the screen gets shorter', async () => {
+  it('masks an app screenshot using that capture\'s viewport after the screen gets shorter', async () => {
     const h = harness({ platform: 'android' });
     // Half the 400 dp wide screen, as tall as the screen is after it shrinks.
     const image = { width: 200, height: 350, channels: 3 as const, pixels: new Uint8Array(200 * 350 * 3).fill(255) };
@@ -2073,7 +2073,7 @@ describe('Android density', () => {
     expect(at(140)).toEqual([255, 255, 255]);
   });
 
-  it('reads the density again before each test point action, so a changed density converts the next point', async () => {
+  it('reads the density again before each test point action, so the next point uses the new density', async () => {
     const h = harness({ platform: 'android' }, false);
     await openAttempt(h);
     const screen = (pixelDensity: number) => ({
@@ -2133,7 +2133,7 @@ describe('Android density', () => {
     expect(h.fake.lastArgs('interactions.press')).toEqual({ x: 200, y: 400 });
   });
 
-  it('sends nothing and times out when no capture gives the screen size', async () => {
+  it('times out without sending input when captures lack a screen size', async () => {
     const h = harness({ platform: 'android' }, false);
     await openAttempt(h);
     h.fake.respond('capture.snapshot', () => ({ nodes: [] }));
@@ -2697,7 +2697,7 @@ describe('device fixture', () => {
       h.fake.respond('capture.snapshot', () => screen(1080, 2400));
       await openAttempt(h);
       const device = fixture(h);
-      // The agent's point actions keep the scale between actions; a test's read it every time.
+      // Agent point actions reuse the scale. Test point actions read it every time.
       const tap = () => h.engine.performAt!({ x: 100, y: 100 }, { kind: 'tap' }, operation());
       await tap();
       expect(h.fake.lastArgs('interactions.press')).toMatchObject({ x: (100 * 1080) / 411, y: (100 * 2400) / 914 });

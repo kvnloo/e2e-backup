@@ -21,8 +21,8 @@ import type { AgentDeviceSurface, FoldPose } from './surface.ts';
 /**
  * How long the agent's `swipe` tool waits for the Android screen's pixel
  * scale. It matches the 15 s bound core puts on a targeted agent action. A
- * tool's `execute` gets no operation context, so `actionTimeout` doesn't
- * lower it, but the step's abort signal can end it sooner.
+ * tool's `execute` doesn't get an operation context, so `actionTimeout`
+ * doesn't lower it. The step's abort signal can end it sooner.
  */
 const TARGETED_ACTION_MS = 15_000;
 

@@ -560,8 +560,8 @@ function isSystemBar(node: RawNode, screen: ViewportSize | undefined, displayOnl
   if (inEdgeBand && width < screen.width * STATUS_ICON_MAX_WIDTH_SHARE && displayOnly()) return true;
   if (height >= screen.height * SYSTEM_BAR_MAX_SHARE || width < screen.width * SYSTEM_BAR_MIN_WIDTH_SHARE) return false;
   // After the dp conversion, an edge-to-edge bar can end one float step
-  // short of the screen's height, so the bottom edge is compared to half a
-  // unit.
+  // short of the screen's height, so the bottom edge gets half a unit of
+  // slack.
   return y <= 0 || y + height > screen.height - 0.5;
 }
 
