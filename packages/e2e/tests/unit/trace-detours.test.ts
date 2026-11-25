@@ -115,9 +115,18 @@ describe('findDetours by recorded locations', () => {
     expect(detours).toEqual([{ from: 1, to: 3, at: '/home', via: '/reports', evidence: 'locations' }]);
   });
 
-  it('compares routes, so a record id in the path is the same screen', () => {
+  it('finds a return to the same record', () => {
     const detours = findDetours(flow([tap('Order', '/orders/123'), back('/invoices'), tap('Ship', '/orders/123')], { endPath: '/orders/123' }));
     expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/123', via: '/invoices', evidence: 'locations' }]);
+  });
+
+  it('is no return to another record on the same route', () => {
+    // One order's edit page, the list, then another order's: the flow moved on, it did not come back.
+    expect(findDetours(flow([tap('Orders', '/orders/123/edit'), tap('Order 456', '/orders'), tap('Ship', '/orders/456/edit')], { endPath: '/orders/456/edit' }))).toEqual([]);
+    // Back to the first order is a return.
+    expect(findDetours(flow([tap('Orders', '/orders/123/edit'), tap('Order 456', '/orders'), back('/orders/456/edit')], { endPath: '/orders/123/edit' }))).toEqual([
+      { from: 0, to: 3, at: '/orders/123/edit', via: '/orders', evidence: 'locations' },
+    ]);
   });
 
   it('uses the detours the recording run found, since stored placeholders no longer compare like their values', () => {
