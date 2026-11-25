@@ -29,6 +29,7 @@
     "packages/web/tests/types/downloads.ts",
     "packages/web/tests/types/app.ts",
     "packages/web/tests/types/engine.ts",
+    "packages/web/tests/types/console-messages.ts",
     "packages/mobile/tests/types/options.ts",
     "packages/mobile/tests/types/engine.ts",
     "packages/desktop/tests/types/engine.ts",

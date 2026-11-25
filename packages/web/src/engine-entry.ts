@@ -35,6 +35,8 @@ export type {
   RouteContinueOverrides,
   RouteFulfillResponse,
   RouteMatcher,
+  WebConsoleMessage,
+  WebPageError,
   WebResponse,
   WebRoute,
 } from './browser.ts';

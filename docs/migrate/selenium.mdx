@@ -94,6 +94,7 @@ test('signs in', async ({ app, screen, browser }) => {
 | `switchTo().frame()`, `switchTo().alert().accept()` | `browser.frameLocator('#frame')`, `browser.onDialog('accept')` before the action |
 | `switchTo().window(handle)`, `getWindowHandles()`, `switchTo().newWindow()` | `tab.activate()`, `browser.tabs()`, `browser.newTab()`; `browser.waitForPopup(() => trigger)` for a tab the app opens, see [Tabs](/reference/web#tabs) |
 | `executeScript(script, args)` | `browser.evaluate(fn, arg)`, JSON in and out only |
+| `manage().logs().get('browser')` | Read console output with [`browser.consoleMessages()`](/reference/web#consolemessages) and uncaught exceptions with [`browser.pageErrors()`](/reference/web#pageerrors). Reading a list doesn't clear it |
 | Page objects | A fixture from `test.extend`, or a goal for `agent.act`, see [Page objects](/page-object-model) |
 
 ## What e2e doesn't have yet
@@ -110,7 +111,7 @@ e2e leaves it out on purpose.
 | `ChromeOptions.addArguments`, `setBinary`, `Proxy`, `acceptInsecureCerts` | Start Chrome or Edge with the flags, then attach with `web({ connect })` |
 | `@BeforeSuite`, `@AfterSuite`, pytest session-scoped fixtures, WebdriverIO `onPrepare` | Once for the run: the script `app.command` starts, or a wrapper around `e2e run`. Once for a file: `beforeAll` and `afterAll`. Sign-in: a top-level `test.setup` that saves a session |
 | BrowserStack or Sauce Labs for web | Your own [browser provider](/browser#write-a-provider), if the vendor has a CDP endpoint |
-| `manage().logs()`, request listeners, geolocation | Patch the page in `browser.addInitScript`, record requests in `browser.route` |
+| Request listeners, geolocation | Record requests in `browser.route`, stub geolocation in `browser.addInitScript` |
 | `setNetworkConditions` | For offline, [`browser.setNetwork('offline')`](/reference/web#setnetwork). No throttling or latency, keep those tests in Selenium |
 
 ### Not yet
