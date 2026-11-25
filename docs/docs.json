@@ -75,6 +75,7 @@
               "web",
               "mobile",
               "desktop",
+              "electron",
               "api-testing",
               "core"
             ]

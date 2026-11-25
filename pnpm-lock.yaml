@@ -393,6 +393,9 @@ importers:
       '@e2e-dev/e2b':
         specifier: workspace:*
         version: link:../packages/e2b
+      '@e2e-dev/electron':
+        specifier: workspace:*
+        version: link:../packages/electron
       '@e2e-dev/limrun':
         specifier: workspace:*
         version: link:../packages/limrun

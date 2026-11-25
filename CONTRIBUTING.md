@@ -387,7 +387,7 @@ prompts and tool descriptions.
 ### Engine contract
 
 `@e2e-dev/core/engine` (re-exported as `e2e/engine`) is what `@e2e-dev/web`,
-`@e2e-dev/mobile`, and `@e2e-dev/desktop` build against, and what a third-party
+`@e2e-dev/mobile`, `@e2e-dev/desktop`, and `@e2e-dev/electron` build against, and what a third-party
 engine builds against too. A change to that contract bumps `@e2e-dev/core`,
 `e2e`, and every engine together in one release, with a changeset for each,
 so an engine and a runner from the same release always match. `e2e` and `@e2e-dev/core` are a changesets

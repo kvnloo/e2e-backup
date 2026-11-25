@@ -1,0 +1,154 @@
+---
+title: Electron
+description: Test an Electron app through Chromium's accessibility tree, window by window.
+---
+
+`@e2e-dev/electron` runs tests on Electron apps. It launches the app, reads
+each window through Chromium's accessibility tree over the DevTools protocol,
+and drives it with trusted input. Tests use the same `agent`, `screen`, and
+`expect` APIs as browser tests.
+
+<Note>
+  The Electron engine is new, and so far tested on macOS only.
+</Note>
+
+## Set up
+
+Install the runner, the engine, and Electron:
+
+<CodeGroup>
+```bash npm
+npm install --save-dev e2e @e2e-dev/electron electron
+```
+
+```bash pnpm
+pnpm add --save-dev e2e @e2e-dev/electron electron
+```
+
+```bash bun
+bun add --dev e2e @e2e-dev/electron electron
+```
+</CodeGroup>
+
+The engine starts the `electron` package installed in the project. Electron 45
+and later download their binary on first use; the engine does this one time
+per run, before the first test. To check the setup, run `npx e2e doctor`.
+
+## Point at your app
+
+Set the target's `app.appPath` to the app's directory or main script, relative
+to the project root. `app.launchArguments` go after it on every launch, where
+the app reads them in `process.argv`.
+
+```ts title="e2e.config.ts"
+import type { E2EConfig } from 'e2e';
+import { electron } from '@e2e-dev/electron';
+
+export default {
+  targets: [
+    {
+      name: 'electron',
+      engine: electron(),
+      app: { appPath: '.', launchArguments: ['--no-update-check'] },
+    },
+  ],
+  credentials: {
+    ada: { username: 'ada', password: process.env.ADA_PASSWORD ?? '' },
+  },
+} satisfies E2EConfig;
+```
+
+To test a packaged app, set `electron({ executablePath: 'dist/mac/MyApp.app/Contents/MacOS/MyApp' })`
+and leave out `appPath`. The app gets the run's environment, without
+`ELECTRON_RUN_AS_NODE`, plus `electron({ env })`.
+
+## Write a test
+
+Import `test` from `@e2e-dev/electron`. `app.open()` launches the app and
+waits for its first window. Every test starts on an empty user-data
+directory and ends with the app quit. `app.restart()` launches it again on
+the same data, and `app.clearState()` on empty data.
+
+```ts title="tests/sign-in.e2e.ts"
+import { test } from '@e2e-dev/electron';
+import { credentials, expect } from 'e2e';
+
+test('signs in and opens settings', async ({ app, screen, electron }) => {
+  const ada = credentials.user('ada');
+  await app.open();
+  await screen.getByRole('textbox', 'Username').fill(ada.username);
+  await screen.getByRole('textbox', 'Password').fill(ada.password);
+  await screen.getByRole('button', 'Sign in').tap();
+  await expect(screen.getByTestId('status')).toContainText('Signed in as ada');
+
+  await screen.getByRole('button', 'Open settings').tap();
+  await electron.useWindow({ title: 'Settings' });
+  await expect(screen.getByRole('heading', 'Settings')).toBeVisible();
+
+  const userData = await electron.evaluate(({ app: main }) => main.getPath('userData'));
+  expect(userData).toContain('e2e-electron-');
+});
+```
+
+Roles and names are the ones Chromium computes, so `getByRole`, `getByLabel`,
+`getByText`, `getByPlaceholder`, and `getByTestId` work as on the web.
+`getByTestId` reads `data-testid`; set another attribute with
+`electron({ testIdAttribute })`.
+
+The `electron` fixture has these methods:
+
+| Method | What it does |
+| --- | --- |
+| `evaluate(fn, arg?)` | Runs `fn` in the main process with the `electron` module and returns its serializable result. `fn` is sent as text, so pass values as `arg` |
+| `windows()` | Lists the open windows, in the order they opened, with their title and URL |
+| `useWindow(which)` | Makes `screen` read a window: an index, or `{ title, url }` with a string or a RegExp. It waits for the window to open |
+| `locator(selector)` | A locator for a CSS selector in the window's document |
+
+## What differs from the web
+
+| Area | On an Electron target |
+| --- | --- |
+| Windows | `screen` reads one window: the one `useWindow()` picked, else the first. A window the app opens does not take over. The agent sees the windows as tabs and switches between them |
+| Headed | Electron has no headless mode. Windows show unless the app hides them, and `--headed` changes nothing. On Linux CI, run under a virtual display such as `xvfb-run` |
+| Reading | Content under `aria-hidden` or `inert` is not read. Nested documents (`iframe`, `webview`) are not read, and the agent is told its screen is incomplete |
+| Selectors | `electron.locator()` matches in the window's own document and open shadow roots, never in a frame |
+| Uploads | `setInputFiles` takes file paths. In-memory files are not supported |
+| Not supported | Video recording, `browser`-only APIs (routes, downloads, cookies), session save and restore, `toBeInViewport`, and computed-style checks |
+| Workers | No limit. An app that holds a single-instance lock can run one test at a time: set `workers: 1` |
+| Secrets | A password field shows no value. Screenshots paint every password field and nested document black. A password field no mask reaches, such as one in a closed shadow root, withholds the agent's screenshot, and `app.screenshot()` fails with `POLICY_DENIED` |
+
+<Warning>
+  An Electron app loads its own pages, often `file:` ones, and has no
+  `app.url`. The bound that keeps a [file app](/reference/security#navigation)
+  in its directory does not apply. A link in the app can open any local file, and
+  the agent reads that screen. Don't let the agent follow links to content you
+  don't trust.
+</Warning>
+
+## Options
+
+| Option | Type | Default |
+| --- | --- | --- |
+| `executablePath` | `string` | the project's `electron` |
+| `args` | `string[]` | `[]` |
+| `env` | `Record<string, string>` | `{}` |
+| `launchTimeout` | `number` | `30000` |
+| `testIdAttribute` | `string` | `'data-testid'` |
+| `settle` | `number \| false` | `100` |
+
+`args` are Electron and Chromium switches, passed before the app path. The
+engine sets `--user-data-dir` itself. `launchTimeout` is how long
+`app.open()` waits for the first window, in milliseconds. `settle` is how
+long the engine waits after an agent action before the agent reads the
+screen.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Agent steps" icon="robot" href="/agent-steps">
+    Let the agent fill a form or check the screen.
+  </Card>
+  <Card title="Engines" icon="gears" href="/engines">
+    How this engine was built, as a model for your own.
+  </Card>
+</CardGroup>

@@ -145,6 +145,21 @@ suites that consume the built packages the way a user would.
   only a few variables of the run's environment (`INHERITED_ENV` in
   `src/surface.ts`). A prototype that runs on macOS only: `prepare` and
   `init` refuse any other OS.
+- `packages/electron` - the published `@e2e-dev/electron` package: the
+  Electron engine, contributing the `electron` fixture, and the reference
+  for an engine built outside this repository (ENG-892): it imports
+  `@e2e-dev/core/engine` and Playwright's public `_electron` launcher and
+  `CDPSession`, never another engine. What it needs from core becomes public
+  contract (`expressionSelectors` came from it); `docs/engines.mdx` lists the
+  assumptions it broke. `app.open()` launches the project's `electron`
+  package on `app.appPath` (or `executablePath`) with a private
+  `--user-data-dir` per attempt; `prepare` downloads the Electron binary,
+  since Electron 45 has no install script. Reads join
+  `Accessibility.getFullAXTree` and one `DOMSnapshot` on backend node ids
+  (`src/tree.ts`, pure, tested on a captured read); actions run in an
+  isolated world and send trusted input. Windows are the tabs. Screenshots
+  mask password fields and nested documents, and are withheld when the tree
+  lists a secure field no mask reaches.
 - `packages/core/src/engine/protocol/` - the engine protocol: the engine
   contract as LSP-style JSON-RPC (`connectEngine` client, `serveEngine`
   server, spawn/socket/loopback transports), so an engine can run in
@@ -296,6 +311,12 @@ suites that consume the built packages the way a user would.
   into `build/SignInForm.app`) and the e2e suites on `@e2e-dev/desktop`
   (`tests/` locators only, `tests-agent/` one `agent.act`). Hand-run on a
   Mac with Accessibility permission; no CI job runs it yet.
+- `apps/electron-testbed` (`@e2e-dev/electron-testbed`, private) - a small
+  Electron app (`app/`: context isolation, a preload bridge, IPC, a second
+  window, a closed-shadow password field) and the e2e suites on
+  `@e2e-dev/electron` (`tests/` deterministic, `tests-agent/` with a model).
+  Its windows stay hidden unless `E2E_ELECTRON_HEADED=1`. Hand-run
+  (`pnpm test:electron-testbed`); no CI job runs it yet.
 - `examples/` — standalone user-facing projects, one per technology
   (`with-vite`, `with-next`, `with-astro`, `with-angular`, `with-expo`, `with-swiftui`,
   `with-compose`, `with-kotlin-multiplatform`, `with-flutter`, `with-maui`), each the same

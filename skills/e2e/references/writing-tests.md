@@ -109,7 +109,7 @@ act or the assertions.
 `test` registers everything, and `describe`, `beforeEach`, `afterEach`,
 `beforeAll`, and `afterAll` are also top-level imports of the same functions
 (`import { describe, beforeEach } from 'e2e'`; `@e2e-dev/web`,
-`@e2e-dev/mobile`, and `@e2e-dev/desktop` export `test`, `describe`, and the hooks typed with their fixture; a
+`@e2e-dev/mobile`, `@e2e-dev/desktop`, and `@e2e-dev/electron` export `test`, `describe`, and the hooks typed with their fixture; a
 `test.extend()` chain registers hooks that see its fixtures through
 `test.beforeEach`). Everything registers at import, so a `describe` body is
 synchronous (`async` is a `COLLECTION_ERROR`).
@@ -215,6 +215,7 @@ configured model, else `MODEL_UNAVAILABLE` (topic `agent`). `platform`
 label. `browser` (`Browser`): browser targets, import `test` from `@e2e-dev/web`.
 `device` (`Device`): device targets, import `test` from `@e2e-dev/mobile`.
 `desktop` (`Desktop`): desktop targets, import `test` from `@e2e-dev/desktop`.
+`electron` (`Electron`): Electron targets, import `test` from `@e2e-dev/electron`.
 `session` (`SetupSession`): only in `test.setup`.
 
 ### app
