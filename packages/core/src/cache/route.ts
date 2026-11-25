@@ -177,7 +177,12 @@ function routeOf(location: string): Route {
 
 /** Whether two locations name the same screen: one origin, and segments and query that read alike. */
 export function sameRoute(recorded: string, live: string): boolean {
-  return routeIdentity(routeOf(recorded)) === routeIdentity(routeOf(live));
+  return routeKey(recorded) === routeKey(live);
+}
+
+/** A location's route as one string: two locations are one screen exactly when their keys are equal (`sameRoute`). */
+export function routeKey(location: string): string {
+  return routeIdentity(routeOf(location));
 }
 
 /** A route's parts as one comparable string, a slash inside a segment kept inside it. */

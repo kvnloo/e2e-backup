@@ -22,7 +22,7 @@
  * it; neither replay nor recording treats it differently.
  */
 
-import { sameRoute } from './route.ts';
+import { routeKey } from './route.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
 /** One stretch of a recording that left a screen and came back to it with nothing typed, chosen, or set on the way. */
@@ -133,6 +133,16 @@ function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): 
  */
 function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): TraceDetour[] {
   const where = places(trace);
+  // Each route read once: the scan compares every place with many others.
+  const keys = new Map<string, string>();
+  const route = (place: string): string => {
+    let key = keys.get(place);
+    if (key === undefined) {
+      key = routeKey(place);
+      keys.set(place, key);
+    }
+    return key;
+  };
   const { actions } = trace;
   const detours: TraceDetour[] = [];
   let from = 0;
@@ -151,7 +161,7 @@ function byLocations(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath
       if (changesState(actions[to - 1]!)) break;
       const place = where[to];
       if (place === undefined) continue;
-      if (!sameRoute(home, place)) {
+      if (route(home) !== route(place)) {
         via ??= place;
         away = true;
       } else if (via === undefined) {
