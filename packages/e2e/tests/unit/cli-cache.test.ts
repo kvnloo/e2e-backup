@@ -229,7 +229,7 @@ describe('e2e cache check', () => {
     ]);
   });
 
-  it('reads an entry recorded before locations by its actions alone', async () => {
+  it('reads an entry recorded before locations by its actions alone, as a hint that fails nothing', async () => {
     const legacy: ActionTrace = {
       ...trace(undefined, 0),
       actions: [
@@ -240,8 +240,13 @@ describe('e2e cache check', () => {
     };
     await seed([{ keyHash: 'e'.repeat(64), trace: legacy }]);
     await invoke('cache', 'check');
-    expect(process.exitCode).toBe(1);
-    expect(written(stdoutSpy)).toContain('eeeeeeeeeeee: actions 1-2 left a screen, only looked around, and went back');
+    // The shape alone cannot tell a wrong turn from a step that asks to go back: a hint, never a failure.
+    expect(process.exitCode).toBe(0);
+    expect(written(stdoutSpy).trimEnd().split('\n')).toEqual([
+      'eeeeeeeeeeee: actions 1-2 left a screen, only looked around, and went back (recorded without locations: a hint only)',
+      `no detours in 1 replay cache entry in ${path.join(root, CACHE_DIR)}`,
+      '1 entry recorded without locations only looks like one; a run that records it again can tell',
+    ]);
   });
 
   it('exits 0 when no entry takes a detour, and on an empty store', async () => {

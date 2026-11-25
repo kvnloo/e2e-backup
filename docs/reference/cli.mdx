@@ -1212,7 +1212,8 @@ With `--json`, it prints the `doctor-1` report to stdout: `{ "schemaVersion": "d
 
 Inspects or clears the replay cache. Each subcommand loads the discovered
 config or `--config <path>`, reads the directory a run would, and exits 0 on
-an empty store. `check` exits 1 when an entry takes a detour.
+an empty store. `check` exits 1 when an entry's recorded screens show a
+detour.
 
 <CodeGroup>
 ```bash npm
@@ -1247,7 +1248,7 @@ bunx e2e cache ls --config packages/web/e2e.config.ts
 | --- | --- |
 | `e2e cache ls` | One row per entry: the first 12 characters of its entry digest, the test and target it was recorded for, the first 12 characters of its instruction digest, its age, and how many actions a replay would run (`(truncated)` when recording hit the action cap, `(detour)` when it takes a [detour](/cache#find-detours-in-a-recording)). Rows are grouped by test, then target, oldest first. |
 | `e2e cache show <entry>` | One entry: what it was recorded for, where it starts and ends, each action with the screen it ran on, the end state a replay checks, and its detours. `<entry>` is the entry digest, as many leading characters as tell it apart, or the path of its file. No match, or more than one, exits 2. |
-| `e2e cache check` | One line per detour, naming the entry, its test, and the actions, then a count. Exits 1 when any entry takes a detour. |
+| `e2e cache check` | One line per detour, naming the entry, its test, and the actions, then a count. Exits 1 when the screens an entry recorded show a detour. An entry recorded before actions kept their screens is read by its actions alone; its lines end in `(recorded without locations: a hint only)` and fail nothing. |
 | `e2e cache stats` | The store directory, the number of readable entries, their total size, and the number of unreadable files when there are any. |
 | `e2e cache clear` | Deletes every cache file, then the directory when nothing else is left in it, and reports how many files went. |
 
