@@ -319,6 +319,7 @@ export class ActionDispatcher {
           name: verb,
           point: clamped,
           viewport: { width: observation.viewport.width, height: observation.viewport.height },
+          ...(hit.control === undefined ? {} : { control: hit.control }),
           ...handle,
         };
       });

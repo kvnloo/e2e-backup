@@ -77,7 +77,12 @@ export type RecordableAction =
    * that node sat: the trace records the point's place inside that box so
    * replay can follow the node when the layout shifts.
    */
-  | ({ readonly name: PointActionName; readonly viewport: ViewportSize } & PlacedPoint)
+  | ({
+      readonly name: PointActionName;
+      readonly viewport: ViewportSize;
+      /** The innermost interactive node the point was on, when the screen listed one. */
+      readonly control?: RedactedNode;
+    } & PlacedPoint)
   /**
    * A drag from one bare viewport point to another, with the viewport it was
    * placed in; each end is placed the way a point action's one point is, so

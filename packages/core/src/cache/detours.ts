@@ -102,7 +102,7 @@ function tappedRole(action: RecordedAction): string | undefined {
     case 'secondaryTap':
       return action.target.role;
     case 'tapAt':
-      return action.within?.target.role;
+      return action.controlRole ?? action.within?.target.role;
     default:
       return undefined;
   }

@@ -350,6 +350,13 @@ export type PointActionName = 'tapAt' | 'hoverAt';
 export interface PointAction extends ActionBase, TracePointEnd {
   readonly name: PointActionName;
   readonly viewport: TraceViewport;
+  /**
+   * The role of the control the point was on, the innermost interactive
+   * node containing it, when that is not the node `within` names (a switch
+   * whose icon is the innermost node). Provenance only, never replay input:
+   * a tap on a switch's icon sets the switch (`cache/detours.ts`).
+   */
+  readonly controlRole?: string;
 }
 
 /** A recorded point and, when a listed node with a durable descriptor contained it, its place inside that node's box. */

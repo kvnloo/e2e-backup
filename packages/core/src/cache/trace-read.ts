@@ -295,7 +295,16 @@ function readActionBody(document: unknown): RecordedAction | undefined {
       const end = readPointEnd(raw);
       const viewport = readViewport(raw['viewport']);
       if (end === undefined || viewport === undefined) return undefined;
-      return { name, summary, point: end.point, viewport, ...(end.within === undefined ? {} : { within: end.within }) };
+      // Provenance: a malformed role is dropped, and the point still replays.
+      const controlRole = readBoundedText(raw['controlRole'], MAX_TRACE_DESCRIPTOR_CHARS);
+      return {
+        name,
+        summary,
+        point: end.point,
+        viewport,
+        ...(end.within === undefined ? {} : { within: end.within }),
+        ...(controlRole === undefined ? {} : { controlRole }),
+      };
     }
     case 'dragAt': {
       const from = readPointEnd(raw['from']);
