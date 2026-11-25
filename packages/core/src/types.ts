@@ -461,7 +461,7 @@ export interface ActionOptions {
  * A point in CSS pixels. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
  * also a `ScreenPoint`. Its origin is the viewport's top-left corner (the
- * space `boundingBox()` reports in), or the node's corner for `locator.swipe`.
+ * `boundingBox()` space), or the node's corner for `locator.swipe`.
  */
 export type Point = ViewportPoint;
 

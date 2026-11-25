@@ -595,7 +595,7 @@ const ref = await this.singleOf(await this.resolveOnce(expression, reads, missin
    * is scrolled into view when the engine can, then its box is read and the
    * pointer dispatched at the point, with no node behind the gesture. The node has to be visible with a box within
    * the deadline; one that never is fails as LOCATOR_NOT_FOUND, as `waitFor`
-   * does. For a swipe, the box also needs a non-zero width and height, since
+   * does. For a swipe, the box also needs non-zero width and height, since
    * percentages collapse to one line on an empty box.
    */
   async performWithin(

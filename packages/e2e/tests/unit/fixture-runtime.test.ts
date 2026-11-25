@@ -1035,7 +1035,7 @@ describe('coordinate input', () => {
     }
   });
 
-  it('locator.swipe waits for a box with a non-zero width and fails with LOCATOR_NOT_FOUND if the width stays 0', async () => {
+  it('locator.swipe waits for a non-zero width and fails with LOCATOR_NOT_FOUND if it stays 0', async () => {
     vi.useFakeTimers();
     vi.setTimerTickMode('nextTimerAsync');
     try {

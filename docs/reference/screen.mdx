@@ -1011,7 +1011,7 @@ valid on `screen.swipe`).
 - `{ from, to, duration? }` is a swipe along a path relative to the node: a
   touch swipe on a device, a pointer drag on the web. On the web, pointer
   and mouse events are sent, but touch events aren't. e2e doesn't check
-  whether the node is enabled or covered, so an element over the start point
+  if the node is enabled or covered, so an element over the start point
   gets the drag.
 
 On the web, the node is scrolled into view first. On a device, scroll to the
@@ -1024,9 +1024,8 @@ The two kinds of coordinate in a path:
   corner as [`tap({ position })`](#tap) (inside the border on the web). It
   can be larger than the node's width or height, so a path can end past the
   right or bottom edge.
-- A percentage, `'0%'` through `'100%'`, is measured against the width (`x`)
-  or height (`y`) of the box `boundingBox()` reports, and rounded to a pixel
-  inside that box.
+- A percentage (`'0%'` to `'100%'`) is measured against the width (`x`) or
+  height (`y`) from `boundingBox()`, rounded to a pixel inside the box.
 
 Pixels are in the units `boundingBox()` reports, and those differ between
 platforms. Use percentages in a test that runs on more than one. Off-screen
@@ -1035,19 +1034,18 @@ of a tall node.
 
 On iOS, a path without `duration` has to stay above the open soft keyboard
 ([Capabilities](/reference/mobile#capabilities)). When the app window's
-position on the screen isn't known (such as a windowed iPad app), the node's
-box and the path may be offset. In that case, a direction swipe fails with
-`ACTION_FAILED`, while a path swipe still runs as it is.
+position on screen isn't known (such as a windowed iPad app), the node's box
+and swipe path may be offset. In that case, a direction swipe fails with
+`ACTION_FAILED`, while a path swipe still runs as-is.
 
-A direction swipe throws the errors listed for every locator action. A path
-can also throw:
+A direction swipe throws standard locator errors. A path can also throw:
 
 | Throws | When |
 | --- | --- |
 | `INVALID_ARGUMENT` | A mix of the two shapes, an unknown option, a `duration` that isn't a whole number from 16 through 10000 ms, a negative or non-finite coordinate, or a string that isn't a percentage from `'0%'` through `'100%'`. |
 | `UNSUPPORTED_CAPABILITY` | The engine doesn't list `swipeTo` in its pointer actions. |
 | `ACTION_FAILED` | The browser engine can't scroll the node into view before the timeout, or the engine rejects the gesture, such as an untimed iOS path into the open keyboard. |
-| `LOCATOR_NOT_FOUND` | The node resolves, but doesn't get a visible box with a non-zero width and height in time. |
+| `LOCATOR_NOT_FOUND` | The node resolves, but doesn't get a visible box with non-zero width and height in time. |
 
 ### Locator reads
 
@@ -1528,7 +1526,7 @@ export interface SwipePathOptions {
  * A point in CSS pixels. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
  * also a `ScreenPoint`. Its origin is the viewport's top-left corner (the
- * space `boundingBox()` reports in), or the node's corner for `locator.swipe`.
+ * `boundingBox()` space), or the node's corner for `locator.swipe`.
  */
 export type Point = ViewportPoint; // { x: number; y: number }
 
