@@ -1179,12 +1179,25 @@ const CHECK_EDITABLE = `function () { ${ELEMENT}
   return { ok: true };
 }`;
 
-/** Sets the value of an input that takes no typed text, with its input and change events; null for any other node. */
+/**
+ * Sets the value of an input that takes no typed text, with its input and
+ * change events, and refuses a value an input does not take before it touches
+ * the field, as Playwright's fill does; null when the value is to be typed.
+ * A value is tried on a detached input of the same type first, since the
+ * field would sanitize a malformed one to "" and lose what it held.
+ */
 const SET_VALUE = `function (value) { ${ELEMENT}
-  if (element.tagName !== 'INPUT' || !${SET_VALUE_TYPES}.includes((element.getAttribute('type') || '').toLowerCase())) return null;
+  if (element.tagName !== 'INPUT') return null;
+  const type = (element.getAttribute('type') || '').toLowerCase();
+  const refused = { ok: false, reason: 'the ' + (type || 'text') + ' input does not take ' + JSON.stringify(value) };
+  if (type === 'number' && value.trim() !== '' && Number.isNaN(Number(value))) return refused;
+  if (!${SET_VALUE_TYPES}.includes(type)) return null;
+  const probe = element.ownerDocument.createElement('input');
+  probe.type = type;
+  probe.value = value;
+  if (probe.value !== value) return refused;
   element.focus();
   element.value = value;
-  if (element.value !== value) return { ok: false, reason: 'the ' + element.type + ' input does not take ' + JSON.stringify(value) };
   element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
   element.dispatchEvent(new Event('change', { bubbles: true }));
   return { ok: true };

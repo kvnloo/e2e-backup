@@ -46,6 +46,14 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('due')).toHaveValue('2026-03-04');
     const malformed = await screen.getByTestId('due').fill('next week', { timeout: 1000 }).then(() => undefined, (error: unknown) => error);
     expect(String(malformed)).toContain('does not take');
+    // A refused value leaves the field as it was.
+    await expect(screen.getByTestId('due')).toHaveValue('2026-03-04');
+    const seats = screen.getByTestId('seats');
+    const notNumber = await seats.fill('many', { timeout: 1000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(notNumber)).toContain('does not take');
+    await expect(seats).toHaveValue('7');
+    await seats.fill('12');
+    await expect(seats).toHaveValue('12');
     await expect(screen.getByTestId('notes')).toHaveValue('Bring the badge');
     // A select holds its options' text, so it is not empty, and with no readonly attribute it is editable.
     await expect(region).not.toBeEmpty();
