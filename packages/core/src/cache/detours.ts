@@ -25,7 +25,7 @@
 import { sameRoute } from './route.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
-/** One stretch of a recording that left a screen and came back to it with nothing changed on the way. */
+/** One stretch of a recording that left a screen and came back to it with nothing typed, chosen, or set on the way. */
 export interface TraceDetour {
   /** Zero-based index of the first action of the detour: the one that left. */
   readonly from: number;
@@ -127,7 +127,7 @@ function places(trace: Pick<ActionTrace, 'actions' | 'startPath' | 'endPath'>): 
 
 /**
  * For each action that stood on a known place, the last return to the same
- * route that followed a departure from it, with nothing changed on the way.
+ * route that followed a departure from it, with nothing typed, chosen, or set on the way.
  * The last, so a flow that tried two wrong pages from one menu reads as one
  * detour; a return, so actions that stay home after it are not part of it.
  */
@@ -197,11 +197,12 @@ function byActions(actions: readonly RecordedAction[]): TraceDetour[] {
 /**
  * One detour as a line names it, actions numbered from 1 as the report
  * numbers them: `actions 2-4 left /settings for /settings/privacy and came
- * back with nothing changed`.
+ * back with nothing typed, chosen, or set`. That is all the rule can show:
+ * a plain button tap on the way may still have saved something.
  */
 export function describeDetour(detour: TraceDetour): string {
   // Every detour spans two actions at least: one that left, one that came back.
   const span = `actions ${String(detour.from + 1)}-${String(detour.to)}`;
   if (detour.evidence === 'actions') return `${span} left a screen, only looked around, and went back`;
-  return `${span} left ${detour.at ?? 'a screen'} for ${detour.via ?? 'another'} and came back with nothing changed`;
+  return `${span} left ${detour.at ?? 'a screen'} for ${detour.via ?? 'another'} and came back with nothing typed, chosen, or set`;
 }

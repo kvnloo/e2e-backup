@@ -274,7 +274,7 @@ export interface CacheTally {
   handedOff: number;
   missed: number;
   notSaved: number;
-  /** Steps of a passing attempt whose recording leaves a screen and comes back with nothing changed. */
+  /** Steps of a passing attempt whose recording leaves a screen and comes back with nothing typed, chosen, or set. */
   detours: number;
 }
 

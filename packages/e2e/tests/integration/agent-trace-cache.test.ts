@@ -1103,7 +1103,7 @@ describe('trace cache: a recording that leaves a screen and comes back', () => {
       cache: 'read-write' as const,
     },
   });
-  const detour = 'actions 1-2 left / for /about and came back with nothing changed';
+  const detour = 'actions 1-2 left / for /about and came back with nothing typed, chosen, or set';
 
   it('records where each action ran and reports the detour when it records and when it replays', async () => {
     const recording: ExecutorRecord = { calls: 0, prefixes: [] };

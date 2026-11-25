@@ -761,9 +761,9 @@ export interface StepCacheInfo {
   recordedBy?: { readonly provider: string; readonly model: string };
   /**
    * Where the step's recording left a screen and came back to it with
-   * nothing changed on the way: the recording this step replayed, or the
-   * one it recorded. A hint to look at the recording, not a failure;
-   * absent when it has none.
+   * nothing typed, chosen, or set on the way: the recording this step
+   * replayed, or the one it recorded. A hint to look at the recording, not
+   * a failure; absent when it has none.
    */
   detour?: string;
 }

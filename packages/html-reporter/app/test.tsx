@@ -216,7 +216,7 @@ const CACHE_LABEL: Record<CacheMode, string> = {
 };
 
 const DETOUR_HINT =
-  'The recording leaves a screen and comes back to it with nothing changed on the way. It still replays; check that it is not a wrong turn the agent took.';
+  'The recording leaves a screen and comes back to it with nothing typed, chosen, or set on the way. It still replays; check that it is not a wrong turn the agent took.';
 
 const CACHE_HINT: Record<CacheMode, string> = {
   'self-finalized': 'Replayed the actions recorded in an earlier run, with no model call.',
