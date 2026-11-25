@@ -7,8 +7,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { constants, existsSync, readFileSync } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { accessSync, constants, existsSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { ConfigurationError, InfrastructureError } from '@e2e-dev/core/engine';
@@ -38,6 +37,22 @@ function electronPackage(projectRoot: string): ElectronPackage | undefined {
   return { directory, binary: binary !== undefined && existsSync(binary) ? binary : undefined, version };
 }
 
+/**
+ * Whether a path names a regular file this process may execute: a directory
+ * passes the execute-permission check too (search permission), so it is
+ * ruled out first. A packaged macOS app is the binary inside the bundle,
+ * `MyApp.app/Contents/MacOS/MyApp`, not the `.app` directory.
+ */
+function isExecutableFile(file: string): boolean {
+  try {
+    if (!statSync(file).isFile()) return false;
+    accessSync(file, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function notInstalled(projectRoot: string): ConfigurationError {
   return new ConfigurationError(
     'INVALID_CONFIG',
@@ -49,11 +64,7 @@ function notInstalled(projectRoot: string): ConfigurationError {
 export async function resolveExecutable(projectRoot: string, executablePath: string | undefined): Promise<string> {
   if (executablePath !== undefined) {
     const resolved = path.resolve(projectRoot, executablePath);
-    try {
-      await access(resolved, constants.X_OK);
-    } catch {
-      throw new ConfigurationError('INVALID_CONFIG', `electron({ executablePath }) names ${resolved}, which is not an executable file`);
-    }
+    if (!isExecutableFile(resolved)) throw new ConfigurationError('INVALID_CONFIG', `electron({ executablePath }) names ${resolved}, which is not an executable file`);
     return resolved;
   }
   const installed = electronPackage(projectRoot);
@@ -106,7 +117,9 @@ export async function ensureElectronBinary(projectRoot: string, executablePath: 
 export function describeExecutable(projectRoot: string, executablePath: string | undefined): { readonly status: 'pass' | 'warn' | 'fail'; readonly message: string } {
   if (executablePath !== undefined) {
     const resolved = path.resolve(projectRoot, executablePath);
-    return existsSync(resolved) ? { status: 'pass', message: `starts ${resolved}` } : { status: 'fail', message: `electron({ executablePath }) names ${resolved}, which does not exist` };
+    return isExecutableFile(resolved)
+      ? { status: 'pass', message: `starts ${resolved}` }
+      : { status: 'fail', message: `electron({ executablePath }) names ${resolved}, which is not an executable file` };
   }
   const installed = electronPackage(projectRoot);
   if (installed === undefined) return { status: 'fail', message: notInstalled(projectRoot).message };

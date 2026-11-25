@@ -58,7 +58,8 @@ export default {
 } satisfies E2EConfig;
 ```
 
-To test a packaged app, set `electron({ executablePath: 'dist/mac/MyApp.app/Contents/MacOS/MyApp' })`
+To test a packaged app, set `electron({ executablePath })` to its binary, such as
+`'dist/mac/MyApp.app/Contents/MacOS/MyApp'` (not the `.app` directory),
 and leave out `appPath`. The app gets the run's environment, without
 `ELECTRON_RUN_AS_NODE`, plus `electron({ env })`.
 
