@@ -287,13 +287,12 @@ export class ElectronSurface {
     ];
     const timeout = Math.max(1, Math.min(operation.timeoutMs, this.options.launchTimeoutMs));
     let app: ElectronApplication;
+    const launching = _electron.launch({ executablePath: this.executable, args, cwd: this.projectRoot, env: this.launchEnv(), timeout });
     try {
-      app = await raceAbort(
-        () => _electron.launch({ executablePath: this.executable!, args, cwd: this.projectRoot, env: this.launchEnv(), timeout }),
-        operation.signal,
-        'launching the app',
-      );
+      app = await raceAbort(launching, operation.signal, 'launching the app');
     } catch (cause) {
+      // A launch the caller stopped waiting for still finishes: the app it starts is closed, or it would outlive the test.
+      void launching.then((late) => late.close().catch(() => late.process().kill('SIGKILL')), () => undefined);
       if (cause instanceof EngineError) throw cause;
       const message = cause instanceof Error ? cause.message.split('\n')[0] : String(cause);
       throw new EngineError('ENGINE_FAILURE', `could not launch ${this.executable}${appPath === undefined ? '' : ` with ${appPath}`}: ${message}`, { retryable: false, cause });
