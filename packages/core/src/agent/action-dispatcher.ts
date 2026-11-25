@@ -779,6 +779,8 @@ export class ActionDispatcher {
     this.accounting.reserveAction();
     await this.before();
     const redaction = { redact: this.runtime.redact, redactCut: this.runtime.redactCut };
+    // The look the action starts from, for a verb that looks again while it runs (`recordTrace`).
+    const startedOn = this.feed.latest;
     let action: RecordableAction;
     try {
       action = await instrumentPhase(
@@ -798,30 +800,33 @@ export class ActionDispatcher {
     if (action.name !== 'scrollUntil' || this.verbs.has('scrollTo')) this.actedFrom = this.feed.latest;
     else if (action.screens > 0) this.actedFrom = undefined;
     this.armAfter(action.name);
-    this.recordTrace(action);
+    this.recordTrace(action, startedOn);
     await this.notify(action.name, (fields) => actionEvent(action, { ...fields, summary: describeAction(action, redaction).summary }));
   }
 
   /**
-   * Where the action being recorded ran: the newest look's location, spelled
-   * as the start and end paths are (`appLocation`), so a page on another
-   * origin keeps its origin. Undefined unless the step looked again since
-   * the previous recorded action: two actions on one look may stand on
+   * Where the action being recorded ran: the location of `observed`, the
+   * newest look unless the action took looks of its own, spelled as the
+   * start and end paths are (`appLocation`), so a page on another origin
+   * keeps its origin. Undefined unless the step looked again since the
+   * previous recorded action: two actions on one look may stand on
    * different screens (a link tapped, then back), and a location the step
    * never saw would invent a route the flow did not take.
    */
-  private freshLocation(): string | undefined {
-    const observed = this.feed.latest;
+  private freshLocation(observed: AgentObservation | undefined = this.feed.latest): string | undefined {
     const at = observed?.location !== undefined && observed !== this.tracedOn ? appLocation(observed.location, this.runtime.app.base?.origin) : undefined;
-    this.tracedOn = observed;
+    this.tracedOn = this.feed.latest;
     return at;
   }
 
   /** Writes a committed action to the step's trace cache, when caching is on. */
-  private recordTrace(action: RecordableAction): void {
+  private recordTrace(action: RecordableAction, startedOn: AgentObservation | undefined): void {
     const trace = this.options.trace();
     if (trace === undefined) return;
-    const at = this.freshLocation();
+    // A scroll to a text looks at every page it turns, so the newest look is
+    // where it ended; it ran where it started. Every other verb resolves its
+    // target on the newest look, which may be one it took itself.
+    const at = this.freshLocation(action.name === 'scrollUntil' ? startedOn : undefined);
     // A typed value the step read off the screen (its tree, or a screenshot
     // it was shown) or reckoned from the date is this run's data, not the
     // flow's: it is recorded as a gap so replay hands over before it rather

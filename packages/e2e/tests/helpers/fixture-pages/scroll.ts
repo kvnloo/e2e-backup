@@ -14,6 +14,23 @@ const ROW_HEIGHT = 60;
  * until the page reaches it.
  */
 export const SCROLL_PAGES: Record<string, PageRenderer> = {
+  /** A feed whose address moves to the next story once the page scrolls it into view, as a news feed does. */
+  '/feed': () => `<!doctype html>
+<html>
+<head><title>Feed</title><style>body { margin: 0; } section { height: 1600px; }</style></head>
+<body>
+<section><h1>First story</h1></section>
+<section id="next"></section>
+<script>
+  // The next story is drawn only once it is scrolled into view, so a scroll to its text has to page.
+  addEventListener('scroll', () => {
+    if (scrollY <= 1000 || location.pathname === '/feed/next-story') return;
+    history.replaceState(null, '', '/feed/next-story');
+    document.getElementById('next').innerHTML = '<h2>Next story</h2><button onclick="document.getElementById(\\'read\\').textContent = \\'read\\'">Mark read</button><output id="read" role="status" aria-label="Read"></output>';
+  });
+</script>
+</body>
+</html>`,
   '/smooth-scroll': (_state, url) => {
     const smooth = url.searchParams.get('smooth') ?? 'none';
     const duration = Number(url.searchParams.get('ms') ?? 450);

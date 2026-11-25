@@ -1284,3 +1284,47 @@ describe('trace cache: a replay that hands off after a detour', () => {
     });
   }, 240_000);
 });
+
+describe('trace cache: a scroll to a text that moves the route', () => {
+  let app: FixtureApp;
+  let project: FixtureProject;
+
+  beforeAll(async () => {
+    app = await startFixtureApp();
+    project = createProject({
+      'tests/feed.e2e.ts': `import { test, expect } from 'e2e';
+
+test('marks the next story read', async ({ app, agent, screen }) => {
+  await app.open('/feed');
+  await agent.act('mark the next story read');
+  await expect(screen.getByRole('status')).toHaveText('read');
+});
+`,
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    project?.cleanup();
+    await app?.close();
+  });
+
+  it('records the scroll where it started, not where its last look landed', async () => {
+    const executor: StepExecutor = {
+      name: 'feed-executor',
+      version: 'test',
+      async runStep(context: StepExecutorContext) {
+        await context.observe();
+        await context.actions.scrollUntil('Next story', 'down');
+        const observation = await context.observe();
+        await context.actions.tap({ id: nodeIdFor(observation.text, /button "Mark read"/) });
+        return { status: 'passed' as const, summary: 'marked read' };
+      },
+    };
+    const outcome = await runExisting(project, { appUrl: app.url, config: { tests: 'tests/**/*.e2e.ts', agents: { default: { executor } }, cache: 'read-write' as const } });
+    expect(outcome.exitCode).toBe(0);
+    expect(readOnlyEntry(project).entry.payload.actions.map((action) => [action.name, action.at])).toEqual([
+      ['scrollUntil', '/feed'],
+      ['tap', '/feed/next-story'],
+    ]);
+  }, 240_000);
+});
