@@ -831,7 +831,7 @@ export class ActionDispatcher {
       });
       const index = trace.recordedCount;
       if (derived === undefined) trace.record(action, at);
-      else trace.recordDerivedGap(derived);
+      else trace.recordDerivedGap(derived, at);
       this.joinTyped(trace, index, action.value);
       return;
     }

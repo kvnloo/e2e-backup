@@ -84,6 +84,13 @@ describe('findDetours by recorded locations', () => {
     expect(findDetours(flow([tap('Next', '/one'), tap('Next', '/two'), tap('Done', '/three')], { endPath: '/done' }))).toEqual([]);
   });
 
+  it('finds the trip before a fill recorded as a gap, from where the gap ran', () => {
+    const gap: RecordedAction = { name: 'tool', summary: 'tool type (run-time value)', derived: 'minted-token', at: '/' };
+    expect(findDetours(flow([tap('About', '/'), back('/about'), gap, tap('Increment', '/')], { endPath: '/' }))).toEqual([
+      { from: 0, to: 2, at: '/', via: '/about', evidence: 'locations' },
+    ]);
+  });
+
   it('starts at the action that left, not at the looking around before it', () => {
     const detours = findDetours(flow([scroll('/home'), tap('Reports', '/home'), back('/reports'), tap('Billing', '/home')], { endPath: '/billing' }));
     expect(detours).toEqual([{ from: 1, to: 3, at: '/home', via: '/reports', evidence: 'locations' }]);

@@ -85,10 +85,14 @@ export class TraceRecorder {
    * poisoning the trace.
    */
   record(action: RecordableAction, at?: string): void {
-    const recorded = this.toRecorded(action, describeAction(action, { redact: this.redact, redactCut: this.redactCut }));
-    const location = at === undefined || at === '' ? undefined : this.redact(at);
-    this.push(location === undefined || location.length > MAX_TRACE_INPUT_CHARS ? recorded : { ...recorded, at: location });
+    this.push(this.located(this.toRecorded(action, describeAction(action, { redact: this.redact, redactCut: this.redactCut })), at));
     this.lastActionAt = Date.now();
+  }
+
+  /** `action` with the location it ran at, redacted; one the entry cannot keep whole is left out. */
+  private located(action: RecordedAction, at: string | undefined): RecordedAction {
+    const location = at === undefined || at === '' ? undefined : this.redact(at);
+    return location === undefined || location.length > MAX_TRACE_INPUT_CHARS ? action : { ...action, at: location };
   }
 
   /**
@@ -121,8 +125,8 @@ export class TraceRecorder {
    * that said so (`agent/derived.ts`). Replay hands the step over before it,
    * so the executor derives the value afresh, and the report can say why.
    */
-  recordDerivedGap(reason: DerivedReason): void {
-    this.push({ name: 'tool', summary: DERIVED_GAP_SUMMARY, derived: reason });
+  recordDerivedGap(reason: DerivedReason, at?: string): void {
+    this.push(this.located({ name: 'tool', summary: DERIVED_GAP_SUMMARY, derived: reason }, at));
     this.lastActionAt = Date.now();
   }
 
@@ -146,8 +150,10 @@ export class TraceRecorder {
     // An earlier gap already ends replay before these pieces, so they never
     // replay: drop them without a new gap rather than keep the code as `type`.
     const handedOff = this.actions.slice(0, index).some((action) => action.name === 'tool');
+    // The gap stands where the first piece was typed, so the location stays for the detour check.
+    const at = this.actions[index]?.at;
     this.actions.length = index;
-    if (!handedOff) this.recordDerivedGap(reason);
+    if (!handedOff) this.recordDerivedGap(reason, at);
   }
 
   /**

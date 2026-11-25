@@ -263,6 +263,18 @@ describe('TraceRecorder', () => {
       expect(recorder.finalize(conclusion)?.actions).toEqual([expect.objectContaining({ name: 'navigate' }), gap]);
     });
 
+    it('keeps where the first piece was typed on the gap, and where a derived fill ran', () => {
+      const recorder = makeRecorder();
+      recorder.record({ name: 'type', node: digitBox, value: '482' }, '/verify');
+      recorder.record({ name: 'type', node: digitBox, value: '913' });
+      recorder.gapFrom(0, 'minted-token');
+      recorder.recordDerivedGap('whole-node', '/profile');
+      expect(recorder.finalize(conclusion)?.actions).toEqual([
+        { ...gap, at: '/verify' },
+        { ...gap, derived: 'whole-node', at: '/profile' },
+      ]);
+    });
+
     it('keeps recording after the gap', () => {
       const recorder = makeRecorder();
       typeDigits(recorder);
