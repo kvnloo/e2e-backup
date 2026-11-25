@@ -26,8 +26,11 @@ test.describe('sign-in window', () => {
   test('reads controls by test id and placeholder, and refuses an empty password', async ({ screen }) => {
     await screen.getByPlaceholder('ada').fill('grace');
     await expect(screen.getByTestId('username')).toHaveValue('grace');
+    await expect(screen.getByTestId('username')).not.toBeEmpty();
     await screen.getByTestId('username').clear();
     await expect(screen.getByTestId('username')).toHaveValue('');
+    await expect(screen.getByTestId('username')).toBeEmpty();
+    await expect(screen.getByTestId('wide-result')).toBeEmpty();
     await screen.getByTestId('sign-in').tap();
     await expect(screen.getByTestId('status')).toHaveText('Password is required');
   });

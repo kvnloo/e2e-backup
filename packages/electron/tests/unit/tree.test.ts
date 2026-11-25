@@ -70,6 +70,14 @@ describe('projectTree', () => {
     expect(find(root, (node) => node.testId === 'plan')).toMatchObject({ role: 'combobox', name: 'Plan', value: 'Pro' });
   });
 
+  it('reports empty for a locator only: a field by its value, anything else by its text', () => {
+    const node = project('node').root;
+    expect(find(node, (candidate) => candidate.testId === 'username').states?.empty).toBe(false);
+    expect(find(node, (candidate) => candidate.testId === 'status').states?.empty).toBe(false);
+    expect(find(node, (candidate) => candidate.testId === 'password').states?.empty).toBeUndefined();
+    expect(find(project('tree').root, (candidate) => candidate.testId === 'username').states?.empty).toBeUndefined();
+  });
+
   it('reads a checkbox value for a locator only, as the value attribute or on', () => {
     expect(find(project('node').root, (node) => node.role === 'checkbox').value).toBe('on');
     expect(find(project('tree').root, (node) => node.role === 'checkbox').value).toBeUndefined();

@@ -379,6 +379,11 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       if (text !== '') draft.text = bound(text, OBSERVED_TEXT_LIMIT, mode);
     }
     if (onlyText) draft.children = [];
+    // What toBeEmpty reads, on a locator's read only and never on a secure field: a field by its value, anything else by its text.
+    if (mode === 'node' && !secure) {
+      const field = facts?.nodeName === 'INPUT' || facts?.nodeName === 'TEXTAREA';
+      draft.states['empty'] = field ? (draft.value ?? '') === '' : (draft.text ?? '') === '';
+    }
     return [draft];
   };
 
