@@ -248,7 +248,7 @@ export function locateQuery(args: LocateArgs, defaultVisible = false): LocateQue
     };
   }
   if (name !== undefined) throw new ConfigurationError('INVALID_ARGUMENT', 'name only narrows a role query');
-  const missing = defaultVisible ? `${notFound} Hidden nodes are skipped, since the target's locators.visible is true. A test can pass { visible: false } to match them.` : notFound;
+  const missing = defaultVisible ? `${notFound} Hidden nodes are skipped because the target's locators.visible is true. Pass { visible: false } in a test to match them.` : notFound;
   if (testId !== undefined) return { expression: testIdQuery(testId, undefined, undefined, defaultVisible), code: `screen.getByTestId(${JSON.stringify(testId)})`, notFound: missing };
   const options = exact ? '' : `, { exact: false }`;
   if (text !== undefined) return { expression: textQuery('text', text, { exact }, undefined, defaultVisible), code: `screen.getByText(${JSON.stringify(text)}${options})`, notFound: missing };

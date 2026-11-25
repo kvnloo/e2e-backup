@@ -358,10 +358,10 @@ Test line: await screen.getByRole("button", "Sign in").tap();
   (`getByRole("listitem").filter({ hasText: "Offer B" })`), then by position
   (`.nth(1)`, with a comment saying so). A position is used only when the
   live twins are the ones the observation listed, each in place or all
-  moved together. A text, label, placeholder, or test id line gets no
-  `{ visible: true }` when the target's
-  [`locators.visible`](/reference/config#locators) is true, since the query
-  already skips hidden nodes.
+  moved together. `{ visible: true }` is left out of text, label,
+  placeholder, and test id lines when the target's
+  [`locators.visible`](/reference/config#locators) is true, as the query
+  skips hidden nodes.
 - A control with no name, label, placeholder, text, or test id is found by
   its role: alone when it is the only one (`getByRole("spinbutton")`, with
   a comment), else narrowed like twins.

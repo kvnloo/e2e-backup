@@ -315,7 +315,7 @@ by `getByText`, `getByLabel`, `getByPlaceholder`, `getByDisplayValue`, and
 locators: { visible: true }, // default: { visible: false }
 ```
 
-Three places set `visible`, lowest first. Each replaces the one before it:
+`visible` can be set in three places, each overriding the one before it:
 
 1. `locators.visible` at the top of the config.
 2. A target's `locators.visible`.
@@ -326,8 +326,8 @@ Three places set `visible`, lowest first. Each replaces the one before it:
   [Hidden duplicates](/reference/screen#hidden-duplicates).
 - In an [`e2e mcp`](/reference/mcp) session, `run_code`, `locate`, and the
   test lines use the target's value.
-- `locators` must be a plain object whose only key is `visible`, an optional
-  boolean. Any other value is `INVALID_CONFIG`.
+- `locators` must be a plain object with only an optional boolean `visible`
+  key. Anything else is `INVALID_CONFIG`.
 
 ### targets
 
@@ -1746,7 +1746,7 @@ export interface E2EConfig {
   trace?: RecordingMode;
   /** Which attempts record a video; default `off`. */
   video?: RecordingMode;
-  /** Defaults for screen queries on every target. A target's `locators.visible` takes precedence over it. */
+  /** Defaults for screen queries on every target. A target's `locators.visible` overrides the config's. */
   locators?: LocatorsConfig;
   /** The results directory, relative to the project root; default `.e2e`. */
   output?: string;
@@ -1787,7 +1787,7 @@ export interface Target {
   video?: RecordingMode;
   /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`. */
   fullyParallel?: boolean;
-  /** Defaults for this target's screen queries. A `visible` set here takes precedence over the config's. */
+  /** Defaults for this target's screen queries. Setting `visible` here overrides the config's. */
   locators?: LocatorsConfig;
 }
 ```
@@ -1795,12 +1795,12 @@ export interface Target {
 ### `LocatorsConfig`
 
 ```ts
-/** Defaults for screen queries. An option passed to a query takes precedence. */
+/** Defaults for screen queries. Options passed to a query override these. */
 export interface LocatorsConfig {
   /**
-   * The default `visible` option of every query except `getByRole`. Set it
-   * to true when most queries need `{ visible: true }`. A target without one
-   * uses the config's, and the default is `false`.
+   * The default `visible` option for every query except `getByRole`. Set it
+   * to true when most queries need `{ visible: true }`. Targets that don't
+   * set it inherit the config's value. The default is `false`.
    */
   visible?: boolean;
 }

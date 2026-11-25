@@ -28,7 +28,7 @@ describe('locateQuery', () => {
       const query = locateQuery(args, true);
       expect(query.expression).toMatchObject({ query: { visible: true } });
       expect(query.code).toBe(locateQuery(args).code);
-      expect(query.notFound).toContain('A test can pass { visible: false } to match them.');
+      expect(query.notFound).toContain('Pass { visible: false } in a test to match them.');
       expect(locateQuery(args).expression).not.toHaveProperty('query.visible');
       expect(locateQuery(args).notFound).not.toContain('Hidden nodes');
     }

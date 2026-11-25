@@ -37,7 +37,7 @@ export function roleQuery(
   return scoped({ kind: 'query', query }, scope);
 }
 
-/** The `visible` predicate, from the option or else `defaultVisible`. A false one is dropped. */
+/** The `visible` predicate from the option or `defaultVisible`, dropped when false. */
 function visibility(options: { visible?: boolean } | undefined, defaultVisible: boolean): { visible: true } | Record<never, never> {
   return (options?.visible ?? defaultVisible) === true ? { visible: true } : {};
 }

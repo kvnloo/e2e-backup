@@ -74,7 +74,7 @@ export interface ScreenContext {
   readonly screenshots?: ScreenshotContext;
   /** Renders an observation as `screen.tree()` returns it: redacted, one node per line. */
   readonly renderTree: (observation: Observation) => string;
-  /** The target's query defaults. An option passed to a query takes precedence. */
+  /** The target's query defaults. Options passed to a query override them. */
   readonly locators: Readonly<Required<LocatorsConfig>>;
 }
 

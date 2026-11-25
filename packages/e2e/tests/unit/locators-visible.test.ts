@@ -1,6 +1,6 @@
 /**
  * A target's `locators.visible` is the `visible` default of every query
- * except `getByRole`. A `visible` passed to a query takes precedence.
+ * except `getByRole`. Passing `visible` to a query overrides it.
  */
 
 import { describe, expect, it } from 'vitest';

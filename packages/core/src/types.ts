@@ -426,9 +426,9 @@ export interface TextMatchOptions {
    * exactly-one rule is applied, so a visible node with a hidden twin (a
    * prerendered copy kept after navigation, a closed drawer) still resolves.
    * When false, every match is kept, hidden ones included. When omitted,
-   * the target's `locators.visible` is used. For `getByRole`, omitted is the
-   * same as false, and a role query skips nodes hidden from the
-   * accessibility tree either way.
+   * the target's `locators.visible` is used. For `getByRole`, omitting it
+   * acts like false. Role queries skip nodes hidden from the accessibility
+   * tree either way.
    */
   visible?: boolean;
 }
@@ -1715,16 +1715,16 @@ export interface Target {
   video?: RecordingMode;
   /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`; `--fully-parallel` wins over it. */
   fullyParallel?: boolean;
-  /** Defaults for this target's screen queries. A `visible` set here takes precedence over the config's. */
+  /** Defaults for this target's screen queries. Setting `visible` here overrides the config's. */
   locators?: LocatorsConfig;
 }
 
-/** Defaults for screen queries. An option passed to a query takes precedence. */
+/** Defaults for screen queries. Options passed to a query override these. */
 export interface LocatorsConfig {
   /**
-   * The default `visible` option of every query except `getByRole`. Set it
-   * to true when most queries need `{ visible: true }`. A target without one
-   * uses the config's, and the default is `false`.
+   * The default `visible` option for every query except `getByRole`. Set it
+   * to true when most queries need `{ visible: true }`. Targets that don't
+   * set it inherit the config's value. The default is `false`.
    */
   visible?: boolean;
 }
@@ -2017,7 +2017,7 @@ export interface ProjectConfig {
    * Applies to the targets whose engine can record.
    */
   video?: RecordingMode;
-  /** Defaults for screen queries on every target. A target's `locators.visible` takes precedence over it. */
+  /** Defaults for screen queries on every target. A target's `locators.visible` overrides the config's. */
   locators?: LocatorsConfig;
   /**
    * The directory a run writes its results to, relative to the project root;

@@ -322,7 +322,7 @@ substring; a `RegExp` matches as written.
   unless the page's CSS still shows them.
 - To make `visible: true` the default of every query except `getByRole`, set
   `locators: { visible: true }` in the config or on a target. Pass
-  `{ visible: false }` to a query that must match hidden nodes. `getByRole`
+  `{ visible: false }` on a query to match hidden nodes. `getByRole`
   doesn't use this default, since a role query already skips nodes hidden
   from the accessibility tree.
 - On the web, queries reach open shadow roots and closed roots attached with

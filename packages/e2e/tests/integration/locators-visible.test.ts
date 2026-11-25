@@ -1,14 +1,14 @@
 /**
  * `locators.visible` from a config file, read again in each worker. With the
  * top-level value, the fixture page's hidden nodes are skipped. A target's
- * value takes precedence over it.
+ * value overrides it.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startFixtureApp, type FixtureApp } from '../helpers/fixture-app.ts';
 import { runProjectWithConfigFile, type FixtureProject } from '../helpers/run-project.ts';
 
-/** Returns a config with `locators: { visible: true }` and one web target, with `target` added to the target. */
+/** Returns a config with `locators: { visible: true }` and one web target, appending `target` to its fields. */
 function config(target: string): string {
   return `import type { E2EConfig } from 'e2e';
 import { web } from '@e2e-dev/web';
@@ -26,7 +26,7 @@ export default {
 /**
  * Returns a test for a target whose `locators.visible` resolves to `visible`.
  * A zero-size checkbox stays in the accessibility tree, so a role query
- * matches it unless the query itself sets `visible: true`.
+ * matches it unless the query sets `visible: true`.
  */
 function suite(visible: boolean): string {
   const byDefault = visible ? 0 : 1;

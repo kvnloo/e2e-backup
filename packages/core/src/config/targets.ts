@@ -154,9 +154,9 @@ export function launchesPinnedApp(target: ResolvedTarget): boolean {
  * contract version, the platform it drives (a named target inherits it, so
  * two workers whose engines declare different platforms must not agree on
  * the digest), and capability set. The app enters as declared, env values
- * reduced to their names and the run's port never. The locator defaults
- * enter the digest only when `visible` is true, so every config without
- * `visible: true` keeps the digest it had.
+ * reduced to their names and the run's port never. Locator defaults are
+ * only included in the digest when `visible` is true, so configs without
+ * `visible: true` keep the same digest.
  */
 export function digestTargets(targets: readonly ResolvedTarget[]) {
   return targets.map(({ name, platform, engine, declaredApp, locators }) => ({
