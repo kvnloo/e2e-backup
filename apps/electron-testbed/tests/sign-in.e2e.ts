@@ -40,6 +40,12 @@ test.describe('sign-in window', () => {
     await expect(screen.getByTestId('status')).toHaveText('Signed in as lin on Pro (main process saw 13 characters)');
   });
 
+  test('refuses to type into a field that hands focus on to another', async ({ screen }) => {
+    const refused = await screen.getByTestId('handoff').fill('typed', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(refused)).toContain('did not keep keyboard focus');
+    await expect(screen.getByTestId('username')).toHaveValue('');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });

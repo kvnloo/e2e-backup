@@ -39,6 +39,11 @@ document.getElementById('open-settings').addEventListener('click', () => {
 // A web component's content sits in an open shadow root, where a CSS locator still reaches it.
 document.getElementById('badge-host').attachShadow({ mode: 'open' }).innerHTML = '<span class="badge">Beta</span>';
 
+// A field that hands focus on to the username field as soon as it gets it, as a focus trap can.
+document.querySelector('[data-testid="handoff"]').addEventListener('focus', () => {
+  document.querySelector('[data-testid="username"]').focus();
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');

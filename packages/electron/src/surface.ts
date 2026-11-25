@@ -111,6 +111,10 @@ function notActionable(message: string): EngineError {
   return new EngineError('NOT_ACTIONABLE', message, { retryable: false });
 }
 
+function lostFocus(backendNodeId: number): EngineError {
+  return notActionable(`node ${backendNodeId} did not keep keyboard focus (the app moved it), so the input would reach another element`);
+}
+
 /** Protocol and Playwright failures that mean the node, or the document it was in, is gone. */
 const GONE = /No node found|Could not find node|Node is detached|No node with given id|Cannot find context with specified id|Execution context was destroyed|Cannot find object with id|Node is not an element|frame was detached/i;
 /** Failures that mean the window, or the whole app, closed. */
@@ -689,7 +693,8 @@ export class ElectronSurface {
           case 'clear': {
             const value = action.kind === 'fill' ? action.value : '';
             await this.waitReady(window, backendNodeId, operation, CHECK_EDITABLE, deadline);
-            await commit(this.callOn(window, backendNodeId, SELECT_CONTENTS));
+            // The app's focus handler can hand focus on; text goes only to the node that still holds it.
+            if (!(await commit(this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
             if (value === '') await keyboard.press('Delete');
             else await keyboard.insertText(value);
             return;
@@ -711,7 +716,7 @@ export class ElectronSurface {
             const parsed = parseKey(action.key);
             if (parsed === undefined) throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(action.key)} is not a key of the contract grammar`, { retryable: false });
             await this.waitReady(window, backendNodeId, operation, CHECK_CONNECTED, deadline);
-            await commit(this.callOn(window, backendNodeId, FOCUS));
+            if (!(await commit(this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
             await keyboard.press(playwrightKey(action.key));
             return;
           }
@@ -1018,9 +1023,13 @@ const SCROLL_INTO_VIEW = `function () { ${ELEMENT}
   if (element) element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
 }`;
 
+/** Whether the element holds focus within its own document or shadow root. */
+const HOLDS_FOCUS = 'element.getRootNode().activeElement === element';
+
 const FOCUS = `function () { ${ELEMENT}
   if (!element) throw new Error('Node is detached');
   element.focus();
+  return ${HOLDS_FOCUS};
 }`;
 
 const BLUR = `function () { ${ELEMENT}
@@ -1042,15 +1051,17 @@ const CHECK_EDITABLE = `function () { ${ELEMENT}
 
 const SELECT_CONTENTS = `function () { ${ELEMENT}
   element.focus();
+  if (!(${HOLDS_FOCUS})) return false;
   if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
     element.select();
-    return;
+    return true;
   }
   const range = document.createRange();
   range.selectNodeContents(element);
   const selection = element.ownerDocument.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
+  return true;
 }`;
 
 const READ_CHECKED = `function () { ${ELEMENT}
