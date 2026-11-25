@@ -14,7 +14,7 @@ import { isKeyModifier, KEY_MODIFIERS, SCROLL_STEP, type KeyModifier } from '../
 import type { LocatorAction, LocatorActionKind, SemanticNode, ViewportPoint, ViewportSize } from '../engine/surface.ts';
 import { asEngineError, TestError } from '../internal/errors.ts';
 import { requireKey } from '../internal/keys.ts';
-import { SWIPE } from '../internal/swipe.ts';
+import { STEP_MOMENTUM, SWIPE } from '../internal/swipe.ts';
 import { sleep } from '../internal/time.ts';
 import { clampToViewport, requireFinitePoint, requireViewportSize, viewportShare } from '../internal/geometry.ts';
 import { resolveNavigationUrl } from '../internal/urls.ts';
@@ -550,7 +550,7 @@ export class ActionDispatcher {
       throw new TestError('INVALID_ARGUMENT', `invalid scroll direction "${String(direction)}"`);
     }
     const viewport = async (): Promise<RecordableAction> => {
-      await this.session.swipe({ kind: 'swipe', direction, ...SWIPE }, this.accounting.actionOperation());
+      await this.session.swipe({ kind: 'swipe', direction, ...SWIPE, momentum: STEP_MOMENTUM }, this.accounting.actionOperation());
       return { name: 'scroll', direction };
     };
     if (target === undefined) return this.runAction('scroll', viewport);
@@ -562,7 +562,7 @@ export class ActionDispatcher {
       return this.targeted(resolved, async (node, observation) => {
         await this.session.perform(
           node.ref,
-          { kind: 'swipe', direction, ...SWIPE },
+          { kind: 'swipe', direction, ...SWIPE, momentum: STEP_MOMENTUM },
           this.accounting.actionOperation(),
         );
         // How much of the screen the list covered decides, on replay, whether
@@ -617,11 +617,11 @@ export class ActionDispatcher {
         const found = observation.kind === 'semantic' ? nodeReading(observation, needle, scope) : undefined;
         if (found !== undefined) {
           // An engine that can bring a node in does, whatever the box says: a
-          // windowed list renders a row a little before it is visible. After
-          // a page, a row more than a fifth of its list from the middle is
-          // moved to the middle too, as `scrollUntilVisible` does. For an
-          // engine that can't, one more page is taken for a row still past
-          // the edge.
+          // windowed list renders a row a little before it is visible. After a
+          // page, the call passes `center`, as `scrollUntilVisible` does, so a
+          // device drags a row far from the middle of its list to the middle.
+          // For an engine that can't, one more page is taken for a row still
+          // past the edge.
           if (this.verbs.has('scrollTo')) {
             await this.session.perform(found.ref, { kind: 'scrollIntoView', ...(screens > 0 ? { center: true } : {}) }, this.accounting.actionOperation());
             return { name: 'scrollUntil', text, direction, screens, ...paged };
@@ -687,11 +687,11 @@ export class ActionDispatcher {
   ): Promise<{ paged: Pick<Extract<RecordableAction, { name: 'scrollUntil' }>, 'node' | 'spans'>; within: ExecutorTarget | undefined }> {
     const resolved = list === undefined ? undefined : this.scrollTargetOrLost(list);
     if (resolved === undefined) {
-      await this.session.swipe({ kind: 'swipe', direction, ...SCROLL_STEP }, this.accounting.actionOperation());
+      await this.session.swipe({ kind: 'swipe', direction, ...SCROLL_STEP, momentum: STEP_MOMENTUM }, this.accounting.actionOperation());
       return { paged: {}, within: undefined };
     }
     const { node, observation } = resolved;
-    await this.session.perform(node.ref, { kind: 'swipe', direction, ...SCROLL_STEP }, this.accounting.actionOperation());
+    await this.session.perform(node.ref, { kind: 'swipe', direction, ...SCROLL_STEP, momentum: STEP_MOMENTUM }, this.accounting.actionOperation());
     return { paged: { node, ...(node.rect === undefined ? {} : { spans: viewportShare(node.rect, observation.viewport) }) }, within: list };
   }
 

@@ -1392,15 +1392,14 @@ export class DesktopSurface {
 
   /**
    * Scrolls by wheel notches, the unit agent-desktop takes. agent-desktop
-   * doesn't report how far a notch moves, so a `distance` of 1 is sent as ten
-   * notches. A swipe of the default 0.5 is sent as five notches, the same as a
-   * plain swipe before. A `SCROLL_STEP` (a `scrollUntilVisible` step or the
-   * agent's page) stays two notches, since a longer step could skip rows of
-   * a short pane.
+   * doesn't report how far a notch moves, so a `distance` of 1 is ten
+   * notches, and a default swipe of 0.5 is five. A distance of
+   * `SCROLL_STEP.distance` (a `scrollUntilVisible` step or the agent's page)
+   * is two notches, since a longer step could skip rows of a short pane.
+   * `durationMs` doesn't change anything.
    */
   private async scroll(binding: NodeBinding, action: SwipeAction, operation: OperationContext): Promise<void> {
-    const step = action.distance === SCROLL_STEP.distance && action.durationMs === SCROLL_STEP.durationMs;
-    const amount = step ? 2 : Math.max(1, Math.round(action.distance * 10));
+    const amount = action.distance === SCROLL_STEP.distance ? 2 : Math.max(1, Math.round(action.distance * 10));
     await this.refCommand('scroll', binding, operation, ['--direction', action.direction, '--amount', String(amount)]);
   }
 

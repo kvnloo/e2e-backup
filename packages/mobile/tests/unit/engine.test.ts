@@ -4998,8 +4998,16 @@ describe('deterministic actions', () => {
         { ref: '@e7', index: 6, parentIndex: 1, depth: 2, type: 'button', label: 'Row 1', rect: { x: 0, y: 100, width: 390, height: 40 } },
         // A row that reaches past the list's bottom edge.
         { ref: '@e8', index: 7, parentIndex: 1, depth: 2, type: 'button', label: 'Row 13', rect: { x: 0, y: 680, width: 390, height: 40 } },
+        // A tall card that shows only its top 50.
+        { ref: '@e9', index: 8, parentIndex: 1, depth: 2, type: 'button', label: 'Card', rect: { x: 0, y: 650, width: 390, height: 400 } },
       ],
     };
+
+    /** The list with agent-device reporting content hidden past its top or bottom edge. */
+    const hiddenPast = (above: boolean, below: boolean) => ({
+      ...LIST_SNAPSHOT,
+      nodes: LIST_SNAPSHOT.nodes.map((node) => (node.ref === '@e2' ? { ...node, hiddenContentAbove: above, hiddenContentBelow: below } : node)),
+    });
     /** The drag sent for a swipe down of half the list. It starts a quarter up from the list's bottom edge. */
     const LIST_DOWN = { x: 195, y: 550, dx: 0, dy: -300, durationMs: 400 };
 
@@ -5049,11 +5057,11 @@ describe('deterministic actions', () => {
       // A distance of 1 is two drags of 400 ms, so 600 ms has room for only one.
       await expect(
         h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 600 }),
-      ).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+      ).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT' });
       expect(pans(h)).toEqual([]);
     });
 
-    it('leaves a node inside its scroll container where it is, a row flush with an edge too, and one outside any container', async () => {
+    it('does not drag a node inside its scroll container (a row flush with an edge included) or a node outside any container', async () => {
       const h = await listHarness();
       for (const name of ['Row 9', 'Row 5', 'Row 1', 'Row 12', 'Continue']) {
         await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView' }, operation());
@@ -5068,16 +5076,65 @@ describe('deterministic actions', () => {
       expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -300, durationMs: 800 }]);
     });
 
-    it('with center, also drags a fully visible node more than a fifth of its container from the middle', async () => {
+    it('drags every part of a move longer than one drag', async () => {
       const h = await listHarness();
-      for (const name of ['Row 9', 'Row 5']) {
+      await h.engine.perform!((await observed(h, 'Card')).ref, { kind: 'scrollIntoView' }, operation());
+      // The card's centre is 450 below the list's middle, 0.75 of the list, so two drags of 225.
+      expect(pans(h)).toEqual([
+        { x: 195, y: 550, dx: 0, dy: -225, durationMs: 800 },
+        { x: 195, y: 550, dx: 0, dy: -225, durationMs: 800 },
+      ]);
+    });
+
+    it('drags a row flush with an edge that has content hidden past it, since a row is clipped to the screen', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      h.fake.respond('capture.snapshot', () => hiddenPast(false, true));
+      await openAttempt(h);
+      for (const name of ['Row 12', 'Row 1']) {
+        await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView' }, operation());
+      }
+      // Row 12's centre is 290 below the list's middle. Nothing is hidden above Row 1.
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -290, durationMs: 800 }]);
+    });
+
+    it('with center, also drags a node more than a fifth of its container from the middle, toward hidden content only', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      h.fake.respond('capture.snapshot', () => hiddenPast(false, true));
+      await openAttempt(h);
+      for (const name of ['Row 9', 'Row 5', 'Row 1']) {
         await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView', center: true }, operation());
       }
-      // Row 9's centre is 270 below the list's middle, more than a fifth of the list; Row 5's is at the middle.
+      // Row 9's centre is 270 below the list's middle, more than a fifth of the list. Row 5's is at the middle.
+      // Row 1 is far above the middle, but nothing is hidden above it, so a drag would pull the list to refresh.
       expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -270, durationMs: 800 }]);
     });
 
-    it('drags a swipe from a client older than distance, as its momentum stands for', async () => {
+    it('does not count a scrollIntoView that sends no drag as an action', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'Row 5')).ref, { kind: 'scrollIntoView' }, test());
+      const reads = h.fake.methods().filter((method) => method === 'capture.snapshot').length;
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
+      expect(h.fake.methods().filter((method) => method === 'capture.snapshot')).toHaveLength(reads);
+      expect(pans(h)).toEqual([LIST_DOWN]);
+    });
+
+    it('swipes the visible scroll container under the centre, past a hidden one and one with no height', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      h.fake.respond('capture.snapshot', () => ({
+        ...LIST_SNAPSHOT,
+        nodes: [
+          ...LIST_SNAPSHOT.nodes,
+          { ref: '@e10', index: 9, parentIndex: 1, depth: 2, type: 'ScrollView', kind: 'scroll-area', visibleToUser: false, rect: { x: 0, y: 300, width: 390, height: 200 } },
+          { ref: '@e11', index: 10, parentIndex: 1, depth: 2, type: 'ScrollView', kind: 'scroll-area', rect: { x: 0, y: 422, width: 390, height: 0 } },
+        ],
+      }));
+      await openAttempt(h);
+      await h.engine.perform!((await screenRootOf(h)).ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(pans(h)).toEqual([LIST_DOWN]);
+    });
+
+    it('sends a swipe from an older client, with momentum and no distance, at the distance and duration its momentum stands for', async () => {
       const local = harness({ settle: false, transition: 0 });
       local.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
       const h = { ...local, engine: connectEngine({ manifest: describeEngine(local.engine), transport: loopbackTransport(local.engine) }) };
@@ -5143,6 +5200,30 @@ describe('deterministic actions', () => {
         h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 1000 }),
       ).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
       expect(pans(h)).toHaveLength(1);
+      // The first drag may have moved the screen, so the next swipe reads it again.
+      h.fake.respond('interactions.pan', () => ({}));
+      h.fake.respond('capture.snapshot', () => ({
+        ...LIST_SNAPSHOT,
+        nodes: LIST_SNAPSHOT.nodes.map((node) => (node.ref === '@e2' ? { ...node, rect: { x: 0, y: 400, width: 390, height: 400 } } : node)),
+      }));
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(h.fake.lastArgs('interactions.pan')).toEqual({ x: 195, y: 700, dx: 0, dy: -200, durationMs: 400 });
+    });
+
+    it('swipes a screen that changed size across its new size, once the device confirms it', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'About')).ref, { kind: 'tap' }, operation());
+      // The screen unfolded to 700 by 900.
+      h.fake.respond('capture.screenshot', () => ({ logicalWidth: 700, logicalHeight: 900 }));
+      h.fake.respond('capture.snapshot', () => ({
+        ...SETTINGS_SNAPSHOT,
+        viewport: { width: 700, height: 900 },
+        nodes: [{ ref: '@e1', index: 0, depth: 0, type: 'application', label: 'Settings', rect: { x: 0, y: 0, width: 700, height: 900 } }],
+      }));
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(h.fake.lastArgs('interactions.pan')).toEqual({ x: 350, y: 675, dx: 0, dy: -450, durationMs: 400 });
     });
   });
 

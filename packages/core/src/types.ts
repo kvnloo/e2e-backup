@@ -524,15 +524,21 @@ export type SwipeSpeed = 'slow' | 'normal' | 'fast';
 export interface SwipeOptions {
   /** Swipe direction. */
   direction: ScrollDirection;
-  /** How far the content scrolls, as a share of the swiped box along the swipe (above 0 and at most 1). The box is the node, or for `screen` on the web and on a device, the scroll container under the screen's center. Default `0.5`. */
+  /**
+   * How far the content scrolls, as a share of a box's length along the
+   * swipe (above 0 and at most 1). On a locator, the box is the node. On
+   * `screen`, it's the scroll container under the screen's center (web and
+   * device). Default `0.5`.
+   */
   distance?: number;
   /** How fast the finger moves. Default `normal`. */
   speed?: SwipeSpeed;
   /**
    * @deprecated Use `distance` and `speed`. `slow` is `distance: 0.25` with
-   * `speed: 'slow'`, `none` the defaults, and `fast` `distance: 0.65` with
-   * `speed: 'fast'`. A `distance` or `speed` set beside it wins. It will be
-   * removed no earlier than April 1, 2027.
+   * `speed: 'slow'`, `none` is `distance: 0.5` with `speed: 'normal'`, and
+   * `fast` is `distance: 0.65` with `speed: 'fast'`. A `distance` or `speed`
+   * set beside it is used instead. It will be removed no earlier than April
+   * 1, 2027.
    */
   momentum?: Momentum;
   from?: never;
@@ -546,7 +552,7 @@ export interface ScrollUntilVisibleOptions {
   direction?: ScrollDirection;
   /** How far each step scrolls, as a share of the scroll container's box. Default `0.65`. */
   distance?: number;
-  /** How fast the finger moves in each step. Default: 800 ms a step. */
+  /** How fast the finger moves in each step. When it isn't set, each drag takes 800 ms, between `slow` and `normal`. */
   speed?: SwipeSpeed;
   /** @deprecated Use `distance` and `speed`, as `SwipeOptions.momentum` maps them. It will be removed no earlier than April 1, 2027. */
   momentum?: Momentum;
@@ -591,9 +597,12 @@ export interface Screen {
   swipe(options: SwipeOptions | SwipePathOptions): Promise<void>;
   /**
    * Scrolls until a locator resolves visibly or times out. On `screen`, the
-   * scroll container under the screen's center scrolls on the web and on a
-   * device, and on a locator, the node scrolls. After at least one step, the found node is brought into
-   * view when the engine supports it, so it isn't left at the container's edge.
+   * scroll container under the screen's center scrolls (web and device). On
+   * a locator, the node scrolls.
+   *
+   * After at least one step, the found node is brought into view when the
+   * engine supports `scrollIntoView`. On a device, it can also be dragged
+   * toward the middle of its container.
    */
   scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void>;
   /**

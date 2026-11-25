@@ -5,6 +5,7 @@ import { setTimeout } from 'node:timers/promises';
 import type { ElementHandle, FrameLocator, Locator as PwLocator, Mouse, Page } from 'playwright-core';
 import { EngineError, withinCleanupBudget, type EngineCleanupContext, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
 import { ConfigurationError, InfrastructureError, TestError } from '@e2e-dev/core/engine';
+import type { ConnectionBudget } from './operation-budget.ts';
 
 export const DEFAULT_VIEWPORT = { width: 1280, height: 720 } as const;
 
@@ -91,12 +92,15 @@ function targetBoundingBox(target: ActionTarget, timeout: number): Promise<Rect 
     : target.element.boundingBox();
 }
 
-/** Minimal scroll that brings one target into view, without centring it. */
-export async function scrollIntoViewNearest(target: ActionTarget): Promise<void> {
+/**
+ * Minimal scroll that brings one target into view, without centring it. A
+ * locator waits for its element within `budget` when one is given.
+ */
+export async function scrollIntoViewNearest(target: ActionTarget, budget?: ConnectionBudget): Promise<void> {
   const scroll = (el: Element): void => {
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   };
-  if (target.kind === 'locator') await target.locator.evaluate(scroll);
+  if (target.kind === 'locator') await target.locator.evaluate(scroll, undefined, budget === undefined ? undefined : { timeout: budget.timeoutMs, signal: budget.signal });
   else await target.element.evaluate(scroll);
 }
 
@@ -613,21 +617,25 @@ function wheelAim(element: Element): WheelAim {
  *
  * The element at the point is found inside open shadow roots. On the way up,
  * the walk goes from a slotted element to its slot, and from a shadow root
- * to its host. The viewport's size is
- * returned when no element scrolls, and for a pane inside an iframe.
+ * to its host. The viewport's size is returned when no element scrolls, and
+ * for a pane inside an iframe.
  */
 function scrollExtent({ vertical, at }: { vertical: boolean; at: ViewportPoint }): number {
+  const axis = vertical ? 'overflowY' : 'overflowX';
   let node = document.elementFromPoint(at.x, at.y);
   while (node?.shadowRoot) {
     const inner = node.shadowRoot.elementFromPoint(at.x, at.y);
     if (inner === null || inner === node) break;
     node = inner;
   }
-  // The document's scroller is the viewport, whatever `body`'s style says.
-  while (node !== null && node !== document.body && node !== document.documentElement) {
-    const overflow = getComputedStyle(node)[vertical ? 'overflowY' : 'overflowX'];
+  // The root element scrolls the viewport. `body`'s overflow scrolls the
+  // viewport too, unless the root element has an overflow of its own
+  // (CSS Overflow 3, section 3.3), and then `body` scrolls on its own.
+  const bodyScrollsViewport = getComputedStyle(document.documentElement)[axis] === 'visible';
+  while (node !== null && node !== document.documentElement) {
     const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;
-    if (overflows && /auto|scroll|overlay/.test(overflow)) return vertical ? node.clientHeight : node.clientWidth;
+    const scrolls = !(node === document.body && bodyScrollsViewport) && /auto|scroll|overlay/.test(getComputedStyle(node)[axis]);
+    if (overflows && scrolls) return vertical ? node.clientHeight : node.clientWidth;
     const root = node.getRootNode();
     node = node.assignedSlot ?? node.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
   }

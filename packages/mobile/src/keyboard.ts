@@ -3,7 +3,7 @@
 import type { CaptureSnapshotResult } from 'agent-device';
 import type { ViewportSize } from '@e2e-dev/core/engine';
 import { keyboardOnScreen, SCREEN_KINDS, type ProjectedSnapshot } from './nodes.ts';
-import type { Point, Rect } from './support.ts';
+import { contains, type Point, type Rect } from './support.ts';
 
 /**
  * Roles no drag starts on, whether or not their children are listed: the
@@ -106,11 +106,6 @@ export function keyboardDragStart(projected: ProjectedSnapshot, viewport: Viewpo
 /** A rect grown by `margin` on every side. */
 function grow(rect: Rect, margin: number): Rect {
   return { x: rect.x - margin, y: rect.y - margin, width: rect.width + margin * 2, height: rect.height + margin * 2 };
-}
-
-/** Whether a point lies inside a rect, edges included. */
-function contains(rect: Rect, point: Point): boolean {
-  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
 }
 
 /** The parts of a capture the keyboard answer reads. */

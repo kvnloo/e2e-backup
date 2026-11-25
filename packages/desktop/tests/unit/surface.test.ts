@@ -355,6 +355,19 @@ describe('DesktopSurface', () => {
     expect(fake.calls().at(-1)?.args.slice(0, 2)).toEqual(['scroll', '@s9:e1']);
   });
 
+  it('scrolls ten notches for a distance of 1, two for a scroll step, and the same at any speed', async () => {
+    const scrollable = { ok: true, data: { snapshot_id: 's9', window: { id: 'w-mine' }, tree: { role: 'window', name: 'List', bounds: { x: 0, y: 0, width: 100, height: 100 }, children: [{ role: 'scrollarea', ref_id: '@s9:e1', available_actions: ['Scroll'] }] } } };
+    const { surface, fake } = await launched({ snapshot: [scrollable] }, { observe: false });
+    await surface.restart(operation());
+    const amounts: string[] = [];
+    for (const [distance, durationMs] of [[0.5, 400], [1, 150], [0.25, 1500], [0.65, 800], [0.65, 150]] as const) {
+      await surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down', distance, durationMs }, operation());
+      const args = fake.calls().at(-1)?.args ?? [];
+      amounts.push(String(args[args.indexOf('--amount') + 1]));
+    }
+    expect(amounts).toEqual(['5', '10', '3', '2', '2']);
+  });
+
   it('reads again when the window closed while it was read, so a locator keeps polling', async () => {
     const { surface } = await launched({ snapshot: [snapshotAnswer('macos/appkit-form'), snapshotAnswer('macos/appkit-form'), failure('WINDOW_NOT_FOUND', 'not_delivered')] });
     const username = { kind: 'query', query: { kind: 'testId', value: { kind: 'string', value: 'username', exact: true } } } as const;

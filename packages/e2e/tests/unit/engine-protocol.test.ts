@@ -134,6 +134,22 @@ describe('engine protocol', () => {
     expect(legacy.remote.actions).not.toContain('setInputFilePayloads');
   });
 
+  it('fills in distance and duration from momentum on a swipe from an older client, for perform and performAt', async () => {
+    const perform = vi.fn<NonNullable<Engine['perform']>>(async () => undefined);
+    const performAt = vi.fn<NonNullable<Engine['performAt']>>(async () => undefined);
+    const { remote } = overLoopback(toy({ actions: ['swipe'], perform, pointerActions: ['swipe'], performAt }));
+    await remote.init!(initInfo());
+    const old = { kind: 'swipe', direction: 'down', momentum: 'slow' } as const;
+    // @ts-expect-error an older client sends momentum alone, with no distance or durationMs
+    await remote.perform!({ id: 'root', revision: '1' }, old, operation());
+    // @ts-expect-error an older client sends momentum alone, with no distance or durationMs
+    await remote.performAt!({ x: 10, y: 20 }, old, operation());
+    const upgraded = { ...old, distance: 0.25, durationMs: 1500 };
+    expect(perform).toHaveBeenCalledWith(expect.anything(), upgraded, expect.anything());
+    expect(performAt).toHaveBeenCalledWith({ x: 10, y: 20 }, upgraded, expect.anything());
+    await remote.dispose!(cleanup);
+  });
+
   it('advertises multiTap and carries its count and modifiers over JSON-RPC unchanged', async () => {
     const perform = vi.fn<NonNullable<Engine['perform']>>(async () => undefined);
     const { remote } = overLoopback(toy({ actions: ['tap', 'multiTap'], perform }));

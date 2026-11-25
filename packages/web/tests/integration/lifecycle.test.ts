@@ -795,6 +795,16 @@ describe('web engine lifecycle', () => {
         const again = await engine.observe!(operation('sc1'));
         await engine.perform!(again.root.ref, swipe, operation('sc1'));
         await expect.poll(shadowOffsets).toEqual([150, 0]);
+
+        // A body that scrolls on its own, since the root element has an overflow of its own.
+        await page.setContent(`<!DOCTYPE html>
+          <html style="overflow: hidden">
+            <body style="margin: 250px 0 0; height: 300px; overflow: auto"><div style="height: 3000px"></div></body>
+          </html>`);
+        const bodyOffsets = () => page.evaluate(() => [document.body.scrollTop, window.scrollY]);
+        const body = await engine.observe!(operation('sc1'));
+        await engine.perform!(body.root.ref, swipe, operation('sc1'));
+        await expect.poll(bodyOffsets).toEqual([150, 0]);
       });
     });
 

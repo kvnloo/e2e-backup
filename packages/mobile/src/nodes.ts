@@ -9,7 +9,7 @@
 
 import type { CaptureSnapshotResult, SnapshotNode } from 'agent-device';
 import type { SemanticNode, ViewportSize } from '@e2e-dev/core/engine';
-import type { Point, Rect } from './support.ts';
+import { contains, type Point, type Rect, type ScrollBox } from './support.ts';
 
 /**
  * One agent-device snapshot node as this engine reads it: agent-device's own
@@ -839,36 +839,41 @@ export function isWithin(entry: ProjectedNode, ancestor: ProjectedNode): boolean
 }
 
 /**
- * Returns the box of the nearest scroll container from `entry` up, `entry`
- * included. A scroll container is a node of a kind agent-device itself treats
- * as scrolling: `scroll-area` (an iOS or Android `ScrollView`, which React
- * Native renders its lists as), `list` (an Android `RecyclerView` or
- * `ListView`), `collection` (an iOS `CollectionView`, which SwiftUI renders
- * lists as), or `table` (an iOS `TableView`). It returns undefined when no
- * container holds the node.
+ * Returns the nearest scroll container from `entry` up, `entry` included,
+ * or undefined when no container holds the node.
  */
-export function scrollBoxOf(entry: ProjectedNode | undefined): Rect | undefined {
+export function scrollBoxOf(entry: ProjectedNode | undefined): ScrollBox | undefined {
   for (let current = entry; current !== undefined; current = current.parent) {
-    if (scrolls(current)) return current.node.rect;
+    const box = scrollBox(current);
+    if (box !== undefined) return box;
   }
   return undefined;
 }
 
 const SCROLL_KINDS: ReadonlySet<string> = new Set(['scroll-area', 'list', 'collection', 'table']);
 
-/** Checks whether agent-device marks the node as a scroll container with a box. */
-function scrolls(entry: ProjectedNode): entry is ProjectedNode & { readonly node: { readonly rect: Rect } } {
-  return SCROLL_KINDS.has(entry.raw.kind ?? '') && entry.node.rect !== undefined;
+/**
+ * Returns the node's box when it's a scroll container: a node of a kind
+ * agent-device treats as scrolling, `scroll-area` (an iOS or Android
+ * `ScrollView`, which React Native renders its lists as), `list` (an Android
+ * `RecyclerView` or `ListView`), `collection` (an iOS `CollectionView`, which
+ * SwiftUI renders lists as), or `table` (an iOS `TableView`). A hidden node
+ * or one with no area isn't a container.
+ */
+function scrollBox(entry: ProjectedNode): ScrollBox | undefined {
+  const rect = entry.node.rect;
+  if (!SCROLL_KINDS.has(entry.raw.kind ?? '') || rect === undefined || rect.width <= 0 || rect.height <= 0 || entry.node.states?.hidden === true) {
+    return undefined;
+  }
+  return { ...rect, hiddenAbove: entry.raw.hiddenContentAbove === true, hiddenBelow: entry.raw.hiddenContentBelow === true };
 }
 
-/** Returns the box of the innermost scroll container under `point` (the smallest one that holds it). */
-export function scrollBoxAt(index: readonly ProjectedNode[], point: Point): Rect | undefined {
-  let found: Rect | undefined;
+/** Returns the innermost scroll container under `point` (the smallest one that holds it). */
+export function scrollBoxAt(index: readonly ProjectedNode[], point: Point): ScrollBox | undefined {
+  let found: ScrollBox | undefined;
   for (const entry of index) {
-    if (!scrolls(entry)) continue;
-    const { rect } = entry.node;
-    const holds = point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
-    if (holds && (found === undefined || rect.width * rect.height < found.width * found.height)) found = rect;
+    const box = scrollBox(entry);
+    if (box !== undefined && contains(box, point) && (found === undefined || box.width * box.height < found.width * found.height)) found = box;
   }
   return found;
 }

@@ -86,11 +86,12 @@ import {
   sanitizeFilename,
   screenLocation,
   type RawScreenshotResult,
-  centringDrag,
+  centringDrags,
   swipeDrags,
   unsupported,
   type Drag,
   type Rect,
+  type ScrollBox,
   InputBudget,
   type InstallIdentity,
 } from './support.ts';
@@ -234,8 +235,8 @@ interface NodeBinding {
   readonly captureViewport: ViewportSize | undefined;
   /** Whether `fill` and `clear` may type into the node, judged with the children `node` leaves out. */
   readonly takesText: boolean;
-  /** The box of the nearest scroll container strictly around the node, where `scrollIntoView` centres it. */
-  readonly container: Rect | undefined;
+  /** The nearest scroll container strictly around the node, where `scrollIntoView` centres it. */
+  readonly container: ScrollBox | undefined;
 }
 
 
@@ -554,10 +555,8 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   private screenBeforeAction: ProjectedScreen | undefined;
   /** The most recent projection of the screen, from any observe or locate. */
   private latestScreen: ProjectedScreen | undefined;
-  /** How many actions this surface had sent when `latestScreen` was projected. */
-  private latestScreenActions = 0;
-  /** How many actions this surface has sent, counted by `markAction`. */
-  private actions = 0;
+  /** Whether an action went out after `latestScreen` was projected. */
+  private actedSinceLatestScreen = false;
   /** Budget a control that came with the last action gets to finish arriving; see DEFAULT_TRANSITION_MS. */
   private readonly transitionMs: number;
   /** Whether snapshots keep interactive nodes only, from the `snapshot` option. */
@@ -1218,7 +1217,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       originUnknown: raw.warnings?.includes(ORIGIN_WARNING) === true,
     };
     this.latestScreen = projected;
-    this.latestScreenActions = this.actions;
+    this.actedSinceLatestScreen = false;
     const read = projected.viewport;
     if (read !== undefined && (this.knownViewport === undefined || sameScreen(read, this.knownViewport))) this.knownViewport = read;
     return projected;
@@ -1491,13 +1490,23 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   }
 
   /**
-   * Sends `drags` one after another, each taking `durationMs`. The first one
-   * is sent only when the budget has room for every drag, so a swipe never
-   * stops between two of its drags.
+   * Sends `drags` one after another, each taking `durationMs`. Nothing is
+   * sent when the budget has no room for every drag: that is
+   * `OPERATION_TIMEOUT`, so `scrollUntilVisible` reads a step it can't
+   * finish as its deadline. A later drag can still run out of budget when an
+   * earlier one answers late, which is `ACTION_MAY_HAVE_COMMITTED`.
    */
   private async pan(client: AgentDeviceClient, drags: readonly Drag[], durationMs: number, input: InputBudget): Promise<void> {
-    for (const [index, drag] of drags.entries()) {
-      await input.send((signal) => client.interactions.pan({ ...drag, durationMs, signal }), index === 0 ? drags.length * durationMs : durationMs);
+    const needed = drags.length * durationMs;
+    const remaining = input.remainingMs();
+    if (needed >= remaining) {
+      throw new EngineError('OPERATION_TIMEOUT', `the swipe's drags take ${needed} ms, but only ${Math.floor(remaining)} ms of its timeout are left; nothing was sent`, { retryable: false });
+    }
+    // A drag can move the screen even when the swipe fails later, so the
+    // last capture's containers stop counting.
+    this.actedSinceLatestScreen = true;
+    for (const drag of drags) {
+      await input.send((signal) => client.interactions.pan({ ...drag, durationMs, signal }), durationMs);
     }
   }
 
@@ -1569,7 +1578,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   private markAction(before: ProjectedScreen | undefined): void {
     this.screenBeforeAction = before;
     this.lastActionAt = Date.now();
-    this.actions += 1;
+    this.actedSinceLatestScreen = true;
   }
 
   async perform(ref: NodeRef, action: LocatorAction, operation: OperationContext, input: InputBudget): Promise<void> {
@@ -1588,11 +1597,11 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       // A capture from before the last input can have the wrong containers:
       // the input may have replaced the screen, or a fill read the field
       // before it typed. In that case, the screen is read again. The
-      // viewport is read after it, since the screen may have rotated.
+      // viewport is read after it, since the screen may have rotated or
+      // changed size.
       const latest = this.latestScreen;
-      const before = latest === undefined || this.latestScreenActions !== this.actions ? this.project(await this.capture(operation.signal, false, input)) : latest;
-      const viewport = this.knownViewport;
-      if (viewport === undefined) throw notActionable('the screen size is not known yet, so the swipe distance cannot be measured. Observe the screen first.');
+      const before = latest === undefined || this.actedSinceLatestScreen ? this.project(await this.capture(operation.signal, false, input)) : latest;
+      const viewport = await this.viewportFor(before.viewport, operation.signal, input);
       const centre = { x: viewport.width / 2, y: viewport.height / 2 };
       // The boxes in a capture that couldn't place its window on the screen are
       // in another frame, so its containers aren't trusted.
@@ -1690,11 +1699,11 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
         case 'scrollIntoView': {
           // Only what's on screen is listed on a device, so the node is at
           // least partly in view. A node cut off at its container's edge is
-          // dragged to the middle (`centringDrag`).
+          // dragged to the middle (`centringDrags`).
           const rect = target.node.rect;
-          const drag = rect === undefined || target.container === undefined || target.originUnknown ? undefined : centringDrag(rect, target.container, action.center === true);
-          if (drag === undefined) return undefined;
-          await this.pan(client, [drag], SCROLL_STEP.durationMs, input);
+          const drags = rect === undefined || target.container === undefined || target.originUnknown ? [] : centringDrags(rect, target.container, action.center === true);
+          if (drags.length === 0) return undefined;
+          await this.pan(client, drags, SCROLL_STEP.durationMs, input);
           this.noteGesture(operation);
           return undefined;
         }
@@ -1723,7 +1732,9 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
     } catch (cause) {
       throw staleOr(cause, label, this.where);
     }
-    this.markAction(before);
+    // A `scrollIntoView` with nothing to move sends nothing, so it isn't an
+    // action the next control must wait on.
+    if (input.hasSent) this.markAction(before);
   }
 
   /**

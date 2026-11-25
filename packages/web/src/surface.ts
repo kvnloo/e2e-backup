@@ -1173,8 +1173,9 @@ export class PlaywrightSurface {
 
   /**
    * One action on a located or observed node. A `swipe` on the observation
-   * root is the viewport swipe: a wheel gesture sized by the viewport, with no
-   * element resolved behind it, so it needs only the page. Every other action
+   * root is the viewport swipe: a wheel gesture at the viewport's center,
+   * sized by the scroll container under it, with no element resolved behind
+   * it, so it needs only the page. Every other action
    * on the root acts on the document element the root stands for.
    */
   perform(ref: NodeRef, action: LocatorAction, operation: OperationContext): Promise<void> {

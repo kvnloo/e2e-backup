@@ -1,6 +1,7 @@
 /** Deadline and cancellation helpers. */
 
 import { asEngineError, E2EError, isE2EError, TestError } from './errors.ts';
+import type { EngineErrorCode } from '../engine/contract.ts';
 
 export class Deadline {
   readonly endsAt: number;
@@ -192,10 +193,14 @@ export class ReadWindow {
   }
 }
 
+/** The code of the engine error `cause` is, bare or wrapped by the locator failure it was translated into. */
+export function engineErrorCode(cause: unknown): EngineErrorCode | undefined {
+  return (asEngineError(cause) ?? asEngineError(cause instanceof Error ? cause.cause : undefined))?.code;
+}
+
 /** Whether `cause` is the engine's `OPERATION_TIMEOUT`, bare or wrapped by the locator failure it was translated into. */
 export function isOperationTimeout(cause: unknown): boolean {
-  const engineError = asEngineError(cause) ?? asEngineError(cause instanceof Error ? cause.cause : undefined);
-  return engineError?.code === 'OPERATION_TIMEOUT';
+  return engineErrorCode(cause) === 'OPERATION_TIMEOUT';
 }
 
 /** How long a negated assertion must hold before it passes. */

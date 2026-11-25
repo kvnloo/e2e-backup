@@ -6,12 +6,12 @@ import { isKeyModifier, KEY_MODIFIERS, SCROLL_STEP, type KeyModifier } from '../
 import type { LocatorAction, LocatorExpression, Observation, SemanticNode } from '../engine/surface.ts';
 import { locatorBrand } from '../internal/brands.ts';
 import { isSecret } from '../secrets.ts';
-import { TestError, asEngineError } from '../internal/errors.ts';
+import { TestError } from '../internal/errors.ts';
 import { isPercentage, requireFinitePoint } from '../internal/geometry.ts';
 import { isCheckable, isValueControl } from '../internal/roles.ts';
 import { isPlainObject, rejectUnknownOptions } from '../internal/options.ts';
 import { realmSlot } from '../internal/realm-slot.ts';
-import { SWIPE, swipeAction } from '../internal/swipe.ts';
+import { STEP_MOMENTUM, SWIPE, swipeAction } from '../internal/swipe.ts';
 import { obj } from '../internal/objects.ts';
 import { isTextMatch, normalizeText } from '../internal/text.ts';
 import type {
@@ -47,7 +47,7 @@ import {
   testIdQuery,
   textQuery,
 } from './expression.ts';
-import { type Deadline, isOperationTimeout, POLL_INTERVAL_MS, pollReads } from '../internal/time.ts';
+import { type Deadline, engineErrorCode, isOperationTimeout, POLL_INTERVAL_MS, pollReads } from '../internal/time.ts';
 import { SampleHistory } from '../expect/samples.ts';
 import type { ArtifactSink } from '../run/fixtures.ts';
 import type { ScreenshotContext } from '../run/screenshots.ts';
@@ -271,7 +271,7 @@ class ScreenImpl implements Screen {
   async scrollUntilVisible(target: Locator, options?: ScrollUntilVisibleOptions): Promise<void> {
     const internals = this.ownLocator(target, 'scrollUntilVisible');
     rejectUnknownOptions('scrollUntilVisible', options, ['direction', 'distance', 'speed', 'momentum', 'timeout']);
-    const step = swipeAction('scrollUntilVisible', options?.direction ?? 'down', options, SCROLL_STEP);
+    const step = { momentum: STEP_MOMENTUM, ...swipeAction('scrollUntilVisible', options?.direction ?? 'down', options, SCROLL_STEP) };
     // On a device, a step longer than one drag is split into drags of at most
     // `SCROLL_STEP.distance` each.
     const dragsMs = Math.ceil(step.distance / SCROLL_STEP.distance) * step.durationMs;
@@ -304,11 +304,20 @@ class ScreenImpl implements Screen {
           throw cause;
         }
         if (isNodeVisible(node)) {
-          // After a step, a node more than a fifth of its container from the
-          // middle is moved to the middle, clear of a sticky header or footer
-          // at the edge. A node that's visible before any step doesn't get a
-          // gesture, since a list at its top could take one as a pull to refresh.
-          if (stepped && engine.supports('scrollIntoView')) await engine.performUntil(internals.expression, { kind: 'scrollIntoView', center: true }, deadline);
+          // After a step, the node is brought fully into view. On a device, a
+          // node more than a fifth of its container from the middle is dragged
+          // to the middle, clear of a sticky header or footer at the edge. A
+          // node that's visible before any step doesn't get a gesture, since a
+          // list at its top could take one as a pull to refresh.
+          if (stepped && engine.supports('scrollIntoView')) {
+            try {
+              await engine.performUntil(internals.expression, { kind: 'scrollIntoView', center: true }, deadline);
+            } catch (cause) {
+              // The node is visible, so a drag that can't finish before the
+              // deadline doesn't fail the scroll.
+              if (!deadline.expired() && !isOperationTimeout(cause)) throw cause;
+            }
+          }
           return;
         }
         if (deadline.expired()) throw notVisible();
@@ -323,9 +332,13 @@ class ScreenImpl implements Screen {
           if (deadline.expired() || (isOperationTimeout(cause) && deadline.remaining() < POLL_INTERVAL_MS)) {
             throw notVisible(cause);
           }
-          // A device refuses a step whose drags can't finish in the time left,
-          // before it sends any of them. That's the deadline as well.
-          if (asEngineError(cause)?.code === 'NOT_ACTIONABLE' && deadline.remaining() <= dragsMs) throw notVisible(cause);
+          // A device refuses a step, before it sends any drag, when the drags
+          // can't finish in the time left (`OPERATION_TIMEOUT`). A later drag
+          // of a split step can run out the same way after an earlier one
+          // answered late (`ACTION_MAY_HAVE_COMMITTED`). Both count as the
+          // scroll timing out.
+          const code = engineErrorCode(cause);
+          if ((code === 'OPERATION_TIMEOUT' || code === 'ACTION_MAY_HAVE_COMMITTED') && deadline.remaining() <= dragsMs) throw notVisible(cause);
           throw cause;
         }
       }

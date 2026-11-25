@@ -352,7 +352,7 @@ export async function dispatchLocatorAction(
       // to stop moving, which a node with an endless animation never does, so
       // the browser's own minimal scroll brings it in without that wait.
       if (action.center === true) {
-        await scrollIntoViewNearest(target);
+        await scrollIntoViewNearest(target, operation);
       } else {
         await locator.scrollIntoViewIfNeeded({ timeout });
       }

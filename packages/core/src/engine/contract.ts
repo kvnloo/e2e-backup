@@ -12,15 +12,19 @@
 
 /** A swipe or scroll direction. */
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
-/** @deprecated Use `distance` and `speed` on the swipe. It will be removed no earlier than April 1, 2027. */
+/**
+ * @deprecated In an engine action, read `distance` and `durationMs`. In a
+ * test's options, use `distance` and `speed`. It will be removed no earlier
+ * than April 1, 2027.
+ */
 export type Momentum = 'none' | 'slow' | 'fast';
 /**
  * One step of a scroll that reads the screen between steps
- * (`scrollUntilVisible` and the agent's `scroll_to`). It's 0.65 of the
- * scroll container, the longest single drag, so 35% of the view before stays
- * on screen.
- *
- * The drag takes 800 ms because after a faster one, the list flings past that 35%.
+ * (`scrollUntilVisible` and the agent's `scroll_to`): 0.65 of the scroll
+ * container, the longest single drag. On a device, the drag takes 800 ms,
+ * since after a faster one the list keeps moving further once the finger
+ * lifts. How much of the previous view stays on screen depends on how far
+ * the list moves after that.
  */
 export const SCROLL_STEP = { distance: 0.65, durationMs: 800 } as const;
 /** One option of a select: its label (a bare string too), its `value` attribute, or its zero-based index. */
@@ -350,12 +354,17 @@ export type LocatorAction =
   | {
       readonly kind: 'scrollIntoView';
       /**
-       * Set to also move a node that is fully visible to the middle of its
-       * scroll container when it's more than a fifth of the container from
-       * the middle. `scrollUntilVisible` and the agent's `scroll_to` set it
-       * after a scroll step. A node at the edge can be under a sticky header
-       * or footer, and the drag moves it out. It's ignored where the scroll
-       * is a wheel event instead of a drag.
+       * Set by `scrollUntilVisible` and the agent's `scroll_to` after a
+       * scroll step, for a node already read as visible.
+       *
+       * On a device, a node more than a fifth of its scroll container from
+       * the middle is also dragged toward the middle, when the container has
+       * content hidden on that side. A node at the edge can be under a
+       * sticky header or footer. One drag is sent and nothing checks what
+       * covers the node after it, so a sticky view can still cover it.
+       *
+       * On the web, the node is brought in with the browser's minimal
+       * scroll, without waiting for it to stop moving.
        */
       readonly center?: boolean;
     }
@@ -389,9 +398,11 @@ export interface SwipeAction {
   /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
   readonly durationMs: number;
   /**
-   * @deprecated Read `distance` and `durationMs`. A swipe from an older
-   * client that sends only this is given the `distance` and `durationMs` it
-   * stands for. It will be removed no earlier than April 1, 2027.
+   * @deprecated Read `distance` and `durationMs`. Core still sends it beside
+   * them for an engine that reads it: the test's `momentum`, or `slow` on
+   * core's own scroll steps. A swipe from an older client that sends only
+   * this is given the `distance` and `durationMs` it stands for. It will be
+   * removed no earlier than April 1, 2027.
    */
   readonly momentum?: Momentum;
 }

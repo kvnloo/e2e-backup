@@ -329,6 +329,15 @@ describe('dispatchLocatorAction', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
+  it('brings a node in with the minimal browser scroll within the operation for center, and with Playwright otherwise', async () => {
+    const { locator, target } = stubLocator();
+    await dispatchLocatorAction(target, { kind: 'scrollIntoView', center: true }, OPERATION, lookup);
+    expect(locator.evaluate).toHaveBeenCalledWith(expect.any(Function), undefined, { timeout: 7, signal: OPERATION.signal });
+    expect(locator.scrollIntoViewIfNeeded).not.toHaveBeenCalled();
+    await dispatchLocatorAction(target, { kind: 'scrollIntoView' }, OPERATION, lookup);
+    expect(locator.scrollIntoViewIfNeeded).toHaveBeenCalledWith({ timeout: 7 });
+  });
+
   it('scrolls a node with a wheel gesture sized by its own box: the agent node scroll', async () => {
     const { locator, target, wheel, frame } = stubLocator({ x: 0, y: 0, width: 400, height: 300 });
     await dispatchLocatorAction(target, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, OPERATION, lookup);
