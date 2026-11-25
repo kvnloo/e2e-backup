@@ -282,8 +282,11 @@ When the app can't start from the link, the call fails with
 
 - An `http(s)` link on an iOS simulator, since agent-device launches the app
   first and then opens the URL in it. Use a custom scheme in `app.linkBase`.
-- A physical iPhone, since agent-device's XCTest backend can't launch the
-  app with a URL, and the engine can't tell which backend drives the device.
+- A physical iPhone that agent-device drives through its XCTest backend,
+  which can't launch the app with a URL. This one fails only after the app
+  has been stopped, so the app is left stopped. An iPhone that
+  `xcrun devicectl list devices` shows is driven through CoreDevice and
+  relaunches from the link.
 - A target with a device provider, launch arguments, or permissions.
 
 See the [reference](/reference/mobile#the-app-under-test). The call works on

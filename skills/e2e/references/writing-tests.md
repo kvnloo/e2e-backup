@@ -253,9 +253,10 @@ label. `browser` (`Browser`): browser targets, import `test` from `@e2e-dev/web`
   - `open(path, { relaunch: true })` starts the app fresh first. On a device
     with `app.linkBase`, the app is stopped if it's running, then launched
     from the link. It's refused (`UNSUPPORTED_CAPABILITY`) on a device
-    provider's device, on a physical iPhone, for an `http(s)` link on an iOS
-    simulator, and on a target with `app.launchArguments` or
-    `app.permissions`. In a browser, the open tabs are closed and a new one
+    provider's device, for an `http(s)` link on an iOS simulator, and on a
+    target with `app.launchArguments` or `app.permissions`. On a physical
+    iPhone that agent-device drives through XCTest, it fails after the app
+    has been stopped. In a browser, the open tabs are closed and a new one
     is opened, as in `restart()`. Then the path is opened instead of the
     base URL.
 - `back()`: one history step back.

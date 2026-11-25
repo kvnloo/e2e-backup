@@ -308,8 +308,9 @@ export default {
   takes no path and a link goes through [`device.openLink`](#openlink).
 - With `app.open(path, { relaunch: true })`, the app is stopped if it's
   running, then launched from the link. On an iOS simulator, only a
-  custom-scheme link is taken, and a physical iPhone isn't supported (see
-  the table below). Before the app starts, the simulator can ask
+  custom-scheme link is taken. A physical iPhone relaunches from the link
+  when agent-device drives it through CoreDevice, but not through XCTest
+  (see the table below). Before the app starts, the simulator can ask
   "Open in ...?". Accept it with `device.alert('accept')`.
 - `app.appPath` is the build the suite runs against. The engine installs
   nothing on its own: [`device.installApp()`](#installapp) installs it where
@@ -322,7 +323,7 @@ export default {
 | Throws | When |
 | --- | --- |
 | `INVALID_CONFIG` | At config load: no `app.bundleId` and no `app.appPath`; an `app.url` (not supported yet); a link in `bundleId` (a test opens one with `device.openLink`); an unknown permission name; an Apple launch argument such as `AppleLocale`, or a list item `am start` cannot carry, in an object on an Android target. |
-| `UNSUPPORTED_CAPABILITY` | `app.open()`, `app.restart()`, or `app.clearState()` on a target with no `app.bundleId` before its build is installed. `app.open(path, { relaunch: true })` on a target that sets `app.launchArguments` or `app.permissions` (`'all'` included), on a device provider's device (its driver can open the link in the running app), with an `http(s)` link on an iOS simulator (agent-device launches the app and then opens the URL), or on a physical iPhone (agent-device's XCTest backend can't launch the app with a URL, and the engine can't tell which backend drives the device). |
+| `UNSUPPORTED_CAPABILITY` | `app.open()`, `app.restart()`, or `app.clearState()` on a target with no `app.bundleId` before its build is installed. `app.open(path, { relaunch: true })` on a target that sets `app.launchArguments` or `app.permissions` (`'all'` included), on a device provider's device (its driver can open the link in the running app), with an `http(s)` link on an iOS simulator (agent-device launches the app and then opens the URL), or on a physical iPhone that agent-device drives through XCTest, which can't launch the app with a URL. That last case fails after the app has been stopped, so the app is left stopped. An iPhone that `xcrun devicectl list devices` shows is driven through CoreDevice instead. |
 
 #### Launch arguments and permissions
 

@@ -3428,16 +3428,24 @@ describe('device fixture', () => {
     expect(android.fake.lastArgs('apps.open')).toEqual({ platform: 'android', app: 'dev.e2e.benchmark', url: 'https://shop.example.com/orders/42', relaunch: true });
   });
 
-  it('refuses to relaunch from a link on a physical iPhone, before any device command', async () => {
-    const h = harness({ bundleId: 'dev.e2e.benchmark' });
-    h.fake.respond('devices.boot', () => ({ platform: 'ios', target: 'mobile', device: 'iPhone', id: '00008110-0001', kind: 'device', booted: true }));
-    await openAttempt(h);
-    const before = h.fake.calls.length;
-    await expect(h.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
-      code: 'UNSUPPORTED_CAPABILITY',
-      message: expect.stringContaining('physical iPhone'),
+  it("relaunches from a link on a physical iPhone, and names what to do when agent-device's XCTest backend refuses the URL", async () => {
+    const physical = () => ({ platform: 'ios', target: 'mobile', device: 'iPhone', id: '00008110-0001', kind: 'device', booted: true });
+    const coredevice = harness({ bundleId: 'dev.e2e.benchmark' });
+    coredevice.fake.respond('devices.boot', physical);
+    await openAttempt(coredevice);
+    await coredevice.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true });
+    expect(coredevice.fake.lastArgs('apps.open')).toMatchObject({ app: 'dev.e2e.benchmark', url: 'e2e-benchmark://orders/42', relaunch: true });
+
+    const xctest = harness({ bundleId: 'dev.e2e.benchmark' });
+    xctest.fake.respond('devices.boot', physical);
+    await openAttempt(xctest);
+    xctest.fake.respond('apps.open', () => {
+      throw new AppError('UNSUPPORTED_OPERATION', 'XCTest-backed physical iOS devices do not support deep links or launch arguments during open.', { deviceId: '00008110-0001', backend: 'xctest' });
     });
-    expect(h.fake.calls.slice(before)).toEqual([]);
+    await expect(xctest.engine.session!.openLink!('e2e-benchmark://orders/42', operation(), { relaunch: true })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('xcrun devicectl list devices'),
+    });
   });
 
   it('refuses to relaunch from a link on a target with launch arguments or permissions, before any device command', async () => {
