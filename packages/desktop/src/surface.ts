@@ -1396,10 +1396,13 @@ export class DesktopSurface {
    * `distance` of 1 is ten units, and a default swipe of 0.5 is five. A
    * distance of `SCROLL_STEP.distance` (a `scrollUntilVisible` step or the
    * agent's page) is two units, since a longer step could skip rows of a
-   * short pane. `durationMs` doesn't change anything.
+   * short pane. The deprecated `momentum: 'fast'` maps to that same
+   * distance, so it's read from `momentum` and stays ten units, as before.
+   * `durationMs` doesn't change anything.
    */
   private async scroll(binding: NodeBinding, action: SwipeAction, operation: OperationContext): Promise<void> {
-    const amount = action.distance === SCROLL_STEP.distance ? 2 : Math.max(1, Math.round(action.distance * 10));
+    const step = action.distance === SCROLL_STEP.distance;
+    const amount = step && action.momentum === 'fast' ? 10 : step ? 2 : Math.max(1, Math.round(action.distance * 10));
     await this.refCommand('scroll', binding, operation, ['--direction', action.direction, '--amount', String(amount)]);
   }
 
