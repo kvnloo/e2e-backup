@@ -92,6 +92,21 @@ export class TraceRecorder {
   }
 
   /**
+   * Gives the actions a replay ran the locations their recording kept,
+   * where the replay ran them without looking first (a replay does not look
+   * before a `back` on the route it ends on). Position for position: a
+   * replay records the recording's actions in order before it hands off, so
+   * a recording made again after a hand-off keeps the trip it repeated.
+   */
+  keepLocations(replayed: readonly RecordedAction[]): void {
+    replayed.forEach((recorded, index) => {
+      const own = this.actions[index];
+      if (own === undefined || own.name !== recorded.name || own.at !== undefined || recorded.at === undefined) return;
+      this.actions[index] = { ...own, at: recorded.at };
+    });
+  }
+
+  /**
    * Records one mutating project-tool call as a gap. Replay ends here rather
    * than skipping it: the grammar cannot reproduce the mutation, and a replay
    * that silently dropped a state change would prove nothing.

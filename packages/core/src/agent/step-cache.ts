@@ -486,6 +486,8 @@ export class StepTraceSession {
       this.info = this.missed(stopReason, outcome.total, outcome.derived, detail);
       return undefined;
     }
+    // The replayed actions are this step's recording now; the ones it ran without looking keep where they were recorded.
+    this.recorder?.keepLocations(trace.actions.slice(0, outcome.executed));
     this.handOff(outcome, stopReason, detail, this.detourOf(trace, outcome.executed));
     return undefined;
   }
@@ -666,8 +668,12 @@ export class StepTraceSession {
     const templated = templateTrace(trace, this.options.templates);
     if (templated === undefined) return 'skipped';
     this.cache.staged.push({ kind: 'write', keyHash: this.keyHash, trace: templated, stepIndex: this.options.stepIndex });
-    const detour = this.detourOf(trace);
-    if (detour !== undefined && this.info !== undefined) this.info = { ...this.info, detour };
+    // The report names the detours of the recording it stages, and none when that has none.
+    if (this.info !== undefined) {
+      const { detour: _replayed, ...info } = this.info;
+      const detour = this.detourOf(trace);
+      this.info = detour === undefined ? info : { ...info, detour };
+    }
     return 'staged';
   }
 

@@ -1179,6 +1179,64 @@ describe('trace cache: a detour to the same path on another origin', () => {
   }, 240_000);
 });
 
+/** Takes the wrong turn on a step it runs from the top; after a hand-off, only taps Increment, as an agent finishing the step would. */
+function resumingExecutor(record: ExecutorRecord): StepExecutor {
+  const fromTop = wrongTurnExecutor(record);
+  return {
+    name: 'resuming-executor',
+    version: 'test',
+    async runStep(context: StepExecutorContext) {
+      if (context.replayedPrefix === undefined) return fromTop.runStep(context);
+      record.calls += 1;
+      const observation = await context.observe();
+      await context.actions.tap({ id: nodeIdFor(observation.text, /button "Increment"/) });
+      return { status: 'passed' as const, summary: 'the counter shows 1' };
+    },
+  };
+}
+
+describe('trace cache: a recording made again after a hand-off', () => {
+  let app: FixtureApp;
+  let project: FixtureProject;
+
+  beforeAll(async () => {
+    app = await startFixtureApp();
+    project = createProject({ 'tests/detour.e2e.ts': DETOUR_SUITE });
+  }, 60_000);
+
+  afterAll(async () => {
+    project?.cleanup();
+    await app?.close();
+  });
+
+  it('keeps the locations of the replayed actions, so the detour it repeated stays reported', async () => {
+    const options = (record: ExecutorRecord) => ({
+      appUrl: app.url,
+      config: { tests: 'tests/**/*.e2e.ts', agents: { default: { executor: resumingExecutor(record) } }, cache: 'read-write' as const },
+    });
+    const detour = 'actions 1-2 left / for /about and came back with nothing typed, chosen, or set';
+    expect((await runExisting(project, options({ calls: 0, prefixes: [] }))).exitCode).toBe(0);
+    // Increment no longer finds its recorded target: the replay runs the wrong turn, then the agent finishes.
+    rewriteOnlyEntry(project, (payload) => ({
+      ...payload,
+      actions: payload.actions.map((action, index) => (index === 2 && action.name === 'tap' ? { ...action, target: { ...action.target, name: 'No Such Button' } } : action)),
+    }));
+    const handedOff = await runExisting(project, options({ calls: 0, prefixes: [] }));
+    expect(handedOff.exitCode).toBe(0);
+    const step = (outcome: RunOutcome) => resultByTitle(outcome, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(step(handedOff).cache).toMatchObject({ mode: 'agent-concluded', detour, write: 'saved' });
+    expect(readOnlyEntry(project).entry.payload.actions.map((action) => [action.name, action.at])).toEqual([
+      ['tap', '/'],
+      ['back', '/about'],
+      ['tap', '/'],
+    ]);
+    const replay: ExecutorRecord = { calls: 0, prefixes: [] };
+    const replayed = await runExisting(project, options(replay));
+    expect(replay.calls).toBe(0);
+    expect(step(replayed).cache).toMatchObject({ mode: 'self-finalized', detour });
+  }, 240_000);
+});
+
 describe('trace cache: a replay that hands off after a detour', () => {
   let app: FixtureApp;
   let project: FixtureProject;
