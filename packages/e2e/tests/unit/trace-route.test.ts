@@ -1,7 +1,7 @@
 /** Routes: a location reduced to the screen it names, across the URL shapes apps use. */
 
 import { describe, expect, it } from 'vitest';
-import { appLocation, appNavigation, sameRoute } from '@e2e-dev/core/lib/cache/route';
+import { appLocation, appNavigation, routeLocation, sameRoute } from '@e2e-dev/core/lib/cache/route';
 
 /** Whether every location names the same screen as the first. */
 const alike = (first: string, ...others: string[]) => others.every((other) => sameRoute(first, other));
@@ -84,6 +84,30 @@ describe('route identity', () => {
     }
     expect(alike('Settings', 'General')).toBe(false);
     expect(alike('Settings', '/Settings')).toBe(false);
+  });
+});
+
+describe('routeLocation', () => {
+  it('spells a location as its route, every minted segment and query value as :id', () => {
+    expect(routeLocation('/orders/123/edit')).toBe('/orders/:id/edit');
+    expect(routeLocation('/auth/magic/Zx8aQ2pLmN4tR7')).toBe('/auth/magic/:id');
+    expect(routeLocation('/callback?state=eyJhbGciOi.x1.y2&code=482913')).toBe('/callback?code=:id&state=:id');
+    expect(routeLocation('/settings?tab=notes#top')).toBe('/settings?tab=notes');
+    expect(routeLocation('/#/companies/1?view=list')).toBe('/companies/:id?view=list');
+    expect(routeLocation('https://idp.test/authorize?client_id=app&nonce=n0nce4c0ffee99')).toBe('https://idp.test/authorize?client_id=app&nonce=:id');
+    expect(routeLocation('/files/a%2Fb/caf%C3%A9')).toBe('/files/a%2Fb/caf%C3%A9');
+  });
+
+  it('keeps a location that is not a web address as it is', () => {
+    expect(routeLocation('com.example / Settings')).toBe('com.example / Settings');
+    expect(routeLocation('about:blank')).toBe('about:blank');
+  });
+
+  it('names the same route as the location it spells', () => {
+    for (const location of ['/orders/123/edit', '/callback?code=482913&tab=a', '/#/companies/1', 'https://other.test/x/9f8e7d6c5b4a', '/', '/files/a%2Fb']) {
+      expect(sameRoute(routeLocation(location), location)).toBe(true);
+      expect(routeLocation(routeLocation(location))).toBe(routeLocation(location));
+    }
   });
 });
 

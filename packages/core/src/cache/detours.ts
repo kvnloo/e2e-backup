@@ -14,7 +14,10 @@
  * (`addressKey`): from one order's page to another's and back is a visit to
  * another record, and from one order to another is no return at all. Each
  * action carries the location it ran at (`RecordedAction.at`) on entries
- * recorded since that was added; for older
+ * recorded since that was added, spelled as its route with every minted
+ * value as `:id` (`routeLocation`), so a token a URL carried is never
+ * stored; the detours are found on the run's own locations before that and
+ * kept as spans (`ActionTrace.detours`). For older
  * entries, which have none, the actions alone are read for the narrowest
  * shape of the same thing: a tap or a navigate, nothing but looking around
  * after it, then `back`.
@@ -25,7 +28,7 @@
  */
 
 import { bound } from '../internal/text.ts';
-import { addressKey } from './route.ts';
+import { addressKey, routeLocation } from './route.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
 /** What the detour check reads of a trace. */
@@ -202,8 +205,8 @@ function byLocations(trace: DetourInput): TraceDetour[] {
       from += 1;
       continue;
     }
-    // Named by the place the leaving action stood on, as a stored span is (`recorded`): the same address, maybe spelled otherwise.
-    detours.push({ from: left, to: back, at: where[left] ?? home, via, evidence: 'locations' });
+    // Named by the place the leaving action stood on, as a stored span is (`recorded`), and spelled as an entry keeps it.
+    detours.push({ from: left, to: back, at: routeLocation(where[left] ?? home), via: routeLocation(via), evidence: 'locations' });
     from = back;
   }
   return detours;

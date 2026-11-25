@@ -106,8 +106,10 @@ describe('findDetours by recorded locations', () => {
   it('names the screen the leaving action stood on, as a stored span does', () => {
     const trip = flow([tap('Top', '/a'), tap('Leave', '/a#top'), back('/b'), tap('Stay', '/a')], { endPath: '/a' });
     const fresh = findDetours(trip);
-    expect(fresh).toEqual([{ from: 1, to: 3, at: '/a#top', via: '/b', evidence: 'locations' }]);
-    expect(findDetours({ ...trip, detours: fresh.map(({ from, to }) => ({ from, to })) })).toEqual(fresh);
+    expect(fresh).toEqual([{ from: 1, to: 3, at: '/a', via: '/b', evidence: 'locations' }]);
+    // The entry stores each location as its route, as the step stages it.
+    const stored = flow([tap('Top', '/a'), tap('Leave', '/a'), back('/b'), tap('Stay', '/a')], { endPath: '/a' });
+    expect(findDetours({ ...stored, detours: fresh.map(({ from, to }) => ({ from, to })) })).toEqual(fresh);
   });
 
   it('starts at the action that left, not at the looking around before it', () => {
@@ -115,9 +117,11 @@ describe('findDetours by recorded locations', () => {
     expect(detours).toEqual([{ from: 1, to: 3, at: '/home', via: '/reports', evidence: 'locations' }]);
   });
 
-  it('finds a return to the same record', () => {
-    const detours = findDetours(flow([tap('Order', '/orders/123'), back('/invoices'), tap('Ship', '/orders/123')], { endPath: '/orders/123' }));
-    expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/123', via: '/invoices', evidence: 'locations' }]);
+  it('names the places by route, a record id or a token as :id', () => {
+    const detours = findDetours(
+      flow([tap('Order', '/orders/123'), back('/login/callback?code=482913&state=eyJhbGciOi.x1.y2'), tap('Ship', '/orders/123')], { endPath: '/orders/123' }),
+    );
+    expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/:id', via: '/login/callback?code=:id&state=:id', evidence: 'locations' }]);
   });
 
   it('is no return to another record on the same route', () => {
@@ -125,7 +129,7 @@ describe('findDetours by recorded locations', () => {
     expect(findDetours(flow([tap('Orders', '/orders/123/edit'), tap('Order 456', '/orders'), tap('Ship', '/orders/456/edit')], { endPath: '/orders/456/edit' }))).toEqual([]);
     // Back to the first order is a return.
     expect(findDetours(flow([tap('Orders', '/orders/123/edit'), tap('Order 456', '/orders'), back('/orders/456/edit')], { endPath: '/orders/123/edit' }))).toEqual([
-      { from: 0, to: 3, at: '/orders/123/edit', via: '/orders', evidence: 'locations' },
+      { from: 0, to: 3, at: '/orders/:id/edit', via: '/orders', evidence: 'locations' },
     ]);
   });
 
