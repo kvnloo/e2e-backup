@@ -570,7 +570,8 @@ options, or to name an export, write `engine` as an object:
 - **`app`** takes `url`, `bundleId`, and `appPath`, as a target's
   [`app`](/reference/config#the-app-under-test) does. `@e2e-dev/web` needs
   `url`. `@e2e-dev/mobile` and `@e2e-dev/desktop` need `bundleId` or
-  `appPath`. `@e2e-dev/electron` needs `appPath`.
+  `appPath`. `@e2e-dev/electron` needs `appPath`, or none for a packaged app
+  named by `options: {executablePath}`.
 - **Files.** The project root is the server's working directory, and the
   session writes `.e2e/` there.
 - **Tests.** `e2e run` and `open_session {test}` need a config. To keep
