@@ -33,7 +33,9 @@ function electronPackage(projectRoot: string): ElectronPackage | undefined {
   const version = typeof parsed === 'object' && parsed !== null && 'version' in parsed && typeof parsed.version === 'string' ? parsed.version : 'unknown';
   const pathFile = path.join(directory, 'path.txt');
   const relative = existsSync(pathFile) ? readFileSync(pathFile, 'utf8').trim() : '';
-  const binary = relative === '' ? undefined : path.join(directory, 'dist', relative);
+  // Electron's own index.js takes the binary from ELECTRON_OVERRIDE_DIST_PATH when it is set (a build of your own, Nix).
+  const override = process.env['ELECTRON_OVERRIDE_DIST_PATH'];
+  const binary = override !== undefined && override !== '' ? path.join(override, relative === '' ? 'electron' : relative) : relative === '' ? undefined : path.join(directory, 'dist', relative);
   return { directory, binary: binary !== undefined && existsSync(binary) ? binary : undefined, version };
 }
 

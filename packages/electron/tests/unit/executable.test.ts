@@ -12,6 +12,28 @@ chmodSync(path.join(root, 'run.sh'), 0o755);
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
+describe('the project\'s electron package', () => {
+  it('starts the binary ELECTRON_OVERRIDE_DIST_PATH names, as Electron\'s own index.js does', async () => {
+    const project = path.join(root, 'project');
+    const electron = path.join(project, 'node_modules', 'electron');
+    const override = path.join(root, 'custom-dist');
+    mkdirSync(electron, { recursive: true });
+    mkdirSync(override, { recursive: true });
+    writeFileSync(path.join(project, 'package.json'), '{}');
+    writeFileSync(path.join(electron, 'package.json'), JSON.stringify({ name: 'electron', version: '45.5.0', main: 'index.js' }));
+    writeFileSync(path.join(electron, 'index.js'), '');
+    writeFileSync(path.join(override, 'electron'), '');
+    expect(describeExecutable(project, undefined).status).toBe('warn');
+    process.env['ELECTRON_OVERRIDE_DIST_PATH'] = override;
+    try {
+      await expect(resolveExecutable(project, undefined)).resolves.toBe(path.join(override, 'electron'));
+      expect(describeExecutable(project, undefined).status).toBe('pass');
+    } finally {
+      delete process.env['ELECTRON_OVERRIDE_DIST_PATH'];
+    }
+  });
+});
+
 describe('executablePath', () => {
   it('starts a regular file it may execute', async () => {
     await expect(resolveExecutable(root, 'run.sh')).resolves.toBe(path.join(root, 'run.sh'));
