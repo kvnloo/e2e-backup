@@ -41,6 +41,10 @@ test.describe('sign-in window', () => {
     await region.selectOption('America');
     await expect(region).toHaveValue('us-1');
     expect(await screen.getByRole('checkbox', 'Remember me').inputValue()).toBe('on');
+    await expect(screen.getByTestId('due')).toHaveValue('2026-01-02');
+    await expect(screen.getByTestId('notes')).toHaveValue('Bring the badge');
+    // A select holds its options' text, so it is not empty.
+    await expect(region).not.toBeEmpty();
   });
 
   test('refuses an option in a disabled group', async ({ screen }) => {

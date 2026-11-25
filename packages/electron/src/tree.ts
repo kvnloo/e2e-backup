@@ -44,6 +44,8 @@ export interface SnapshotDocument {
     readonly nodeName?: readonly number[];
     readonly attributes?: readonly (readonly number[])[];
     readonly inputValue?: RareStrings;
+    /** A textarea's current text. */
+    readonly textValue?: RareStrings;
     readonly nodeType?: readonly number[];
     readonly nodeValue?: readonly number[];
     /** The option elements that are selected. */
@@ -137,6 +139,10 @@ interface DomFacts {
   readonly nodeName: string;
   readonly attributes: Readonly<Record<string, string>>;
   readonly inputValue?: string;
+  /** A textarea's current text. */
+  readonly textValue?: string;
+  /** Whether the node's text content holds anything but white space, as `textContent` reads it. */
+  readonly hasText: boolean;
   /** A select's value: what its first selected option submits. */
   readonly selectValue?: string;
   /** Device-pixel document bounds. */
@@ -171,15 +177,32 @@ function selectedValues(document: SnapshotDocument, strings: readonly string[], 
   return values;
 }
 
+/** The node indices whose text content holds anything but white space: every ancestor of such a text node. */
+function nodesWithText(document: SnapshotDocument, strings: readonly string[]): Set<number> {
+  const marked = new Set<number>();
+  const parents = document.nodes.parentIndex ?? [];
+  const values = document.nodes.nodeValue ?? [];
+  (document.nodes.nodeType ?? []).forEach((type, index) => {
+    if (type !== 3 || (strings[values[index]!] ?? '').trim() === '') return;
+    for (let at = parents[index] ?? -1; at >= 0 && !marked.has(at); at = parents[at] ?? -1) marked.add(at);
+  });
+  return marked;
+}
+
 /** Indexes the snapshot by backend DOM node id. */
 function indexSnapshot(document: SnapshotDocument, strings: readonly string[]): Map<number, DomFacts> {
   const facts = new Map<number, DomFacts>();
   const ids = document.nodes.backendNodeId ?? [];
   const names = document.nodes.nodeName ?? [];
   const attributes = document.nodes.attributes ?? [];
-  const inputValues = new Map<number, number>();
-  const rare = document.nodes.inputValue;
-  if (rare !== undefined) rare.index.forEach((node, at) => inputValues.set(node, rare.value[at]!));
+  const rareStrings = (rare: RareStrings | undefined): Map<number, string> => {
+    const values = new Map<number, string>();
+    rare?.index.forEach((node, at) => values.set(node, strings[rare.value[at]!] ?? ''));
+    return values;
+  };
+  const inputValues = rareStrings(document.nodes.inputValue);
+  const textValues = rareStrings(document.nodes.textValue);
+  const withText = nodesWithText(document, strings);
   const bounds = new Map<number, readonly number[]>();
   document.layout.nodeIndex.forEach((node, at) => {
     if (!bounds.has(node)) bounds.set(node, document.layout.bounds[at]!);
@@ -193,12 +216,15 @@ function indexSnapshot(document: SnapshotDocument, strings: readonly string[]): 
   const selectValues = selectedValues(document, strings, attributesOf);
   ids.forEach((backendNodeId, index) => {
     const input = inputValues.get(index);
+    const text = textValues.get(index);
     const selected = selectValues.get(index);
     const box = bounds.get(index);
     facts.set(backendNodeId, {
       nodeName: strings[names[index]!] ?? '',
       attributes: attributesOf(index),
-      ...(input === undefined ? {} : { inputValue: strings[input] ?? '' }),
+      hasText: withText.has(index),
+      ...(input === undefined ? {} : { inputValue: input }),
+      ...(text === undefined ? {} : { textValue: text }),
       ...(selected === undefined ? {} : { selectValue: selected }),
       ...(box === undefined ? {} : { bounds: box }),
     });
@@ -356,8 +382,12 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
     } else if (checkable) {
       // A checkbox or radio submits its value attribute, `on` without one, whatever its state; an observation leaves that token out.
       if (mode === 'node') draft.value = attributes['value'] ?? 'on';
+    } else if (!secure && (facts?.nodeName === 'INPUT' || facts?.nodeName === 'TEXTAREA')) {
+      // A field's value is the element's own, whatever role Chromium gives it (a date input is no textbox).
+      draft.value = bound((facts.nodeName === 'INPUT' ? facts.inputValue : facts.textValue) ?? '', OBSERVED_TEXT_LIMIT, mode);
     } else if (!secure && VALUE_ROLES.has(role)) {
-      draft.value = bound(facts?.inputValue ?? stringOf(node.value) ?? '', OBSERVED_TEXT_LIMIT, mode);
+      // An editing host or an ARIA widget has no DOM value: its value is the one Chromium computes.
+      draft.value = bound(stringOf(node.value) ?? '', OBSERVED_TEXT_LIMIT, mode);
     }
     const shown: Record<string, string> = {};
     for (const [key, value] of Object.entries(attributes)) {
@@ -379,10 +409,11 @@ export function projectTree(axNodes: readonly AXNode[], document: SnapshotDocume
       if (text !== '') draft.text = bound(text, OBSERVED_TEXT_LIMIT, mode);
     }
     if (onlyText) draft.children = [];
-    // What toBeEmpty reads, on a locator's read only and never on a secure field: a field by its value, anything else by its text.
+    // What toBeEmpty reads, on a locator's read only and never on a secure field: a field by its value, anything else
+    // by its text content, as the web engine reads it (a select's option text counts, and so does hidden text).
     if (mode === 'node' && !secure) {
       const field = facts?.nodeName === 'INPUT' || facts?.nodeName === 'TEXTAREA';
-      draft.states['empty'] = field ? (draft.value ?? '') === '' : (draft.text ?? '') === '';
+      draft.states['empty'] = field ? (draft.value ?? '') === '' : facts?.hasText !== true;
     }
     return [draft];
   };
