@@ -493,7 +493,7 @@ async function removeTemporaries(directory: string): Promise<number> {
   return removed;
 }
 
-/** Names what was left alone, so a surprising count has an explanation. */
+/** Names what was left alone, so a surprising count has an explanation; file names come from the directory and may be anyone's. */
 function warnAboutSkipped(contents: CacheContents): void {
   if (contents.unreadable.length > 0) {
     process.stderr.write(
@@ -502,7 +502,7 @@ function warnAboutSkipped(contents: CacheContents): void {
   }
   if (contents.foreign.length > 0) {
     process.stderr.write(
-      `${contents.foreign.length} file(s) in ${contents.directory} are not cache files and were left alone: ${contents.foreign.join(', ')}\n`,
+      `${contents.foreign.length} file(s) in ${contents.directory} are not cache files and were left alone: ${contents.foreign.map(plain).join(', ')}\n`,
     );
   }
 }
