@@ -772,8 +772,9 @@ export class ElectronSurface {
           return;
         }
         case 'selectOption': {
-          await this.waitReady(window, backendNodeId, operation, CHECK_SELECT, deadline);
           const option = typeof action.value === 'string' ? { label: action.value } : action.value;
+          // An app can fill its options in after a request: the wait lasts until the option is there and enabled.
+          await this.waitReady(window, backendNodeId, operation, CHECK_SELECT, deadline, [option]);
           const outcome = await commit(() => this.callOn<Readiness>(window, backendNodeId, SELECT_OPTION, [option]));
           if (!outcome.ok) throw notActionable(outcome.reason);
           return;
@@ -829,9 +830,9 @@ export class ElectronSurface {
   }
 
   /** Waits until a page-side check passes, for actions that need no point. */
-  private async waitReady(window: AppWindow, backendNodeId: number, operation: OperationContext, check: string, deadline: number): Promise<void> {
+  private async waitReady(window: AppWindow, backendNodeId: number, operation: OperationContext, check: string, deadline: number, args: readonly unknown[] = []): Promise<void> {
     for (;;) {
-      const state = await this.callOn<Readiness>(window, backendNodeId, check);
+      const state = await this.callOn<Readiness>(window, backendNodeId, check, args);
       if (state.ok) return;
       if (Date.now() >= deadline) throw notActionable(`node ${backendNodeId} cannot take the action: ${state.reason}`);
       await sleep(Math.min(100, Math.max(0, deadline - Date.now())), operation.signal);
@@ -1236,20 +1237,23 @@ const READ_CHECKED = `function () { ${ELEMENT}
   return null;
 }`;
 
-const CHECK_SELECT = `function () { ${ELEMENT}
+/** The index of the option `wanted` names, or a reason it cannot be chosen: absent, or disabled (:disabled covers one a disabled group holds). */
+const FIND_OPTION = `const options = Array.from(element.options);
+  const index = options.findIndex((option, at) =>
+    wanted.index !== undefined ? at === wanted.index : wanted.value !== undefined ? option.value === wanted.value : option.label === wanted.label || option.text.trim() === wanted.label);
+  if (index < 0) return { ok: false, reason: 'no option matches ' + JSON.stringify(wanted) + '; the options are ' + options.map((option) => JSON.stringify(option.label)).join(', ') };
+  if (options[index].matches(':disabled')) return { ok: false, reason: 'option ' + JSON.stringify(options[index].label) + ' is disabled' };`;
+
+const CHECK_SELECT = `function (wanted) { ${ELEMENT}
   if (!element || !element.isConnected) return { ok: false, reason: 'it is no longer in the document' };
   if (element.tagName !== 'SELECT') return { ok: false, reason: 'it is not a <select>' };
   if (${IS_DISABLED}) return { ok: false, reason: 'it is disabled' };
+  ${FIND_OPTION}
   return { ok: true };
 }`;
 
 const SELECT_OPTION = `function (wanted) { ${ELEMENT}
-  const options = Array.from(element.options);
-  const index = options.findIndex((option, at) =>
-    wanted.index !== undefined ? at === wanted.index : wanted.value !== undefined ? option.value === wanted.value : option.label === wanted.label || option.text.trim() === wanted.label);
-  if (index < 0) return { ok: false, reason: 'no option matches ' + JSON.stringify(wanted) + '; the options are ' + options.map((option) => JSON.stringify(option.label)).join(', ') };
-  // :disabled covers an option a disabled group holds, which its own disabled property does not.
-  if (options[index].matches(':disabled')) return { ok: false, reason: 'option ' + JSON.stringify(options[index].label) + ' is disabled' };
+  ${FIND_OPTION}
   element.focus();
   element.selectedIndex = index;
   element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));

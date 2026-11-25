@@ -60,6 +60,11 @@ test.describe('sign-in window', () => {
     await expect(region).toBeEditable();
   });
 
+  test('waits for an option that arrives after the page loads', async ({ screen }) => {
+    await screen.getByTestId('room').selectOption('Studio');
+    await expect(screen.getByTestId('room')).toHaveValue('Studio');
+  });
+
   test('refuses an option in a disabled group', async ({ screen }) => {
     const refused = await screen.getByRole('combobox', 'Plan').selectOption('Legacy', { timeout: 2000 }).then(() => undefined, (error: unknown) => error);
     expect(String(refused)).toContain('is disabled');

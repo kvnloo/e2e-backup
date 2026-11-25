@@ -92,6 +92,12 @@ document.querySelector('[data-testid="attachment"]').addEventListener('change', 
   document.querySelector('[data-testid="attachment-name"]').textContent = Array.from(event.target.files, (file) => file.name).join(', ');
 });
 
+// Options that arrive after a request, as a list loaded from a server does.
+setTimeout(() => {
+  const room = document.querySelector('[data-testid="room"]');
+  room.replaceChildren(...['Lobby', 'Studio'].map((name) => new Option(name)));
+}, 300);
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');
