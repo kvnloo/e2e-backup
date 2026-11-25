@@ -360,6 +360,21 @@ describe('settleStagedTraces', () => {
     expect(readTraceEntry(JSON.parse(store.entries.get(KEY_A)!))?.payload).toEqual({ ...recorded, recordedFor: STEP });
   });
 
+  it('masks a secret resolved while the store read for the same-flow check ran', async () => {
+    const store = memoryStore();
+    const ledger = new SecretLedger();
+    const read = store.read;
+    // Another session resolves the secret while settlement waits on the store.
+    const context = contextWith({ ...store, read: async (keyHash) => {
+      ledger.register('token', 'token-2718-value');
+      return read(keyHash);
+    } });
+    const located: ActionTrace = { ...trace('invited'), actions: [{ name: 'tap', summary: 'tap button "X"', target: { role: 'button', name: 'X' }, at: '/invite?code=token-2718-value' }] };
+    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: located, stepIndex: 1, redact: ledger.redact });
+    await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
+    expect(store.entries.get(KEY_A)).not.toContain('token-2718-value');
+  });
+
   it('masks a secret a later step resolved in the locations it writes', async () => {
     const store = memoryStore();
     const ledger = new SecretLedger();
