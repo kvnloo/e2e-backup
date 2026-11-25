@@ -311,8 +311,8 @@ no field declares a purpose, as no field does on iOS and Android.
 ## What a recording holds
 
 Each entry is a JSON file under `.e2e/cache/`, named by a hash of its key.
-It holds actions, the screen each ran on (a route stores every record id
-and token as `:id`), the detours the recording run found, target
+It holds actions, the screen each ran on (a route stores each id or token
+it reads as `:id`), the detours the recording run found, target
 descriptions, typed text, a step summary, and the end checks:
 the route and up to eight controls that appeared and eight that went away. Entries hold no prompts, conversations, screenshots, observed
 trees, or secret values. A secret fill stores only the secret's name.
@@ -457,10 +457,11 @@ agent takes the same wrong turn, name the destination in the instruction.
 - A detour comes back to the same address, record id and query included:
   `/orders/7` to `/orders/8` and back to `/orders/7` is one, `/orders/7`
   to `/orders/8` is not. The recording run compares the addresses it saw,
-  and the entry stores each as its route, as in
-  [What counts as the same route](#how-a-replay-works), with every record
-  id and token as `:id`, so the magic link or callback code an action ran
-  on isn't stored with it.
+  and the entry stores each as its route, with each id or token that
+  [What counts as the same route](#how-a-replay-works) reads as an id
+  stored as `:id`. A magic link or callback code an action ran on isn't
+  stored with it. A short word of letters only reads as a route word and
+  stays.
 - On a device, the address is the screen title. Two screens with the same
   title count as one. On Android, a screen with no toolbar (a React Native
   header, for example) reports only the app, so a detour between such
