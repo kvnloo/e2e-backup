@@ -155,7 +155,7 @@ function detouredTrace(): ActionTrace {
   };
 }
 
-const DETOUR_LINE = 'actions 1-3 left com.example / Settings for com.example / Notifications and came back with nothing changed';
+const DETOUR_LINE = 'actions 1-3 left com.example / Settings for com.example / Notifications and came back with nothing typed, chosen, or set';
 
 describe('e2e cache ls: detours', () => {
   it('marks an entry whose flow takes a detour', async () => {

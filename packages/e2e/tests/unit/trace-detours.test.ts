@@ -1,4 +1,4 @@
-/** Detours in a recorded flow: a screen left and come back to with nothing changed on the way. */
+/** Detours in a recorded flow: a screen left and come back to with nothing typed, chosen, or set on the way. */
 
 import { describe, expect, it } from 'vitest';
 import { describeDetour, findDetours } from '@e2e-dev/core/lib/cache/detours';
@@ -40,7 +40,7 @@ describe('findDetours by recorded locations', () => {
       ),
     );
     expect(detours).toEqual([{ from: 0, to: 3, at: 'com.example / Settings', via: 'com.example / Notifications', evidence: 'locations' }]);
-    expect(describeDetour(detours[0]!)).toBe('actions 1-3 left com.example / Settings for com.example / Notifications and came back with nothing changed');
+    expect(describeDetour(detours[0]!)).toBe('actions 1-3 left com.example / Settings for com.example / Notifications and came back with nothing typed, chosen, or set');
   });
 
   it('finds a return at the end of the step, against the end location', () => {

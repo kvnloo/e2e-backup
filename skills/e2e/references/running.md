@@ -131,7 +131,7 @@ its own tools.
 | --- | --- |
 | `e2e cache ls` | One row per entry: entry digest, test, target, instruction digest, age, action count (`(detour)` marks one that takes a detour). |
 | `e2e cache show <entry>` | One entry by digest prefix or file path: each action with the screen it ran on, the end state, and its detours. |
-| `e2e cache check` | Every entry whose flow leaves a screen and comes back with nothing changed; exits 1 when there is one. |
+| `e2e cache check` | Every entry whose flow leaves a screen and comes back with nothing typed, chosen, or set; exits 1 when there is one. |
 | `e2e cache stats` | Directory, entry count, total size. |
 | `e2e cache clear` | Deletes the entries and the directory; files the runner never wrote stay. |
 

@@ -55,7 +55,7 @@ interface CacheEntrySummary {
   readonly instructionDigest: string | undefined;
   /** The recording itself, as a run would read it. */
   readonly trace: ActionTrace;
-  /** Where its flow leaves a screen and comes back with nothing changed. */
+  /** Where its flow leaves a screen and comes back with nothing typed, chosen, or set. */
   readonly detours: readonly TraceDetour[];
 }
 
@@ -145,7 +145,7 @@ export function registerCacheCommand(program: Command): void {
     .argument('<entry>', 'the entry digest, as many leading characters as tell it apart (ls prints 12), or its file path')
     .summary('print one cached trace action by action')
     .description(
-      'Print one cached trace: what it was recorded for, where it starts and ends, each action with the screen it ran on, the end state a replay checks, and any detour, a stretch that leaves a screen and comes back with nothing changed.',
+      'Print one cached trace: what it was recorded for, where it starts and ends, each action with the screen it ran on, the end state a replay checks, and any detour, a stretch that leaves a screen and comes back with nothing typed, chosen, or set.',
     )
     .option('--config <path>', 'config file (default: the nearest e2e.config.ts, .mts, .js, or .mjs)')
     .option('--cache-dir <dir>', CACHE_DIR_DESCRIPTION)

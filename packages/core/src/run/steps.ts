@@ -147,7 +147,7 @@ export interface StepCacheInfo {
   recordedBy?: RecordedModel;
   /**
    * Where the step's recording left a screen and came back to it with
-   * nothing changed on the way (`cache/detours.ts`): the recording this step
+   * nothing typed, chosen, or set on the way (`cache/detours.ts`): the recording this step
    * replayed, or the one it recorded. A hint to look at the recording, not a
    * failure; absent when it has none.
    */

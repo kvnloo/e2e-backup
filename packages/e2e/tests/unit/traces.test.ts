@@ -144,7 +144,7 @@ describe('the steps on a trace page', () => {
   });
 
   it('name the detour a replayed recording takes', async () => {
-    const detour = 'actions 1-3 left /settings for /settings/notifications and came back with nothing changed';
+    const detour = 'actions 1-3 left /settings for /settings/notifications and came back with nothing typed, chosen, or set';
     const step = reportStep({
       index: 0,
       kind: 'agent',
