@@ -109,6 +109,18 @@ describe('TraceRecorder', () => {
     expect(read?.payload.actions.map((action) => action.at)).toEqual(['/settings', undefined, '/reset?code=<secret:token>']);
   });
 
+  it('masks a secret resolved after an action ran in that action\'s location', () => {
+    const ledger = new SecretLedger();
+    const recorder = new TraceRecorder({ redact: ledger.redact, redactCut: ledger.redactCut });
+    recorder.record({ name: 'tap', node: upgradeButton }, '/invite?code=token-2718-value');
+    // A provider-backed fill resolves the value only inside a later action.
+    ledger.register('token', 'token-2718-value');
+    recorder.record({ name: 'typeSecret', node: passwordField, secret: 'token' }, '/invite');
+    const trace = recorder.finalize(conclusion);
+    expect(JSON.stringify(trace)).not.toContain('token-2718-value');
+    expect(trace?.actions[0]?.at).toBe('/invite?code=<secret:token>');
+  });
+
   it('leaves out a location too long to keep whole, and replays without it', () => {
     const recorder = makeRecorder();
     recorder.record({ name: 'tap', node: upgradeButton }, `/${'a'.repeat(MAX_TRACE_INPUT_CHARS)}`);

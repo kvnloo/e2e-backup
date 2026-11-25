@@ -188,7 +188,8 @@ export class TraceRecorder {
     const startPath = this.anchorPath(conclusion.startPath);
     const endPath = this.anchorPath(conclusion.endPath);
     return {
-      actions: [...this.actions],
+      // A secret the step resolved after an action ran is masked in that action's location too.
+      actions: this.actions.map((action) => (action.at === undefined ? action : { ...action, at: this.redact(action.at) })),
       executor: {
         name: conclusion.executor.name,
         ...(conclusion.executor.version === undefined ? {} : { version: conclusion.executor.version }),
