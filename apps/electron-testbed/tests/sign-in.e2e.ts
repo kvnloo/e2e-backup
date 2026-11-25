@@ -57,6 +57,14 @@ test.describe('sign-in window', () => {
     await expect(invite).toHaveValue('');
   });
 
+  test('sends no text once a fill has run out of time', async ({ screen }) => {
+    const refused = await screen.getByTestId('slow').fill('late', { timeout: 1000 }).then(() => undefined, (error: unknown) => error);
+    expect(String(refused)).not.toBe('undefined');
+    // The focus handler returns after two seconds; a fill still running then would type now.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    await expect(screen.getByTestId('slow')).toHaveValue('');
+  });
+
   test('passes the launch arguments to the app', async ({ screen }) => {
     await expect(screen.getByRole('heading', { name: 'Hello from e2e', level: 1 })).toBeVisible();
   });

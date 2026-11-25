@@ -646,10 +646,15 @@ export class ElectronSurface {
     // The wait for actionability ends a little before the operation does, so it reports why the node never became actionable.
     const deadline = Date.now() + Math.max(0, operation.timeoutMs - Math.min(250, operation.timeoutMs / 10));
     const { mouse, keyboard } = window.page;
+    const ends = Date.now() + operation.timeoutMs;
     let committed = false;
-    const commit = <T>(work: Promise<T>): Promise<T> => {
+    // Every input goes through here: once the operation's budget is spent or it was cancelled, its caller stopped
+    // waiting, and nothing more may reach the app.
+    const commit = <T>(send: () => Promise<T>): Promise<T> => {
+      if (operation.signal.aborted) throw new EngineError('CANCELLED', `${action.kind} was cancelled`, { retryable: false });
+      if (Date.now() >= ends) throw new EngineError('OPERATION_TIMEOUT', `${action.kind} timed out after ${operation.timeoutMs}ms`, { retryable: false });
       committed = true;
-      return work;
+      return send();
     };
     const label = action.kind;
     try {
@@ -662,27 +667,27 @@ export class ElectronSurface {
             const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
             const clickCount = action.kind === 'doubleTap' ? 2 : action.kind === 'multiTap' ? action.count : 1;
             const modifiers = (action.modifiers ?? []).map(modifierKey);
-            await commit(this.withModifiers(window, modifiers, () => mouse.click(point.x, point.y, { clickCount, button: action.kind === 'secondaryTap' ? 'right' : 'left' })));
+            await commit(() => this.withModifiers(window, modifiers, () => mouse.click(point.x, point.y, { clickCount, button: action.kind === 'secondaryTap' ? 'right' : 'left' })));
             return;
           }
           case 'hover': {
             const point = await this.actionablePoint(window, backendNodeId, operation, false, deadline);
-            await commit(mouse.move(point.x, point.y));
+            await commit(() => mouse.move(point.x, point.y));
             return;
           }
           case 'longPress': {
             const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            await mouse.move(point.x, point.y);
-            await commit(mouse.down());
+            await commit(() => mouse.move(point.x, point.y));
+            await commit(() => mouse.down());
             await sleep(action.durationMs ?? LONG_PRESS_MS, operation.signal);
             await mouse.up();
             return;
           }
           case 'focus':
-            await commit(this.callOn(window, backendNodeId, FOCUS));
+            await commit(() => this.callOn(window, backendNodeId, FOCUS));
             return;
           case 'blur':
-            await commit(this.callOn(window, backendNodeId, BLUR));
+            await commit(() => this.callOn(window, backendNodeId, BLUR));
             return;
           case 'scrollIntoView': {
             const session = await this.session(window.page);
@@ -694,10 +699,10 @@ export class ElectronSurface {
             const value = action.kind === 'fill' ? action.value : '';
             await this.waitReady(window, backendNodeId, operation, CHECK_EDITABLE, deadline);
             // The app's focus handler can hand focus on; text goes only to the node that still holds it.
-            if (!(await commit(this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
+            if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, SELECT_CONTENTS)))) throw lostFocus(backendNodeId);
             // Both edit the selection as typing would, with input events and no key events, as fill promises.
-            if (value === '') await this.callOn(window, backendNodeId, DELETE_SELECTION);
-            else await keyboard.insertText(value);
+            if (value === '') await commit(() => this.callOn(window, backendNodeId, DELETE_SELECTION));
+            else await commit(() => keyboard.insertText(value));
             return;
           }
           case 'check':
@@ -707,7 +712,7 @@ export class ElectronSurface {
             if (now === null) throw new EngineError('UNSUPPORTED_CAPABILITY', `node ${backendNodeId} has no checked state to ${action.kind}`, { retryable: false });
             if (now === want) return;
             const point = await this.actionablePoint(window, backendNodeId, operation, true, deadline);
-            await commit(mouse.click(point.x, point.y));
+            await commit(() => mouse.click(point.x, point.y));
             if ((await this.callOn<boolean | null>(window, backendNodeId, READ_CHECKED)) !== want) {
               throw notActionable(`clicking node ${backendNodeId} did not ${action.kind} it`);
             }
@@ -717,14 +722,14 @@ export class ElectronSurface {
             const parsed = parseKey(action.key);
             if (parsed === undefined) throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(action.key)} is not a key of the contract grammar`, { retryable: false });
             await this.waitReady(window, backendNodeId, operation, CHECK_CONNECTED, deadline);
-            if (!(await commit(this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
-            await keyboard.press(playwrightKey(action.key));
+            if (!(await commit(() => this.callOn<boolean>(window, backendNodeId, FOCUS)))) throw lostFocus(backendNodeId);
+            await commit(() => keyboard.press(playwrightKey(action.key)));
             return;
           }
           case 'selectOption': {
             await this.waitReady(window, backendNodeId, operation, CHECK_SELECT, deadline);
             const option = typeof action.value === 'string' ? { label: action.value } : action.value;
-            const outcome = await commit(this.callOn<Readiness>(window, backendNodeId, SELECT_OPTION, [option]));
+            const outcome = await commit(() => this.callOn<Readiness>(window, backendNodeId, SELECT_OPTION, [option]));
             if (!outcome.ok) throw notActionable(outcome.reason);
             return;
           }
@@ -733,7 +738,7 @@ export class ElectronSurface {
             if (action.kind === 'setInputFilePayloads') throw new EngineError('UNSUPPORTED_CAPABILITY', 'in-memory files are not supported; pass file paths', { retryable: false });
             await this.waitReady(window, backendNodeId, operation, CHECK_FILE_INPUT, deadline);
             const session = await this.session(window.page);
-            await commit(session.send('DOM.setFileInputFiles', { files: action.paths.map((file) => path.resolve(this.projectRoot, file)), backendNodeId }));
+            await commit(() => session.send('DOM.setFileInputFiles', { files: action.paths.map((file) => path.resolve(this.projectRoot, file)), backendNodeId }));
             return;
           }
           case 'dragTo': {
@@ -744,7 +749,7 @@ export class ElectronSurface {
             const { quads } = await session.send('DOM.getContentQuads', { backendNodeId: target.backendNodeId });
             const quad = quads.find((candidate) => area(candidate) > 0);
             if (quad === undefined) throw notActionable('the drop target has no box on screen');
-            await commit(this.drag(window, from, whole(centre(quad))));
+            await commit(() => this.drag(window, from, whole(centre(quad))));
             return;
           }
           case 'swipe': {
@@ -753,8 +758,8 @@ export class ElectronSurface {
             const { quads } = await session.send('DOM.getContentQuads', { backendNodeId });
             const quad = quads.find((candidate) => area(candidate) > 0)!;
             const box = boxOf(quad);
-            await mouse.move(point.x, point.y);
-            await commit(this.wheel(window, action.direction, action.momentum ?? 'none', box));
+            await commit(() => mouse.move(point.x, point.y));
+            await commit(() => this.wheel(window, action.direction, action.momentum ?? 'none', box));
             return;
           }
         }

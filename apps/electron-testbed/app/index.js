@@ -47,6 +47,14 @@ document.querySelector('[data-testid="handoff"]').addEventListener('focus', () =
 // A field that swallows every key press, as a masked input that handles keys itself does.
 document.querySelector('[data-testid="invite"]').addEventListener('keydown', (event) => event.preventDefault());
 
+// A field whose focus handler holds the page for two seconds, longer than a short action timeout.
+document.querySelector('[data-testid="slow"]').addEventListener('focus', () => {
+  const until = Date.now() + 2000;
+  while (Date.now() < until) {
+    // Busy on purpose: the page answers nothing until the handler returns.
+  }
+});
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');
