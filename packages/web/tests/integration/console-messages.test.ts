@@ -91,23 +91,25 @@ describe('browser.consoleMessages and browser.pageErrors', () => {
     ]);
   });
 
-  it('returns thrown errors and unhandled rejections with their message and stack', async () => {
+  it('returns thrown errors and unhandled rejections with their name, message, and stack', async () => {
     await start();
     await browser.goto('/page-errors');
 
     await expect.poll(async () => (await browser.pageErrors()).map((error) => error.message).toSorted()).toEqual(['rejected', 'thrown']);
     for (const error of await browser.pageErrors()) {
+      expect(error.name).toBe('Error');
       expect(error.stack).toContain(error.message);
     }
   });
 
-  it('returns the text of thrown and rejected non-Error values with an empty stack in Chromium', async () => {
+  it('splits thrown and rejected non-Error values at the first colon, with an empty stack in Chromium', async () => {
     await start();
     await browser.goto('/thrown-values');
 
     await expect.poll(async () => (await browser.pageErrors()).toSorted((a, b) => a.message.localeCompare(b.message))).toEqual([
-      { message: '7', stack: '' },
-      { message: 'plain', stack: '' },
+      { name: 'Request failed', message: '500', stack: '' },
+      { name: '', message: '7', stack: '' },
+      { name: '', message: 'plain', stack: '' },
     ]);
   });
 

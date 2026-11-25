@@ -671,9 +671,9 @@ the opener is gone. `tabs()`, `newTab()`, `tab.activate()`, and
   `EVALUATE_FAILED`.
 - `consoleMessages()`, `pageErrors()`: the active tab's console messages
   (`{ type, text }`) and its uncaught errors and unhandled rejections
-  (`{ message, stack }`) since it opened. Only the latest 200 are kept. The
-  lists aren't cleared on navigation. After `app.restart()`, they only have
-  entries from the new page. Wait for the result on screen with
+  (`{ name, message, stack }`) since it opened. Only the latest 200 are
+  kept. The lists aren't cleared on navigation. After `app.restart()`, they
+  only have entries from the new page. Wait for the result on screen with
   `expect(locator)` before asserting a list is empty. To wait for a late
   entry, use `expect.poll`.
 - `addInitScript(source | { path } | fn)`, `addInitScript(fn, arg)`: runs

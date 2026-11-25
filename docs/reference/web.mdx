@@ -788,6 +788,8 @@ expect(await browser.pageErrors()).toEqual([]);
 
 ```ts
 export interface WebPageError {
+  /** The error name, such as `'Error'` or `'TypeError'`. */
+  readonly name: string;
   /** The error message, as the browser reports it. */
   readonly message: string;
   /** The stack trace, as the browser reports it, or `''` when there isn't one. */
@@ -795,6 +797,10 @@ export interface WebPageError {
 }
 ```
 
+- The browser's error text is split at its first colon into `name` and
+  `message`, as Playwright splits it. So a rejected `'Request failed: 500'`
+  has the name `'Request failed'` and the message `'500'`. A value without
+  a colon has the name `''`.
 - Errors from the tab's frames are included, along with dedicated worker
   errors in Chromium.
 - Navigation, `app.restart()`, other tabs, late entries, and persistent

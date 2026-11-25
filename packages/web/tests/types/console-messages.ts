@@ -6,6 +6,7 @@ void (browser.consoleMessages() satisfies Promise<WebConsoleMessage[]>);
 void (browser.pageErrors() satisfies Promise<WebPageError[]>);
 
 declare const error: WebPageError;
+void (error.name satisfies string);
 void (error.message satisfies string);
 void (error.stack satisfies string);
 

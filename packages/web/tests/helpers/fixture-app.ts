@@ -423,6 +423,7 @@ const THROWN_VALUES = `<!doctype html>
 <head><title>Fixture Thrown Values</title></head>
 <body><script>
   Promise.reject('plain');
+  Promise.reject('Request failed: 500');
   setTimeout(() => { throw 7; });
 </script></body>
 </html>`;

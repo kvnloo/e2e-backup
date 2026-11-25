@@ -144,6 +144,8 @@ export interface WebConsoleMessage {
 
 /** An uncaught error or an unhandled promise rejection from the page, as returned by `browser.pageErrors`. */
 export interface WebPageError {
+  /** The error name, such as `'Error'` or `'TypeError'`. */
+  readonly name: string;
   /** The error message, as the browser reports it. */
   readonly message: string;
   /** The stack trace, as the browser reports it, or `''` when there isn't one. */
@@ -711,7 +713,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     pageErrors: () =>
       surface.guard(context.operation(), 'pageErrors', async () => {
         const errors = await surface.requirePage().pageErrors({ filter: 'all' });
-        return errors.map((error) => ({ message: error.message, stack: error.stack ?? '' }));
+        return errors.map((error) => ({ name: error.name, message: error.message, stack: error.stack ?? '' }));
       }),
     async addInitScript(script: unknown, ...rest: unknown[]) {
       const source = await testInitScriptSource(script, rest.length === 0 ? undefined : { arg: rest[0] }, (file) => surface.projectPath(file));
