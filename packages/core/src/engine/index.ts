@@ -831,14 +831,15 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set when `button` is honored on the tap actions: `tap`, `doubleTap`, and
-   * `multiTap` for `perform`, and the same kinds for `performAt`. Without it,
-   * an action with a `button` fails with `UNSUPPORTED_CAPABILITY` before it
-   * reaches the engine. A left tap and a single right tap (`secondaryTap`)
-   * don't need it.
+   * Set to `true` when the engine handles `button` on the `tap`,
+   * `doubleTap`, and `multiTap` actions, in `perform` or `performAt`,
+   * whichever it implements. Without it, an action with a `button` fails
+   * with `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left tap and
+   * a single right tap (`secondaryTap`) don't carry `button`, so they don't
+   * need it.
    *
-   * The button is never sent to an engine written before this field, so a
-   * middle or right click can't turn into a primary click there.
+   * An engine written before this field never receives a `button`, so it
+   * can't turn a middle or right click into a left click.
    */
   readonly tapButtons?: boolean;
   /**

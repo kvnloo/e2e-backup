@@ -72,7 +72,7 @@ describe.each(schemas)('%s schema', (name) => {
       );
     });
 
-    it('accepts a web manifest with tapButtons and the multiTap pointer action, and refuses tapButtons without engine/perform', () => {
+    it('accepts tapButtons with engine/perform or engine/performAt, and the multiTap pointer action, and refuses tapButtons with neither', () => {
       const web = {
         name: 'web', version: '0.1.0', spiVersion: 1, platform: 'web',
         methods: ['engine/observe', 'engine/perform', 'engine/performAt'],
@@ -82,13 +82,18 @@ describe.each(schemas)('%s schema', (name) => {
       };
       expect(validate(web)).toBe(true);
       expect(validate({
-        name: 'web', version: '0.1.0', spiVersion: 1,
+        name: 'pointer', version: '0.1.0', spiVersion: 1,
         methods: ['engine/observe', 'engine/performAt'],
         pointerActions: ['tap'],
         tapButtons: true,
+      })).toBe(true);
+      expect(validate({
+        name: 'reader', version: '0.1.0', spiVersion: 1,
+        methods: ['engine/observe'],
+        tapButtons: true,
       })).toBe(false);
       expect(validate.errors).toEqual(
-        expect.arrayContaining([expect.objectContaining({ instancePath: '/methods', keyword: 'contains', schemaPath: expect.stringContaining('/then/') })]),
+        expect.arrayContaining([expect.objectContaining({ instancePath: '/methods', keyword: 'anyOf', schemaPath: expect.stringContaining('/then/') })]),
       );
     });
 

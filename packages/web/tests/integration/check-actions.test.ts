@@ -540,12 +540,33 @@ describe.each(KINDS)('a mouse button, through the %s target', (kind) => {
     expect((await pressed()).map((event) => event.replace(/ x\d+/, ''))).toEqual(['auxclick b1 d1', 'auxclick b1 d2']);
   });
 
-  it('presses the right button three times for a multi-tap, opening the menu each time', async () => {
+  it('fires three contextmenu events and a final auxclick with a detail of 3 for a right triple click', async () => {
     await page.setContent(PRESSED_LINK);
     expect(await perform(await targetOf(kind, '#next'), { kind: 'multiTap', count: 3, button: 'right' })).toBeUndefined();
     const events = (await pressed()).map((event) => event.replace(/ x\d+/, ''));
     expect(events.filter((event) => event.startsWith('contextmenu'))).toEqual(['contextmenu b2 d0', 'contextmenu b2 d0', 'contextmenu b2 d0']);
     expect(events.at(-1)).toBe('auxclick b2 d3');
+  });
+
+  it('presses the middle button on a hidden checkbox itself, never on the label a left tap would take', async () => {
+    await page.setContent(`<input type="checkbox" id="box" style="display: none"><label for="box">Agree</label><p id="pressed"></p>
+      <script>
+        for (const id of ['box', 'label']) {
+          const node = id === 'box' ? document.getElementById('box') : document.querySelector('label');
+          node.addEventListener('auxclick', () => { document.getElementById('pressed').textContent += 'auxclick on ' + id; });
+        }
+      </script>`);
+    expect(await perform(await targetOf(kind, '#box'), { kind: 'tap', button: 'middle' }, REFUSAL_TIMEOUT_MS)).toBeDefined();
+    expect(await page.textContent('#pressed')).toBe('');
+  });
+
+  it('refuses a multi-tap above 200 clicks before it sends any input', async () => {
+    await page.setContent(PRESSED_LINK);
+    expect(await perform(await targetOf(kind, '#next'), { kind: 'multiTap', count: 201, button: 'middle' })).toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('the browser engine clicks at most 200 times in a row; got a count of 201'),
+    });
+    expect(await pressed()).toEqual([]);
   });
 });
 
@@ -577,9 +598,17 @@ describe('a mouse button at a point', () => {
     expect(events.at(-1)).toBe('auxclick b2 d3 x7');
   });
 
-  it('clicks three times at the point with the primary button for a multi-tap without one', async () => {
+  it('clicks three times with the left button for a multi-tap without a button', async () => {
     await page.setContent(PRESSED_LINK);
     await dispatchPointerAction(page, await into(8), { kind: 'multiTap', count: 3 });
     expect(await pressed()).toEqual(['click b0 d1 x8', 'click b0 d2 x8', 'click b0 d3 x8']);
+  });
+
+  it('refuses a multi-tap above 200 clicks at the point before it sends any input', async () => {
+    await page.setContent(PRESSED_LINK);
+    await expect(dispatchPointerAction(page, await into(8), { kind: 'multiTap', count: 201 })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+    });
+    expect(await pressed()).toEqual([]);
   });
 });

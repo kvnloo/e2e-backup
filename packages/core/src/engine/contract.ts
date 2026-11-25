@@ -299,41 +299,25 @@ export interface ObservationPixels {
 }
 
 /**
- * One deterministic action `perform` carries out on a node. The `swipe`
- * kind on the observation's root node is the viewport swipe: the agent's
- * `scroll` verb and `screen.swipe()` both arrive as `perform(root, swipe)`,
- * so a surface implements scrolling once.
- *
- * `press` takes one key in the `Key` grammar below.
+ * The tap kinds `perform` and `performAt` share. `LocatorAction` adds the
+ * held keys to each of them.
  */
-export type LocatorAction =
+type TapActions =
   | {
       readonly kind: 'tap';
-      /** Keys held for the click, as on the `doubleTap` and `secondaryTap` kinds. */
-      readonly modifiers?: readonly KeyModifier[];
       /**
-       * The middle mouse button, set for a middle click. It's sent only to
-       * an engine that declares `tapButtons`. For any other engine, it's
-       * refused before dispatch. A single right click is `secondaryTap`.
+       * Set to `'middle'` for a middle click. It's sent only to an engine
+       * that declares `tapButtons`. For any other engine, it's refused before
+       * dispatch. A single right click is the `secondaryTap` kind.
        */
       readonly button?: 'middle';
     }
   | {
       readonly kind: 'doubleTap';
-      /** Keys held for the clicks, as on `secondaryTap`. */
-      readonly modifiers?: readonly KeyModifier[];
-      /** The mouse button for both clicks when it isn't the primary one, as on `tap`. */
+      /** The button for both clicks, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
       readonly button?: 'middle' | 'right';
     }
-  | {
-      readonly kind: 'secondaryTap';
-      /**
-       * Keys held for the click, as a Shift-click extends a selection. Only
-       * an engine that declares `tapModifiers` receives it; the harness
-       * refuses it for any other before dispatch.
-       */
-      readonly modifiers?: readonly KeyModifier[];
-    }
+  | { readonly kind: 'secondaryTap' }
   | {
       /**
        * `count` taps in a row on one point: 3 or more, since 2 is
@@ -344,11 +328,27 @@ export type LocatorAction =
        */
       readonly kind: 'multiTap';
       readonly count: number;
-      /** As on `tap`: only an engine that declares `tapModifiers` receives it. */
-      readonly modifiers?: readonly KeyModifier[];
-      /** The mouse button for every click when it isn't the primary one, as on `doubleTap`. */
+      /** The button for every click, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
       readonly button?: 'middle' | 'right';
-    }
+    };
+
+/**
+ * One deterministic action `perform` carries out on a node. The `swipe`
+ * kind on the observation's root node is the viewport swipe: the agent's
+ * `scroll` verb and `screen.swipe()` both arrive as `perform(root, swipe)`,
+ * so a surface implements scrolling once.
+ *
+ * `press` takes one key in the `Key` grammar below.
+ */
+export type LocatorAction =
+  | (TapActions & {
+      /**
+       * Keys held for the click, as a Shift-click extends a selection. Only
+       * an engine that declares `tapModifiers` receives it; the harness
+       * refuses it for any other before dispatch.
+       */
+      readonly modifiers?: readonly KeyModifier[];
+    })
   | {
       readonly kind:
         | 'check'
@@ -416,24 +416,7 @@ export const KNOWN_LOCATOR_ACTION_KINDS = [...LOCATOR_ACTION_KINDS, 'blur', 'set
  * before it drags.
  */
 export type PointerAction =
-  | {
-      readonly kind: 'tap';
-      /** As on the node `tap`: only an engine that declares `tapButtons` receives it. */
-      readonly button?: 'middle';
-    }
-  | {
-      readonly kind: 'doubleTap';
-      /** As on the node `doubleTap`: only an engine that declares `tapButtons` receives it. */
-      readonly button?: 'middle' | 'right';
-    }
-  | {
-      /** `count` clicks at the point, as the node `multiTap`. Not a kind of SPI v1, so an engine lists it explicitly. */
-      readonly kind: 'multiTap';
-      readonly count: number;
-      /** As on the node `multiTap`: only an engine that declares `tapButtons` receives it. */
-      readonly button?: 'middle' | 'right';
-    }
-  | { readonly kind: 'secondaryTap' }
+  | TapActions
   | { readonly kind: 'hover' }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'dragTo'; readonly target: ViewportPoint }

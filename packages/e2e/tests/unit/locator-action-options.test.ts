@@ -12,14 +12,13 @@ import {
   resolveExpression,
   type KeyModifier,
   type LocatorAction,
-  type LocatorActionKind,
   type LocatorExpression,
   type PointerAction,
   LOCATOR_ACTION_KINDS,
 } from '@e2e-dev/core/lib/engine/index';
 import type { ActionOptions, Locator, Screen, TapOptions } from '@e2e-dev/core/lib/types';
 import { invalid } from '../helpers/invalid.ts';
-import { screenOver } from '../helpers/screen-over.ts';
+import { screenOver, type ScreenOverOptions } from '../helpers/screen-over.ts';
 import { snapshot } from '../helpers/snapshot.ts';
 import { useFakeTime } from '../helpers/fake-time.ts';
 
@@ -69,8 +68,8 @@ function boxScreen() {
   return { screen, steps, performed, actions, locate };
 }
 
-/** A screen over the box whose engine declares the tap flags given, keeping every lookup and every action it receives. */
-function tapScreen(flags: { tapModifiers?: boolean; tapButtons?: boolean } = {}) {
+/** A screen over the box whose engine declares the actions and tap flags given, keeping every lookup and every action it receives. */
+function tapScreen(flags: Pick<ScreenOverOptions, 'actions' | 'tapModifiers' | 'tapButtons'> = {}) {
   const received: LocatorAction[] = [];
   const locate = vi.fn(async (expression: LocatorExpression) => resolveExpression(expression, NODES));
   const { screen, steps } = screenOver({
@@ -88,14 +87,14 @@ function tapScreen(flags: { tapModifiers?: boolean; tapButtons?: boolean } = {})
 /** A screen over a box with a rect whose engine takes every pointer kind, keeping each point action and every lookup. */
 function pointScreen(flags: { tapButtons?: boolean } = {}) {
   const box = { ...BOX, rect: { x: 10, y: 20, width: 100, height: 40 } };
-  const at: string[] = [];
+  const at: { action: PointerAction; point: { x: number; y: number } }[] = [];
   const locate = vi.fn(async (expression: LocatorExpression) => resolveExpression(expression, [box]));
   const { screen, steps } = screenOver({
     locate,
     observe: () => snapshot([box]),
     perform: () => {},
     performAt: (point, action: PointerAction) => {
-      at.push(`${JSON.stringify(action)} @ ${point.x},${point.y}`);
+      at.push({ action, point });
     },
     pointerActions: KNOWN_POINTER_ACTION_KINDS,
     ...flags,
@@ -191,25 +190,8 @@ describe('locator action options', () => {
   });
 
   describe('tap count', () => {
-    /** A screen over the box whose engine declares `actions`, keeping every action it receives. */
-    function countScreen(actions?: readonly LocatorActionKind[], tapModifiers?: boolean) {
-      const received: LocatorAction[] = [];
-      const locate = vi.fn(async (expression: LocatorExpression) => resolveExpression(expression, NODES));
-      const { screen, steps } = screenOver({
-        locate,
-        observe: () => snapshot(NODES),
-        perform: (_ref, action) => {
-          received.push(action);
-        },
-        ...(actions === undefined ? {} : { actions }),
-        ...(tapModifiers === undefined ? {} : { tapModifiers }),
-        timeoutMs: 1_000,
-      });
-      return { screen, steps, received, locate };
-    }
-
     it('taps once for count 1, as with no count', async () => {
-      const { screen, steps, received } = countScreen();
+      const { screen, steps, received } = tapScreen();
       await screen.getByLabel('Agree').tap({ count: 1 });
       await screen.getByLabel('Agree').click({ count: 1 });
       expect(received).toEqual([{ kind: 'tap' }, { kind: 'tap' }]);
@@ -217,7 +199,7 @@ describe('locator action options', () => {
     });
 
     it('sends count 2 as the action doubleTap() sends, labelled with the count', async () => {
-      const { screen, steps, received } = countScreen(LOCATOR_ACTION_KINDS);
+      const { screen, steps, received } = tapScreen({ actions: LOCATOR_ACTION_KINDS });
       await screen.getByLabel('Agree').tap({ count: 2 });
       await screen.getByLabel('Agree').doubleTap();
       expect(received).toEqual([{ kind: 'doubleTap' }, { kind: 'doubleTap' }]);
@@ -231,7 +213,7 @@ describe('locator action options', () => {
       ['tap', (locator: Locator) => locator.tap({ count: 3 })],
       ['click', (locator: Locator) => locator.click({ count: 3 })],
     ] as const)('%s sends count 3 as one multiTap and names the count in the step', async (verb, call) => {
-      const { screen, steps, received } = countScreen();
+      const { screen, steps, received } = tapScreen();
       await call(screen.getByLabel('Agree'));
       expect(received).toEqual([{ kind: 'multiTap', count: 3 }]);
       expect(steps.all()).toEqual([
@@ -240,7 +222,7 @@ describe('locator action options', () => {
     });
 
     it('holds modifiers for a multiTap on an engine that declares tapModifiers', async () => {
-      const { screen, steps, received } = countScreen(undefined, true);
+      const { screen, steps, received } = tapScreen({ tapModifiers: true });
       await screen.getByLabel('Agree').tap({ count: 3, modifiers: ['Shift'] });
       await screen.getByLabel('Agree').tap({ count: 2, modifiers: ['Shift'] });
       expect(received).toEqual([
@@ -254,7 +236,7 @@ describe('locator action options', () => {
     });
 
     it('refuses count 3 on an engine without multiTap before resolving, while count 2 still works there', async () => {
-      const { screen, received, locate } = countScreen(LOCATOR_ACTION_KINDS);
+      const { screen, received, locate } = tapScreen({ actions: LOCATOR_ACTION_KINDS });
       await expect(screen.getByLabel('Missing').tap({ count: 3 })).rejects.toMatchObject({
         code: 'UNSUPPORTED_CAPABILITY',
         message: expect.stringContaining('the "multiTap" action is not available on this target'),
@@ -265,7 +247,7 @@ describe('locator action options', () => {
     });
 
     it('leaves the upper limit to the engine, sending the largest safe count as one multiTap', async () => {
-      const { screen, received } = countScreen();
+      const { screen, received } = tapScreen();
       await screen.getByLabel('Agree').tap({ count: Number.MAX_SAFE_INTEGER });
       expect(received).toEqual([{ kind: 'multiTap', count: Number.MAX_SAFE_INTEGER }]);
     });
@@ -273,7 +255,7 @@ describe('locator action options', () => {
     it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53, '3', null])(
       'rejects count %j before any lookup, action, or step',
       async (count) => {
-        const { screen, steps, received, locate } = countScreen();
+        const { screen, steps, received, locate } = tapScreen();
         await expect(
           Promise.resolve().then(() => screen.getByLabel('Agree').tap(invalid<TapOptions>({ count }))),
         ).rejects.toMatchObject({
@@ -290,7 +272,10 @@ describe('locator action options', () => {
       const { screen, steps, at } = pointScreen();
       await screen.getByLabel('Agree').tap({ count: 2, position: { x: 1, y: 1 } });
       await screen.getByLabel('Agree').click({ count: 3, position: { x: 2, y: 3 } });
-      expect(at).toEqual(['{"kind":"doubleTap"} @ 11,21', '{"kind":"multiTap","count":3} @ 12,23']);
+      expect(at).toEqual([
+        { action: { kind: 'doubleTap' }, point: { x: 11, y: 21 } },
+        { action: { kind: 'multiTap', count: 3 }, point: { x: 12, y: 23 } },
+      ]);
       expect(steps.all().map((step) => step.label)).toEqual([
         'getByLabel("Agree") 2 times at (1, 1)',
         'getByLabel("Agree") 3 times at (2, 3)',
@@ -351,14 +336,8 @@ describe('locator action options', () => {
       ]);
     });
 
-    it('fails a right click like secondaryTap on an engine that does not list it', async () => {
-      const { screen } = screenOver({
-        locate: (expression) => resolveExpression(expression, NODES),
-        observe: () => snapshot(NODES),
-        perform: () => {},
-        actions: ['tap'],
-        timeoutMs: 1_000,
-      });
+    it('refuses a right click on an engine that does not list secondaryTap', async () => {
+      const { screen } = tapScreen({ actions: ['tap'] });
       await expect(screen.getByLabel('Agree').tap({ button: 'right' })).rejects.toMatchObject({
         code: 'UNSUPPORTED_CAPABILITY',
         message: expect.stringContaining('the "secondaryTap" action is not available on this target'),
@@ -403,14 +382,14 @@ describe('locator action options', () => {
     });
 
     it.each([
-      [{ button: 'middle' }, '{"kind":"tap","button":"middle"} @ 11,21', 'with the middle button at (1, 1)'],
-      [{ button: 'right' }, '{"kind":"secondaryTap"} @ 11,21', 'with the right button at (1, 1)'],
-      [{ button: 'middle', count: 2 }, '{"kind":"doubleTap","button":"middle"} @ 11,21', '2 times with the middle button at (1, 1)'],
-      [{ button: 'right', count: 3 }, '{"kind":"multiTap","count":3,"button":"right"} @ 11,21', '3 times with the right button at (1, 1)'],
-    ] as const)('taps %j at a position with the pointer action that carries the button', async (options, sent, label) => {
+      [{ button: 'middle' }, { kind: 'tap', button: 'middle' }, 'with the middle button at (1, 1)'],
+      [{ button: 'right' }, { kind: 'secondaryTap' }, 'with the right button at (1, 1)'],
+      [{ button: 'middle', count: 2 }, { kind: 'doubleTap', button: 'middle' }, '2 times with the middle button at (1, 1)'],
+      [{ button: 'right', count: 3 }, { kind: 'multiTap', count: 3, button: 'right' }, '3 times with the right button at (1, 1)'],
+    ] as const)('taps %j at a position with the pointer action for that button and count', async (options, action, label) => {
       const { screen, steps, at } = pointScreen({ tapButtons: true });
       await screen.getByLabel('Agree').tap({ ...options, position: { x: 1, y: 1 } });
-      expect(at).toEqual([sent]);
+      expect(at).toEqual([{ action, point: { x: 11, y: 21 } }]);
       expect(steps.all().map((step) => step.label)).toEqual([`getByLabel("Agree") ${label}`]);
     });
 
@@ -443,7 +422,7 @@ describe('locator action options', () => {
     it('right-clicks a position as a secondary tap on an engine without tapButtons', async () => {
       const { screen, at } = pointScreen();
       await screen.getByLabel('Agree').tap({ button: 'right', position: { x: 1, y: 1 } });
-      expect(at).toEqual(['{"kind":"secondaryTap"} @ 11,21']);
+      expect(at).toEqual([{ action: { kind: 'secondaryTap' }, point: { x: 11, y: 21 } }]);
     });
   });
 

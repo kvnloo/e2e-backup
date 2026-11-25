@@ -304,8 +304,8 @@ export function defineEngine<
   }
   if (spec.tapButtons !== undefined) {
     if (typeof spec.tapButtons !== 'boolean') throw invalid(name, 'tapButtons must be a boolean');
-    if (spec.tapButtons && !capabilities.has('actions')) {
-      throw invalid(name, 'declares tapButtons without perform: the button is sent with the tap action that perform receives');
+    if (spec.tapButtons && !capabilities.has('actions') && !capabilities.has('pointer')) {
+      throw invalid(name, 'declares tapButtons without perform or performAt: the button is sent with the tap actions they receive');
     }
   }
   if (spec.selectsDevice !== undefined) {

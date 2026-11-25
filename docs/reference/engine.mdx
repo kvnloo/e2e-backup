@@ -136,7 +136,8 @@ rules:
 | `viewportIntersection` | Declared without `locate`. |
 | `perform`, `actions` | One without the other. An `actions` list that is empty, repeats a kind, or names one outside `KNOWN_LOCATOR_ACTION_KINDS`. |
 | `performAt`, `pointerActions` | One without the other. A `pointerActions` list that is empty, repeats a kind, or names one outside `KNOWN_POINTER_ACTION_KINDS`. |
-| `tapModifiers`, `tapButtons` | Not a boolean, or `true` without `perform`. |
+| `tapModifiers` | Not a boolean, or `true` without `perform`. |
+| `tapButtons` | Not a boolean, or `true` without `perform` or `performAt`. |
 | `selectsDevice` | Not a boolean, or `true` without `prepare`. |
 | `grantsAllPermissions` | Not a boolean. |
 | `launchArgumentValues` | Not a boolean. |
@@ -281,11 +282,12 @@ export interface Engine {
    */
   readonly tapModifiers?: boolean;
   /**
-   * Set when `button` is honored on the tap actions: `tap`, `doubleTap`, and
-   * `multiTap` for `perform`, and the same kinds for `performAt`. Without it,
-   * an action with a `button` fails with `UNSUPPORTED_CAPABILITY` before it
-   * reaches the engine. A left tap and a single right tap (`secondaryTap`)
-   * don't need it.
+   * Set to `true` when the engine handles `button` on the `tap`,
+   * `doubleTap`, and `multiTap` actions, in `perform` or `performAt`,
+   * whichever it implements. Without it, an action with a `button` fails
+   * with `UNSUPPORTED_CAPABILITY` before it reaches the engine. A left tap and
+   * a single right tap (`secondaryTap`) don't carry `button`, so they don't
+   * need it.
    */
   readonly tapButtons?: boolean;
   /**
@@ -463,7 +465,7 @@ member. Two gaps end differently:
 | `locate` | `location` | `observe` | `screen`, `Locator`, `expect(locator)`. |
 | `viewportIntersection` | `viewport-intersection` | `locate` | `expect(locator).toBeInViewport()`. |
 | `tapModifiers: true` | - | `perform` | `modifiers` on `tap`, `doubleTap`, `multiTap`, and `secondaryTap`. |
-| `tapButtons: true` | - | `perform` | `button` on `tap`, `doubleTap`, and `multiTap`, at a point too. |
+| `tapButtons: true` | - | `perform` or `performAt` | `button` on `tap`, `doubleTap`, and `multiTap`, on a node and at a point. |
 | `selectsDevice: true` | - | `prepare` | `e2e run --device`, the device `prepare` binds. |
 | `grantsAllPermissions: true` | - | - | `app.permissions: 'all'`, which the engine receives as `EngineAppInfo.allPermissions`. Without it, config load refuses `'all'`, so an engine released before it never receives the string. |
 | `launchArgumentValues: true` | - | - | The object form of `app.launchArguments`, in `EngineAppInfo.launchArgumentValues`. |
@@ -579,9 +581,9 @@ engine. Without `tapButtons`, an action with a `button` fails the same way.
 | `screen` and `Locator` actions | `perform`, each only for a kind listed in `actions` |
 | `screen.swipe()` | `perform` with `swipe` on the observation root |
 | `modifiers` on a tap (`row.click({ modifiers: ['Shift'] })`) | `tapModifiers: true`; the keys are held for the click |
-| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true`, except for a single right tap, which is sent as `secondaryTap`. A `left` tap is sent without `button`. |
+| `button` on a tap (`link.click({ button: 'middle' })`) | `tapButtons: true` for a middle tap, or a right tap with a `count` above 1. A single right tap needs the `secondaryTap` kind, and a `left` tap needs neither. |
 | `screen.tapAt`, `tap({ position })` | `performAt` with the `tap` pointer kind |
-| `tap({ position, count })` | `performAt` with the `doubleTap` pointer kind for 2, `multiTap` for 3 or more |
+| `tap({ position })` with a `count` or `button` | `performAt` with the `doubleTap` pointer kind for 2 taps, `multiTap` for 3 or more, or `secondaryTap` for a single right tap |
 | `screen.doubleTapAt` | `performAt` with the `doubleTap` pointer kind |
 | `screen.swipe({ from, to })` | `performAt` with the `swipeTo` pointer kind |
 | `locator.pressSequentially` | the `focus` action and `keyboard`; the harness composes `focus` then `keyboard.type` |
@@ -1305,6 +1307,27 @@ async perform(ref, action, context) {
 ```
 
 ```ts
+/** The tap kinds `perform` and `performAt` share. `LocatorAction` adds the held keys to each of them. */
+type TapActions =
+  | {
+      readonly kind: 'tap';
+      /** Set to `'middle'` for a middle click. It's sent only to an engine that declares `tapButtons`. For any other engine, it's refused before dispatch. A single right click is the `secondaryTap` kind. */
+      readonly button?: 'middle';
+    }
+  | {
+      readonly kind: 'doubleTap';
+      /** The button for both clicks, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
+      readonly button?: 'middle' | 'right';
+    }
+  | { readonly kind: 'secondaryTap' }
+  | {
+      /** `count` taps in a row (3 or more; 2 is `doubleTap`): one multi-click in a browser, presses at the device's cadence on a device. */
+      readonly kind: 'multiTap';
+      readonly count: number;
+      /** The button for every click, unset for the left one. As on `tap`: only an engine that declares `tapButtons` receives it. */
+      readonly button?: 'middle' | 'right';
+    };
+
 /**
  * One deterministic action `perform` carries out on a node. The `swipe`
  * kind on the observation's root node is the viewport swipe: the agent's
@@ -1314,33 +1337,10 @@ async perform(ref, action, context) {
  * `press` takes one key in the `Key` grammar below.
  */
 export type LocatorAction =
-  | {
-      readonly kind: 'tap';
-      /** Keys held for the click, as on the `doubleTap` and `secondaryTap` kinds. */
-      readonly modifiers?: readonly KeyModifier[];
-      /** The middle mouse button, set for a middle click. It's sent only to an engine that declares `tapButtons`. For any other engine, it's refused before dispatch. A single right click is `secondaryTap`. */
-      readonly button?: 'middle';
-    }
-  | {
-      readonly kind: 'doubleTap';
-      /** Keys held for the clicks, as on `secondaryTap`. */
-      readonly modifiers?: readonly KeyModifier[];
-      /** The mouse button for both clicks when it isn't the primary one, as on `tap`. */
-      readonly button?: 'middle' | 'right';
-    }
-  | {
-      readonly kind: 'secondaryTap';
+  | (TapActions & {
       /** Keys held for the click; only an engine that declares `tapModifiers` receives it. */
       readonly modifiers?: readonly KeyModifier[];
-    }
-  | {
-      /** `count` taps in a row (3 or more; 2 is `doubleTap`): one multi-click in a browser, presses at the device's cadence on a device. */
-      readonly kind: 'multiTap';
-      readonly count: number;
-      readonly modifiers?: readonly KeyModifier[];
-      /** The mouse button for every click when it isn't the primary one, as on `doubleTap`. */
-      readonly button?: 'middle' | 'right';
-    }
+    })
   | {
       readonly kind:
         | 'check'
@@ -1408,24 +1408,7 @@ Pointer actions use viewport coordinates when no semantic node is available.
 
 ```ts
 export type PointerAction =
-  | {
-      readonly kind: 'tap';
-      /** As on the node `tap`: only an engine that declares `tapButtons` receives it. */
-      readonly button?: 'middle';
-    }
-  | {
-      readonly kind: 'doubleTap';
-      /** As on the node `doubleTap`: only an engine that declares `tapButtons` receives it. */
-      readonly button?: 'middle' | 'right';
-    }
-  | {
-      /** `count` clicks at the point, as the node `multiTap`. Not a kind of SPI v1, so an engine lists it explicitly. */
-      readonly kind: 'multiTap';
-      readonly count: number;
-      /** As on the node `multiTap`: only an engine that declares `tapButtons` receives it. */
-      readonly button?: 'middle' | 'right';
-    }
-  | { readonly kind: 'secondaryTap' }
+  | TapActions
   | { readonly kind: 'hover' }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'dragTo'; readonly target: ViewportPoint }

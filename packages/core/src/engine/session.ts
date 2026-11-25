@@ -346,8 +346,8 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
     actions,
     pointerActions,
     tapModifiers,
-    measuresViewport: engine?.viewportIntersection !== undefined,
     tapButtons,
+    measuresViewport: engine?.viewportIntersection !== undefined,
     app,
     artifacts,
     appLog: createAppLogRoute(),
@@ -480,6 +480,9 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
       if ('modifiers' in action && action.modifiers !== undefined && !tapModifiers) {
         unsupported(`modifiers on the "${action.kind}" action`);
       }
+      if ('button' in action && action.button !== undefined && !tapButtons) {
+        unsupported(`the ${action.button} button on the "${action.kind}" action`);
+      }
       if (action.kind === 'press') requireKey(action.key);
       rejectSupersededLocate(ref);
       if (action.kind === 'dragTo') rejectSupersededLocate(action.target);
@@ -492,6 +495,9 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
     },
     async performAt(point, action, operation) {
       if (!pointerActions.has(action.kind)) unsupported(`the "${action.kind}" action at a point`);
+      if ('button' in action && action.button !== undefined && !tapButtons) {
+        unsupported(`the ${action.button} button on the "${action.kind}" action at a point`);
+      }
       await performAtRaw(point, action, operation);
     },
     keyboard: {

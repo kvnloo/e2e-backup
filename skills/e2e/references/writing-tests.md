@@ -332,11 +332,11 @@ substring; a `RegExp` matches as written.
 
 Each action resolves one node, waits up to `config.actionTimeout` (30 s, or
 `{ timeout }`) for it to be actionable, and does one thing: `tap()` (alias
-`click()`; `{ button: 'middle' }` or `{ button: 'right' }` picks the mouse
-button; `{ count: 3 }` taps three times in a row, a triple click in a
+`click()`; `{ button: 'middle' }` or `{ button: 'right' }` clicks with that
+mouse button; `{ count: 3 }` taps three times in a row, a triple click in a
 browser; `count` is a positive safe integer, `2` is `doubleTap()`, 3 or more
-need the engine's `multiTap` (browser and mobile have it; mobile refuses more
-than 200), and with `position` 3 or more need the browser's `multiTap` pointer action),
+need the engine's `multiTap` (browser and mobile have it, and both refuse more
+than 200), and with `position`, 3 or more work in a browser only),
 `doubleTap()` (alias `dblclick()`),
 `secondaryTap()` (each takes `{ modifiers: ['Shift'] }`),
 `longPress({ duration? })`
@@ -348,7 +348,9 @@ array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(fil
 (paths relative to the project root, or `{ name, mimeType, buffer: Buffer }` payloads, singly or as an array; `[]` clears; a missing path, or one under a directory the runner cannot search, is `INVALID_ARGUMENT`), `dragTo(locator)`, `scrollIntoView()`,
 `swipe({ direction, momentum? })`. Web only, `UNSUPPORTED_CAPABILITY` on a
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
-`modifiers`, and a middle or right `button`.
+and `modifiers`. `tap({ button: 'right' })` is a single right click on web or
+desktop. Only the web engine takes a middle click or repeated right clicks,
+and the mobile engine takes neither.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the

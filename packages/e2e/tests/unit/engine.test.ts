@@ -92,11 +92,12 @@ describe('defineEngine', () => {
     }))).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
-  it('carries tapButtons onto the handle only with perform, and only as a boolean', () => {
+  it('carries tapButtons onto the handle only with perform or performAt, and only as a boolean', () => {
     const perform = async () => undefined;
     expect(defineEngine(observingEngine({ actions: ['tap'], perform, tapButtons: true })).tapButtons).toBe(true);
+    expect(defineEngine(observingEngine({ pointerActions: ['tap'], performAt: perform, tapButtons: true })).tapButtons).toBe(true);
     expect(defineEngine(observingEngine({ actions: ['tap'], perform, tapButtons: false })).tapButtons).toBeUndefined();
-    expect(() => defineEngine(observingEngine({ tapButtons: true }))).toThrow(/tapButtons without perform/);
+    expect(() => defineEngine(observingEngine({ tapButtons: true }))).toThrow(/tapButtons without perform or performAt/);
     expect(() => defineEngine(observingEngine({ actions: ['tap'], perform, tapButtons: 'yes' as never }))).toThrow(
       /tapButtons must be a boolean/,
     );
@@ -400,6 +401,34 @@ describe('createEngineSession', () => {
     expect(performed).toEqual(['tap@3,4', 'longPress@5,6']);
     const none = createEngineSession({ engine: defineEngine(observingEngine()), targetName: 'toy-target' });
     await expect(none.performAt({ x: 1, y: 1 }, { kind: 'tap' }, OP)).rejects.toThrow(/point/);
+  });
+
+  it('refuses a button on an engine without tapButtons, on a node and at a point, before it reaches the engine', async () => {
+    const calls: string[] = [];
+    const session = createEngineSession({
+      engine: defineEngine(
+        observingEngine({
+          actions: ['tap', 'doubleTap', 'multiTap'],
+          perform: async (ref, action) => void calls.push(`${action.kind}:${ref.id}`),
+          pointerActions: ['tap', 'doubleTap'],
+          performAt: async (point, action) => void calls.push(`${action.kind}@${point.x},${point.y}`),
+        }),
+      ),
+      targetName: 'toy-target',
+    });
+    await expect(session.perform({ id: 'n1', revision: 'b1' }, { kind: 'tap', button: 'middle' }, OP)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('no engine capability for the middle button on the "tap" action'),
+    });
+    await expect(session.perform({ id: 'n1', revision: 'b1' }, { kind: 'multiTap', count: 3, button: 'right' }, OP)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('the right button on the "multiTap" action'),
+    });
+    await expect(session.performAt({ x: 1, y: 1 }, { kind: 'doubleTap', button: 'middle' }, OP)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('the middle button on the "doubleTap" action at a point'),
+    });
+    expect(calls).toEqual([]);
   });
 
   it('swipes the viewport as perform(root, swipe), observing first when nothing named the root yet', async () => {

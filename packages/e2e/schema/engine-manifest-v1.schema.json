@@ -213,9 +213,18 @@
       "then": {
         "properties": {
           "methods": {
-            "contains": {
-              "const": "engine/perform"
-            }
+            "anyOf": [
+              {
+                "contains": {
+                  "const": "engine/perform"
+                }
+              },
+              {
+                "contains": {
+                  "const": "engine/performAt"
+                }
+              }
+            ]
           }
         }
       }

@@ -1,7 +1,7 @@
 /** Locator action dispatch for the Playwright engine. */
 
 import type { ElementHandle, Page } from 'playwright-core';
-import { Deadline, EngineError, pollCondition, TestError, type KeyModifier, type LocatorAction, type NodeRef, type PointerAction, type ViewportPoint } from '@e2e-dev/core/engine';
+import { Deadline, EngineError, obj, pollCondition, TestError, type KeyModifier, type LocatorAction, type NodeRef, type PointerAction, type ViewportPoint } from '@e2e-dev/core/engine';
 import {
   asActionable,
   isClassified,
@@ -30,9 +30,20 @@ function heldKeys(action: Extract<LocatorAction, { kind: 'tap' | 'doubleTap' | '
   return action.modifiers === undefined ? {} : { modifiers: [...action.modifiers] };
 }
 
-/** The mouse button of a tap-family action, as Playwright's `button` takes it; left out for the primary one. */
-function pressed(action: { readonly button?: 'middle' | 'right' }): { button?: 'middle' | 'right' } {
-  return action.button === undefined ? {} : { button: action.button };
+/**
+ * The most clicks one multi-tap sends. Playwright queues every press before it
+ * sends the first, so a larger count could hold the worker past its timeout.
+ */
+const MAX_CLICK_COUNT = 200;
+
+/** Returns the click count of a multi-tap, refusing one above `MAX_CLICK_COUNT` before any input. */
+function clickCount(count: number): number {
+  if (count > MAX_CLICK_COUNT) {
+    throw new EngineError('UNSUPPORTED_CAPABILITY', `the browser engine clicks at most ${MAX_CLICK_COUNT} times in a row; got a count of ${count}`, {
+      retryable: false,
+    });
+  }
+  return count;
 }
 
 /** Playwright's words for an element handle whose element left the DOM. */
@@ -172,7 +183,7 @@ function controlPoint(label: HTMLLabelElement): { x: number; y: number } | null 
 async function clickControl(
   target: ActionTarget,
   verb: 'tap' | 'check' | 'uncheck',
-  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[]; button?: 'middle' | 'right' },
+  options: { timeout: number; signal: AbortSignal; modifiers?: KeyModifier[] },
 ): Promise<void> {
   const { signal, ...click } = options;
   const deadline = new Deadline(options.timeout);
@@ -295,19 +306,20 @@ export async function dispatchLocatorAction(
   const locator = asActionable(target);
   switch (action.kind) {
     case 'tap':
-      await clickControl(target, 'tap', {
-        timeout,
-        signal: operation.signal,
-        ...heldKeys(action),
-        ...pressed(action),
-      });
+      // A middle click goes to the node itself: a label stand-in would take the click away from its control.
+      if (action.button === 'middle') {
+        await locator.click({ button: 'middle', timeout, ...heldKeys(action) });
+        return;
+      }
+
+      await clickControl(target, 'tap', { timeout, signal: operation.signal, ...heldKeys(action) });
       return;
     case 'doubleTap':
-      await locator.dblclick({ timeout, ...heldKeys(action), ...pressed(action) });
+      await locator.dblclick({ timeout, ...heldKeys(action), ...obj({ button: action.button }) });
       return;
     case 'multiTap':
       // One click sequence with a rising `detail`, as a person's triple click is.
-      await locator.click({ clickCount: action.count, timeout, ...heldKeys(action), ...pressed(action) });
+      await locator.click({ clickCount: clickCount(action.count), timeout, ...heldKeys(action), ...obj({ button: action.button }) });
       return;
     case 'secondaryTap':
       await locator.click({ button: 'right', timeout, ...heldKeys(action) });
@@ -422,13 +434,13 @@ export async function dispatchPointerAction(
   const point = nearestPixel(at);
   switch (action.kind) {
     case 'tap':
-      await mouse.click(point.x, point.y, pressed(action));
+      await mouse.click(point.x, point.y, obj({ button: action.button }));
       return;
     case 'doubleTap':
-      await mouse.dblclick(point.x, point.y, pressed(action));
+      await mouse.dblclick(point.x, point.y, obj({ button: action.button }));
       return;
     case 'multiTap':
-      await mouse.click(point.x, point.y, { clickCount: action.count, ...pressed(action) });
+      await mouse.click(point.x, point.y, obj({ clickCount: clickCount(action.count), button: action.button }));
       return;
     case 'secondaryTap':
       await mouse.click(point.x, point.y, { button: 'right' });
