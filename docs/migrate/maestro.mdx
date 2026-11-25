@@ -127,7 +127,7 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `inputRandomEmail`, `inputRandomText`, `faker` | `unique()` around a value in `act` params, so the cache still replays; any npm faker for the rest |
 | `copyTextFrom`, `pasteText` | `await locator.textContent()`, then `.fill(text)` |
 | `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`; Maestro names the finger's direction, e2e the content's |
-| `swipe: { start, end }`, `scrollUntilVisible` | `screen.swipe({ from, to })` in pixels or percentages, `screen.scrollUntilVisible(locator, { direction })` |
+| `swipe: { start, end }`, `scrollUntilVisible` | `screen.swipe({ from, to })` in points (dp on Android) or percentages, `screen.scrollUntilVisible(locator, { direction })` |
 
 </Accordion>
 <Accordion title="Assertions and flows">
