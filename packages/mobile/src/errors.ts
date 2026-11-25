@@ -357,8 +357,8 @@ export function isAppNotInstalled(error: unknown): boolean {
 /**
  * Returns true if agent-device refused a command because a physical
  * iPhone's XCTest backend doesn't support it (such as launching with a URL).
- * The refusal comes back as `UNSUPPORTED_CAPABILITY`, with agent-device's
- * error as its cause and `backend: 'xctest'` in that error's details.
+ * Those errors come back as `UNSUPPORTED_CAPABILITY` with `backend: 'xctest'`
+ * in the cause's details.
  */
 export function isXctestRefusal(error: unknown): boolean {
   return error instanceof EngineError && error.code === 'UNSUPPORTED_CAPABILITY' && details(error.cause).backend === 'xctest';

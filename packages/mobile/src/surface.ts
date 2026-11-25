@@ -114,7 +114,7 @@ export interface InstalledApp {
 /** Why nothing is pinned with `appPath` alone: the install is the suite's. */
 /** Why a relaunch from a link fails on an iPhone agent-device drives through XCTest, and what to do instead. */
 const XCTEST_RELAUNCH =
-  "app.open(path, { relaunch: true }) can't launch the app from a link on this iPhone because agent-device is using its XCTest backend. XCTest stopped the app, then couldn't launch it with a URL, leaving it closed. Run the test on an iOS simulator or an Android device, or connect the iPhone so it appears in `xcrun devicectl list devices` and agent-device uses CoreDevice";
+  "app.open(path, { relaunch: true }) can't launch the app from a link on this iPhone because agent-device is using its XCTest backend. XCTest stopped the app, then couldn't launch it with a URL, leaving it closed. Run the test on an iOS simulator or Android device, or connect the iPhone so it appears in `xcrun devicectl list devices` and agent-device uses CoreDevice.";
 
 const UNINSTALLED_BUILD = "the build the target's `app.appPath` names installed first with `device.installApp()`";
 
@@ -983,19 +983,18 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    * no identity, and the package that took the link as its bundle id when
    * the OS told it; the next snapshot names the foreground app either way.
    *
-   * With `relaunch`, the app is stopped if it's running, then launched from
-   * the link. A device from a provider is refused, since its driver can open
-   * the link in the running app. A target with launch arguments or
-   * permissions is refused too, since neither can be passed when the app
-   * launches from a link.
+   * With `relaunch`, the app is stopped if running, then launched from the
+   * link. Provider devices are refused since their drivers can open the link
+   * in the running app. Targets with launch arguments or permissions are also
+   * refused, since neither can be passed when launching from a link.
    *
-   * On an iOS simulator, only a custom-scheme link launches the app. For an
-   * http(s) link, agent-device launches the app first and then opens the URL.
+   * On an iOS simulator, only custom-scheme links launch the app. For http(s)
+   * links, agent-device launches the app first and then opens the URL.
    *
-   * A physical iPhone uses CoreDevice or XCTest, and agent-device doesn't
-   * report which one. CoreDevice launches the app with the URL. XCTest stops
-   * the app and refuses the URL, leaving the app closed, so that error is
-   * rethrown with next steps.
+   * Physical iPhones use CoreDevice or XCTest, and agent-device doesn't report
+   * which one. CoreDevice launches the app with the URL. XCTest stops the app
+   * and refuses the URL, leaving it closed, so that error is rethrown with
+   * next steps.
    */
   async openLink(url: URL, app: string | undefined, signal: AbortSignal, input?: InputBudget, relaunch = false): Promise<void> {
     const target = app ?? this.pinnedApp;
@@ -1007,10 +1006,10 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       const launchArguments = launchArgumentList(this.options.platform, this.app.launchArgumentValues ?? this.app.launchArguments);
       const permissions = configuredPermissions(this.app);
       if (launchArguments !== undefined || permissions === 'all' || Object.keys(permissions ?? {}).length > 0) {
-        throw unsupported("app.open(path, { relaunch: true }) can't pass the target's `app.launchArguments` or `app.permissions` when it launches the app from a link. Remove them from the target to use relaunch");
+        throw unsupported("app.open(path, { relaunch: true }) can't pass the target's `app.launchArguments` or `app.permissions` when launching from a link. Remove them from the target to use relaunch.");
       }
       if (this.options.platform === 'ios' && (url.protocol === 'http:' || url.protocol === 'https:')) {
-        throw unsupported("app.open(path, { relaunch: true }) only supports custom-scheme links on an iOS simulator, because agent-device launches the app before it opens an http(s) URL. Set app.linkBase to the app's custom scheme, or use device.openLink(url) to open the http(s) link in the running app");
+        throw unsupported("app.open(path, { relaunch: true }) only supports custom-scheme links on an iOS simulator because agent-device launches the app before opening an http(s) URL. Set app.linkBase to the app's custom scheme, or use device.openLink(url) to open the http(s) link in the running app.");
       }
     }
     if (target === undefined && this.options.platform === 'ios') {

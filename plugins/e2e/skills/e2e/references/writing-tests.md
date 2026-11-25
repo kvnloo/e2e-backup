@@ -252,10 +252,10 @@ label. `browser` (`Browser`): browser targets, import `test` from `@e2e-dev/web`
     the running app.
   - `open(path, { relaunch: true })` starts the app fresh first. On a device
     with `app.linkBase`, the app is stopped if it's running, then launched
-    from the link. `UNSUPPORTED_CAPABILITY` is thrown on a device from a
-    provider, with an `http(s)` link on an iOS simulator, or when
-    `app.launchArguments` or `app.permissions` is set. On a physical iPhone
-    driven through XCTest, the call fails after agent-device stops the app. In a browser, the open tabs are closed and a new one
+    from the link. `relaunch: true` throws `UNSUPPORTED_CAPABILITY` on a
+    device from a provider, with an `http(s)` link on an iOS simulator, or
+    when `app.launchArguments` or `app.permissions` is set. On a physical
+    iPhone driven through XCTest, it fails after stopping the app. In a browser, the open tabs are closed and a new one
     is opened, as in `restart()`. Then the path is opened instead of the
     base URL.
 - `back()`: one history step back.

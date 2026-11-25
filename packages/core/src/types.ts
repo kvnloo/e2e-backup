@@ -729,7 +729,7 @@ export interface App {
 /** Options for `app.open`. */
 export interface AppOpenOptions {
   /**
-   * Set to `true` to start the app fresh before opening the path.
+   * Set to `true` to start fresh before opening the path.
    *
    * - On a device target with `app.linkBase`, the pinned app is stopped if
    *   it's running, then launched from the link.

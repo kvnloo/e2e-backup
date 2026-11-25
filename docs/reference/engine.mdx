@@ -1694,8 +1694,8 @@ export interface EngineSession {
    * would: `app.open(path)` on a target that declares `app.linkBase` lands
    * here with the link joined and its scheme checked. A device engine's hook;
    * a target whose engine lacks it cannot declare `linkBase`. `options` is
-   * `{ relaunch: true }` for `app.open(path, { relaunch: true })`. It's
-   * passed only to an engine that declares `linkRelaunch`.
+   * `{ relaunch: true }` for `app.open(path, { relaunch: true })`. Only
+   * passed to engines declaring `linkRelaunch`.
    */
   openLink?(url: string, context: OperationContext, options?: OpenLinkOptions): Promise<void>;
   /** Navigates back once in the surface's history. */

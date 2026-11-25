@@ -6,4 +6,4 @@
 '@e2e-dev/desktop': patch
 ---
 
-`app.open(path, { relaunch: true })` starts the app fresh before the path is opened. On a device target with `app.linkBase`, the app is launched from the link. Engine support is declared with `linkRelaunch: true`. `{ relaunch: true }` is passed as the third argument to `session.openLink`.
+`app.open(path, { relaunch: true })` starts the app fresh before the path is opened. On a device target with `app.linkBase`, the app is launched from the link. Declare engine support with `linkRelaunch: true`. `{ relaunch: true }` is passed as the third argument to `session.openLink`.

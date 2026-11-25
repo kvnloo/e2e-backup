@@ -248,9 +248,9 @@ export class DevicePool {
 
   /**
    * True when the engine drives a local device rather than a leased device
-   * from a provider. Only a local device can be selected with
-   * `e2e run --device` or relaunched from a link (a provider's driver, such
-   * as Revyl's, can launch the app first and then pass it the link).
+   * from a provider. Only local devices can be selected with
+   * `e2e run --device` or relaunched from a link (provider drivers like
+   * Revyl's can launch the app first and then pass it the link).
    */
   get isLocal(): boolean {
     return !(this.source instanceof LeasedDevices);
