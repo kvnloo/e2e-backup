@@ -1772,9 +1772,7 @@ instead:
 | an action, `waitFor` | `LOCATOR_NOT_FOUND`, with the timeout as its cause |
 | an assertion | `ASSERTION_FAILED`, with the timeout as its cause |
 
-A negated assertion passes there if its negation had held long enough by the
-time the read was cut off. [`pollCondition`](#pollcondition) polls by these
-rules.
+[`pollCondition`](#pollcondition) polls by these rules.
 
 #### Runner error classes
 
@@ -1932,7 +1930,7 @@ if (isRefusedLinkScheme(new URL(link).protocol)) throw new ConfigurationError('P
 
 #### `pollCondition`
 
-Assertion polling and the negation grace window.
+Assertion polling: until a read sees the condition hold or, negated, not hold.
 
 ```ts
 export function pollCondition(options: PollConditionOptions): Promise<void>;

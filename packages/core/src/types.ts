@@ -1206,7 +1206,7 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
  * not a boolean, is `INVALID_ARGUMENT` before the first read.
  */
 export interface AsyncExpectation {
-  /** Inverts the matcher. A negated matcher passes after 1000 ms of continuous truth. */
+  /** Inverts the matcher. A negated matcher passes on the first read that satisfies the negation. */
   readonly not: AsyncExpectation;
   /** Waits for visibility; `visible: false` waits for hidden or absent state, as `toBeHidden`. */
   toBeVisible(options?: { visible?: boolean; timeout?: number }): Promise<void>;

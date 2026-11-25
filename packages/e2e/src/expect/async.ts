@@ -262,8 +262,8 @@ class AsyncExpectationImpl implements AsyncExpectation {
       return { count: refs.length, node: null, nodes: [] };
     }
     const missingFrame = spec.evaluableWithoutNode === true ? 'empty' : 'wait';
-    const { node, count } = await engine.tryRead(this.internals.expression, reads, missingFrame);
-    return { count, node, nodes: [] };
+    const { node, count, stale } = await engine.tryRead(this.internals.expression, reads, missingFrame);
+    return { count, node, nodes: [], stale };
   }
 
   /** A state matcher; its Playwright flag set to `false` expects the opposite state. */

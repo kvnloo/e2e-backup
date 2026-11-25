@@ -136,6 +136,7 @@ run only in a browser, so a test that uses it declares
 | --- | --- |
 | `toBeVisible()`, `toBeHidden()`, `toBeEnabled()`, `toBeDisabled()`, `toBeChecked()`, `toBeFocused()`, `toBeAttached()`, `toBeInViewport()`, `toHaveText()`, `toContainText()`, `toHaveValue()`, `toHaveAttribute()`, `toHaveCount()`, `toHaveAccessibleName()`, `toHaveRole()`, `toBeEditable()` | the same, with `{ visible }`, `{ enabled }`, `{ editable }`, `{ checked }`, `{ attached }`, `{ ratio }`, and `{ ignoreCase }`; `toBeInViewport` reads a zero-size element as outside and [differs on a device](/reference/expect#tobeinviewport) |
 | `toBeEmpty()` | the same, with `{ timeout }` |
+| `.not` on a locator or `expect(page)` matcher | the same on a locator or `expect(browser)` matcher: it passes on the first read that satisfies the negation |
 | `toHaveId(id)`, `toContainClass(name)` | `toHaveAttribute('id', id)`, `toHaveAttribute('class', RegExp)` |
 | `expect(page).toHaveURL()`, `toHaveTitle()` | `expect(browser).toHaveURL()`, `toHaveTitle()` |
 | `expect(page).toHaveScreenshot()`, `expect(locator).toHaveScreenshot()` | `expect(screen).toHaveScreenshot()` and the locator form, see [Visual comparison](/visual-testing) |
@@ -280,7 +281,6 @@ purpose. Use the workaround, or keep the test in Playwright.
 | `expect.configure()` | `{ timeout }` on each call |
 | `@axe-core/playwright` | axe-core through `browser.addInitScript({ path: 'node_modules/axe-core/axe.min.js' })`, then `axe.run()` in `browser.evaluate` |
 | `.resolves`, `.rejects`, `toThrow()`, `toStrictEqual()`, `toContainEqual()`, `toBeInstanceOf()`, `expect.closeTo()` | `await` first, or catch the error and assert on it; `toEqual`; `toContain`, which compares by deep equality; `toBeCloseTo` |
-| A `.not` locator matcher that passes on the first read | It passes after the condition holds for 1 s. The positive inverse passes on the first read: `toBeHidden()`, `toBeDisabled()`, `toBeChecked({ checked: false })` |
 | `expect.extend()` | An async helper that calls `expect` |
 
 </Accordion>

@@ -714,7 +714,8 @@ class LocatorImpl extends ScreenImpl implements Locator {
           signal: engine.signal,
           negated: false,
           evaluate: async (reads) => {
-            const { node } = await engine.tryRead(this.expression, reads, ABSENCE_STATES.has(state) ? 'empty' : 'wait');
+            const { node, stale } = await engine.tryRead(this.expression, reads, ABSENCE_STATES.has(state) ? 'empty' : 'wait');
+            if (stale) return undefined;
             samples.add(node === null ? 'absent' : isNodeVisible(node) ? 'visible' : 'hidden');
             return inWaitForState(node, state);
           },

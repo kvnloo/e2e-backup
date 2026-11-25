@@ -943,14 +943,9 @@ Rules that apply across the matcher groups.
 
 ### Negation
 
-`.not` inverts a matcher. A negated matcher passes only once the negation
-has held:
-
-- It passes after 1000 ms of continuous truth.
-- When `{ timeout }` is shorter than 1000 ms, it passes at the deadline if the
-  negation held for the whole budget.
-- The window counts from the moment the first read that saw the negation
-  started, so a slow read counts toward it.
+`.not` inverts a matcher. A negated matcher passes on the first read that
+satisfies the negation, as in Playwright, and fails when none does before the
+timeout.
 
 ### Strictness
 
@@ -1060,7 +1055,7 @@ export interface Expect extends ExpectCall {
  * not a boolean, is `INVALID_ARGUMENT` before the first read.
  */
 export interface AsyncExpectation {
-  /** Inverts the matcher. A negated matcher passes after 1000 ms of continuous truth. */
+  /** Inverts the matcher. A negated matcher passes on the first read that satisfies the negation. */
   readonly not: AsyncExpectation;
   /** Waits for visibility; `visible: false` waits for hidden or absent state, as `toBeHidden`. */
   toBeVisible(options?: { visible?: boolean; timeout?: number }): Promise<void>;
