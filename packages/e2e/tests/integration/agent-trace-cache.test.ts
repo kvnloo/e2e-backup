@@ -1295,7 +1295,7 @@ describe('trace cache: a scroll to a text that moves the route', () => {
       'tests/feed.e2e.ts': `import { test, expect } from 'e2e';
 
 test('marks the next story read', async ({ app, agent, screen }) => {
-  await app.open('/feed');
+  await app.open('/story-feed');
   await agent.act('mark the next story read');
   await expect(screen.getByRole('status')).toHaveText('read');
 });
@@ -1323,8 +1323,8 @@ test('marks the next story read', async ({ app, agent, screen }) => {
     const outcome = await runExisting(project, { appUrl: app.url, config: { tests: 'tests/**/*.e2e.ts', agents: { default: { executor } }, cache: 'read-write' as const } });
     expect(outcome.exitCode).toBe(0);
     expect(readOnlyEntry(project).entry.payload.actions.map((action) => [action.name, action.at])).toEqual([
-      ['scrollUntil', '/feed'],
-      ['tap', '/feed/next-story'],
+      ['scrollUntil', '/story-feed'],
+      ['tap', '/story-feed/next-story'],
     ]);
   }, 240_000);
 });
