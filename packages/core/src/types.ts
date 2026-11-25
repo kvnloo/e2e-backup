@@ -460,12 +460,12 @@ export interface ActionOptions {
 /**
  * A point in CSS pixels. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
- * also a `ScreenPoint`, whose origin is the viewport's top-left corner, the
- * space `boundingBox()` reports in, or the node's for `locator.swipe`.
+ * also a `ScreenPoint`. Its origin is the viewport's top-left corner (the
+ * space `boundingBox()` reports in), or the node's corner for `locator.swipe`.
  */
 export type Point = ViewportPoint;
 
-/** CSS pixels, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. For `locator.swipe`, both are measured on the node: see `SwipePathOptions`. */
+/** CSS pixels, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. For `locator.swipe`, both are relative to the node (see `SwipePathOptions`). */
 export type ScreenCoordinate = number | `${number}%`;
 
 /** A point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. It's on the viewport, or on the node for `locator.swipe`. */
@@ -531,9 +531,9 @@ export interface SwipeOptions {
 /**
  * A swipe along a path between two points: a touch swipe on a device, a
  * pointer drag on a document platform. The points are on the viewport for
- * `screen.swipe` and relative to the node for `locator.swipe`. There, a pixel
- * coordinate is an offset from the node's top-left corner (the same corner as
- * `tap({ position })`), and a percentage is a share of its box.
+ * `screen.swipe` and relative to the node for `locator.swipe`. On a node,
+ * pixels are offset from its top-left corner (the same corner as
+ * `tap({ position })`), and percentages are relative to its box.
  */
 export interface SwipePathOptions {
   /** Where the finger goes down. */

@@ -357,15 +357,16 @@ field and types one character per `delay`, plain string only (a `Secret` is
 
 Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 { x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` it is
-`INVALID_ARGUMENT`), `locator.swipe({ from, to, duration? })` swipes along a
-path relative to the node, as offsets from the same corner or as percentages
-of its box (`{ x: '90%', y: '50%' }`), and moves a pager built on pointer
-events, `screen.tapAt({ x, y })` taps a viewport point,
+`INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
-`screen.swipe({ from, to, duration? })` swipes along a path (on iOS an
-untimed path, on `screen` or a locator, must stay above the open soft keyboard; pass `duration` to drag
+`screen.swipe({ from, to, duration? })` swipes along a path (on iOS, an
+untimed path on `screen` or a locator must stay above the open soft keyboard. Pass `duration` to drag
 across it),
-`screen.swipe({ direction, momentum? })` swipes the viewport. Viewport
+`screen.swipe({ direction, momentum? })` swipes the viewport.
+`locator.swipe({ from, to, duration? })` swipes along a path relative to the
+node. Its points are offsets from the same corner as `tap({ position })`, or
+percentages of its box (`{ x: '90%', y: '50%' }`). It moves a pager built on
+pointer events. Viewport
 points also take percentages from `'0%'` through `'100%'`, rounded to the
 nearest pixel: `{ x: '50%', y: '50%' }`. Prefer a locator; a point moves with
 the layout.

@@ -396,8 +396,8 @@ test.describe('control inventory', () => {
   // right to left, because a left-to-right fling pops the screen. The pad
   // reports points, and its box is 80 points tall on both platforms, so its
   // width in points is the box's width scaled by that height. The start lands
-  // on the point asked for. A fling's reported end has landed up to 24 points
-  // either side of `to`, so the end gets 25.
+  // on the point asked for. A fling's reported end can be up to 24 points off
+  // from `to`, so the check allows 25.
   test('a locator swipe follows a path relative to the node', async ({ screen }) => {
     await showSection(screen, 'Gestures');
     const pad = screen.getByTestId('swipe-pad');

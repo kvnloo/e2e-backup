@@ -910,7 +910,7 @@ void executorContext.actions.tapAt({ x: '50%', y: 0 });
 void screen.getByRole('list').swipe({ from: { x: '90%', y: '50%' }, to: { x: 10, y: '50%' }, duration: 300, timeout: 1_000 });
 // @ts-expect-error a locator swipe is a direction or a path, never both.
 void screen.getByRole('list').swipe({ direction: 'up', from: point, to: point });
-// @ts-expect-error a locator path swipe names both ends.
+// @ts-expect-error a locator path swipe needs both `from` and `to`.
 void screen.getByRole('list').swipe({ from: point });
 // @ts-expect-error a directional swipe takes no duration.
 void screen.swipe({ direction: 'up', duration: 300 });

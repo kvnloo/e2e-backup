@@ -1035,7 +1035,7 @@ describe('coordinate input', () => {
     }
   });
 
-  it('locator.swipe waits for a box with a width and fails LOCATOR_NOT_FOUND if it never gets one', async () => {
+  it('locator.swipe waits for a box with a non-zero width and fails with LOCATOR_NOT_FOUND if the width stays 0', async () => {
     vi.useFakeTimers();
     vi.setTimerTickMode('nextTimerAsync');
     try {
@@ -1095,7 +1095,7 @@ describe('coordinate input', () => {
     ]);
   });
 
-  it('locator.swipe({ from, to }) drags between points of the node box, in pixels from its corner or percentages of the box', async () => {
+  it('locator.swipe({ from, to }) drags between points on the node, in pixels or percentages of its box', async () => {
     const { engine, performed, performedAt, pointTimeouts } = pointer();
     const { fixtures, steps } = runtime(engine, { actionTimeout: 5_000 });
     const pad = fixtures.screen.getByLabel('Pad');
@@ -1122,7 +1122,7 @@ describe('coordinate input', () => {
     await runtime(clipped.engine).fixtures.screen.getByLabel('Pad').swipe({ from: { x: '50%', y: '50%' }, to: { x: '100%', y: '100%' } });
     expect(clipped.performedAt).toEqual(['swipeTo @ 115,210 -> 129,219']);
 
-    // A box that starts between two pixels keeps '0%' and '100%' on the whole pixels inside it.
+    // When a box starts between pixels, '0%' and '100%' clamp to whole pixels inside it.
     const fractional = pointer({ rect: { ...box, x: 100.25 } });
     await runtime(fractional.engine).fixtures.screen.getByLabel('Pad').swipe({ from: { x: '0%', y: '0%' }, to: { x: '100%', y: '100%' } });
     expect(fractional.performedAt).toEqual(['swipeTo @ 101,200 -> 150,219']);

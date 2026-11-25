@@ -81,9 +81,9 @@ export function resolveScreenPoint(point: ScreenPoint, viewport: ViewportSize): 
 }
 
 /**
- * One coordinate of `resolveScreenPoint`, or of `resolveBoxPoint`, along a
- * side that starts at `start` and is `size` CSS pixels long. A percentage is
- * rounded once and kept on the whole pixels inside the side, so `'0%'` and
+ * Resolves one coordinate for `resolveScreenPoint` or `resolveBoxPoint`, along
+ * a side that starts at `start` and is `size` CSS pixels long. A percentage is
+ * rounded once and clamped to the whole pixels on that side, so `'0%'` and
  * `'100%'` stay inside a box that starts between two pixels.
  */
 function resolveCoordinate(value: ScreenCoordinate, size: number, start = 0): number {
