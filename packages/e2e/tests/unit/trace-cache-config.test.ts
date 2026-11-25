@@ -360,6 +360,18 @@ describe('settleStagedTraces', () => {
     expect(readTraceEntry(JSON.parse(store.entries.get(KEY_A)!))?.payload).toEqual({ ...recorded, recordedFor: STEP });
   });
 
+  it('keeps an entry whose flow differs from the new recording only in where each action ran', async () => {
+    const store = memoryStore();
+    const located = (at: string): ActionTrace => ({ ...trace('same flow'), actions: [{ name: 'tap', summary: 'tap button "X"', target: { role: 'button', name: 'X' }, at }] });
+    const stored = JSON.stringify(buildTraceEntry(located('/requests/1001')));
+    store.entries.set(KEY_A, stored);
+    const context = contextWith(store);
+    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: located('/requests/1002'), stepIndex: 1 });
+    const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
+    expect(writes.get(1)).toBe('kept');
+    expect(store.entries.get(KEY_A)).toBe(stored);
+  });
+
   it('writes the identity digest into a confirmed kept entry that cut a long test id before entries kept one', async () => {
     const store = memoryStore();
     const long = { ...STEP, testId: `${STEP.testId}${'x'.repeat(400)}` };
