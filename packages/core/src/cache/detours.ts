@@ -22,6 +22,7 @@
  * it; neither replay nor recording treats it differently.
  */
 
+import { bound } from '../internal/text.ts';
 import { routeKey } from './route.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
@@ -225,6 +226,21 @@ function byActions(actions: readonly RecordedAction[]): TraceDetour[] {
     from = next + 1;
   }
   return detours;
+}
+
+/** Characters of `step.cache.detour` the report admits (report-1). */
+const MAX_DETOUR_REPORT_CHARS = 600;
+
+/**
+ * A step's detour text once its attempt settled, masked by the ledger as it
+ * is then: a secret a later step resolved may be in a location the text
+ * names. Where the report's bound cut the text it ends in an ellipsis, so a
+ * value the cut went through is what ends before it (`redactCut`). Bounded
+ * again after, since a marker can be longer than the value it replaced.
+ */
+export function settledDetour(detour: string, ledger: { readonly redact: (text: string) => string; readonly redactCut: (text: string) => string }): string {
+  const masked = detour.endsWith('…') ? `${ledger.redactCut(detour.slice(0, -1))}…` : ledger.redact(detour);
+  return bound(masked, MAX_DETOUR_REPORT_CHARS);
 }
 
 /**

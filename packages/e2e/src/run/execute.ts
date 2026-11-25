@@ -42,6 +42,7 @@ import { AttemptGuestSessions } from './guests.ts';
 import { runSerialUnit, type SerialAttemptStart, type SerialHost, type SharedSerialSession } from './serial.ts';
 import { interruptedInPhase, interruptedSkip, pairKey, unitResult, unstartedResult } from './units.ts';
 import { carriedSecrets, processSecrets, redactForSession, sessionLedger, staticSecretLedger } from '@e2e-dev/core/lib/run/secrecy';
+import { settledDetour } from '@e2e-dev/core/lib/cache/detours';
 import { SessionStaging } from '@e2e-dev/core/lib/run/sessions';
 import { isOwnStep, StepRecorder, type StepHoldRequest, type StepProgress } from '@e2e-dev/core/lib/run/steps';
 import { holdAttemptSteps, readHeldScreen, type AttemptHolds, type HoldReads, type StepHold } from './step-hold.ts';
@@ -1063,13 +1064,12 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
             },
       );
       // A secret a later step resolved may be in an earlier step's detour,
-      // which names locations; masked by the ledger as it is now, a value cut
-      // at the detail's bound included.
+      // which names locations (`settledDetour`).
       const ledger = openSession === null ? processSecrets : sessionLedger(openSession, this.config.allSecrets);
       for (const step of record.steps) {
         const write = writes.get(step.index);
         if (step.cache !== undefined && write !== undefined) step.cache.write = write;
-        if (step.cache?.detour !== undefined) step.cache.detour = ledger.redactCut(step.cache.detour);
+        if (step.cache?.detour !== undefined) step.cache.detour = settledDetour(step.cache.detour, ledger);
       }
     }
     return record;
