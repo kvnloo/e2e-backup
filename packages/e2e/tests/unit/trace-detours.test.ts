@@ -124,6 +124,14 @@ describe('findDetours by recorded locations', () => {
     expect(detours).toEqual([{ from: 0, to: 2, at: '/orders/:id', via: '/login/callback?code=:id&state=:id', evidence: 'locations' }]);
   });
 
+  it('compares a location kept as a route by its route, since its record ids are gone', () => {
+    // After a hand-off, an action the replay ran without looking keeps the recording's location, spelled as a route.
+    const stayed = flow([tap('Details', '/orders/789'), { name: 'back', summary: 'go back', at: '/orders/:id' }, tap('Notes', '/orders/789'), type('Note', 'hi', '/orders/789')], { endPath: '/orders/789' });
+    expect(findDetours(stayed)).toEqual([]);
+    const trip = flow([tap('Invoices', '/orders/:id'), back('/invoices'), tap('Ship', '/orders/789')], { endPath: '/orders/789' });
+    expect(findDetours(trip)).toEqual([{ from: 0, to: 2, at: '/orders/:id', via: '/invoices', evidence: 'locations' }]);
+  });
+
   it('is no return to another record on the same route', () => {
     // One order's edit page, the list, then another order's: the flow moved on, it did not come back.
     expect(findDetours(flow([tap('Orders', '/orders/123/edit'), tap('Order 456', '/orders'), tap('Ship', '/orders/456/edit')], { endPath: '/orders/456/edit' }))).toEqual([]);

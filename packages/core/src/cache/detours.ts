@@ -28,7 +28,7 @@
  */
 
 import { bound } from '../internal/text.ts';
-import { addressKey, routeLocation } from './route.ts';
+import { addressKey, routeKey, routeLocation, spelledAsRoute } from './route.ts';
 import type { ActionTrace, RecordedAction } from './trace.ts';
 
 /** What the detour check reads of a trace. */
@@ -154,23 +154,39 @@ function places(trace: DetourInput): (string | undefined)[] {
   return [...trace.actions.map((action, index) => action.at ?? (index === 0 ? trace.startPath : undefined)), end];
 }
 
+/** How a place compares: its address, its route, and whether it is spelled as a route already. */
+interface PlaceKeys {
+  readonly address: string;
+  readonly route: string;
+  readonly spelled: boolean;
+}
+
 /**
  * For each action that stood on a known place, the last return to the same
  * address that followed a departure from it, with nothing typed, chosen, or set on the way.
  * The last, so a flow that tried two wrong pages from one menu reads as one
  * detour; a return, so actions that stay home after it are not part of it.
+ *
+ * A place spelled as a route (the location a recording kept, copied onto an
+ * action a replay ran before a hand-off) has no record ids left to compare,
+ * so it is the same place as any other on its route.
  */
 function byLocations(trace: DetourInput): TraceDetour[] {
   const where = places(trace);
-  // Each address read once: the scan compares every place with many others.
-  const keys = new Map<string, string>();
-  const address = (place: string): string => {
-    let key = keys.get(place);
-    if (key === undefined) {
-      key = addressKey(place);
-      keys.set(place, key);
+  // Each place read once: the scan compares every place with many others.
+  const keys = new Map<string, PlaceKeys>();
+  const keysOf = (place: string): PlaceKeys => {
+    let read = keys.get(place);
+    if (read === undefined) {
+      read = { address: addressKey(place), route: routeKey(place), spelled: spelledAsRoute(place) };
+      keys.set(place, read);
     }
-    return key;
+    return read;
+  };
+  const samePlace = (first: string, second: string): boolean => {
+    const a = keysOf(first);
+    const b = keysOf(second);
+    return a.address === b.address || ((a.spelled || b.spelled) && a.route === b.route);
   };
   const { actions } = trace;
   const detours: TraceDetour[] = [];
@@ -190,7 +206,7 @@ function byLocations(trace: DetourInput): TraceDetour[] {
       if (changesState(actions[to - 1]!)) break;
       const place = where[to];
       if (place === undefined) continue;
-      if (address(home) !== address(place)) {
+      if (!samePlace(home, place)) {
         via ??= place;
         away = true;
       } else if (via === undefined) {
