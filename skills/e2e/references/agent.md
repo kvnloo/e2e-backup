@@ -146,7 +146,7 @@ The tools, one per engine action. Name the target as the screen names it
 - `press`: one key to a node or, on browser/device, to focus; `times` up to 20.
 - `select`: one option by visible label.
 - `check`: set a checkbox, switch, or radio to a state, not flip it.
-- `scroll`: viewport or one scrollable node, a screen or a few.
+- `scroll`: viewport or one scrollable node, half of it each time.
 - `scroll_to`: a listed node into view, or by `text` page a list to a row.
 - `drag`: one node onto another.
 - `upload`: project-root files, or e2e's samples (`sample:photo.png`,
@@ -183,7 +183,7 @@ a bare-point drag); `press_at`, `select_at`, and `type_at` hit-test the
 tree first so a listed control underneath is acted on by id, and `type_at`
 on nothing listed taps, then types. A screen with
 nothing to tap by id opens with a screenshot attached. A device has no
-`right_click`, `select`, `upload`, or `scroll_to` by node id. Pixels mask
+`right_click`, `select`, or `upload`. Pixels mask
 secure fields only (topic writing-tests). A result says when an action
 closed an on-screen keyboard; on a touch screen that tap was often spent
 closing it, so act again. A control that commits something (save, submit,

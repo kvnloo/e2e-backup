@@ -13,8 +13,9 @@ import {
   performElementSwipe,
   performPointDrag,
   performPointerDrag,
-  performViewportSwipe,
+  performPointSwipe,
   POST_DISPATCH_PATTERN,
+  scrollIntoViewNearest,
   statPath,
   translatePwError,
   targetPage,
@@ -346,7 +347,15 @@ export async function dispatchLocatorAction(
       await locator.hover({ timeout });
       return;
     case 'scrollIntoView':
-      await locator.scrollIntoViewIfNeeded({ timeout });
+      // `center` comes after a scroll step, for a node already read as
+      // visible. Playwright's scrollIntoViewIfNeeded also waits for the node
+      // to stop moving, which a node with an endless animation never does, so
+      // the browser's own minimal scroll brings it in without that wait.
+      if (action.center === true) {
+        await scrollIntoViewNearest(target);
+      } else {
+        await locator.scrollIntoViewIfNeeded({ timeout });
+      }
       return;
     case 'selectOption': {
       const value = action.value;
@@ -392,7 +401,7 @@ export async function dispatchLocatorAction(
     case 'swipe':
       // The agent's node scroll and `screen` swipes both arrive here: a wheel
       // gesture over the node, sized by its own box.
-      await performElementSwipe(target, action.direction, action.momentum ?? 'none', timeout);
+      await performElementSwipe(target, action.direction, action.distance, timeout);
       return;
   }
 }
@@ -434,9 +443,7 @@ export async function dispatchPointerAction(
       await performPointDrag(mouse, point, action.target, action.durationMs, signal);
       return;
     case 'swipe':
-      // The pointer moves to the point first so the scrollable under it receives the wheel.
-      await mouse.move(point.x, point.y);
-      await performViewportSwipe(page, action.direction, action.momentum ?? 'none');
+      await performPointSwipe(page, point, action.direction, action.distance);
       return;
   }
 }

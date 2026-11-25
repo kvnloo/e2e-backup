@@ -75,6 +75,7 @@ import { credentialOrigins, httpCredentials, installConfiguredHeaders, lowercase
 import { RefRegistry } from './refs.ts';
 import {
   cancelled,
+  currentViewport,
   DEFAULT_VIEWPORT,
   dispatchedInput,
   ErrorLatch,
@@ -84,7 +85,7 @@ import {
   isPwTimeout,
   message,
   navigationStaleOr,
-  performViewportSwipe,
+  performPointSwipe,
   sanitizeFilename,
   pageScriptFailure,
   staleOr,
@@ -1184,7 +1185,7 @@ export class PlaywrightSurface {
         const page = this.requirePage();
         if (action.kind === 'swipe' && ref.id === ROOT_NODE_ID) {
           this.requireSession().requireObservation();
-          return performViewportSwipe(page, action.direction, action.momentum ?? 'none');
+          return currentViewport(page).then((viewport) => performPointSwipe(page, { x: viewport.width / 2, y: viewport.height / 2 }, action.direction, action.distance));
         }
         const session = this.requireSession();
         const { refs } = session;

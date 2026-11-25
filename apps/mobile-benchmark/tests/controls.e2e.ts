@@ -418,7 +418,6 @@ test.describe('refusals', () => {
     const row = screen.getByTestId('Login Form');
     for (const attempt of [
       () => row.selectOption('Small'),
-      () => row.scrollIntoView(),
       () => row.secondaryTap(),
       () => row.setInputFiles('assets/icon.png'),
     ]) {

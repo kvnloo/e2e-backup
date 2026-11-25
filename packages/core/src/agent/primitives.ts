@@ -579,13 +579,13 @@ export function grammarTools(
     tools['scroll'] = verbs.has('tap')
       ? screenTool({
           description:
-            'Scroll the viewport, or one scrollable node when target is given, by a screen or a few. The result reports the rows that came into or left the tree. For a row far down a long or windowed list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
+            'Scroll the viewport, or one scrollable node when target is given, by half of it each time. The result reports the rows that came into or left the tree. For a row far down a long or windowed list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
           inputSchema: z.object({ direction, target: target.optional(), times }),
           execute: ({ direction: way, target: id, times: count }) =>
             acting(scrolled(way, count ?? 1, id), () => scrolling(way, id, count ?? 1), { expectChange: false }),
         })
       : screenTool({
-          description: 'Scroll the viewport by a screen or a few. The result reports the rows that came into or left the tree. For a row far down a long list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
+          description: 'Scroll the viewport by half of it each time. The result reports the rows that came into or left the tree. For a row far down a long list, prefer scroll_to with the row\'s text: it pages until the row shows, as one action.',
           inputSchema: z.object({ direction, times }),
           execute: ({ direction: way, times: count }) =>
             acting(scrolled(way, count ?? 1), () => scrolling(way, undefined, count ?? 1), { expectChange: false }),

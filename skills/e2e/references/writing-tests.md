@@ -324,9 +324,13 @@ substring; a `RegExp` matches as written.
   `attachShadow`, not declarative closed roots. `browser.locator(css)`,
   `frameLocator`, and `filter({ hasText })` stop at a closed root; query the
   text inside or filter with `has`.
-- `screen.scrollUntilVisible(locator, { direction?, momentum?, timeout? })`
-  scrolls the viewport (`down`, `slow` by default) until the locator resolves
-  visibly, else `LOCATOR_NOT_FOUND`; on a locator it scrolls that node.
+- With `screen.scrollUntilVisible(locator, { direction?, distance?, speed?, timeout? })`,
+  the container under the screen's center scrolls on the web and on a
+  device (`down`, 0.65 of it a step by default) until the locator resolves
+  visibly, else it fails with `LOCATOR_NOT_FOUND`. On a locator, that node
+  scrolls instead. On a device, the node can also be dragged to the middle
+  of its container
+  ([Mobile visibility](https://e2e.com/docs/reference/mobile#visibility)).
 
 ### Actions
 
@@ -345,9 +349,20 @@ than 200), and a count above 1 doesn't combine with `position`),
 `selectOption(label | { label } | { value } | { index })` (one option; an
 array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(files)`
 (paths relative to the project root, or `{ name, mimeType, buffer: Buffer }` payloads, singly or as an array; `[]` clears; a missing path, or one under a directory the runner cannot search, is `INVALID_ARGUMENT`), `dragTo(locator)`, `scrollIntoView()`,
-`swipe({ direction, momentum? })`. Web only, `UNSUPPORTED_CAPABILITY` on a
-device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
-and `modifiers`.
+`swipe({ direction, distance?, speed? })`. Web only, `UNSUPPORTED_CAPABILITY`
+on a device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, and
+`modifiers`.
+
+A locator swipe crosses the node's box. On the web and on a device, a
+`screen.swipe` scrolls the container under the screen's center:
+
+- `distance` is how far the content scrolls, as a share of that box (above
+  0 and at most 1). It's `0.5` by default.
+- `speed` is how fast the finger moves: `'slow'` (1500 ms), `'normal'` (400
+  ms, the default), or `'fast'` (150 ms). On the web, `speed` doesn't change
+  anything.
+- `momentum` is deprecated. Use `distance` and `speed`.
+- On a device, the content keeps coasting after the finger lifts.
 
 `fill` sets the value with no key events; when the app reacts to keystrokes
 (autocomplete, a masked input) use `pressSequentially`, which focuses the
@@ -361,7 +376,7 @@ Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 `screen.swipe({ from, to, duration? })` swipes along a path (on iOS an
 untimed one must stay above the open soft keyboard; pass `duration` to drag
 across it),
-`screen.swipe({ direction, momentum? })` swipes the viewport. Viewport
+`screen.swipe({ direction, distance?, speed? })` scrolls the container under the screen's center on the web and on a device. Viewport
 points also take percentages from `'0%'` through `'100%'`, rounded to the
 nearest pixel: `{ x: '50%', y: '50%' }`. Prefer a locator; a point moves with
 the layout.

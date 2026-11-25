@@ -40,7 +40,7 @@ test('gestures: long-press, then swipe left', async ({ app, device, screen }) =>
 test('gestures: double-tap completes the flow', { platforms: ['android'] }, async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Gestures');
   await screen.getByTestId('long-press-target').longPress({ duration: 1200 });
-  await screen.getByTestId('swipe-target').swipe({ direction: 'right', momentum: 'fast' });
+  await screen.getByTestId('swipe-target').swipe({ direction: 'right', distance: 0.65, speed: 'fast' });
   await screen.getByTestId('double-tap-target').doubleTap();
   await expect(screen.getByTestId('success-message')).toHaveText('All gestures completed');
 });
@@ -78,7 +78,7 @@ test('async states: load, pull to refresh, claim through the toast', async ({ ap
   await expect
     .poll(async () => {
       if (await claim.isVisible()) return true;
-      await list.swipe({ direction: 'up', momentum: 'fast' });
+      await list.swipe({ direction: 'up', distance: 0.65, speed: 'fast' });
       return false;
     }, { timeout: 20_000 })
     .toBe(true);
@@ -101,9 +101,10 @@ test('async states: load, pull to refresh, claim through the toast', async ({ ap
   await expect(claimed).toHaveText('Reward claimed');
 });
 
-// Row 512 is about 40 screens down and scrollUntilVisible pages one screen
-// per swipe, so the test needs more than the default budget. Only the rows on
-// screen enter the tree, so the count is a screenful, never the 600 loaded.
+// Row 512 is about 40 screens down, and each scrollUntilVisible swipe pages
+// 0.65 of the list, so the test needs more than the default budget. Only the
+// rows on screen are in the tree, so the count is a screenful instead of the
+// 600 loaded.
 test('huge virtualized list reaches row 512', { timeout: 300_000 }, async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Huge Virtualized List');
   const rows = screen.getByTestId('huge-list').getByText(/^Row \d{4}$/);

@@ -3,7 +3,7 @@
 import { statSync, type Stats } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 import type { ElementHandle, FrameLocator, Locator as PwLocator, Mouse, Page } from 'playwright-core';
-import { EngineError, withinCleanupBudget, type EngineCleanupContext, type Momentum, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
+import { EngineError, withinCleanupBudget, type EngineCleanupContext, type ScrollDirection, type ViewportPoint, type ViewportSize } from '@e2e-dev/core/engine';
 import { ConfigurationError, InfrastructureError, TestError } from '@e2e-dev/core/engine';
 
 export const DEFAULT_VIEWPORT = { width: 1280, height: 720 } as const;
@@ -92,7 +92,7 @@ function targetBoundingBox(target: ActionTarget, timeout: number): Promise<Rect 
 }
 
 /** Minimal scroll that brings one target into view, without centring it. */
-async function scrollIntoViewNearest(target: ActionTarget): Promise<void> {
+export async function scrollIntoViewNearest(target: ActionTarget): Promise<void> {
   const scroll = (el: Element): void => {
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   };
@@ -484,17 +484,16 @@ export function staleOr(cause: unknown, operation: string): Error {
   return translatePwError(cause, operation);
 }
 
-export async function performViewportSwipe(
-  page: Page,
-  direction: ScrollDirection,
-  momentum: Momentum,
-): Promise<void> {
-  const viewport = await currentViewport(page);
-  const distance = swipeDistance(
-    direction === 'up' || direction === 'down' ? viewport.height : viewport.width,
-    momentum,
-  );
-  const [deltaX, deltaY] = wheelDelta(direction, distance);
+/**
+ * Wheels at `point` by `distance` of the scroll container under it. The
+ * container is the nearest element there that scrolls along the swipe's
+ * axis, or the viewport when none does. The wheel event lands on that
+ * container, so the swipe scrolls what a person's wheel over the point would.
+ */
+export async function performPointSwipe(page: Page, point: ViewportPoint, direction: ScrollDirection, distance: number): Promise<void> {
+  const extent = await page.evaluate(scrollExtent, { vertical: direction === 'up' || direction === 'down', at: point });
+  await page.mouse.move(point.x, point.y);
+  const [deltaX, deltaY] = wheelDelta(direction, Math.round(extent * distance));
   await wheelRendered(page, deltaX, deltaY);
 }
 
@@ -545,7 +544,7 @@ export async function performPointDrag(
 export async function performElementSwipe(
   target: ActionTarget,
   direction: ScrollDirection,
-  momentum: Momentum,
+  distance: number,
   timeout: number,
 ): Promise<void> {
   // A node the pointer already hovers takes the wheel where it is; one hit at
@@ -562,11 +561,8 @@ export async function performElementSwipe(
       retryable: false,
     });
   }
-  const distance = swipeDistance(
-    direction === 'up' || direction === 'down' ? box.height : box.width,
-    momentum,
-  );
-  const [deltaX, deltaY] = wheelDelta(direction, distance);
+  const extent = direction === 'up' || direction === 'down' ? box.height : box.width;
+  const [deltaX, deltaY] = wheelDelta(direction, Math.round(extent * distance));
   const page = await targetPage(target);
   if (aimed.aim === 'centre') await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await wheelRendered(page, deltaX, deltaY);
@@ -609,9 +605,33 @@ function wheelAim(element: Element): WheelAim {
   return hit !== null && element.contains(hit) ? { aim: 'centre', box } : { aim: 'blocked' };
 }
 
-function swipeDistance(extent: number, momentum: Momentum): number {
-  const ratio = momentum === 'fast' ? 1.5 : momentum === 'slow' ? 0.75 : 0.5;
-  return Math.round(extent * ratio);
+/**
+ * Returns the client size, along the swipe's axis, of the container a wheel
+ * at `at` scrolls. It runs in the page. The container is the nearest element
+ * at the point, that element included, whose content overflows along that
+ * axis and whose style lets it scroll.
+ *
+ * The element at the point is found inside open shadow roots. On the way up,
+ * the walk goes from a slotted element to its slot, and from a shadow root
+ * to its host. The viewport's size is
+ * returned when no element scrolls, and for a pane inside an iframe.
+ */
+function scrollExtent({ vertical, at }: { vertical: boolean; at: ViewportPoint }): number {
+  let node = document.elementFromPoint(at.x, at.y);
+  while (node?.shadowRoot) {
+    const inner = node.shadowRoot.elementFromPoint(at.x, at.y);
+    if (inner === null || inner === node) break;
+    node = inner;
+  }
+  // The document's scroller is the viewport, whatever `body`'s style says.
+  while (node !== null && node !== document.body && node !== document.documentElement) {
+    const overflow = getComputedStyle(node)[vertical ? 'overflowY' : 'overflowX'];
+    const overflows = vertical ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;
+    if (overflows && /auto|scroll|overlay/.test(overflow)) return vertical ? node.clientHeight : node.clientWidth;
+    const root = node.getRootNode();
+    node = node.assignedSlot ?? node.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+  }
+  return vertical ? window.innerHeight : window.innerWidth;
 }
 
 function wheelDelta(direction: ScrollDirection, distance: number): [number, number] {

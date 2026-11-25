@@ -867,7 +867,14 @@ void (screen.doubleTapAt(point, { timeout: 1_000 }) satisfies Promise<void>);
 void screen.doubleTapAt({ x: 1 });
 // @ts-expect-error viewport double-taps accept action timeout, not locator modifiers.
 void screen.doubleTapAt(point, { modifiers: ['Shift'] });
+void screen.swipe({ direction: 'up', distance: 0.8, speed: 'fast' });
+// The deprecated momentum still type-checks beside the options that replace it.
 void screen.swipe({ direction: 'up', momentum: 'fast' });
+// @ts-expect-error a swipe along a path takes no momentum
+void screen.swipe({ from: point, to: point, momentum: 'fast' });
+// @ts-expect-error a swipe along a path takes no distance
+void screen.swipe({ from: point, to: point, distance: 0.5 });
+void screen.scrollUntilVisible(screen.getByRole('button'), { direction: 'down', distance: 0.5, speed: 'slow', timeout: 1_000 });
 void screen.swipe({ from: point, to: point });
 void screen.swipe({ from: point, to: point, duration: 300 });
 void screen.getByRole('image').tap({ position: point, timeout: 1_000 });

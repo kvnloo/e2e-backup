@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createAgentDeviceClient } from 'agent-device';
 import { describe, expect, it, vi } from 'vitest';
-import { InputBudget, sanitizeFilename, screenLocation, swipeWithin } from '../../src/support.ts';
+import { InputBudget, sanitizeFilename, screenLocation, swipeDrags } from '../../src/support.ts';
 
 describe('support helpers', () => {
   it('sends an input with what is left of its budget, and reports one cut off as possibly committed', async () => {
@@ -92,12 +92,21 @@ describe('support helpers', () => {
     expect(URL.canParse(screenLocation('com.apple.Preferences', 'General')!)).toBe(false);
   });
 
-  it('swipes against the scroll direction inside the rect', () => {
-    const rect = { x: 0, y: 100, width: 200, height: 400 };
-    expect(swipeWithin(rect, 'down', undefined)).toEqual({ from: { x: 100, y: 400 }, to: { x: 100, y: 200 } });
-    expect(swipeWithin(rect, 'up', 'fast')).toEqual({ from: { x: 100, y: 140 }, to: { x: 100, y: 460 } });
-    expect(swipeWithin(rect, 'right', 'slow')).toEqual({ from: { x: 125, y: 300 }, to: { x: 75, y: 300 } });
-    expect(swipeWithin(rect, 'left', undefined)).toEqual({ from: { x: 50, y: 300 }, to: { x: 150, y: 300 } });
+  it('starts each drag a quarter in from the edge the content comes from, centred on the other axis', () => {
+    const box = { x: 0, y: 100, width: 200, height: 400 };
+    expect(swipeDrags(box, 'down', 0.5)).toEqual([{ x: 100, y: 400, dx: 0, dy: -200 }]);
+    expect(swipeDrags(box, 'up', 0.5)).toEqual([{ x: 100, y: 200, dx: 0, dy: 200 }]);
+    expect(swipeDrags(box, 'right', 0.5)).toEqual([{ x: 150, y: 300, dx: -100, dy: 0 }]);
+    expect(swipeDrags(box, 'left', 0.5)).toEqual([{ x: 50, y: 300, dx: 100, dy: 0 }]);
+  });
+
+  it('drags 0.65 of the box at most, ending a tenth from the far edge, and splits a longer distance into equal drags', () => {
+    const box = { x: 0, y: 100, width: 200, height: 400 };
+    expect(swipeDrags(box, 'down', 0.65)).toEqual([{ x: 100, y: 400, dx: 0, dy: -260 }]);
+    expect(swipeDrags(box, 'down', 1)).toEqual([
+      { x: 100, y: 400, dx: 0, dy: -200 },
+      { x: 100, y: 400, dx: 0, dy: -200 },
+    ]);
   });
 
   it('constrains labels to safe filenames', () => {

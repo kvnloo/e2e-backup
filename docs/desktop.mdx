@@ -153,6 +153,7 @@ the one `screen` reads (`desktop.useWindow(window)`), and quits the app
 | Menu bar | The app's menu bar cannot be read yet. Use a key shortcut with `press` and `headed: true` |
 | Web content | Text in a browser window, an Electron app, or a web view is not supported. Test web apps with `@e2e-dev/web` |
 | Workers | One per target, because its workers would share one screen. Two desktop targets run at the same time. With `headed: true` they would share the pointer and keyboard too, so set `workers: 1` in the config |
+| Swipe | A screen swipe scrolls the window's first scrollable control instead of the one under the window's center. agent-desktop scrolls by wheel notches and doesn't report how far one notch moves, so `distance` is sent as notches (10 for a `distance` of 1), and a `scrollUntilVisible` step is 2 notches. `speed` doesn't change anything |
 | State | `app.clearState()` is not supported |
 | Secrets | A password field shows no value, and screenshots paint it black. One whose states agent-desktop could not read is not painted; it shows dots, not text |
 

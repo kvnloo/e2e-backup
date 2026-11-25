@@ -13,13 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from 'agent-device';
 import { decodePng, encodePng } from '../helpers/png.ts';
 import type { EngineFixtureContext, EngineSnapshot, FixtureOperations, LocatorExpression, OperationContext, SemanticNode } from '@e2e-dev/core/engine';
-import { describeEngine } from '@e2e-dev/core/engine';
+import { connectEngine, describeEngine, loopbackTransport } from '@e2e-dev/core/engine';
 import type { Device } from '../../src/device.ts';
 import type { RawNode } from '../../src/nodes.ts';
 import { buildEngine, mobile } from '../../src/engine.ts';
 import { ORIGIN_UNKNOWN_BOUNDS, ORIGIN_WARNING } from '../../src/errors.ts';
 import { AgentDeviceSurface } from '../../src/surface.ts';
-import { swipeWithin } from '../../src/support.ts';
+import { swipeDrags } from '../../src/support.ts';
 import { tvTools } from '../../src/tools.ts';
 import { ANDROID_APP_PACKAGE, ANDROID_ID_SNAPSHOT, createFakeClient, SETTINGS_NODES, SETTINGS_SNAPSHOT, type FakeClient } from '../helpers/fake-client.ts';
 import { boot, harness, poolVariableIn, PROJECT_ROOT, type Harness } from '../helpers/harness.ts';
@@ -92,6 +92,9 @@ function* walk(root: SemanticNode): Generator<SemanticNode> {
   }
 }
 
+/** The drag sent for a screen swipe down of half the 390 by 844 screen. It starts a quarter up from the bottom edge. */
+const SCREEN_DOWN = { x: 195, y: 633, dx: 0, dy: -422, durationMs: 400 };
+
 /** The screen root of an observation, `perform(root, swipe)` being the viewport swipe. */
 async function screenRootOf(h: Harness): Promise<SemanticNode> {
   return (await h.engine.observe!(operation())).root;
@@ -107,7 +110,7 @@ describe('manifest', () => {
     expect(Object.keys(pinned.session!).toSorted()).toEqual(['back', 'openLink', 'reset', 'restart']);
     // No `open`: a device app has no URL. No select verb either: the touch surface has no option lists to pick from.
     expect(pinned.session!.open).toBeUndefined();
-    expect(pinned.actions).toEqual(['tap', 'doubleTap', 'multiTap', 'longPress', 'fill', 'clear', 'press', 'check', 'uncheck', 'focus', 'hover', 'dragTo', 'swipe']);
+    expect(pinned.actions).toEqual(['tap', 'doubleTap', 'multiTap', 'longPress', 'fill', 'clear', 'press', 'check', 'uncheck', 'focus', 'hover', 'dragTo', 'swipe', 'scrollIntoView']);
     expect(pinned.state).toBeUndefined();
   });
 
@@ -1025,14 +1028,14 @@ describe('lifecycle', () => {
     await none.engine.session!.back!(operation());
     expect(none.fake.lastArgs('command.back')).toEqual({});
     const screen = await screenRootOf(none);
-    await none.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, operation());
-    expect(none.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down' });
+    await none.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+    expect(none.fake.lastArgs('interactions.pan')).toEqual({ x: 195, y: 633, dx: 0, dy: -422, durationMs: 400 });
 
     // A test's own step never settles: its `expect` polls for the outcome.
     const step: OperationContext = { ...operation(), origin: 'test' };
     const slowScreen = await screenRootOf(slow);
-    await slow.engine.perform!(slowScreen.ref, { kind: 'swipe', direction: 'up', momentum: 'slow' }, step);
-    expect(slow.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'up', postGestureStabilization: false });
+    await slow.engine.perform!(slowScreen.ref, { kind: 'swipe', direction: 'up', distance: 0.25, durationMs: 400 }, step);
+    expect(slow.fake.lastArgs('interactions.pan')).toEqual({ x: 195, y: 211, dx: 0, dy: 211, durationMs: 400 });
 
     expect(() => harness({ settle: -1 })).toThrow(/non-negative integer/);
     expect(() => harness({ settle: 1.5 })).toThrow(/non-negative integer/);
@@ -1539,7 +1542,7 @@ describe('observation', () => {
   // Every input entry runs under its budget; one that went out and timed out is possibly committed, so the runner never repeats it.
   const INPUTS: ReadonlyArray<readonly [string, string, (h: Harness, op: OperationContext) => Promise<unknown>]> = [
     ['tap', 'interactions.press', async (h, op) => h.engine.perform!((await observed(h, 'About')).ref, { kind: 'tap' }, op)],
-    ['screen swipe', 'interactions.scroll', async (h, op) => h.engine.perform!((await h.engine.observe!(operation())).root.ref, { kind: 'swipe', direction: 'down' }, op)],
+    ['screen swipe', 'interactions.pan', async (h, op) => h.engine.perform!((await h.engine.observe!(operation())).root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, op)],
     ['tap at point', 'interactions.press', (h, op) => h.engine.performAt!({ x: 10, y: 10 }, { kind: 'tap' }, op)],
     ['type', 'interactions.type', (h, op) => h.engine.keyboard!.type('hi', { replace: false }, op)],
     ['press', 'command.keyboard', (h, op) => h.engine.keyboard!.press('Enter', op)],
@@ -2006,8 +2009,8 @@ describe('perform', () => {
     await h.engine.perform!(search!.ref, { kind: 'press', key: 'Enter' }, op);
     await h.engine.perform!(search!.ref, { kind: 'press', key: 'a' }, op);
     await h.engine.perform!(search!.ref, { kind: 'press', key: 'Space' }, op);
-    await h.engine.perform!(scroller!.ref, { kind: 'swipe', direction: 'down' }, op);
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'up', momentum: 'fast' }, op);
+    await h.engine.perform!(scroller!.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, op);
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'up', distance: 0.8, durationMs: 150 }, op);
     await h.engine.perform!(about!.ref, { kind: 'dragTo', target: back!.ref }, op);
     expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([
       ['interactions.press', { ref: '@e4', settle: true, settleQuietMs: 150 }],
@@ -2031,9 +2034,14 @@ describe('perform', () => {
       // Space is typed like a character, the unfocused field tapped first.
       ['interactions.press', { ref: '@e7', settle: true, settleQuietMs: 150 }],
       ['interactions.type', { text: ' ' }],
-      ['interactions.swipe', { from: { x: 195, y: 620 }, to: { x: 195, y: 420 } }],
-      // The root swipe is the viewport swipe: agent-device's whole-screen scroll at its default amount, settled like a tap.
-      ['interactions.scroll', { direction: 'up', settle: true, settleQuietMs: 150 }],
+      // A node swipe drags from a quarter in from the edge the content comes from.
+      ['interactions.pan', { x: 195, y: 620, dx: 0, dy: -200, durationMs: 400 }],
+      // The root swipe is the viewport swipe. The node swipe may have changed
+      // the screen, so the screen is read again for its containers. 0.8 of
+      // the screen is longer than one drag, so it's sent as two.
+      ['capture.snapshot', { interactiveOnly: false }],
+      ['interactions.pan', { x: 195, y: 211, dx: 0, dy: 337.6, durationMs: 150 }],
+      ['interactions.pan', { x: 195, y: 211, dx: 0, dy: 337.6, durationMs: 150 }],
       ['interactions.drag', { source: '@e4', destination: '@e3' }],
     ]);
     const presses = h.fake.calls.filter((call) => call.method === 'interactions.press');
@@ -2114,7 +2122,6 @@ describe('perform', () => {
       { kind: 'selectOption', value: 'x' },
       { kind: 'setInputFiles', paths: ['/tmp/x'] },
       { kind: 'setInputFilePayloads', files: [{ name: 'x', mimeType: 'text/plain', buffer: new Uint8Array([120]) }] },
-      { kind: 'scrollIntoView' },
       // Named keys other than Enter and Space, and every modifier, have no soft-keyboard equivalent.
       { kind: 'press', key: 'Escape' },
       { kind: 'press', key: 'Tab' },
@@ -3120,10 +3127,10 @@ describe('device fixture', () => {
     const screen = await screenRootOf(h);
     await sleep(30);
 
-    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...operation(), origin: 'test' });
+    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...operation(), origin: 'test' });
 
     expect(Date.now() - dismissedAt).toBe(120);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', postGestureStabilization: false });
+    expect(h.fake.lastArgs('interactions.pan')).toEqual(SCREEN_DOWN);
   });
 
   it('counts a back, home, remote press, shake, alert, keyboard, rotation, or fold as an action, so a control that arrives with it waits out the transition budget', async () => {
@@ -4433,10 +4440,10 @@ describe('deterministic actions', () => {
     const screen = await screenRootOf(h);
     const startedAt = Date.now();
 
-    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, operation());
+    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
 
     expect(Date.now()).toBe(startedAt);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', settle: true, settleQuietMs: 150 });
+    expect(h.fake.lastArgs('interactions.pan')).toEqual(SCREEN_DOWN);
   });
 
   it('counts captures between consecutive screen swipes toward the transition budget', async () => {
@@ -4444,15 +4451,15 @@ describe('deterministic actions', () => {
     await openAttempt(h);
     await sleep(150);
     const screen = await screenRootOf(h);
-    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, test());
+    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
     const firstSwipeAt = Date.now();
     h.fake.respond('capture.snapshot', async () => { await sleep(50); return SETTINGS_SNAPSHOT; });
     const nextScreen = await screenRootOf(h);
 
-    await h.engine.perform!(nextScreen.ref, { kind: 'swipe', direction: 'down' }, test());
+    await h.engine.perform!(nextScreen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
 
     expect(Date.now() - firstSwipeAt).toBe(120);
-    expect(h.fake.calls.filter((call) => call.method === 'interactions.scroll')).toHaveLength(2);
+    expect(h.fake.calls.filter((call) => call.method === 'interactions.pan')).toHaveLength(2);
   });
 
   it('does not dispatch a screen swipe whose transition wait was cancelled', async () => {
@@ -4460,11 +4467,11 @@ describe('deterministic actions', () => {
     await openAttempt(h);
     const screen = await screenRootOf(h);
     const controller = new AbortController();
-    const pending = h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...test(), signal: controller.signal });
+    const pending = h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...test(), signal: controller.signal });
     setTimeout(() => controller.abort(), 20);
 
     await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' });
-    expect(h.fake.methods()).not.toContain('interactions.scroll');
+    expect(h.fake.methods()).not.toContain('interactions.pan');
   });
 
   it('rejects an already cancelled screen swipe without starting its transition wait', async () => {
@@ -4475,10 +4482,10 @@ describe('deterministic actions', () => {
     controller.abort();
     const startedAt = Date.now();
 
-    await expect(h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...test(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
+    await expect(h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...test(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
 
     expect(Date.now()).toBe(startedAt);
-    expect(h.fake.methods()).not.toContain('interactions.scroll');
+    expect(h.fake.methods()).not.toContain('interactions.pan');
   });
 
   it('ends a screen-swipe transition at its action budget without sending a gesture', async () => {
@@ -4487,11 +4494,11 @@ describe('deterministic actions', () => {
     const screen = await screenRootOf(h);
     const startedAt = Date.now();
 
-    await expect(h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...test(), timeoutMs: 20 })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT' });
+    await expect(h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...test(), timeoutMs: 20 })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT' });
 
     expect(Date.now() - startedAt).toBe(20);
     await sleep(200);
-    expect(h.fake.methods()).not.toContain('interactions.scroll');
+    expect(h.fake.methods()).not.toContain('interactions.pan');
   });
 
   it.each([20, 20.5])('does not send a %s ms capped screen swipe when its timer wakes before the wall-clock deadline', async (timeoutMs) => {
@@ -4503,24 +4510,24 @@ describe('deterministic actions', () => {
     // The timer fires while the clock the budget reads still lags it by 1 ms.
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => startedAt + Math.max(0, timerNow() - startedAt - 1));
     try {
-      await expect(h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...test(), timeoutMs })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT', retryable: false });
+      await expect(h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...test(), timeoutMs })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT', retryable: false });
       expect(Date.now() - startedAt).toBeLessThan(timeoutMs);
-      expect(h.fake.methods()).not.toContain('interactions.scroll');
+      expect(h.fake.methods()).not.toContain('interactions.pan');
     } finally {
       clock.mockRestore();
     }
   });
 
-  it('sends a screen swipe when its action budget can accommodate the full transition', async () => {
+  it('sends a screen swipe when the action budget has room for the full transition and the drag', async () => {
     const h = harness({ transition: 160 });
     await openAttempt(h);
     const screen = await screenRootOf(h);
     const startedAt = Date.now();
 
-    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...test(), timeoutMs: 200 });
+    await h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...test(), timeoutMs: 600 });
 
     expect(Date.now() - startedAt).toBe(160);
-    expect(h.fake.calls.filter((call) => call.method === 'interactions.scroll')).toHaveLength(1);
+    expect(h.fake.calls.filter((call) => call.method === 'interactions.pan')).toHaveLength(1);
   });
 
   it('reports cancellation when the caller aborts a capped transition wait', async () => {
@@ -4528,11 +4535,11 @@ describe('deterministic actions', () => {
     await openAttempt(h);
     const screen = await screenRootOf(h);
     const controller = new AbortController();
-    const pending = h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down' }, { ...test(), signal: controller.signal, timeoutMs: 20 });
+    const pending = h.engine.perform!(screen.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, { ...test(), signal: controller.signal, timeoutMs: 20 });
     setTimeout(() => controller.abort(), 10);
 
     await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' });
-    expect(h.fake.methods()).not.toContain('interactions.scroll');
+    expect(h.fake.methods()).not.toContain('interactions.pan');
   });
 
   it('ends an arriving control transition at its action budget without tapping', async () => {
@@ -4786,30 +4793,6 @@ describe('deterministic actions', () => {
     expect(presses.every((call) => call.signal instanceof AbortSignal)).toBe(true);
   });
 
-  it('skips the post-gesture stabilization wait for a test swipe and scroll, and keeps it for the agent', async () => {
-    const h = harness({ settle: false });
-    await openAttempt(h);
-    await sleep(0);
-    const root = await screenRootOf(h);
-    const scroller = await observed(h, 'Scroller');
-    const step = test();
-    const agent: OperationContext = { ...operation(), origin: 'agent' };
-
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, step);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down', postGestureStabilization: false });
-    await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, step);
-    expect(h.fake.lastArgs('interactions.swipe')).toEqual({
-      from: expect.any(Object),
-      to: expect.any(Object),
-      postGestureStabilization: false,
-    });
-
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, agent);
-    expect(h.fake.lastArgs('interactions.scroll')).toEqual({ direction: 'down' });
-    await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, agent);
-    expect(h.fake.lastArgs('interactions.swipe')).toEqual({ from: expect.any(Object), to: expect.any(Object) });
-  });
-
   it('re-reads a control until it rests before a test acts on it after a gesture that skipped the stabilization wait', async () => {
     autoAdvanceTimers();
     const h = harness({ settle: false, transition: 0 });
@@ -4824,7 +4807,7 @@ describe('deterministic actions', () => {
       return { ...SETTINGS_SNAPSHOT, nodes: SETTINGS_NODES.map((node) => (node.ref === '@e4' ? { ...node, rect: { ...node.rect!, y } } : node)) };
     });
 
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, test());
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
     await h.engine.perform!(about.ref, { kind: 'tap' }, test());
     // Two reads while the control still moved, one more to see it rest.
     expect(reads).toBe(3);
@@ -4849,7 +4832,7 @@ describe('deterministic actions', () => {
       return { ...SETTINGS_SNAPSHOT, nodes: SETTINGS_NODES.map((node) => (node.ref === '@e7' ? { ...node, ...field, rect: { ...node.rect!, y: 220 + reads * 10 } } : node)) };
     });
 
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, test());
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
     await expect(h.engine.perform!(search.ref, { kind: 'fill', value: 'blue', sensitive: false }, test())).rejects.toMatchObject({
       code: 'NODE_STALE',
       retryable: true,
@@ -4870,7 +4853,7 @@ describe('deterministic actions', () => {
       return { ...SETTINGS_SNAPSHOT, nodes: SETTINGS_NODES.map((node) => (node.ref === '@e4' ? { ...node, rect: { ...node.rect!, y: 120 + reads * 10 } } : node)) };
     });
 
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, test());
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
     await expect(h.engine.perform!(about.ref, { kind: 'tap' }, { ...test(), timeoutMs: 150 })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT' });
     expect(h.fake.methods()).not.toContain('interactions.press');
   });
@@ -4888,11 +4871,11 @@ describe('deterministic actions', () => {
       return { ...SETTINGS_SNAPSHOT, nodes: SETTINGS_NODES.map((node) => (node.ref === '@e10' ? { ...node, rect: { ...node.rect!, y: 350 } } : node)) };
     });
 
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, test());
-    await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, test());
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
+    await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
     // The control moved from y 320 to 350 after the gesture, then rested.
     expect(reads).toBe(2);
-    expect(h.fake.lastArgs('interactions.swipe')).toMatchObject({ from: { y: expect.any(Number) } });
+    expect(h.fake.lastArgs('interactions.pan')).toEqual({ ...swipeDrags({ ...scroller.rect!, y: 350 }, 'down', 0.5)[0], durationMs: 400 });
   });
 
   const ORIGIN_UNKNOWN_SNAPSHOT = { ...SETTINGS_SNAPSHOT, warnings: [ORIGIN_WARNING] };
@@ -4905,10 +4888,10 @@ describe('deterministic actions', () => {
     const scroller = await observed(h, 'Scroller');
 
     const refused = { code: 'NOT_ACTIONABLE', retryable: false, message: ORIGIN_UNKNOWN_SWIPE };
-    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, test())).rejects.toMatchObject(refused);
-    // The swipe shape a locator-scoped scrollUntilVisible sends (momentum: 'slow').
-    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', momentum: 'slow' }, test())).rejects.toMatchObject(refused);
-    expect(h.fake.methods()).not.toContain('interactions.swipe');
+    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test())).rejects.toMatchObject(refused);
+    // The swipe shape a locator-scoped scrollUntilVisible sends (`SCROLL_STEP`).
+    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.65, durationMs: 800 }, test())).rejects.toMatchObject(refused);
+    expect(h.fake.methods()).not.toContain('interactions.pan');
   });
 
   it('fails a point swipe agent-device refuses as off its viewport as NOT_ACTIONABLE, naming duration only when the keyboard cut an untimed swipe', async () => {
@@ -4949,11 +4932,11 @@ describe('deterministic actions', () => {
     h.fake.respond('capture.snapshot', () => ORIGIN_UNKNOWN_SNAPSHOT);
     const scroller = await observed(h, 'Scroller');
 
-    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, operation())).rejects.toMatchObject({
+    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation())).rejects.toMatchObject({
       code: 'NOT_ACTIONABLE',
       retryable: false,
     });
-    expect(h.fake.methods()).not.toContain('interactions.swipe');
+    expect(h.fake.methods()).not.toContain('interactions.pan');
   });
 
   it('sends the same node swipe when the capture carries only part of the origin warning', async () => {
@@ -4962,8 +4945,8 @@ describe('deterministic actions', () => {
     h.fake.respond('capture.snapshot', () => ({ ...SETTINGS_SNAPSHOT, warnings: ['This snapshot cannot establish the window origin on screen.'] }));
     const scroller = await observed(h, 'Scroller');
 
-    await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, test());
-    expect(h.fake.lastArgs('interactions.swipe')).toMatchObject(swipeWithin(scroller.rect!, 'down', undefined));
+    await h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
+    expect(h.fake.lastArgs('interactions.pan')).toEqual({ ...swipeDrags(scroller.rect!, 'down', 0.5)[0], durationMs: 400 });
   });
 
   it('refuses a node swipe when only the re-read that supplied its bounds lost the window origin', async () => {
@@ -4974,12 +4957,13 @@ describe('deterministic actions', () => {
     const scroller = await observed(h, 'Scroller');
     h.fake.respond('capture.snapshot', () => ORIGIN_UNKNOWN_SNAPSHOT);
 
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, test());
-    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, test())).rejects.toMatchObject({
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
+    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test())).rejects.toMatchObject({
       code: 'NOT_ACTIONABLE',
       message: ORIGIN_UNKNOWN_SWIPE,
     });
-    expect(h.fake.methods()).not.toContain('interactions.swipe');
+    // Only the screen swipe was sent.
+    expect(h.fake.calls.filter((call) => call.method === 'interactions.pan').map((call) => call.args)).toEqual([SCREEN_DOWN]);
   });
 
   it('swipes a node again once a later capture places the window', async () => {
@@ -4989,13 +4973,177 @@ describe('deterministic actions', () => {
     const root = await screenRootOf(h);
     const scroller = await observed(h, 'Scroller');
     h.fake.respond('capture.snapshot', () => ORIGIN_UNKNOWN_SNAPSHOT);
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, test());
-    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down' }, test())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
+    await expect(h.engine.perform!(scroller.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
 
     h.fake.respond('capture.snapshot', () => SETTINGS_SNAPSHOT);
     const placed = await observed(h, 'Scroller');
-    await h.engine.perform!(placed.ref, { kind: 'swipe', direction: 'down' }, test());
-    expect(h.fake.lastArgs('interactions.swipe')).toMatchObject(swipeWithin(placed.rect!, 'down', undefined));
+    await h.engine.perform!(placed.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, test());
+    expect(h.fake.lastArgs('interactions.pan')).toEqual({ ...swipeDrags(placed.rect!, 'down', 0.5)[0], durationMs: 400 });
+  });
+
+  describe('scroll containers', () => {
+    // A list from y 100 to 700 that agent-device marks as a scroll container,
+    // and a footer outside it, like the mobile benchmark's sticky chrome.
+    const LIST_SNAPSHOT = {
+      ...SETTINGS_SNAPSHOT,
+      nodes: [
+        { ref: '@e1', index: 0, depth: 0, type: 'application', label: 'Settings', rect: { x: 0, y: 0, width: 390, height: 844 } },
+        { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'ScrollView', kind: 'scroll-area', rect: { x: 0, y: 100, width: 390, height: 600 } },
+        { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'button', label: 'Row 5', rect: { x: 0, y: 380, width: 390, height: 40 } },
+        { ref: '@e4', index: 3, parentIndex: 1, depth: 2, type: 'button', label: 'Row 9', rect: { x: 0, y: 650, width: 390, height: 40 } },
+        { ref: '@e5', index: 4, parentIndex: 0, depth: 1, type: 'button', label: 'Continue', rect: { x: 0, y: 760, width: 390, height: 60 } },
+        // Rows flush with the list's top and bottom edges.
+        { ref: '@e6', index: 5, parentIndex: 1, depth: 2, type: 'button', label: 'Row 12', rect: { x: 0, y: 680, width: 390, height: 20 } },
+        { ref: '@e7', index: 6, parentIndex: 1, depth: 2, type: 'button', label: 'Row 1', rect: { x: 0, y: 100, width: 390, height: 40 } },
+        // A row that reaches past the list's bottom edge.
+        { ref: '@e8', index: 7, parentIndex: 1, depth: 2, type: 'button', label: 'Row 13', rect: { x: 0, y: 680, width: 390, height: 40 } },
+      ],
+    };
+    /** The drag sent for a swipe down of half the list. It starts a quarter up from the list's bottom edge. */
+    const LIST_DOWN = { x: 195, y: 550, dx: 0, dy: -300, durationMs: 400 };
+
+    async function listHarness() {
+      const h = harness({ settle: false, transition: 0 });
+      h.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
+      await openAttempt(h);
+      return h;
+    }
+
+    const pans = (h: Harness) => h.fake.calls.filter((call) => call.method === 'interactions.pan').map((call) => call.args);
+
+    it('swipes the scroll container under the screen centre on a screen swipe', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(pans(h)).toEqual([LIST_DOWN]);
+    });
+
+    it('swipes a node across its box, whether it is inside a scroll container or not', async () => {
+      const h = await listHarness();
+      const swipe = { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 } as const;
+      await h.engine.perform!((await observed(h, 'Row 5')).ref, swipe, operation());
+      await h.engine.perform!((await observed(h, 'Continue')).ref, swipe, operation());
+      expect(pans(h)).toEqual([
+        { x: 195, y: 410, dx: 0, dy: -20, durationMs: 400 },
+        { x: 195, y: 805, dx: 0, dy: -30, durationMs: 400 },
+      ]);
+    });
+
+    it('reads the screen again for its containers when an action came after the last read', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'Continue')).ref, { kind: 'tap' }, operation());
+      // The tap opened a sheet with a shorter list, from y 400 to 800.
+      h.fake.respond('capture.snapshot', () => ({
+        ...LIST_SNAPSHOT,
+        nodes: LIST_SNAPSHOT.nodes.map((node) => (node.ref === '@e2' ? { ...node, rect: { x: 0, y: 400, width: 390, height: 400 } } : node)),
+      }));
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(pans(h)).toEqual([{ x: 195, y: 700, dx: 0, dy: -200, durationMs: 400 }]);
+    });
+
+    it('does not send any drag of a split swipe when its budget does not have room for every drag', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      // A distance of 1 is two drags of 400 ms, so 600 ms has room for only one.
+      await expect(
+        h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 600 }),
+      ).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+      expect(pans(h)).toEqual([]);
+    });
+
+    it('leaves a node inside its scroll container where it is, a row flush with an edge too, and one outside any container', async () => {
+      const h = await listHarness();
+      for (const name of ['Row 9', 'Row 5', 'Row 1', 'Row 12', 'Continue']) {
+        await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView' }, operation());
+      }
+      expect(pans(h)).toEqual([]);
+    });
+
+    it("drags a node that reaches past its scroll container's edge to the middle", async () => {
+      const h = await listHarness();
+      await h.engine.perform!((await observed(h, 'Row 13')).ref, { kind: 'scrollIntoView' }, operation());
+      // Row 13's centre is 300 below the list's middle.
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -300, durationMs: 800 }]);
+    });
+
+    it('with center, also drags a fully visible node more than a fifth of its container from the middle', async () => {
+      const h = await listHarness();
+      for (const name of ['Row 9', 'Row 5']) {
+        await h.engine.perform!((await observed(h, name)).ref, { kind: 'scrollIntoView', center: true }, operation());
+      }
+      // Row 9's centre is 270 below the list's middle, more than a fifth of the list; Row 5's is at the middle.
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -270, durationMs: 800 }]);
+    });
+
+    it('drags a swipe from a client older than distance, as its momentum stands for', async () => {
+      const local = harness({ settle: false, transition: 0 });
+      local.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
+      const h = { ...local, engine: connectEngine({ manifest: describeEngine(local.engine), transport: loopbackTransport(local.engine) }) };
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      // @ts-expect-error an older client sends momentum alone, with no distance or durationMs
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', momentum: 'slow' }, operation());
+      expect(pans(h)).toEqual([{ x: 195, y: 550, dx: 0, dy: -150, durationMs: 1500 }]);
+    });
+
+    it('swipes a native list that fills part of the screen, and brings its rows into view within it', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      h.fake.respond('capture.snapshot', () => ({
+        ...SETTINGS_SNAPSHOT,
+        nodes: [
+          { ref: '@e1', index: 0, depth: 0, type: 'application', label: 'Settings', rect: { x: 0, y: 0, width: 390, height: 844 } },
+          // agent-device reports an Android RecyclerView or ListView as a list.
+          { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'RecyclerView', kind: 'list', rect: { x: 0, y: 300, width: 390, height: 300 } },
+          { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'button', label: 'Row 8', rect: { x: 0, y: 580, width: 390, height: 40 } },
+        ],
+      }));
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      await h.engine.perform!((await observed(h, 'Row 8')).ref, { kind: 'scrollIntoView' }, operation());
+      expect(pans(h)).toEqual([
+        { x: 195, y: 525, dx: 0, dy: -150, durationMs: 400 },
+        { x: 195, y: 525, dx: 0, dy: -150, durationMs: 800 },
+      ]);
+    });
+
+    it('reads the screen again for its containers after a fill', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'Search')).ref, { kind: 'fill', value: 'blue', sensitive: false }, operation());
+      // Typing brought up a list of results under the screen centre.
+      h.fake.respond('capture.snapshot', () => LIST_SNAPSHOT);
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(h.fake.lastArgs('interactions.pan')).toEqual(LIST_DOWN);
+    });
+
+    it('measures the screen after reading it again, so a rotated screen is swiped across its new size', async () => {
+      const h = harness({ settle: false, transition: 0 });
+      await openAttempt(h);
+      const root = await screenRootOf(h);
+      await h.engine.perform!((await observed(h, 'About')).ref, { kind: 'tap' }, operation());
+      h.fake.respond('capture.snapshot', () => ({
+        ...SETTINGS_SNAPSHOT,
+        viewport: { width: 844, height: 390 },
+        nodes: [{ ref: '@e1', index: 0, depth: 0, type: 'application', label: 'Settings', rect: { x: 0, y: 0, width: 844, height: 390 } }],
+      }));
+      await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+      expect(h.fake.lastArgs('interactions.pan')).toEqual({ x: 422, y: 292.5, dx: 0, dy: -195, durationMs: 400 });
+    });
+
+    it('reports a split swipe whose later drag no longer fits its budget as possibly committed', async () => {
+      const h = await listHarness();
+      const root = await screenRootOf(h);
+      // The first drag is acknowledged late, so too little of the budget is left for the second.
+      h.fake.respond('interactions.pan', () => sleep(700));
+      await expect(
+        h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 1, durationMs: 400 }, { ...operation(), timeoutMs: 1000 }),
+      ).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+      expect(pans(h)).toHaveLength(1);
+    });
   });
 
   it('leaves a screen swipe and a ref tap on a capture without the window origin to agent-device', async () => {
@@ -5005,11 +5153,10 @@ describe('deterministic actions', () => {
     const root = await screenRootOf(h);
     const about = await observed(h, 'About');
 
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, operation());
-    expect(h.fake.lastArgs('interactions.scroll')).toMatchObject({ direction: 'down' });
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
+    expect(h.fake.lastArgs('interactions.pan')).toEqual(SCREEN_DOWN);
     await h.engine.perform!(about.ref, { kind: 'tap' }, operation());
     expect(h.fake.lastArgs('interactions.press')).toMatchObject({ ref: '@e4' });
-    expect(h.fake.methods()).not.toContain('interactions.swipe');
   });
 
   it('does not re-read a control after a gesture when the agent made it', async () => {
@@ -5020,7 +5167,7 @@ describe('deterministic actions', () => {
     const about = await observed(h, 'About');
     const agent: OperationContext = { ...operation(), origin: 'agent' };
     const before = h.fake.methods().filter((m) => m === 'capture.snapshot').length;
-    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down' }, agent);
+    await h.engine.perform!(root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, agent);
     await h.engine.perform!(about.ref, { kind: 'tap' }, agent);
     expect(h.fake.methods().filter((m) => m === 'capture.snapshot')).toHaveLength(before);
   });

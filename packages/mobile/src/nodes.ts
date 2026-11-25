@@ -9,7 +9,7 @@
 
 import type { CaptureSnapshotResult, SnapshotNode } from 'agent-device';
 import type { SemanticNode, ViewportSize } from '@e2e-dev/core/engine';
-import type { Rect } from './support.ts';
+import type { Point, Rect } from './support.ts';
 
 /**
  * One agent-device snapshot node as this engine reads it: agent-device's own
@@ -836,4 +836,39 @@ export function isWithin(entry: ProjectedNode, ancestor: ProjectedNode): boolean
     if (current === ancestor) return true;
   }
   return false;
+}
+
+/**
+ * Returns the box of the nearest scroll container from `entry` up, `entry`
+ * included. A scroll container is a node of a kind agent-device itself treats
+ * as scrolling: `scroll-area` (an iOS or Android `ScrollView`, which React
+ * Native renders its lists as), `list` (an Android `RecyclerView` or
+ * `ListView`), `collection` (an iOS `CollectionView`, which SwiftUI renders
+ * lists as), or `table` (an iOS `TableView`). It returns undefined when no
+ * container holds the node.
+ */
+export function scrollBoxOf(entry: ProjectedNode | undefined): Rect | undefined {
+  for (let current = entry; current !== undefined; current = current.parent) {
+    if (scrolls(current)) return current.node.rect;
+  }
+  return undefined;
+}
+
+const SCROLL_KINDS: ReadonlySet<string> = new Set(['scroll-area', 'list', 'collection', 'table']);
+
+/** Checks whether agent-device marks the node as a scroll container with a box. */
+function scrolls(entry: ProjectedNode): entry is ProjectedNode & { readonly node: { readonly rect: Rect } } {
+  return SCROLL_KINDS.has(entry.raw.kind ?? '') && entry.node.rect !== undefined;
+}
+
+/** Returns the box of the innermost scroll container under `point` (the smallest one that holds it). */
+export function scrollBoxAt(index: readonly ProjectedNode[], point: Point): Rect | undefined {
+  let found: Rect | undefined;
+  for (const entry of index) {
+    if (!scrolls(entry)) continue;
+    const { rect } = entry.node;
+    const holds = point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+    if (holds && (found === undefined || rect.width * rect.height < found.width * found.height)) found = rect;
+  }
+  return found;
 }

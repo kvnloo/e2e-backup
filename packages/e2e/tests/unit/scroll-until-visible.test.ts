@@ -1,9 +1,11 @@
 /**
  * `screen.scrollUntilVisible`: polls the target through the locator engine
- * and swipes the viewport between polls. What the engine sees is a slow swipe
- * in the requested direction, addressed to the observation root, repeated
- * until the target reads as visible or the deadline passes. Every swipe is
- * bounded by that deadline. The target, like a `dragTo` target and a
+ * and swipes the viewport between polls. The engine gets a step of 0.65 of
+ * the scroll container over 800 ms in the requested direction, addressed to
+ * the observation root. The step repeats until the target reads as visible
+ * or the deadline passes. After at least one step, the target is brought
+ * into view when the engine can do it. Every swipe is bounded by that
+ * deadline. The target, like a `dragTo` target and a
  * `filter({ has })` locator, has to come from the same target's screen.
  */
 
@@ -31,20 +33,31 @@ type ScrollOptions = Parameters<Screen['scrollUntilVisible']>[1];
 interface Swipe {
   readonly ref: string;
   readonly direction: string;
-  readonly momentum: string | undefined;
+  readonly distance: number;
+  readonly durationMs: number;
 }
+
+/** The step used when a test doesn't set a distance or speed. */
+const STEP = { distance: 0.65, durationMs: 800 } as const;
 
 interface ScrollScript {
   /** What the screen shows before any swipe, then after each; the last entry stays. */
   readonly screens: readonly (readonly SemanticNode[])[];
   /** Whether the engine declares the swipe action; default true. */
   readonly swipeable?: boolean;
+  /** Set it when the engine should declare `scrollIntoView`. Default false. */
+  readonly bringsIntoView?: boolean;
   /**
    * Every swipe hangs, then fails as an engine reporting a timeout does: `true`
    * for the whole operation budget, as one honouring `timeoutMs` does, or a
    * number of milliseconds of its own clock.
    */
   readonly hang?: boolean | number;
+  /**
+   * Set it to refuse a swipe, unsent, whose drags of at most 0.65 each take
+   * at least the operation budget, as a device does.
+   */
+  readonly refuseDragsOver?: boolean;
   /** The action timeout of the locator engine; default 1000 ms. */
   readonly actionTimeout?: number;
 }
@@ -52,6 +65,7 @@ interface ScrollScript {
 /** A screen over a fake engine that pages through `screens` one swipe at a time and logs every swipe. */
 function scrollScreen(script: ScrollScript) {
   const swipes: Swipe[] = [];
+  const broughtIntoView: string[] = [];
   const current = (): readonly SemanticNode[] =>
     script.screens[Math.min(swipes.length, script.screens.length - 1)] ?? [];
   const { screen, steps } = screenOver({
@@ -61,22 +75,29 @@ function scrollScreen(script: ScrollScript) {
     ...(script.swipeable === false
       ? {}
       : {
-          actions: ['swipe'],
+          actions: script.bringsIntoView === true ? ['swipe', 'scrollIntoView'] : ['swipe'],
           perform: async (ref, action, operation) => {
+            if (action.kind === 'scrollIntoView') {
+              broughtIntoView.push(action.center === true ? `${ref.id} to the middle` : ref.id);
+              return;
+            }
             if (action.kind !== 'swipe') throw new Error(`unexpected ${action.kind}`);
             if (script.hang !== undefined && script.hang !== false) {
               const budget = script.hang === true ? operation.timeoutMs : script.hang;
               await sleep(budget);
               throw new EngineError('OPERATION_TIMEOUT', `swipe exceeded ${budget} ms`, { retryable: false });
             }
+            if (script.refuseDragsOver === true && Math.ceil(action.distance / 0.65) * action.durationMs >= operation.timeoutMs) {
+              throw new EngineError('NOT_ACTIONABLE', 'swipe holds longer than its budget', { retryable: false });
+            }
             // A swipe resolves once the scroll it caused is on screen, a frame or more later.
             await sleep(SWIPE_MS);
-            swipes.push({ ref: ref.id, direction: action.direction, momentum: action.momentum });
+            swipes.push({ ref: ref.id, direction: action.direction, distance: action.distance, durationMs: action.durationMs });
           },
         }),
     timeoutMs: script.actionTimeout ?? 1_000,
   });
-  return { screen, steps, swipes };
+  return { screen, steps, swipes, broughtIntoView };
 }
 
 beforeEach(() => {
@@ -93,40 +114,84 @@ describe('screen.scrollUntilVisible', () => {
     const { screen, swipes } = scrollScreen({ screens: [[feed()], [feed()], [feed(TARGET)]] });
     await screen.getByRole('list', { name: 'Feed' }).scrollUntilVisible(screen.getByText('Accept'));
     expect(swipes).toEqual([
-      { ref: 'feed', direction: 'down', momentum: 'slow' },
-      { ref: 'feed', direction: 'down', momentum: 'slow' },
+      { ref: 'feed', direction: 'down', ...STEP },
+      { ref: 'feed', direction: 'down', ...STEP },
     ]);
   });
 
-  it('takes a direction and a momentum for the stride of each step, on the screen and on a locator', async () => {
+  it('takes a direction, a distance, and a speed for each step, on the screen and on a locator', async () => {
     const viewport = scrollScreen({ screens: [[], [TARGET]] });
-    await viewport.screen.scrollUntilVisible(viewport.screen.getByText('Accept'), { direction: 'up', momentum: 'none' });
-    expect(viewport.swipes).toEqual([{ ref: 'root', direction: 'up', momentum: 'none' }]);
+    await viewport.screen.scrollUntilVisible(viewport.screen.getByText('Accept'), { direction: 'up', distance: 0.4, speed: 'fast' });
+    expect(viewport.swipes).toEqual([{ ref: 'root', direction: 'up', distance: 0.4, durationMs: 150 }]);
     const { screen, swipes } = scrollScreen({ screens: [[feed()], [feed(TARGET)]] });
-    await screen.getByRole('list', { name: 'Feed' }).scrollUntilVisible(screen.getByText('Accept'), { direction: 'right', momentum: 'none' });
-    expect(swipes).toEqual([{ ref: 'feed', direction: 'right', momentum: 'none' }]);
+    await screen.getByRole('list', { name: 'Feed' }).scrollUntilVisible(screen.getByText('Accept'), { direction: 'right', speed: 'slow' });
+    expect(swipes).toEqual([{ ref: 'feed', direction: 'right', distance: 0.65, durationMs: 1500 }]);
   });
 
-  it('refuses an option it does not take before any swipe', async () => {
+  it.each([
+    ['a distance of 0', { distance: 0 }],
+    ['a distance above 1', { distance: 1.5 }],
+    ['a speed that is not a preset', { speed: 'warp' }],
+  ])('refuses %s before any swipe', async (_label, options) => {
     const { screen, swipes } = scrollScreen({ screens: [[], [TARGET]] });
-    await expect(
-      screen.scrollUntilVisible(screen.getByText('Accept'), invalid<ScrollOptions>({ speed: 'fast' })),
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), invalid<ScrollOptions>(options))).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
     expect(swipes).toEqual([]);
+  });
+
+  it('brings the target into view after a step, when the engine can', async () => {
+    const { screen, swipes, broughtIntoView } = scrollScreen({ screens: [[], [TARGET]], bringsIntoView: true });
+    await screen.scrollUntilVisible(screen.getByText('Accept'));
+    expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...STEP }]);
+    expect(broughtIntoView).toEqual(['target to the middle']);
+  });
+
+  it('takes the deprecated momentum as a distance and a speed, lets one set beside it win, and warns once a process', async () => {
+    // The warning is printed once per process, so this is the file's only test that passes momentum.
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const cases = [
+        { momentum: 'slow' },
+        { momentum: 'none' },
+        { momentum: 'fast' },
+        { momentum: 'fast', distance: 0.3 },
+        { momentum: 'slow', speed: 'normal' },
+      ] as const;
+      const swipes: Swipe[] = [];
+      for (const options of cases) {
+        const scroll = scrollScreen({ screens: [[], [TARGET]] });
+        await scroll.screen.scrollUntilVisible(scroll.screen.getByText('Accept'), options);
+        swipes.push(...scroll.swipes);
+      }
+      expect(swipes.map(({ distance, durationMs }) => ({ distance, durationMs }))).toEqual([
+        { distance: 0.25, durationMs: 1500 },
+        { distance: 0.5, durationMs: 400 },
+        { distance: 0.65, durationMs: 150 },
+        { distance: 0.3, durationMs: 150 },
+        { distance: 0.25, durationMs: 400 },
+      ]);
+      expect(warn.mock.calls.map(([text]) => String(text)).filter((text) => text.includes('momentum'))).toEqual([
+        'e2e: [warning] swipe momentum is deprecated. Pass distance and speed.\n',
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('returns at once when the target is already visible, with no swipe', async () => {
-    const { screen, swipes } = scrollScreen({ screens: [[TARGET]] });
+    const { screen, swipes, broughtIntoView } = scrollScreen({ screens: [[TARGET]], bringsIntoView: true });
     await screen.scrollUntilVisible(screen.getByText('Accept'));
     expect(swipes).toEqual([]);
+    expect(broughtIntoView).toEqual([]);
   });
 
-  it('swipes down slowly at the observation root until the target appears, then stops', async () => {
+  it('steps down at the observation root until the target appears, then stops', async () => {
     const { screen, swipes } = scrollScreen({ screens: [[], [], [TARGET]] });
     await screen.scrollUntilVisible(screen.getByText('Accept'));
     expect(swipes).toEqual([
-      { ref: 'root', direction: 'down', momentum: 'slow' },
-      { ref: 'root', direction: 'down', momentum: 'slow' },
+      { ref: 'root', direction: 'down', ...STEP },
+      { ref: 'root', direction: 'down', ...STEP },
     ]);
   });
 
@@ -196,7 +261,16 @@ describe('screen.scrollUntilVisible', () => {
   it('still swipes with less than a poll interval of the budget left', async () => {
     const { screen, swipes } = scrollScreen({ screens: [[], [TARGET]] });
     await screen.scrollUntilVisible(screen.getByText('Accept'), { timeout: 50 });
-    expect(swipes).toEqual([{ ref: 'root', direction: 'down', momentum: 'slow' }]);
+    expect(swipes).toEqual([{ ref: 'root', direction: 'down', ...STEP }]);
+  });
+
+  it('fails as LOCATOR_NOT_FOUND when a device refuses a step of two drags that no longer fits before the deadline', async () => {
+    const { screen, swipes } = scrollScreen({ screens: [[]], refuseDragsOver: true });
+    await expect(screen.scrollUntilVisible(screen.getByText('Accept'), { distance: 1, timeout: 1_000 })).rejects.toMatchObject({
+      code: 'LOCATOR_NOT_FOUND',
+      cause: expect.objectContaining({ code: 'NOT_ACTIONABLE' }),
+    });
+    expect(swipes).toEqual([]);
   });
 
   it('keeps an engine timeout far from the deadline as the action failure it is', async () => {

@@ -492,7 +492,7 @@ export default {
   `writing-tests`, Sign-in sessions).
 - A deterministic check naming a platform label runs there only:
   `test('...', { platforms: ['ios'] }, ...)`.
-- `selectOption`, `setInputFiles`, `scrollIntoView`, `secondaryTap`, and
+- `selectOption`, `setInputFiles`, `secondaryTap`, and
   `modifiers` on `tap` or `doubleTap` are `UNSUPPORTED_CAPABILITY` on a
   device.
 - `device.clipboard()` and `device.setClipboard()` are

@@ -358,7 +358,7 @@ describe('web engine lifecycle', () => {
         await engine.performAt!({ x: 180, y: 380 }, { kind: 'longPress', durationMs: 120 }, op());
         await engine.performAt!({ x: 190, y: 390 }, { kind: 'hover' }, op());
         await engine.performAt!({ x: 200, y: 400 }, { kind: 'dragTo', target: { x: 300, y: 450 } }, op());
-        await engine.performAt!({ x: 210, y: 410 }, { kind: 'swipe', direction: 'down' }, op());
+        await engine.performAt!({ x: 210, y: 410 }, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, op());
         // A fractional path lands on whole pixels: the browser would truncate it a pixel early.
         await engine.performAt!({ x: 220.6, y: 420.4 }, { kind: 'swipeTo', target: { x: 320.5, y: 460.5 } }, op());
         const [log] = await engine.locate!({ kind: 'selector', selector: '#log' }, op());
@@ -761,11 +761,40 @@ describe('web engine lifecycle', () => {
         // The viewport swipe arrives as a swipe on the root, addressed from an earlier observation.
         const page = surfaceOf(engine)!.page();
         await page.setContent('<div style="height: 5000px">tall</div>');
-        await engine.perform!(first.root.ref, { kind: 'swipe', direction: 'down' }, operation('r1'));
+        await engine.perform!(first.root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation('r1'));
         await page.waitForFunction(() => window.scrollY > 0);
         expect(await page.evaluate(() => window.scrollY)).toBe(360);
-        await engine.perform!(first.root.ref, { kind: 'swipe', direction: 'up', momentum: 'fast' }, operation('r1'));
+        await engine.perform!(first.root.ref, { kind: 'swipe', direction: 'up', distance: 0.8, durationMs: 150 }, operation('r1'));
         await page.waitForFunction(() => window.scrollY === 0);
+      });
+    });
+
+    it('swipes the scroll container under the viewport centre by a share of that container, in the document and inside a shadow root', async () => {
+      await inAttempt('sc1', async () => {
+        await engine.session!.open!(`${app.url}/`, operation('sc1'));
+        const page = surfaceOf(engine)!.page();
+        await page.setContent(`
+          <body style="margin: 0; height: 3000px">
+            <div id="pane" style="position: fixed; top: 200px; left: 0; right: 0; height: 300px; overflow: auto">
+              <div style="height: 3000px"></div>
+            </div>
+          </body>`);
+        const offsets = () => page.evaluate(() => [document.querySelector('#pane')?.scrollTop ?? -1, window.scrollY]);
+        const swipe = { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 } as const;
+        const observation = await engine.observe!(operation('sc1'));
+        await engine.perform!(observation.root.ref, swipe, operation('sc1'));
+        await expect.poll(offsets).toEqual([150, 0]);
+
+        // The same pane is found and measured inside an open shadow root.
+        await page.setContent(`<body style="margin: 0; height: 3000px"><div id="host"></div></body>`);
+        await page.evaluate(() => {
+          const root = document.querySelector('#host')?.attachShadow({ mode: 'open' });
+          if (root !== undefined) root.innerHTML = '<div id="pane" style="position: fixed; top: 200px; left: 0; right: 0; height: 300px; overflow: auto"><div style="height: 3000px"></div></div>';
+        });
+        const shadowOffsets = () => page.evaluate(() => [document.querySelector('#host')?.shadowRoot?.querySelector('#pane')?.scrollTop ?? -1, window.scrollY]);
+        const again = await engine.observe!(operation('sc1'));
+        await engine.perform!(again.root.ref, swipe, operation('sc1'));
+        await expect.poll(shadowOffsets).toEqual([150, 0]);
       });
     });
 
@@ -777,7 +806,7 @@ describe('web engine lifecycle', () => {
           <body style="margin: 0"><ul aria-label="Feed" style="display: contents"><li style="display: block; height: 400px">Item</li></ul></body>`);
         const [feed] = await engine.locate!(byRole('list'), operation('dc2'));
         await expect(
-          engine.perform!(feed!.ref, { kind: 'swipe', direction: 'down' }, operation('dc2')),
+          engine.perform!(feed!.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation('dc2')),
         ).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
       });
     });
@@ -993,7 +1022,7 @@ describe('web engine lifecycle', () => {
       expect(snapshot.pixels).toBeDefined();
 
       await page.setContent('<div style="height: 5000px">tall</div>');
-      await engine.perform!(snapshot.root.ref, { kind: 'swipe', direction: 'down' }, operation('w1'));
+      await engine.perform!(snapshot.root.ref, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation('w1'));
       await page.waitForFunction(() => window.scrollY > 0);
       expect(await page.evaluate(() => window.scrollY)).toBe(Math.round(measured.height / 2));
     });

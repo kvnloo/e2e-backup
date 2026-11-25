@@ -29,6 +29,7 @@ import {
   SERVED_METHODS,
   decodeError,
   decodeLocatorAction,
+  decodePointerAction,
   encodeError,
   encodeSnapshot,
   engineMember,
@@ -40,6 +41,7 @@ import {
   type OperationMethod,
   type WireCleanup,
   type WireLocatorAction,
+  type WirePointerAction,
   type WireOperation,
   type WireSignal,
 } from './protocol.ts';
@@ -180,6 +182,7 @@ class EngineServer {
     return spec.args.map((name) => {
       if (name === 'operation') return this.#operation(named['operation'] as WireOperation);
       if (name === 'action' && spec.member === 'perform') return decodeLocatorAction(named[name] as WireLocatorAction);
+      if (name === 'action' && spec.member === 'performAt') return decodePointerAction(named[name] as WirePointerAction);
       return named[name];
     });
   }

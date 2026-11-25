@@ -28,24 +28,33 @@ test.describe('scrolling', { platforms: ['web'], tags: ['scroll'] }, () => {
     await expect(screen.getByRole('status', 'Picked row')).toHaveText('picked Item 40');
   });
 
-  test('a viewport swipe and a wheel gesture both move the page', async ({ screen, browser }) => {
-    const position = screen.getByRole('status', 'Scroll position');
-    await expect(position).toHaveText('0');
+  test('scrollUntilVisible reaches every row of a long list in turn', async ({ screen }) => {
+    const pane = screen.getByRole('list', 'Pane');
+    for (let index = 1; index <= 40; index += 1) {
+      await pane.scrollUntilVisible(screen.getByRole('button', { name: `Item ${index}`, exact: true }));
+    }
 
+    for (let index = 1; index <= 120; index += 1) {
+      await screen.scrollUntilVisible(screen.getByRole('button', { name: `Row ${index}`, exact: true }));
+    }
+  });
+
+  test('a screen swipe scrolls the container under the screen centre, as a wheel there does', async ({ screen, browser }) => {
+    const pane = screen.getByRole('status', 'Pane position');
+    // The pane is under the screen's centre, so it scrolls half of its 200 px. The page doesn't scroll.
     await screen.swipe({ direction: 'down' });
-    await expect(position).not.toHaveText('0');
-    const afterSwipe = Number(await position.textContent());
-    expect(afterSwipe).toBeGreaterThan(0);
+    await expect(pane).toHaveText('100');
+    await expect(screen.getByRole('status', 'Scroll position')).toHaveText('0');
 
     await browser.mouse.wheel(0, 600);
-    await expect(position).toHaveText(String(afterSwipe + 600));
+    await expect(pane).toHaveText('700');
 
     await screen.swipe({ direction: 'up' });
-    await expect.poll(async () => Number(await position.textContent())).toBeLessThan(afterSwipe + 600);
+    await expect(pane).toHaveText('600');
   });
 
   test('a node swipe scrolls only inside a scrollable node', async ({ screen }) => {
-    await screen.getByRole('list', 'Pane').swipe({ direction: 'down', momentum: 'slow' });
+    await screen.getByRole('list', 'Pane').swipe({ direction: 'down', distance: 0.25 });
     await expect(screen.getByRole('status', 'Pane position')).not.toHaveText('0');
     await expect(screen.getByRole('status', 'Scroll position')).toHaveText('0');
   });

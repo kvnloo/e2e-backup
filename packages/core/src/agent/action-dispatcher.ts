@@ -10,14 +10,15 @@
  * and queue as `runTool`.
  */
 
-import { isKeyModifier, KEY_MODIFIERS, type KeyModifier } from '../engine/contract.ts';
+import { isKeyModifier, KEY_MODIFIERS, SCROLL_STEP, type KeyModifier } from '../engine/contract.ts';
 import type { LocatorAction, LocatorActionKind, SemanticNode, ViewportPoint, ViewportSize } from '../engine/surface.ts';
 import { asEngineError, TestError } from '../internal/errors.ts';
 import { requireKey } from '../internal/keys.ts';
+import { SWIPE } from '../internal/swipe.ts';
 import { sleep } from '../internal/time.ts';
 import { clampToViewport, requireFinitePoint, requireViewportSize, viewportShare } from '../internal/geometry.ts';
 import { resolveNavigationUrl } from '../internal/urls.ts';
-import type { ActionEvent, ActionHook, BeforeActionHook, ClickOptions, JsonValue, Momentum, ScrollDirection, Secret } from '../types.ts';
+import type { ActionEvent, ActionHook, BeforeActionHook, ClickOptions, JsonValue, ScrollDirection, Secret } from '../types.ts';
 import { PROJECT_TOOL_EVENT_PREFIX, READ_ONLY_GRAMMAR, type GrammarActionName } from './action-names.ts';
 import { actionEvent, containerKey, describeAction, type PlacedPoint, type Placement, type RecordableAction } from './actions.ts';
 import { describePosition, hasTwinsWithoutTestId } from '../cache/relocate.ts';
@@ -60,21 +61,12 @@ const ASSERTION_ACTIONS = new Set<string>(Object.values(READ_ONLY_GRAMMAR).flat(
 const MAX_STALE_RELOCATIONS = 2;
 
 /**
- * How far one grammar scroll moves. The engine's default flick is half the
- * scrolled box; a deliberate scroll of three quarters keeps every row on
- * screen at least once while covering a long feed in fewer actions.
- */
-const SCROLL_MOMENTUM: Momentum = 'slow';
-
-/**
- * How many pages a scroll to a text may turn. Each page moves as a grammar
- * scroll does (`SCROLL_MOMENTUM`): three quarters of the list, so every row
- * is on screen in at least one look and none is skipped between pages, and a
- * drag that starts inside the list, not in the chrome under it, which a
- * longer flick on a full-screen list lands in and loses. A windowed table of
- * five thousand short rows is over four hundred pages on a browser; the cap
- * bounds a text that never shows, the step's own clock bounds the time, and a
- * screen that stops moving ends the paging before either.
+ * How many pages a scroll to a text may turn. Each page is one
+ * `scrollUntilVisible` step (`SCROLL_STEP`, 0.65 of the list). A windowed
+ * table of five thousand short rows is about five hundred pages on a
+ * browser. The cap bounds a text that never shows, the step's own clock
+ * bounds the time, and a screen that stops moving ends the paging before
+ * either.
  */
 const MAX_SCROLL_UNTIL_SCREENS = 800;
 const MAX_SCROLL_UNTIL_TEXT_CHARS = 200;
@@ -558,7 +550,7 @@ export class ActionDispatcher {
       throw new TestError('INVALID_ARGUMENT', `invalid scroll direction "${String(direction)}"`);
     }
     const viewport = async (): Promise<RecordableAction> => {
-      await this.session.swipe(direction, SCROLL_MOMENTUM, this.accounting.actionOperation());
+      await this.session.swipe({ kind: 'swipe', direction, ...SWIPE }, this.accounting.actionOperation());
       return { name: 'scroll', direction };
     };
     if (target === undefined) return this.runAction('scroll', viewport);
@@ -570,7 +562,7 @@ export class ActionDispatcher {
       return this.targeted(resolved, async (node, observation) => {
         await this.session.perform(
           node.ref,
-          { kind: 'swipe', direction, momentum: SCROLL_MOMENTUM },
+          { kind: 'swipe', direction, ...SWIPE },
           this.accounting.actionOperation(),
         );
         // How much of the screen the list covered decides, on replay, whether
@@ -625,11 +617,13 @@ export class ActionDispatcher {
         const found = observation.kind === 'semantic' ? nodeReading(observation, needle, scope) : undefined;
         if (found !== undefined) {
           // An engine that can bring a node in does, whatever the box says: a
-          // windowed list renders a row a little before it is visible. One
-          // that cannot, a device lists what it draws, takes one more page
-          // for a row still past the edge.
+          // windowed list renders a row a little before it is visible. After
+          // a page, a row more than a fifth of its list from the middle is
+          // moved to the middle too, as `scrollUntilVisible` does. For an
+          // engine that can't, one more page is taken for a row still past
+          // the edge.
           if (this.verbs.has('scrollTo')) {
-            await this.session.perform(found.ref, { kind: 'scrollIntoView' }, this.accounting.actionOperation());
+            await this.session.perform(found.ref, { kind: 'scrollIntoView', ...(screens > 0 ? { center: true } : {}) }, this.accounting.actionOperation());
             return { name: 'scrollUntil', text, direction, screens, ...paged };
           }
           if (isInViewport(found.rect, observation.viewport)) return { name: 'scrollUntil', text, direction, screens, ...paged };
@@ -693,11 +687,11 @@ export class ActionDispatcher {
   ): Promise<{ paged: Pick<Extract<RecordableAction, { name: 'scrollUntil' }>, 'node' | 'spans'>; within: ExecutorTarget | undefined }> {
     const resolved = list === undefined ? undefined : this.scrollTargetOrLost(list);
     if (resolved === undefined) {
-      await this.session.swipe(direction, SCROLL_MOMENTUM, this.accounting.actionOperation());
+      await this.session.swipe({ kind: 'swipe', direction, ...SCROLL_STEP }, this.accounting.actionOperation());
       return { paged: {}, within: undefined };
     }
     const { node, observation } = resolved;
-    await this.session.perform(node.ref, { kind: 'swipe', direction, momentum: SCROLL_MOMENTUM }, this.accounting.actionOperation());
+    await this.session.perform(node.ref, { kind: 'swipe', direction, ...SCROLL_STEP }, this.accounting.actionOperation());
     return { paged: { node, ...(node.rect === undefined ? {} : { spans: viewportShare(node.rect, observation.viewport) }) }, within: list };
   }
 

@@ -351,7 +351,7 @@ describe('DesktopSurface', () => {
     const scrollable = { ok: true, data: { snapshot_id: 's9', window: { id: 'w-mine' }, tree: { role: 'window', name: 'List', bounds: { x: 0, y: 0, width: 100, height: 100 }, children: [{ role: 'scrollarea', ref_id: '@s9:e1', available_actions: ['Scroll'] }] } } };
     const { surface, fake } = await launched({ snapshot: [scrollable] }, { observe: false });
     await surface.restart(operation());
-    await surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down' }, operation());
+    await surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
     expect(fake.calls().at(-1)?.args.slice(0, 2)).toEqual(['scroll', '@s9:e1']);
   });
 
@@ -1041,7 +1041,7 @@ describe('DesktopSurface', () => {
   it('scrolls the window as it is now on a root swipe, not the container of an older observation', async () => {
     const screen = (id: string) => ({ ok: true, data: { snapshot_id: id, window: { id: 'w-mine' }, tree: { role: 'window', name: 'List', bounds: { x: 0, y: 0, width: 100, height: 100 }, children: [{ role: 'scrollarea', name: id, ref_id: `@${id}:e1`, available_actions: ['Scroll'] }] } } });
     const { surface, fake } = await launched({ snapshot: [screen('s1'), screen('s1'), screen('s2')] });
-    await surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down' }, operation());
+    await surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation());
     expect(fake.calls().at(-1)?.args.slice(0, 2)).toEqual(['scroll', '@s2:e1']);
   });
 
@@ -1280,7 +1280,7 @@ describe('DesktopSurface', () => {
     const whole = { ok: true, data: { snapshot_id: 's', window: { id: 'w-mine' }, tree: { ...window, children: [] } } };
     const { surface } = await launched({ snapshot: [whole, cut] }, { observe: false, options: { headed: true } });
     await expect(surface.typeText('ada', { replace: false }, operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/which field has keyboard focus/) });
-    await expect(surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down' }, operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/what in it scrolls/) });
+    await expect(surface.perform({ id: 'root', revision: '' }, { kind: 'swipe', direction: 'down', distance: 0.5, durationMs: 400 }, operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/what in it scrolls/) });
   });
 
   it('says the read was cut short, not that focus moved, when the focus check runs out of time', async () => {

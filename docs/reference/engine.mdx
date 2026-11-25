@@ -1267,15 +1267,26 @@ honors in `actions` and `pointerActions`.
 | `focus` | - | yes | - |
 | `blur` | - | yes | - |
 | `hover` | - | yes | yes |
-| `scrollIntoView` | - | yes | - |
+| `scrollIntoView` | `center?` | yes | - |
 | `selectOption` | `value` | yes | - |
 | `setInputFiles` | `paths`; empty clears the input | yes | - |
 | `setInputFilePayloads` | `files` with `name`, `mimeType`, and `Uint8Array` `buffer`. An empty `files` array clears the input. The runner uses it to clear when the engine declares this action without `setInputFiles`. | yes | - |
 | `dragTo` | `target`: a `NodeRef` or a `ViewportPoint` | yes | yes |
-| `swipe` | `direction`, `momentum?` | yes | yes |
+| `swipe` | `direction`, `distance`, `durationMs` | yes | yes |
 | `swipeTo` | `target`, `durationMs?` | - | yes |
 
 The grammar is closed. Anything beyond it is an agent-side `defineTool`.
+
+A `swipe` scrolls the content by `distance` of a box along the swipe:
+
+- On the root, the box is the scroll container under the viewport's
+  center, or the whole viewport when there isn't one.
+- On a node, the box is the node's box.
+
+Each drag takes `durationMs`. It's ignored where the scroll is a wheel
+event instead of a drag. `SCROLL_STEP` in `e2e/engine` is the step
+used by `scrollUntilVisible` and the agent's `scroll_to` (0.65 of the
+container over 800 ms).
 
 #### Locator actions
 
@@ -1320,8 +1331,19 @@ export type LocatorAction =
         | 'clear'
         | 'focus'
         | 'blur'
-        | 'hover'
-        | 'scrollIntoView';
+        | 'hover';
+    }
+  | {
+      readonly kind: 'scrollIntoView';
+      /**
+       * Set to also move a node that is fully visible to the middle of its
+       * scroll container when it's more than a fifth of the container from
+       * the middle. `scrollUntilVisible` and the agent's `scroll_to` set it
+       * after a scroll step. A node at the edge can be under a sticky header
+       * or footer, and the drag moves it out. It's ignored where the scroll
+       * is a wheel event instead of a drag.
+       */
+      readonly center?: boolean;
     }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'fill'; readonly value: string; readonly sensitive: boolean }
@@ -1334,11 +1356,31 @@ export type LocatorAction =
       readonly files: readonly { readonly name: string; readonly mimeType: string; readonly buffer: Uint8Array }[];
     }
   | { readonly kind: 'dragTo'; readonly target: NodeRef }
-  | {
-      readonly kind: 'swipe';
-      readonly direction: ScrollDirection;
-      readonly momentum?: Momentum;
-    };
+  | SwipeAction;
+
+/**
+ * A scroll gesture in a direction. `direction` is the way the content
+ * scrolls (`down` shows what is below).
+ */
+export interface SwipeAction {
+  readonly kind: 'swipe';
+  readonly direction: ScrollDirection;
+  /**
+   * How far the content scrolls, as a share of the swiped box along the
+   * swipe (above 0 and at most 1). The box is the node, or the scroll
+   * container under the viewport's center for the root. On a touch surface,
+   * a distance longer than one drag is split into several drags.
+   */
+  readonly distance: number;
+  /** How long each drag takes. It's ignored on a platform that scrolls without a drag (a wheel). */
+  readonly durationMs: number;
+  /**
+   * @deprecated Read `distance` and `durationMs`. A swipe from an older
+   * client that sends only this is given the `distance` and `durationMs` it
+   * stands for. It will be removed no earlier than April 1, 2027.
+   */
+  readonly momentum?: Momentum;
+}
 
 /** Every action kind; what an engine declares in `actions`. */
 export type LocatorActionKind = LocatorAction['kind'];
@@ -1383,11 +1425,7 @@ export type PointerAction =
   | { readonly kind: 'tap' | 'doubleTap' | 'secondaryTap' | 'hover' }
   | { readonly kind: 'longPress'; readonly durationMs?: number }
   | { readonly kind: 'dragTo'; readonly target: ViewportPoint }
-  | {
-      readonly kind: 'swipe';
-      readonly direction: ScrollDirection;
-      readonly momentum?: Momentum;
-    }
+  | SwipeAction
   | {
       readonly kind: 'swipeTo';
       readonly target: ViewportPoint;
@@ -2589,13 +2627,13 @@ return context.fixture('printer', printer, { print: { kind: 'resource' } });
 `TextPattern`, `SemanticQuery`, `LocatorExpression`,
 `NodeRef`, `SemanticNode`, `ViewportPoint`, `ViewportSize`,
 `ObservationPixels`, `LocatorAction`, `LocatorActionKind`, `PointerAction`,
-`PointerActionKind`, `ScrollDirection`, `Momentum`, `SelectOption`, `Key`,
+`PointerActionKind`, `ScrollDirection`, `SwipeAction`, `Momentum` (deprecated), `SelectOption`, `Key`,
 `KeyModifier`, `KeyName`, `ParsedKey`, `ENGINE_SPI_VERSION`,
 `LOCATOR_ACTION_KINDS`, `KNOWN_LOCATOR_ACTION_KINDS`, `POINTER_ACTION_KINDS`, `KEY_MODIFIERS`,
 `KEY_NAMES`, `parseKey`, `ENGINE_ERROR_CODES`, `RETRYABLE_ENGINE_ERROR_CODES`,
 `Secret`, `isSecret`, `TextMatch`, `JsonValue`, `JsonValueRules`,
 `ResolveExpressionOptions`, `PollConditionOptions`, `WithoutUndefined`,
-`FixtureOperation`, `EngineIsolation`, `OBSERVED_NAME_LIMIT`, and `OBSERVED_TEXT_LIMIT` are
+`FixtureOperation`, `EngineIsolation`, `OBSERVED_NAME_LIMIT`, `OBSERVED_TEXT_LIMIT`, and `SCROLL_STEP` are
 exported from `e2e/engine`. So are the [engine protocol](/reference/engine-protocol)'s
 `connectEngine`, `serveEngine`, `describeEngine`, `spawnTransport`,
 `socketTransport`, `loopbackTransport`, `ENGINE_METHODS`,

@@ -6,7 +6,7 @@ test('scrolls the feed until the Golden Ticket loads, then claims it', async ({ 
   const feed = screen.getByTestId('feed');
   await expect(feed.getByTestId('feed-item')).toHaveCount(20);
   // The feed is its own scroll container, so the feed pages, not the viewport.
-  // The Golden Ticket is item 138: 137 rows of 61 px at a 360 px slow stride
+  // The Golden Ticket is item 138: 137 rows of 61 px at a 312 px stride
   // and seven lazy loads of 400 ms, about 4 s measured, so the default 30 s
   // scroll budget holds seven of those.
   const claim = screen.getByRole('button', 'Claim');
