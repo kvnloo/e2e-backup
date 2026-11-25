@@ -1128,3 +1128,51 @@ describe('trace cache: a recording that leaves a screen and comes back', () => {
     expect(replayed.cache).toMatchObject({ mode: 'self-finalized', detour });
   }, 240_000);
 });
+
+/** Opens another site's home page, goes back, then taps Increment: the same path on two origins. */
+function otherOriginExecutor(otherUrl: string): StepExecutor {
+  return {
+    name: 'other-origin-executor',
+    version: 'test',
+    async runStep(context: StepExecutorContext) {
+      await context.observe();
+      await context.actions.navigate(`${otherUrl}/`);
+      await context.observe();
+      await context.actions.back();
+      const observation = await context.observe();
+      await context.actions.tap({ id: nodeIdFor(observation.text, /button "Increment"/) });
+      return { status: 'passed' as const, summary: 'the counter shows 1' };
+    },
+  };
+}
+
+describe('trace cache: a detour to the same path on another origin', () => {
+  let app: FixtureApp;
+  let other: FixtureApp;
+  let project: FixtureProject;
+
+  beforeAll(async () => {
+    app = await startFixtureApp();
+    other = await startFixtureApp();
+    project = createProject({ 'tests/detour.e2e.ts': DETOUR_SUITE });
+  }, 60_000);
+
+  afterAll(async () => {
+    project?.cleanup();
+    await app?.close();
+    await other?.close();
+  });
+
+  it("keeps the other site's origin, so its home page is not the app's", async () => {
+    const outcome = await runExisting(project, {
+      appUrl: app.url,
+      config: { tests: 'tests/**/*.e2e.ts', agents: { default: { executor: otherOriginExecutor(other.url) } }, cache: 'read-write' as const },
+    });
+    expect(outcome.exitCode).toBe(0);
+    const { entry } = readOnlyEntry(project);
+    const otherHome = `${new URL(other.url).origin}/`;
+    expect(entry.payload.actions.map((action) => action.at)).toEqual(['/', otherHome, '/']);
+    const step = resultByTitle(outcome, 'increments after a wrong turn').attempts.at(-1)!.steps.find((s) => s.api === 'agent.act')!;
+    expect(step.cache?.detour).toBe(`actions 1-2 left / for ${otherHome} and came back with nothing typed, chosen, or set`);
+  }, 240_000);
+});
