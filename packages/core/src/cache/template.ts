@@ -24,7 +24,7 @@
 
 import { normalizeText } from '../internal/text.ts';
 import type { JsonValue } from '../types.ts';
-import { mapTraceText, type ActionTrace } from './trace.ts';
+import { mapTraceText, type ActionTrace, type RecordedAction } from './trace.ts';
 
 /** One `unique()` param: its JSON Pointer in the params and this call's value. */
 export interface ParamTemplate {
@@ -268,7 +268,9 @@ export function templateTrace(trace: ActionTrace, templates: readonly ParamTempl
     if (text.includes(PLACEHOLDER_PREFIX)) literalPlaceholder = true;
     return templateText(text, templates);
   });
-  return literalPlaceholder || templated === undefined ? undefined : { ...templated, summary: trace.summary };
+  if (literalPlaceholder || templated === undefined) return undefined;
+  const actions = mapLocations(templated.actions, (at) => (at.includes(PLACEHOLDER_PREFIX) ? undefined : templateText(at, templates)));
+  return { ...templated, actions, summary: trace.summary };
 }
 
 /**
@@ -277,5 +279,23 @@ export function templateTrace(trace: ActionTrace, templates: readonly ParamTempl
  */
 export function expandTrace(trace: ActionTrace, templates: readonly ParamTemplate[]): ActionTrace | undefined {
   const values = new Map(templates.map((template) => [template.pointer, template.value]));
-  return mapTraceText(trace, (text) => expandText(text, values));
+  const expanded = mapTraceText(trace, (text) => expandText(text, values));
+  return expanded === undefined ? undefined : { ...expanded, actions: mapLocations(expanded.actions, (at) => expandText(at, values)) };
+}
+
+/**
+ * Each action's location (`RecordedAction.at`) through `map`, left out
+ * where `map` cannot spell it: the location is provenance, so a page whose
+ * address spelled a placeholder, or a slot this call cannot fill, costs the
+ * location and never the recording.
+ */
+function mapLocations(actions: readonly RecordedAction[], map: (at: string) => string | undefined): RecordedAction[] {
+  return actions.map((action) => {
+    if (action.at === undefined) return action;
+    const at = map(action.at);
+    if (at === action.at) return action;
+    if (at !== undefined) return { ...action, at };
+    const { at: _dropped, ...rest } = action;
+    return rest as RecordedAction;
+  });
 }

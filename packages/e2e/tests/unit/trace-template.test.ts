@@ -250,6 +250,21 @@ describe('templateTrace and expandTrace', () => {
     expect(expandTrace(recorded, name('Globex Inc'))?.actions[3]?.at).toBe('/companies/Globex%20Inc');
   });
 
+  it('leaves out a location it cannot template or fill, and keeps the recording', () => {
+    const base = trace('Acme & Co');
+    const literal: ActionTrace = {
+      ...base,
+      actions: base.actions.map((action, index) => (index === 3 ? { ...action, at: '/viewer?template={{param:/x}}' } : action)),
+    };
+    const recorded = templateTrace(literal, name('Acme & Co'));
+    expect(recorded).toBeDefined();
+    expect(recorded!.actions[3]).not.toHaveProperty('at');
+    const unfillable: ActionTrace = { ...templateTrace(base, name('Acme & Co'))!, actions: [{ ...recorded!.actions[0]!, at: '/teams/{{param:/team}}' }, ...recorded!.actions.slice(1)] };
+    const expanded = expandTrace(unfillable, name('Globex Inc'));
+    expect(expanded).toBeDefined();
+    expect(expanded!.actions[0]).not.toHaveProperty('at');
+  });
+
   it('spells a value as the slug an app derives for a record path, and fills it back the same way', () => {
     const templates = [{ pointer: '/name', value: 'E2E abc Company' }];
     expect(templateText('/companies/e2e-abc-company?q=E2E%20abc%20Company', templates)).toBe('/companies/{{param:/name|slug}}?q={{param:/name|uri}}');
