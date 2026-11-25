@@ -345,8 +345,8 @@ than 200), and a count above 1 doesn't combine with `position`),
 `selectOption(label | { label } | { value } | { index })` (one option; an
 array is `INVALID_ARGUMENT`), `focus()`, `blur()`, `hover()`, `setInputFiles(files)`
 (paths relative to the project root, or `{ name, mimeType, buffer: Buffer }` payloads, singly or as an array; `[]` clears; a missing path, or one under a directory the runner cannot search, is `INVALID_ARGUMENT`), `dragTo(locator)`, `scrollIntoView()`,
-`swipe({ direction, momentum? })` or `swipe({ from, to, duration? })` (a
-drag between two points of the node, for pagers built on pointer events). Web only, `UNSUPPORTED_CAPABILITY` on a
+`swipe({ direction, momentum? })` or `swipe({ from, to, duration? })` (see
+the coordinates below). Web only, `UNSUPPORTED_CAPABILITY` on a
 device: `blur`, `secondaryTap`, `selectOption`, `setInputFiles`, `scrollIntoView`,
 and `modifiers`.
 
@@ -357,16 +357,17 @@ field and types one character per `delay`, plain string only (a `Secret` is
 
 Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 { x, y } })` offsets from the node's top-left corner inside its border (with `modifiers` it is
-`INVALID_ARGUMENT`), `screen.tapAt({ x, y })` taps a viewport point,
+`INVALID_ARGUMENT`), `locator.swipe({ from, to, duration? })` swipes along a
+path relative to the node, as offsets from the same corner or as percentages
+of its box (`{ x: '90%', y: '50%' }`), and moves a pager built on pointer
+events, `screen.tapAt({ x, y })` taps a viewport point,
 `screen.doubleTapAt({ x, y })` double-taps a viewport point,
 `screen.swipe({ from, to, duration? })` swipes along a path (on iOS an
-untimed one must stay above the open soft keyboard; pass `duration` to drag
+untimed path, on `screen` or a locator, must stay above the open soft keyboard; pass `duration` to drag
 across it),
 `screen.swipe({ direction, momentum? })` swipes the viewport. Viewport
 points also take percentages from `'0%'` through `'100%'`, rounded to the
-nearest pixel: `{ x: '50%', y: '50%' }`. Points for `locator.swipe({ from,
-to })` take the same forms: pixels from the node's top-left corner, as in
-`tap({ position })`, and percentages of the box `boundingBox()` reports. Prefer a locator; a point moves with
+nearest pixel: `{ x: '50%', y: '50%' }`. Prefer a locator; a point moves with
 the layout.
 
 ### Reads

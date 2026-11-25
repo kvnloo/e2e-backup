@@ -875,22 +875,24 @@ describe('app steering hooks', () => {
 
 describe('coordinate input', () => {
   const box = { x: 100, y: 200, width: 50, height: 20 };
-  function pointer(options: { rect?: false | typeof box; hidden?: true; origin?: { x: number; y: number } } = {}) {
+  function pointer(
+    options: { rect?: false | typeof box | (() => typeof box); hidden?: true; origin?: { x: number; y: number } } = {},
+  ) {
     const performed: string[] = [];
     const performedAt: string[] = [];
     const pointTimeouts: number[] = [];
     const locates: number[] = [];
     const observes: number[] = [];
-    const node = {
+    const node = () => ({
       ref: { id: 'pad', revision: '' }, role: 'img', name: 'Pad',
-      ...(options.rect === false ? {} : { rect: options.rect ?? box }),
+      ...(options.rect === false ? {} : { rect: typeof options.rect === 'function' ? options.rect() : options.rect ?? box }),
       ...(options.hidden === true ? { states: { hidden: true } } : {}),
       ...(options.origin === undefined ? {} : { origin: options.origin }),
-    };
+    });
     const engine = defineEngine({
       name: 'fake', version: '1', spiVersion: 1,
-      observe: async () => { observes.push(1); return snapshot([node]); },
-      locate: async () => { locates.push(1); return [node]; },
+      observe: async () => { observes.push(1); return snapshot([node()]); },
+      locate: async () => { locates.push(1); return [node()]; },
       actions: ['tap', 'scrollIntoView'],
       perform: async (_ref, action) => { performed.push(action.kind); },
       pointerActions: ['tap', 'doubleTap', 'swipeTo'],
@@ -1033,6 +1035,25 @@ describe('coordinate input', () => {
     }
   });
 
+  it('locator.swipe waits for a box with a width and fails LOCATOR_NOT_FOUND if it never gets one', async () => {
+    vi.useFakeTimers();
+    vi.setTimerTickMode('nextTimerAsync');
+    try {
+      let reads = 0;
+      const growing = pointer({ rect: () => (++reads < 3 ? { ...box, width: 0 } : box) });
+      await runtime(growing.engine).fixtures.screen.getByLabel('Pad').swipe({ from: { x: '10%', y: '50%' }, to: { x: '90%', y: '50%' } });
+      expect(growing.performedAt).toEqual(['swipeTo @ 105,210 -> 145,210']);
+
+      const flat = pointer({ rect: { ...box, width: 0 } });
+      await expect(
+        runtime(flat.engine).fixtures.screen.getByLabel('Pad').swipe({ from: { x: '10%', y: '50%' }, to: { x: '90%', y: '50%' }, timeout: 250 }),
+      ).rejects.toMatchObject({ code: 'LOCATOR_NOT_FOUND', message: expect.stringContaining('did not become visible with a box') });
+      expect(flat.performedAt).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('screen.swipe({ from, to }) dispatches a pointer swipe along the path; a direction still needs the swipe action', async () => {
     const { engine, performedAt, observes } = pointer();
     const { fixtures, steps } = runtime(engine);
@@ -1080,7 +1101,7 @@ describe('coordinate input', () => {
     const pad = fixtures.screen.getByLabel('Pad');
     await pad.swipe({ from: { x: '90%', y: '50%' }, to: { x: 5, y: '50%' } });
     expect(steps.all().at(-1)).toMatchObject({
-      kind: 'locator', api: 'locator.swipe', label: 'getByLabel("Pad") (90%, 50%) → (5, 50%)', status: 'passed',
+      kind: 'locator', api: 'locator.swipe', label: 'getByLabel("Pad") from (90%, 50%) to (5, 50%)', status: 'passed',
     });
     await pad.swipe({ from: { x: '0%', y: 0 }, to: { x: '100%', y: '100%' }, duration: 300, timeout: 1_000 });
     expect(performedAt).toEqual(['swipeTo @ 145,210 -> 105,210', 'swipeTo @ 100,200 -> 149,219 for 300ms']);
@@ -1100,6 +1121,11 @@ describe('coordinate input', () => {
     const clipped = pointer({ rect: { ...box, width: 30 } });
     await runtime(clipped.engine).fixtures.screen.getByLabel('Pad').swipe({ from: { x: '50%', y: '50%' }, to: { x: '100%', y: '100%' } });
     expect(clipped.performedAt).toEqual(['swipeTo @ 115,210 -> 129,219']);
+
+    // A box that starts between two pixels keeps '0%' and '100%' on the whole pixels inside it.
+    const fractional = pointer({ rect: { ...box, x: 100.25 } });
+    await runtime(fractional.engine).fixtures.screen.getByLabel('Pad').swipe({ from: { x: '0%', y: '0%' }, to: { x: '100%', y: '100%' } });
+    expect(fractional.performedAt).toEqual(['swipeTo @ 101,200 -> 150,219']);
   });
 
   it('locator.swipe refuses invalid points, durations, and options before resolving the node', async () => {
@@ -1111,11 +1137,12 @@ describe('coordinate input', () => {
       [{ from: { x: '120%', y: 0 }, to: point }, `swipe from takes a percentage from '0%' through '100%', got "120%"`],
       [{ from: point, to: point, duration: 15 }, 'swipe duration must be an integer from 16 through 10000, got 15'],
       [{ from: point, to: point, momentum: 'fast' }, 'swipe options has no key "momentum"'],
+      [{ from: point, to: point, direction: 'left' }, 'swipe options has no key "direction"'],
     ];
     for (const [options, message] of cases) {
-      await expect(Promise.resolve().then(() => pad.swipe(options as never))).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT', message: expect.stringContaining(message),
-      });
+      expect(() => pad.swipe(options as never)).toThrow(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT', message: expect.stringContaining(message) }),
+      );
     }
     expect(locates).toEqual([]);
     expect(performed).toEqual([]);

@@ -392,22 +392,29 @@ test.describe('control inventory', () => {
       .toBe(true);
   });
 
-  // Percentages of the pad work the same on both platforms. The path runs
-  // right to left, since the screen is popped on a left-to-right fling. A
-  // fling lifts a little short of `to`, so the test checks the direction, and
-  // a start within a point of the pad's middle row (40 of its 80 points).
-  test('a locator swipe drags between points of the node', async ({ screen }) => {
+  // The path is in percentages, so one test covers iOS and Android. It runs
+  // right to left, because a left-to-right fling pops the screen. The pad
+  // reports points, and its box is 80 points tall on both platforms, so its
+  // width in points is the box's width scaled by that height. The start lands
+  // on the point asked for. A fling's reported end has landed up to 24 points
+  // either side of `to`, so the end gets 25.
+  test('a locator swipe follows a path relative to the node', async ({ screen }) => {
     await showSection(screen, 'Gestures');
+    const pad = screen.getByTestId('swipe-pad');
     const swipeStatus = screen.getByTestId('swipe-status');
+    const box = await pad.boundingBox();
+    if (box === null) throw new Error('swipe pad has no box');
+    const width = (box.width * 80) / box.height;
 
-    await screen.getByTestId('swipe-pad').swipe({ from: { x: '80%', y: '50%' }, to: { x: '20%', y: '50%' } });
+    await pad.swipe({ from: { x: '80%', y: '50%' }, to: { x: '20%', y: '50%' } });
 
-    await expect
-      .poll(async () => {
-        const match = /^swipe: (\d+),(\d+) to (-?\d+),\d+$/.exec((await swipeStatus.textContent()) ?? '');
-        return match !== null && Number(match[3]) < Number(match[1]) && Math.abs(Number(match[2]) - 40) <= 1;
-      })
-      .toBe(true);
+    await expect(swipeStatus).toContainText(' to ');
+    const path = /^swipe: (\d+),(\d+) to (-?\d+),(\d+)$/.exec((await swipeStatus.textContent()) ?? '');
+    if (path === null) throw new Error('swipe status has no path');
+    expect(Math.abs(Number(path[1]) - 0.8 * width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(Number(path[3]) - 0.2 * width)).toBeLessThanOrEqual(25);
+    expect(Math.abs(Number(path[2]) - 40)).toBeLessThanOrEqual(2);
+    expect(Math.abs(Number(path[4]) - 40)).toBeLessThanOrEqual(2);
   });
 
   test('an ambiguous locator fails at once', async ({ screen }) => {

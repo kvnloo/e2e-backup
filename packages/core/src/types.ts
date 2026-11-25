@@ -461,14 +461,14 @@ export interface ActionOptions {
  * A point in CSS pixels. For `tap({ position })` the origin is the node's own
  * top-left corner, inside its border on a document platform. A `Point` is
  * also a `ScreenPoint`, whose origin is the viewport's top-left corner, the
- * space `boundingBox()` reports in.
+ * space `boundingBox()` reports in, or the node's for `locator.swipe`.
  */
 export type Point = ViewportPoint;
 
-/** CSS pixels, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. For `locator.swipe`, the percentage is of the node's box. */
+/** CSS pixels, or a percentage of the viewport's width (`x`) or height (`y`), `'0%'` through `'100%'`. For `locator.swipe`, both are measured on the node: see `SwipePathOptions`. */
 export type ScreenCoordinate = number | `${number}%`;
 
-/** A viewport point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. */
+/** A point in pixels, percentages, or both: `{ x: '50%', y: 120 }`. It's on the viewport, or on the node for `locator.swipe`. */
 export interface ScreenPoint {
   readonly x: ScreenCoordinate;
   readonly y: ScreenCoordinate;
@@ -531,8 +531,8 @@ export interface SwipeOptions {
 /**
  * A swipe along a path between two points: a touch swipe on a device, a
  * pointer drag on a document platform. The points are on the viewport for
- * `screen.swipe` and on the node for `locator.swipe`. On a node, a pixel
- * coordinate is an offset from its top-left corner (the same corner as
+ * `screen.swipe` and relative to the node for `locator.swipe`. There, a pixel
+ * coordinate is an offset from the node's top-left corner (the same corner as
  * `tap({ position })`), and a percentage is a share of its box.
  */
 export interface SwipePathOptions {
@@ -641,7 +641,7 @@ export interface Locator extends Omit<Screen, 'tree' | 'debug' | 'pause'> {
   scrollIntoView(options?: ActionOptions): Promise<void>;
   /**
    * Performs a swipe scoped to exactly one node: in a direction, or along a
-   * path between two of its points.
+   * path relative to the node.
    */
   swipe(options: (SwipeOptions | SwipePathOptions) & ActionOptions): Promise<void>;
   /** Reads normalized text once a match exists, without retrying for a particular value. */

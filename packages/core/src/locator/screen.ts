@@ -240,8 +240,10 @@ class ScreenImpl implements Screen {
 
   async swipe(options: SwipeOptions | SwipePathOptions): Promise<void> {
     if (isSwipePath(options)) {
-      const { from, action, label } = swipePath(options, ['from', 'to', 'duration']);
-      await this.context.steps.run('screen', 'screen.swipe', label, () => this.context.engine.performAt(from, action));
+      const { from, to, action } = swipePath(options);
+      await this.context.steps.run('screen', 'screen.swipe', `${describePoint(from)} → ${describePoint(to)}`, () =>
+        this.context.engine.performAt(from, action),
+      );
       return;
     }
     rejectUnknownOptions('swipe', options, ['direction', 'momentum']);
@@ -595,8 +597,8 @@ class LocatorImpl extends ScreenImpl implements Locator {
 
   override swipe(options: (SwipeOptions | SwipePathOptions) & ActionOptions): Promise<void> {
     if (isSwipePath(options)) {
-      const { from, action, label } = swipePath(options, ['from', 'to', 'duration', 'timeout']);
-      return this.context.steps.run('locator', 'locator.swipe', `${this.label} ${label}`, () =>
+      const { from, to, action } = swipePath(options, 'timeout');
+      return this.context.steps.run('locator', 'locator.swipe', `${this.label} from ${describePoint(from)} to ${describePoint(to)}`, () =>
         this.context.engine.performWithin(this.expression, from, action, options.timeout),
       );
     }
@@ -764,13 +766,12 @@ function isSwipePath(options: SwipeOptions | SwipePathOptions): options is Swipe
   return typeof options === 'object' && options !== null && ('from' in options || 'to' in options);
 }
 
-/** Validates a path swipe's options, then returns its start point, its `swipeTo` action, and its step label. */
-function swipePath(options: SwipePathOptions, keys: readonly string[]) {
-  rejectUnknownOptions('swipe', options, keys);
+/** Validates a path swipe's options, then returns its two points and its `swipeTo` action. A locator also takes `timeout`. */
+function swipePath(options: SwipePathOptions, ...extraKeys: 'timeout'[]) {
+  rejectUnknownOptions('swipe', options, ['from', 'to', 'duration', ...extraKeys]);
   const from = requireScreenPoint(options.from, 'swipe from');
   const to = requireScreenPoint(options.to, 'swipe to');
-  const action = obj({ kind: 'swipeTo' as const, target: to, durationMs: validateSwipeDuration(options.duration) });
-  return { from, action, label: `${describePoint(from)} → ${describePoint(to)}` };
+  return { from, to, action: obj({ kind: 'swipeTo' as const, target: to, durationMs: validateSwipeDuration(options.duration) }) };
 }
 
 /** Validates a point a test names: finite, and never off the plane. */

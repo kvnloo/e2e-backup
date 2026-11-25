@@ -387,7 +387,7 @@ export const KNOWN_LOCATOR_ACTION_KINDS = [...LOCATOR_ACTION_KINDS, 'blur', 'set
  * behind it: the pointer half of the action vocabulary, for a surface that
  * has pixels and coordinates where the tree lists nothing (a canvas, a map, a
  * desktop shell, a game), and for a test that names a point outright
- * (`screen.tapAt`, `screen.swipe({ from, to })`, `tap({ position })`). The
+ * (`screen.tapAt`, `screen.swipe({ from, to })`, `locator.swipe({ from, to })`, `tap({ position })`). The
  * kinds are the pointer subset of `LocatorAction` with the same meanings;
  * `dragTo` ends at a second point, and `swipe` is a scroll gesture started at
  * the point. `swipeTo` is the one kind with no node form: the finger's path
