@@ -362,7 +362,7 @@ async function showFile(file: string): Promise<number> {
     trace.actions.map((action, index) => [
       String(index + 1),
       action.at === undefined ? '-' : plain(action.at),
-      `${plain(action.summary)}${detoured.has(index) ? picocolors.yellow(' (detour)') : ''}`,
+      `${plain(action.summary)}${action.name === 'scroll' && action.times !== undefined ? ` (${String(action.times)} times)` : ''}${detoured.has(index) ? picocolors.yellow(' (detour)') : ''}`,
     ]),
   );
   const anchors = [
