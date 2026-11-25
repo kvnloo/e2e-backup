@@ -111,7 +111,7 @@ The `electron` fixture has these methods:
 | Windows | `screen` reads one window: the one `useWindow()` picked, else the first. A window the app opens does not take over. The agent sees the windows as tabs and switches between them |
 | Headed | Electron has no headless mode. Windows show unless the app hides them, and `--headed` changes nothing. On Linux CI, run under a virtual display such as `xvfb-run` |
 | Reading | Content under `aria-hidden` or `inert` is not read. Nested documents (`iframe`, `webview`) are not read, and the agent is told its screen is incomplete |
-| Selectors | `electron.locator()` matches in the window's own document and open shadow roots, never in a frame |
+| Selectors | `electron.locator()` matches in the window's document and in each open shadow root, one root at a time: a selector does not cross a shadow boundary. It never enters a frame |
 | Uploads | `setInputFiles` takes file paths. In-memory files are not supported |
 | Not supported | Video recording, `browser`-only APIs (routes, downloads, cookies), session save and restore, `toBeInViewport`, and computed-style checks |
 | Workers | No limit. An app that holds a single-instance lock can run one test at a time: set `workers: 1` |

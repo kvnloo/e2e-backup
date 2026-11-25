@@ -53,6 +53,8 @@ test.describe('sign-in window', () => {
     // A label wrapping a field is a container Chromium's tree leaves out; a selector still reaches it.
     await expect(electron.locator('#sign-in > label').first()).toHaveText('Username');
     await expect(electron.locator('#sign-in > label')).toHaveCount(4);
+    // A web component's content is in an open shadow root.
+    await expect(electron.locator('.badge')).toHaveText('Beta');
   });
 
   test('scrolls a list to an item below its edge', async ({ screen }) => {

@@ -521,22 +521,37 @@ export class ElectronSurface {
     });
   }
 
-  /** The backend ids of the elements a CSS selector matches in the window's document. */
+  /**
+   * The backend ids of the elements a CSS selector matches in the window's
+   * document and in each open shadow root, run in the engine's isolated
+   * world. A selector matches within one root at a time, as
+   * `querySelectorAll` does; it never enters a frame.
+   */
   private async querySelectorAll(window: AppWindow, selector: string): Promise<ReadonlySet<number>> {
     const session = await this.session(window.page);
-    const { root } = await session.send('DOM.getDocument', { depth: 0 });
-    let nodeIds: readonly number[];
+    const contextId = await this.world(window.page);
+    const { result, exceptionDetails } = await session.send('Runtime.evaluate', {
+      expression: `(${QUERY_ALL})(${JSON.stringify(selector)})`,
+      contextId,
+      objectGroup: WORLD_NAME,
+    });
     try {
-      ({ nodeIds } = await session.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector }));
-    } catch (cause) {
-      throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(selector)} is not a CSS selector this window can match: ${(cause as Error).message.split('\n')[0]}`, { retryable: false, cause });
+      if (exceptionDetails !== undefined) {
+        const reason = (exceptionDetails.exception?.description ?? exceptionDetails.text).split('\n')[0];
+        throw new EngineError('UNSUPPORTED_CAPABILITY', `${JSON.stringify(selector)} is not a CSS selector this window can match: ${reason}`, { retryable: false });
+      }
+      const ids = new Set<number>();
+      if (result.objectId === undefined) return ids;
+      const { result: entries } = await session.send('Runtime.getProperties', { objectId: result.objectId, ownProperties: true });
+      for (const entry of entries) {
+        if (!/^\d+$/.test(entry.name) || entry.value?.objectId === undefined) continue;
+        const { node } = await session.send('DOM.describeNode', { objectId: entry.value.objectId });
+        ids.add(node.backendNodeId);
+      }
+      return ids;
+    } finally {
+      await session.send('Runtime.releaseObjectGroup', { objectGroup: WORLD_NAME }).catch(() => undefined);
     }
-    const ids = new Set<number>();
-    for (const nodeId of nodeIds) {
-      const { node } = await session.send('DOM.describeNode', { nodeId });
-      ids.add(node.backendNodeId);
-    }
-    return ids;
   }
 
   // --- acting ---
@@ -1084,5 +1099,15 @@ const FOCUSED_EDITABLE = `(() => {
   if (active.tagName === 'INPUT') return ${TEXT_INPUT_TYPES}.includes((active.getAttribute('type') || '').toLowerCase()) && !active.readOnly && !active.disabled;
   return false;
 })()`;
+
+const QUERY_ALL = `function (selector) {
+  const found = [];
+  const visit = (root) => {
+    found.push(...root.querySelectorAll(selector));
+    for (const element of root.querySelectorAll('*')) if (element.shadowRoot) visit(element.shadowRoot);
+  };
+  visit(document);
+  return found;
+}`;
 
 const NEXT_FRAME = `document.visibilityState === 'hidden' ? Promise.resolve() : new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))`;

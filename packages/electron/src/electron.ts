@@ -35,8 +35,9 @@ export interface Electron {
   useWindow(which: WindowMatcher): Promise<ElectronWindow>;
   /**
    * A locator for a CSS selector in the window `screen` reads, for an element
-   * no role, label, text, or test id names. It matches in the window's own
-   * document, piercing open shadow roots and never entering a frame.
+   * no role, label, text, or test id names. It matches in the window's
+   * document and in each open shadow root, one root at a time, and never
+   * enters a frame.
    */
   locator(selector: string): Locator;
 }

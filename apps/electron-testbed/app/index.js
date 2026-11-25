@@ -36,6 +36,9 @@ document.getElementById('open-settings').addEventListener('click', () => {
   void window.testbed.openSettings();
 });
 
+// A web component's content sits in an open shadow root, where a CSS locator still reaches it.
+document.getElementById('badge-host').attachShadow({ mode: 'open' }).innerHTML = '<span class="badge">Beta</span>';
+
 const items = document.getElementById('items');
 for (let index = 1; index <= 40; index += 1) {
   const item = document.createElement('li');
