@@ -562,10 +562,13 @@ export class ElectronSurface {
       const keep = new Set([...selected.values()].flatMap((ids) => [...ids]));
       const { root } = this.project(raw, 'node', keep);
       const idOf = (backendNodeId: number): string => `${window.serial}.${backendNodeId}`;
+      // The hook answers in document order, as `querySelectorAll` does; `aria-owns` can put the tree in another one.
+      const domOrder = new Map((raw.document.nodes.backendNodeId ?? []).map((backendNodeId, index) => [idOf(backendNodeId), index]));
+      const position = (node: SemanticNode): number => domOrder.get(node.ref.id) ?? Number.MAX_SAFE_INTEGER;
       return resolveExpression(expression, [root], {
         selector: (selector, candidates) => {
           const ids = new Set([...(selected.get(selector) ?? [])].map(idOf));
-          return candidates.filter((node) => ids.has(node.ref.id));
+          return candidates.filter((node) => ids.has(node.ref.id)).toSorted((a, b) => position(a) - position(b));
         },
       });
     });

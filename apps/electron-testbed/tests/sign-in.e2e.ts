@@ -165,6 +165,11 @@ test.describe('sign-in window', () => {
     await expect(rich).toHaveText('Rewritten');
   });
 
+  test('counts a CSS locator in document order where aria-owns reorders the tree', async ({ electron }) => {
+    await expect(electron.locator('button.ordered').first()).toHaveText('DOM first');
+    await expect(electron.locator('button.ordered').last()).toHaveText('DOM second');
+  });
+
   test('attaches a file by path and refuses a path that names nothing', async ({ screen }) => {
     const attachment = screen.getByTestId('attachment');
     await attachment.setInputFiles('app/settings.html');
