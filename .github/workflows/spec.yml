@@ -230,6 +230,8 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
+      # The notices of the crates the addon links, committed in each platform package, must match Cargo.lock.
+      - run: node ../scripts/native-licenses.ts --check
       - run: node ../scripts/build-native.ts --target aarch64-apple-darwin
       - run: node ../scripts/build-native.ts --target x86_64-apple-darwin
       # Only an Intel Mac could load the x64 build; reading its architecture catches a wrong or cut-short build here.
