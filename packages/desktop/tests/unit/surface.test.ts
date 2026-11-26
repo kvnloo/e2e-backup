@@ -245,6 +245,16 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(theirs, 300)).toBe(false);
   });
 
+  it('quits an app a launch that answered without one starts a moment later, by its token', async () => {
+    const { surface, fake } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified', 'no new process carries the token', { kind: 'unclaimed' })] });
+    await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    const { token } = last<{ token: string }>(fake, 'launch')!;
+    const late = standIn();
+    setTimeout(() => fake.carriers.set(late, token), 350);
+    await surface.endAttempt({ signal, timeoutMs: 5_000 });
+    expect(await gone(late)).toBe(true);
+  });
+
   it('never takes a running copy without its launch token, and says the launch left nothing it could find', async () => {
     const theirs = standIn();
     const { surface } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified')] });

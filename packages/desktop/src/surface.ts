@@ -60,6 +60,12 @@ const PENDING_SETTLE_MS = 3_000;
 /** How much of a quit's budget is kept for a killed process to exit. */
 const EXIT_WAIT_MS = 500;
 
+/** How long a quit looks for an app a launch that answered without one may still have started. */
+const LATE_APP_MS = 2_000;
+
+/** How often it looks. */
+const LATE_APP_POLL_MS = 100;
+
 /** How long a launch waits for its process, and then for the app's window to become readable, before it reports why it did not. */
 const LAUNCH_READY_MS = 10_000;
 
@@ -617,6 +623,10 @@ export class DesktopSurface {
       }
       const owned = new Set(carriers);
       if (settled !== 'timeout' && settled !== undefined) owned.add(settled.pid);
+      // A launch that answered without a process may have started the app a moment later: look again, within the budget.
+      if (owned.size === 0 && settled !== 'timeout') {
+        for (const pid of await this.lateCarriers(pending.token, Math.min(deadline - EXIT_WAIT_MS, Date.now() + LATE_APP_MS), signal)) owned.add(pid);
+      }
       if (!(await killed([...owned], deadline, signal))) {
         throw new EngineError('ENGINE_FAILURE', `the process a launch of ${pending.target} started did not exit; quitting tries again`, { retryable: false });
       }
@@ -637,6 +647,16 @@ export class DesktopSurface {
     this.driver?.forgetProcess(pid);
     this.dropProcess();
     if (this.home !== undefined) await rm(path.join(this.home, APP_FILE), { force: true }).catch(() => undefined);
+  }
+
+  /** The processes carrying a launch's token, looked for until one appears or `until` passes; none when none did. */
+  private async lateCarriers(token: string, until: number, signal: AbortSignal): Promise<readonly number[]> {
+    while (Date.now() < until && !signal.aborted) {
+      await new Promise((resolve) => setTimeout(resolve, LATE_APP_POLL_MS));
+      const carriers = this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${token}`);
+      if (carriers !== null && carriers.length > 0) return carriers;
+    }
+    return [];
   }
 
   /**
