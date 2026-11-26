@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { createAgentDeviceClient } from 'agent-device';
 import { ConfigurationError, defineEngine, obj, type EngineAppCheckInfo, type EngineAppDeclaration, type EngineHandle, type EngineIsolation } from '@e2e-dev/core/engine';
 import { createDeviceFixture } from './device.ts';
+import { isDeviceList } from './pool.ts';
 import type { ClientFactory, MobileOptions, MobilePlatform } from './options.ts';
 import { assertLaunchArgumentsFor } from './launch-arguments.ts';
 import { isLink, linkTarget } from './links.ts';
@@ -78,6 +79,16 @@ export function buildEngine<Platform extends MobilePlatform>(surface: AgentDevic
       startVideo: (operation) => surface.startVideo(operation),
       stopVideo: (operation) => surface.stopVideo(operation),
     },
+    // A session is the app's files and its secure-store rows, read from the
+    // host: a provider's hosted device exposes neither. See state/index.ts.
+    ...(isLocalDevice(surface.options.device)
+      ? {
+          state: {
+            capture: (operation) => surface.captureState(operation),
+            restore: (state, operation) => surface.restoreState(state, operation),
+          },
+        }
+      : {}),
     fixtures: {
       device: (context) => createDeviceFixture(surface, context),
     },
@@ -88,6 +99,11 @@ export function buildEngine<Platform extends MobilePlatform>(surface: AgentDevic
   });
   surfaces.set(handle, surface);
   return handle;
+}
+
+/** Whether the `device` option names local devices, as opposed to a provider that leases hosted ones. */
+function isLocalDevice(device: MobileOptions['device']): boolean {
+  return device === undefined || typeof device === 'string' || isDeviceList(device);
 }
 
 /** Creates one agent-device engine: one device session per worker; a test launches the pinned app with `app.open()`. */

@@ -31,6 +31,7 @@ import {
   type EngineInitInfo,
   type EngineObserveOptions,
   type EngineSnapshot,
+  type EngineState,
   type EngineAppInfo,
   type LaunchArguments,
   type ResolvedLaunchArguments,
@@ -72,6 +73,7 @@ import { maskPng } from './png.ts';
 import { mobileDoctor } from './doctor.ts';
 import { deviceLabel, deviceSelection, pinnedApp, type DeviceSelection, type SlotBinding } from './bindings.ts';
 import { assertAppId } from './links.ts';
+import { captureAppState, restoreAppState, type StateTarget } from './state/index.ts';
 import { bootRequest, DevicePool } from './pool.ts';
 import { recordLease, travelledLease, type DeviceLease, type RecordingDeviceProvider } from './provider.ts';
 import {
@@ -1924,21 +1926,46 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   }
 
   async restart(operation: OperationContext): Promise<void> {
-    const app = this.pinnedApp;
-    if (app === undefined) throw unsupported(`launching the app needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
+    const app = this.requirePinnedApp('launching the app');
     await this.openApp(app, { relaunch: true }, operation.signal);
   }
 
   /** Clears the pinned app's persisted state and relaunches it: the device equivalent of a fresh context. */
   async reset(operation: OperationContext): Promise<void> {
-    const app = this.pinnedApp;
-    if (app === undefined) throw unsupported(`app.clearState needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
+    const app = this.requirePinnedApp('app.clearState');
     await this.command(
       'clear app state',
       (client) => client.settings.update({ ...this.selection(), setting: 'clear-app-state', state: 'clear', app }),
       operation.signal,
     );
     await this.openApp(app, { relaunch: true }, operation.signal);
+  }
+
+  /** Saves the pinned app's persisted state, files and secure store; the app is stopped for the read and relaunched after it. */
+  async captureState(operation: OperationContext): Promise<EngineState> {
+    const target = this.stateTarget('session.save()');
+    // Leaving the app is when it, and the system on its behalf (cookies), writes what it still holds in memory.
+    await this.command('session.save()', (client) => client.command.home(this.selection()), operation.signal);
+    const state = await captureAppState(target, operation.signal);
+    await this.openApp(target.app, { relaunch: true }, operation.signal);
+    return state;
+  }
+
+  /** Replaces the pinned app's persisted state with a saved one and relaunches it, so the test starts on the restored app. */
+  async restoreState(state: EngineState, operation: OperationContext): Promise<void> {
+    const target = this.stateTarget('restoring a session');
+    await restoreAppState(target, state, operation.signal);
+    await this.openApp(target.app, { relaunch: true }, operation.signal);
+  }
+
+  private stateTarget(api: string): StateTarget {
+    return { platform: this.options.platform, deviceId: this.boundDevice.deviceId, app: this.requirePinnedApp(api) };
+  }
+
+  private requirePinnedApp(api: string): string {
+    const app = this.pinnedApp;
+    if (app === undefined) throw unsupported(`${api} needs the target's \`app.bundleId\`, or ${UNINSTALLED_BUILD}`);
+    return app;
   }
 
   /**

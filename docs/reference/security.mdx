@@ -378,7 +378,9 @@ scans leave the download as served and label it `incomplete`.
 A saved session holds authentication state. It also carries, in the same
 ciphertext, the secret values the setup test resolved from a provider. The
 test that restores it redacts those values. The envelope holds, unencrypted
-but authenticated, the secret names.
+but authenticated, the secret names. On a device, the state is the app's
+data directory and its keychain or Keystore entries, with the keys the
+simulator's keychain encrypts them under.
 
 | Property | Value |
 | --- | --- |

@@ -377,7 +377,9 @@ Every matcher and option: Full reference: docs/reference/expect.mdx.
 ## Sign-in sessions
 
 Save sign-in state under a name in a setup test, and declare it with
-`session`. Selecting a dependent test alone still runs its setup.
+`session`. Selecting a dependent test alone still runs its setup. On
+`@e2e-dev/mobile` this works on a local simulator or emulator only, and the
+restored sign-in stays on the device for later tests.
 
 For a test of two users interacting, use distinct accounts in separate
 sessions. Restore the primary user's named session through `session`.

@@ -107,7 +107,7 @@ async function screenRootOf(h: Harness): Promise<SemanticNode> {
 describe('manifest', () => {
   it('declares observation, actions, location, artifacts, the device fixture, and session hooks', () => {
     const pinned = harness().engine;
-    expect([...pinned.capabilities].toSorted()).toEqual(['actions', 'artifacts', 'device', 'keyboard', 'location', 'observation', 'pointer', 'viewport-intersection']);
+    expect([...pinned.capabilities].toSorted()).toEqual(['actions', 'artifacts', 'device', 'keyboard', 'location', 'observation', 'pointer', 'state', 'viewport-intersection']);
     expect(pinned.name).toBe('mobile');
     expect(describeEngine(pinned).launchArgumentValues).toBe(true);
     expect(pinned.version).not.toBe('unknown');
@@ -115,7 +115,13 @@ describe('manifest', () => {
     // No `open`: a device app has no URL. No select verb either: the touch surface has no option lists to pick from.
     expect(pinned.session!.open).toBeUndefined();
     expect(pinned.actions).toEqual(['tap', 'doubleTap', 'multiTap', 'longPress', 'fill', 'clear', 'press', 'check', 'uncheck', 'focus', 'hover', 'dragTo', 'swipe']);
-    expect(pinned.state).toBeUndefined();
+    expect(Object.keys(pinned.state!).toSorted()).toEqual(['capture', 'restore']);
+  });
+
+  it('declares no session state for a device provider, whose devices the host cannot read', () => {
+    const hosted = harness({ device: { name: 'cloud', acquire: async () => ({ id: 'lease' }), release: async () => undefined } }).engine;
+    expect(hosted.state).toBeUndefined();
+    expect(hosted.capabilities.has('state')).toBe(false);
   });
 
   it('default-exports the factory, which is what an MCP session that names the package calls', async () => {

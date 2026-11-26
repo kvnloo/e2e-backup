@@ -93,6 +93,23 @@ call `app.open()` at the start of each test. Sessions last one run, are
 encrypted on disk with a key held only in memory, and are deleted at
 cleanup. See [Sessions](/reference/security#sessions).
 
+### On a device
+
+On a `mobile()` target a session is the app's data directory plus what the
+app keeps in the keychain (iOS) or the Keystore (Android), so a saved
+sign-in restores on any simulator or emulator in the run. The app restarts
+on save and on restore. A restored session stays on the device after the
+test: a later test without `session` on the same device starts signed in
+unless it calls `app.clearState()`, which leaves the iOS keychain alone.
+
+| Device | Sessions |
+| --- | --- |
+| Local iOS simulator | Yes. The first restore of a session saved on another simulator clears the other apps' keychain items on that simulator |
+| Local Android emulator, image without Google Play | Yes |
+| Local Android emulator, Google Play image | Debuggable builds only, without Keystore keys |
+| Physical iPhone or iPad | No: `UNSUPPORTED_CAPABILITY` |
+| Device provider | No: collection error |
+
 ## Credentials
 
 Declare test accounts in your config and read passwords from the
