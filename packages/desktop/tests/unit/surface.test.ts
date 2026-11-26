@@ -538,6 +538,13 @@ describe('DesktopSurface: reading', () => {
     await expect(surface.locate(testId('username'), operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/screen is locked/) });
   });
 
+  it('reads the main window before the first one listed when the app in the background has none focused', async () => {
+    const list = windows(() => [{ id: 'w-dialog', visible: true }, { id: 'w-doc', visible: true, is_main: true }]);
+    const { surface, fake } = await launched({ listWindows: [list] }, { observe: false });
+    await surface.observe(operation(), undefined);
+    expect((last(fake, 'snapshot') as { windowId: string }).windowId).toBe('w-doc');
+  });
+
   it("reads the app's own window, not the Siri dialog macOS put in focus over it, unless the test picks the dialog", async () => {
     const list = windows(() => [{ id: 'w-siri', is_focused: true, system: true }, { id: 'w-doc', visible: true }]);
     const { surface, fake } = await launched({ listWindows: [list] }, { observe: false });

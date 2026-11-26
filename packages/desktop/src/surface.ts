@@ -1379,13 +1379,15 @@ export class DesktopSurface {
 
 /**
  * The app's windows in the order a command reads them when the test chose
- * none: the focused one, the visible ones, the rest. A dialog macOS adds
- * (Siri's, which macOS 27 shows over an app after a press in a SwiftUI
- * sheet) comes last, though it takes focus: `desktop.useWindow` still
- * picks it.
+ * none: the focused one, the main one (an app in the background may have no
+ * focused window), the visible ones, the rest. A dialog macOS adds (Siri's,
+ * which macOS 27 shows over an app after a press in a SwiftUI sheet, and
+ * lists first) comes last, though it may take focus: `desktop.useWindow`
+ * still picks it.
  */
 function byPreference(windows: readonly RawWindow[]): RawWindow[] {
-  const rank = (window: RawWindow): number => (window.system === true ? 3 : window.is_focused === true ? 0 : window.visible !== false ? 1 : 2);
+  const rank = (window: RawWindow): number =>
+    window.system === true ? 4 : window.is_focused === true ? 0 : window.is_main === true ? 1 : window.visible !== false ? 2 : 3;
   return windows.toSorted((a, b) => rank(a) - rank(b));
 }
 

@@ -52,6 +52,8 @@ export interface RawWindow {
   readonly title?: string;
   /** The app's key window, or the window its focused sheet or alert is on. */
   readonly is_focused?: boolean;
+  /** The app's main window, which an app in the background still names while none has focus. */
+  readonly is_main?: boolean;
   /** On screen now: false for a minimized window, or one on another Space. */
   readonly visible?: boolean;
   /** False for a window accessibility cannot read. */
