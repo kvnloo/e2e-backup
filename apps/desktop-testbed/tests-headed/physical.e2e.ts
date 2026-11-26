@@ -24,6 +24,8 @@ test.describe('physical input', () => {
     const box = await note.boundingBox();
     expect(box).not.toBeNull();
     await screen.tapAt({ x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 });
+    // The tap put focus in the field: typing below would focus it by itself, and pass whether the tap landed or not.
+    await expect(note).toBeFocused();
     await note.pressSequentially('by hand');
     await note.press('Enter');
     await expect(screen.getByTestId('controls-status')).toHaveText('Submitted: by hand');
