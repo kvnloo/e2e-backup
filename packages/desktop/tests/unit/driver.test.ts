@@ -1,7 +1,7 @@
 import { EngineError } from '@e2e-dev/core/engine';
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { call, DriverFailure, loadNativeDriver, translate, type Envelope } from '../../src/driver.ts';
+import { call, DriverFailure, loadNativeDriver, translate, type DesktopDriver, type Envelope } from '../../src/driver.ts';
 
 const signal = new AbortController().signal;
 const later = <T>(answer: Envelope<T>, ms: number): Promise<Envelope<T>> => new Promise((resolve) => setTimeout(() => resolve(answer), ms));
@@ -91,7 +91,29 @@ describe('call: onCutOff', () => {
   });
 });
 
+/** Every function of `DesktopDriver`; `satisfies` fails the typecheck when the interface gains or loses one. */
+const NATIVE_FUNCTIONS = [
+  'status',
+  'screenLocked',
+  'processStarted',
+  'processesCarrying',
+  'forgetProcess',
+  'launch',
+  'listWindows',
+  'snapshot',
+  'act',
+  'cancelInput',
+  'press',
+  'focusWindow',
+  'pointer',
+  'screenshot',
+] as const satisfies readonly Exclude<keyof DesktopDriver, 'version'>[];
+type Missing = Exclude<Exclude<keyof DesktopDriver, 'version'>, (typeof NATIVE_FUNCTIONS)[number]>;
+const everyFunction: [Missing] extends [never] ? true : Missing = true;
+
 describe('loadNativeDriver', () => {
+  it('lists every function of the driver interface', () => expect(everyFunction).toBe(true));
+
   // Skipped wherever no addon was built, but never in CI's `native` job, which sets REQUIRE_DESKTOP_NATIVE once it built one.
   it.skipIf(process.env.REQUIRE_DESKTOP_NATIVE !== '1' && (process.platform !== 'darwin' || !existsSync(new URL(`../../native/desktop.darwin-${process.arch}.node`, import.meta.url))))(
     'names the build it loaded and keeps every native function callable',
@@ -99,6 +121,8 @@ describe('loadNativeDriver', () => {
       const driver = loadNativeDriver();
       expect(['checkout build', expect.stringMatching(/^\d+\.\d+\.\d+/)]).toContainEqual(driver.version);
       expect(typeof driver.status().accessibility).toBe('boolean');
+      // The loader casts the addon to the interface unchecked: a renamed export would fail only on a real app.
+      for (const name of NATIVE_FUNCTIONS) expect(typeof driver[name], name).toBe('function');
     },
   );
 
