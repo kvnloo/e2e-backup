@@ -226,8 +226,9 @@ export interface Device {
    */
   lock(): Promise<void>;
   /**
-   * Unlocks the screen and resolves once the device reports it unlocked; the
-   * app that was in front comes back. Android wakes the screen and dismisses
+   * Unlocks the screen and resolves once the device reports it unlocked.
+   * Nothing brings an app to the front: check the screen you expect next.
+   * Android wakes the screen and dismisses
    * the keyguard, an iOS simulator swipes up from the bottom edge. A display
    * that is off turns on even when the screen is not locked (Android always
    * sends its wake key); an unlocked screen that is on stays as it is. It never
