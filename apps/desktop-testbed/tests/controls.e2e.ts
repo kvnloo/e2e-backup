@@ -3,7 +3,8 @@ import { expect } from 'e2e';
 
 /**
  * The controls window: one test per capability the sign-in form does not
- * reach, all without physical input, so the app stays in the background.
+ * reach, all without physical input. The app activates itself at launch, so
+ * these do not test delivery to an app in the background.
  */
 test.describe('controls window', () => {
   test.beforeEach(async ({ app, screen, desktop }) => {
