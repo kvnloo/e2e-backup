@@ -25,6 +25,8 @@ export interface RawNode {
   readonly value?: string;
   readonly description?: string;
   readonly hint?: string;
+  /** A heading's level, from the app's `AXHeadingLevel`. */
+  readonly level?: number;
   readonly placeholder?: string;
   readonly native_id?: { readonly kind: string; readonly value: string };
   readonly states?: readonly string[];
@@ -438,8 +440,9 @@ export function projectSnapshot(
   };
 }
 
-/** A heading's level, when the driver names it in the node's description (`heading level 2`). */
+/** A heading's level: the one the app reports, else one its description names (`heading level 2`). */
 function headingLevel(node: RawNode): { level?: number } {
+  if (node.level !== undefined) return { level: node.level };
   const match = /\blevel (\d)\b/i.exec(node.description ?? '');
   return match === null ? {} : { level: Number(match[1]) };
 }

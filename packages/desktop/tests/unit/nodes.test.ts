@@ -43,6 +43,36 @@ describe('projectSnapshot', () => {
     expect(bindings.get(signIn.ref.id)).toMatchObject({ ref: '@s1y1hxmo5pexrl:e5', actions: ['Click', 'SetFocus'] });
   });
 
+  it("reads a heading's level from the app, else from its description", () => {
+    const { root } = projectSnapshot(
+      {
+        snapshot_id: 's',
+        tree: {
+          role: 'window',
+          name: 'W',
+          children: [
+            { role: 'heading', name: 'Summary', level: 2 },
+            { role: 'heading', name: 'Notes', description: 'heading level 3' },
+            { role: 'heading', name: 'Plain' },
+          ],
+        },
+      },
+      minter(),
+    );
+    expect(all(root).filter((node) => node.role === 'heading').map((node) => [node.name, node.level])).toEqual([
+      ['Summary', 2],
+      ['Notes', 3],
+      ['Plain', undefined],
+    ]);
+    const heading = (level: number) =>
+      resolveExpression(
+        { kind: 'query', query: { kind: 'role', value: { kind: 'string', value: 'heading', exact: true }, name: { kind: 'string', value: 'Summary', exact: true }, level } },
+        [root],
+      );
+    expect(heading(2)).toHaveLength(1);
+    expect(heading(1)).toEqual([]);
+  });
+
   it('reports a secure field as a password field with no value', () => {
     const { root } = project('macos/appkit-form');
     const password = byTestId(root, 'password')!;
