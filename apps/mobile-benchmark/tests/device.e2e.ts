@@ -97,6 +97,15 @@ test('a shake is sent without an error and leaves the screen readable', async ({
   await expect(screen.getByTestId('email-input')).toBeVisible();
 });
 
+// lock and unlock each return only once the device reports the new state, so
+// the check after them is that the app the lock covered is back in front.
+test('locking and unlocking the screen brings the same screen back', async ({ app, device, screen }) => {
+  await openScenario({ app, device, screen }, 'Sequential Onboarding');
+  await device.lock();
+  await device.unlock();
+  await expect(screen.getByTestId('email-input')).toBeVisible();
+});
+
 test('onboarding rejects a malformed email before advancing', async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Sequential Onboarding');
   await screen.getByTestId('email-input').fill('jane');
