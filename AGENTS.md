@@ -914,7 +914,8 @@ trees, on both platforms, without a device.
   latest Bun, `scripts/install-smoke.ts`, a fresh install of the packed
   packages with pnpm 11 and 12, and `native` on `blacksmith-6vcpu-macos-26`
   (the desktop driver's `cargo fmt --check`, clippy, and `cargo test`, a
-  build for both Mac architectures, and a load of the arm64 build, also
+  build for both Mac architectures with each one's architecture checked by
+  `lipo`, and a load of the arm64 build, also
   through the engine's loader test), which
   `spec gate` needs; `benchmark.yml` runs the
   web benchmark's two suites; `mobile.yml` runs the mobile benchmark's on an

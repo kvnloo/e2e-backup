@@ -225,6 +225,11 @@ jobs:
       - run: cargo test --locked
       - run: node ../scripts/build-native.ts --target aarch64-apple-darwin
       - run: node ../scripts/build-native.ts --target x86_64-apple-darwin
+      # Only an Intel Mac could load the x64 build; reading its architecture catches a wrong or cut-short build here.
+      - name: Check each build's architecture
+        run: |
+          test "$(lipo -archs desktop.darwin-arm64.node)" = arm64
+          test "$(lipo -archs desktop.darwin-x64.node)" = x86_64
       - name: Load the addon
         run: node -e "const status = require('./desktop.darwin-arm64.node').status(); if (typeof status.accessibility !== 'boolean') process.exit(1)"
       # The engine's loader on the addon just built: the test that runs it is skipped wherever no addon was built.
