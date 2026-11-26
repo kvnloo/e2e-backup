@@ -139,6 +139,13 @@ describe('locator expressions', () => {
     );
   });
 
+  it('describeExpression renders a scoped selector after its scope', () => {
+    const scope = roleQuery('row', { name: 'Ada' }, undefined);
+    expect(describeExpression({ kind: 'selector', selector: 'td.price', scope })).toBe(
+      'getByRole("row", name: "Ada") >> locator("td.price")',
+    );
+  });
+
   it('describeExpression renders a has filter with the inner locator, after hasText when both are set', () => {
     const inner = roleQuery('button', { name: 'Remove' }, undefined);
     const source = roleQuery('listitem', undefined, undefined);

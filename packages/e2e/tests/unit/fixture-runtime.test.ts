@@ -17,6 +17,8 @@ import type { E2EConfig } from '../../src/run-types.ts';
 import { installFakeLoopModel } from '../helpers/fake-loop-model.ts';
 import { extracted, fakeCalls, installFakeModel, judgment, notFound } from '../helpers/fake-model.ts';
 import { snapshot } from '../helpers/snapshot.ts';
+import { locatorInternals } from '@e2e-dev/core/lib/locator/screen';
+import type { Locator, Screen } from '@e2e-dev/core/lib/types';
 
 /** A real fixture graph with an in-memory engine and no runner process or model provider. */
 function runtime(engine: EngineHandle, overrides: Partial<E2EConfig> = {}, app?: TargetApp) {
@@ -291,6 +293,21 @@ describe('explicit fixture operations', () => {
     await (expectFixture(gadget) as unknown as { toBeReady(): Promise<void> }).toBeReady();
     expect(steps.lastVerifiedStepIndex).toBe(2);
     expect(steps.all().map((step) => step.status)).toEqual(['passed', 'failed', 'passed']);
+  });
+
+  it('reads the expression behind a locator of this screen, and refuses anything else naming the api', () => {
+    const engine = defineEngine({ name: 'fake', version: '1', spiVersion: 1, observe: async () => snapshot([]), fixtures: {
+      gadget: (context) => context.fixture('gadget', { expressionOf: (locator: Locator) => context.expressionOf('gadget.scope', locator) }, {}),
+    } });
+    const { fixtures } = runtime(engine);
+    const { gadget, screen } = fixtures as unknown as { gadget: { expressionOf(locator: unknown): unknown }; screen: Screen };
+    const row = screen.getByRole('row');
+    expect(gadget.expressionOf(row)).toBe(locatorInternals(row)?.expression);
+    expect(() => gadget.expressionOf({})).toThrowError(expect.objectContaining({ code: 'INVALID_LOCATOR', message: 'gadget.scope requires an e2e locator' }));
+    const other = runtime(engine).fixtures as unknown as { screen: Screen };
+    expect(() => gadget.expressionOf(other.screen.getByRole('row'))).toThrowError(
+      expect.objectContaining({ code: 'INVALID_LOCATOR', message: expect.stringContaining('gadget.scope requires a locator made by this screen') }),
+    );
   });
 
   it('maps an EngineError a contributed method throws onto the runner taxonomy, and leaves other errors as thrown', async () => {

@@ -255,6 +255,29 @@ describe('resolveExpression', () => {
     expect(seen).toEqual([['a1'], []]);
   });
 
+  it('hands a scoped selector the descendants of every scope match in one call, and refuses before resolving the scope without a hook', () => {
+    const seen: string[][] = [];
+    const all = (_selector: string, candidates: readonly SemanticNode[]): readonly SemanticNode[] => {
+      seen.push(candidates.map((candidate) => candidate.ref.id));
+      return candidates;
+    };
+    const lists = [
+      node('l1', { role: 'list', children: [node('a', {}), node('l2', { role: 'list', children: [node('b', {})] })] }),
+      node('c', {}),
+      node('l3', { role: 'list', children: [node('d', {})] }),
+    ];
+    const scoped = (scope: LocatorExpression): LocatorExpression => ({ kind: 'selector', selector: '*', scope });
+    // Nested scopes merge, so `b` is a candidate once; `c` and the scope matches themselves are none.
+    expect(resolveExpression(scoped(query('role', 'list')), lists, { selector: all }).map((match) => match.ref.id)).toEqual(['a', 'l2', 'b', 'd']);
+    expect(seen).toEqual([['a', 'l2', 'b', 'd']]);
+    // A scope that matches nothing still hands the hook its selector, so a malformed one fails.
+    expect(resolveExpression(scoped(query('role', 'table')), lists, { selector: all })).toEqual([]);
+    expect(seen.at(-1)).toEqual([]);
+    // A frame scope would throw FRAME_NOT_FOUND if it were resolved first.
+    const framed: LocatorExpression = { kind: 'frame', selector: 'iframe', source: query('role', 'list') };
+    expect(() => ids(scoped(framed), lists)).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }));
+  });
+
   it('rejects frames, since a semantic tree has no nested documents', () => {
     expect(() => ids({ kind: 'frame', selector: 'iframe', source: query('role', 'button') })).toThrowError(
       expect.objectContaining({ code: 'FRAME_NOT_FOUND', retryable: false }),

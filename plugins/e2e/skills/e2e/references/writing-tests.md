@@ -521,8 +521,9 @@ background: `waitForPopup(() => trigger)` makes it active and returns it.
 - **Identity:** `name` (`'chromium'`, `'firefox'`, or `'webkit'`; always
   `'chromium'` over CDP) and `version` are properties. Skip on a browser in
   the body: `test.skip(browser.name === 'firefox', 'reason')`.
-- `locator(css)` and `keyboard`/`mouse` are last resorts: prefer a
-  `screen` locator.
+- `locator(css, { within? })` and `keyboard`/`mouse` are last resorts:
+  prefer a `screen` locator. `within: row` runs the selector inside another
+  locator, like Playwright's `row.locator(css)`.
 
 Patterns use Playwright's glob grammar (`*` within one path segment, `**`
 across `/`); a relative one resolves against the base URL. Full reference:

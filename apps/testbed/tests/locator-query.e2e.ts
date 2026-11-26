@@ -2,9 +2,8 @@
  * Adapted from microsoft/playwright tests/page/locator-query.spec.ts at v1.64.1.
  * Copyright Microsoft Corporation. Licensed under the Apache License 2.0 (see ../app/playwright/LICENSE).
  * Rewritten against the e2e public API: `locator(css, { hasText, has })` is
- * a locator `filter`, `div >> p` the CSS `div p`, a nested `.locator(css)`
- * the matching semantic query scoped to the outer locator, `toHaveClass` the
- * browser matcher, and `evaluate(e => e.outerHTML)` a text read.
+ * a locator `filter`, a nested `.locator(css)` `browser.locator(css, { within })`,
+ * `toHaveClass` the browser matcher, and `evaluate(e => e.outerHTML)` a text read.
  *
  * Not ported:
  * - should throw on capture w/ nth(): Playwright `*css=` capture selector.
@@ -30,16 +29,17 @@ const sections = `
 test.describe('locator query', { platforms: ['web'], tags: ['playwright'] }, () => {
   test('should respect first() and last() @smoke', async ({ browser }) => {
     await browser.goto(content(sections));
-    expect(await browser.locator('div p').count()).toBe(6);
-    expect(await browser.locator('div').first().getByText('A').count()).toBe(1);
-    expect(await browser.locator('div').last().getByText('A').count()).toBe(3);
+    expect(await browser.locator('div >> p').count()).toBe(6);
+    expect(await browser.locator('p', { within: browser.locator('div') }).count()).toBe(6);
+    expect(await browser.locator('p', { within: browser.locator('div').first() }).count()).toBe(1);
+    expect(await browser.locator('p', { within: browser.locator('div').last() }).count()).toBe(3);
   });
 
   test('should respect nth()', async ({ browser }) => {
     await browser.goto(content(sections));
-    expect(await browser.locator('div p').nth(0).count()).toBe(1);
-    expect(await browser.locator('div').nth(1).getByText('A').count()).toBe(2);
-    expect(await browser.locator('div').nth(2).getByText('A').count()).toBe(3);
+    expect(await browser.locator('div >> p').nth(0).count()).toBe(1);
+    expect(await browser.locator('p', { within: browser.locator('div').nth(1) }).count()).toBe(2);
+    expect(await browser.locator('p', { within: browser.locator('div').nth(2) }).count()).toBe(3);
   });
 
   test('should throw on due to strictness', async ({ browser }) => {

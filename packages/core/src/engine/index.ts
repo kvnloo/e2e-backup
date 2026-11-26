@@ -271,6 +271,13 @@ export interface EngineFixtureContext {
   attachViewport(viewport: { width: number; height: number; scale: number }): void;
   /** Mints a public locator from a raw expression (a platform selector, say). */
   locator(expression: LocatorExpression): Locator;
+  /**
+   * The expression behind a test's locator, to build a new one on (a
+   * platform selector scoped inside it, say). Throws `INVALID_LOCATOR`
+   * naming `api` for a value that is not an e2e locator, or one made by
+   * another target's screen or another attempt.
+   */
+  expressionOf(api: string, locator: Locator): LocatorExpression;
   /** Mints a screen scope whose every query is wrapped by `scope` (a nested document, say). */
   screen(scope: (expression: LocatorExpression) => LocatorExpression): Screen;
   /**

@@ -1878,7 +1878,8 @@ async locate(expression) {
   a descendant's text.
 - An engine whose tree is the whole truth (a device) calls it; a browser
   engine reproduces it.
-- A `selector` expression needs the `selector` option.
+- A `selector` expression needs the `selector` option. With a `scope`, the
+  option gets the descendants of the scope's matches, in one call.
 - A `frame` expression is `FRAME_NOT_FOUND`.
 - A `union` expression matches either branch in document order, without duplicate nodes.
 
@@ -2423,6 +2424,7 @@ The factory runs once per attempt with an `EngineFixtureContext`:
 | `attachArtifact(kind, relativePath)` | Registers a file the current step produced. |
 | `attachViewport(viewport)` | Records the viewport the current step established. |
 | `locator(expression)` | Mints a public locator from a raw expression. |
+| `expressionOf(api, locator)` | Reads the expression behind a test's locator. |
 | `screen(scope)` | Mints a screen scope. |
 | [`expectable(target, factory)`](#expectations) | Makes `expect(fixture)` return matchers. |
 
@@ -2431,6 +2433,7 @@ The factory runs once per attempt with an `EngineFixtureContext`:
 | `INVALID_CONFIG` | The factory returns a plain surface, not one declared through `context.fixture`, the first time a test reaches for it. |
 | `APP_URL_REQUIRED` | `app.resolveUrl` on a target that declares no URL. |
 | `POLICY_DENIED` | `app.resolveUrl` with any scheme but `http:` and `https:` (`about:blank` aside). |
+| `INVALID_LOCATOR` | `expressionOf` with a value that is not an e2e locator, or one from another target's screen or another attempt. The message names `api`. |
 
 ```ts
 /**
@@ -2480,6 +2483,13 @@ export interface EngineFixtureContext {
   attachViewport(viewport: { width: number; height: number; scale: number }): void;
   /** Mints a public locator from a raw expression (a platform selector, say). */
   locator(expression: LocatorExpression): Locator;
+  /**
+   * The expression behind a test's locator, to build a new one on (a
+   * platform selector scoped inside it, say). Throws `INVALID_LOCATOR`
+   * naming `api` for a value that is not an e2e locator, or one made by
+   * another target's screen or another attempt.
+   */
+  expressionOf(api: string, locator: Locator): LocatorExpression;
   /** Mints a screen scope whose every query is wrapped by `scope` (a nested document, say). */
   screen(scope: (expression: LocatorExpression) => LocatorExpression): Screen;
   /**
@@ -2731,6 +2741,14 @@ export interface SemanticNode {
 
 The `selector` expression kind carries a platform-native selector string;
 `frame` scopes a query into a nested document.
+
+A `selector` with a `scope` runs from each node the scope matches, the way
+the platform chains one selector after another. The web engine uses
+Playwright's `scope.locator(selector)`, and `resolveExpression` searches the
+scope's descendants. `browser.locator(selector, { within })` builds one
+through [`expressionOf`](#contributed-fixtures). An engine that resolves
+expressions itself must honor `scope`: one that ignores it matches the whole
+screen.
 
 ```ts
 /** The `screen` query kinds. */

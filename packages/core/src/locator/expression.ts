@@ -202,8 +202,10 @@ export function describeExpression(expression: LocatorExpression): string {
       return typeof expression.index === 'number'
         ? `${describeExpression(expression.source)}.nth(${expression.index})`
         : `${describeExpression(expression.source)}.${expression.index}()`;
-    case 'selector':
-      return `locator(${JSON.stringify(expression.selector)})`;
+    case 'selector': {
+      const scope = expression.scope === undefined ? '' : `${describeExpression(expression.scope)} >> `;
+      return `${scope}locator(${JSON.stringify(expression.selector)})`;
+    }
     case 'frame':
       return `frameLocator(${JSON.stringify(expression.selector)}) >> ${describeExpression(expression.source)}`;
   }

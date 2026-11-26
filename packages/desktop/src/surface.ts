@@ -262,6 +262,9 @@ function queryKinds(expression: LocatorExpression, kinds = new Set<string>()): S
       queryKinds(expression.left, kinds);
       queryKinds(expression.right, kinds);
       break;
+    case 'selector':
+      if (expression.scope !== undefined) queryKinds(expression.scope, kinds);
+      break;
     default:
       break;
   }

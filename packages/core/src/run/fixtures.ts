@@ -25,6 +25,7 @@ import type { AttemptBudget } from './budget.ts';
 import { LocatorEngine } from '../locator/engine.ts';
 import {
   createLocator,
+  ownedLocator,
   createScopedScreen,
   createScreen,
   type ScreenContext,
@@ -526,6 +527,7 @@ function fixtureContext(
       steps.attachArtifact(environment.artifacts.register(kind, relativePath)),
     attachViewport: (viewport) => steps.attachViewport(viewport),
     locator: (expression) => createLocator(screenContext, expression),
+    expressionOf: (api, locator) => ownedLocator(screenContext, locator, api).expression,
     screen: (wrap) => createScopedScreen(screenContext, wrap),
     expectable<T extends object, E extends object>(target: T, factory: () => E): T & Expectable<E> {
       let surface: E | undefined;

@@ -374,8 +374,12 @@ export interface Browser extends Expectable<BrowserExpectation> {
   title(): Promise<string>;
   /** Waits for the current URL to match. */
   waitForURL(url: string | RegExp, options?: { timeout?: number }): Promise<void>;
-  /** Creates a web-only CSS or XPath locator. */
-  locator(selector: string): Locator;
+  /**
+   * Creates a web-only CSS or XPath locator. With `within`, the selector runs
+   * from each element that locator matches, like Playwright's
+   * `within.locator(selector)`, and inside its frame.
+   */
+  locator(selector: string, options?: { within?: Locator }): Locator;
   /** Creates a screen query scope inside one iframe. */
   frameLocator(selector: string): FrameScreen;
   /** Evaluates trusted test code in the page: a function, or a string expression whose value is returned, called first if it is a function. */
@@ -859,7 +863,13 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       rejectUnknownOptions('browser.waitForURL', options, ['timeout']);
       return waitForUrl(expectationDeps, url, options?.timeout);
     },
-    locator: (selector) => context.locator({ kind: 'selector', selector: requireSelector('browser.locator', selector) }),
+    locator: (selector, options) => {
+      const valid = requireSelector('browser.locator', selector);
+      rejectUnknownOptions('browser.locator', options, ['within'], 'INVALID_LOCATOR');
+      const within = options?.within;
+      if (within === undefined) return context.locator({ kind: 'selector', selector: valid });
+      return context.locator({ kind: 'selector', selector: valid, scope: context.expressionOf('browser.locator({ within })', within) });
+    },
     frameLocator: (selector) => frameScreen(context, [requireSelector('browser.frameLocator', selector)]),
     async evaluate<T extends JsonValue>(
       fn: string | ((arg?: never) => T | Promise<T>),

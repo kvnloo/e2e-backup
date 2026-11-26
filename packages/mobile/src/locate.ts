@@ -54,8 +54,12 @@ export function resolveExpression(
       const picked = source[position];
       return picked === undefined ? [] : [picked];
     }
-    case 'selector':
-      return compileSelector(expression.selector, platform)(index);
+    case 'selector': {
+      const matcher = compileSelector(expression.selector, platform);
+      return matcher(
+        expression.scope === undefined ? index : descendantsOf(resolveExpression(expression.scope, index, platform), index),
+      );
+    }
     case 'frame':
       throw new EngineError('FRAME_NOT_FOUND', 'a device surface has no nested documents to scope a query into', {
         retryable: false,

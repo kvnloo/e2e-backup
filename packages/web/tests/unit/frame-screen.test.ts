@@ -2,7 +2,8 @@
  * `browser.frameLocator` returns a frame-scoped screen that keeps the web-only
  * escape hatches: `locator` for an unnamed control inside the frame and
  * `frameLocator` for a frame nested in it. Both compose the same `frame`
- * expression every query in that scope compiles through.
+ * expression every query in that scope compiles through. `browser.locator`
+ * with `within` scopes its selector under another locator's expression.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -14,6 +15,7 @@ import { createBrowserFixture } from '../../src/browser.ts';
 function browserWithRecordingContext() {
   const minted: LocatorExpression[] = [];
   const context = {
+    expressionOf: (_api: string, locator: Locator) => (locator as unknown as { minted: LocatorExpression }).minted,
     operation: () => ({ signal: new AbortController().signal, timeoutMs: 1_000, runId: 'r', attemptId: 'a', origin: 'test' }),
     expectable: (target: object) => target,
     fixture: (_name: string, target: object) => target,
@@ -65,5 +67,27 @@ describe('frame screen', () => {
     expect(() => browser.frameLocator('')).toThrow(/browser\.frameLocator\(\) requires a nonempty selector/);
     expect(() => frame.locator('')).toThrow(/^locator\(\) requires a nonempty selector/);
     expect(() => frame.frameLocator('')).toThrow(/^frameLocator\(\) requires a nonempty selector/);
+  });
+
+  it('scopes browser.locator within another locator, keeping that locator\'s frame', () => {
+    const { browser } = browserWithRecordingContext();
+    const row = browser.frameLocator('#grid').getByRole('row');
+    expect(minted(browser.locator('td.price', { within: row }))).toEqual({
+      kind: 'selector',
+      selector: 'td.price',
+      scope: { kind: 'frame', selector: '#grid', source: { kind: 'query', query: { kind: 'role', value: { kind: 'string', value: 'row', exact: true } } } },
+    });
+    expect(minted(browser.locator('td', { within: undefined } as never))).toEqual({ kind: 'selector', selector: 'td' });
+  });
+
+  it('refuses an unknown option and a locator passed as the options', () => {
+    const { browser } = browserWithRecordingContext();
+    const row = browser.locator('tr');
+    expect(() => browser.locator('td', { scope: row } as never)).toThrowError(expect.objectContaining({ code: 'INVALID_LOCATOR' }));
+    // A real locator is a class instance, not a plain options object.
+    const instance = Object.assign(Object.create({ tap() {} }) as object, row);
+    expect(() => browser.locator('td', instance as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_LOCATOR', message: 'browser.locator options must be a plain object' }),
+    );
   });
 });

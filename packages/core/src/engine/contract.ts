@@ -88,6 +88,13 @@ export interface SemanticQuery {
  * selector string (CSS or XPath on a document platform, a predicate on a
  * device platform); `frame` scopes a query inside one nested document;
  * `union` matches either side, each node once, in document order.
+ *
+ * A `selector` with a `scope` runs from each node the scope matches, the way
+ * the platform chains one selector after another (Playwright's
+ * `scope.locator(selector)` on a document platform), each match once, in
+ * document order. A tree-only resolver (`resolveExpression`) answers it over
+ * the scope's descendants. An engine that resolves expressions itself must
+ * honor `scope`: ignoring it matches the whole screen.
  */
 export type LocatorExpression =
   | {
@@ -111,6 +118,7 @@ export type LocatorExpression =
   | {
       readonly kind: 'selector';
       readonly selector: string;
+      readonly scope?: LocatorExpression;
     }
   | {
       readonly kind: 'frame';

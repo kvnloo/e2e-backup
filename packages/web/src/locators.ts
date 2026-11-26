@@ -281,7 +281,8 @@ const DISPLAY_VALUE_COMPOSITION_MESSAGE =
  * Every semantic query searches its scope and the closed shadow roots under
  * it (see `Candidates`), so a scope, a `has` filter, and an index reach
  * across a closed boundary. Two compositions stay Playwright's own and stop
- * at one: a `selector` expression is the platform's CSS or XPath, and
+ * at one: a `selector` expression is the platform's CSS or XPath, chained
+ * from each of its scope's matches with Playwright's `locator.locator`, and
  * `filter({ hasText, hasNotText })` reads an element's text as Playwright
  * does, light DOM and open roots, so text inside a closed root does not count
  * toward an element outside it.
@@ -294,8 +295,8 @@ const DISPLAY_VALUE_COMPOSITION_MESSAGE =
  * recorded as a step and applied after filtering; a filter that follows a
  * position is recorded the same way and checked on the selected element. Two
  * compositions need the predicate inside Playwright's own chain and stay
- * unsupported: a display-value query as the scope of a child query, and as a
- * `has` filter.
+ * unsupported: a display-value query as the scope of a child query or
+ * selector, and as a `has` filter.
  */
 function project(scope: PwScope, expression: LocatorExpression, options: ProjectionOptions): ProjectedLocator {
   switch (expression.kind) {
@@ -333,7 +334,12 @@ function project(scope: PwScope, expression: LocatorExpression, options: Project
         filter.hasNot = requireComposable(project(scope, expression.hasNot, options));
       }
       if (source.steps.length > 0) {
-        return { ...source, steps: [...source.steps, { kind: 'filter', options: filter }] };
+        return {
+          ...source,
+          // A scope or `has` composes this locator, so it carries the filter too.
+          composable: source.composable === null ? null : source.composable.filter(filter),
+          steps: [...source.steps, { kind: 'filter', options: filter }],
+        };
       }
       return {
         ...source,
@@ -353,8 +359,11 @@ function project(scope: PwScope, expression: LocatorExpression, options: Project
       }
       return plain(positioned(source.locator, expression.index));
     }
-    case 'selector':
-      return plain(scope.locator(expression.selector));
+    case 'selector': {
+      const inner =
+        expression.scope === undefined ? scope : requireComposable(project(scope, expression.scope, options));
+      return plain(inner.locator(expression.selector));
+    }
     case 'frame':
       return project(scope.frameLocator(expression.selector), expression.source, options);
   }
@@ -428,12 +437,11 @@ export function frameSelectors(expression: LocatorExpression): string[] {
       return left;
     }
     case 'query':
+    case 'selector':
       return expression.scope === undefined ? [] : frameSelectors(expression.scope);
     case 'filter':
     case 'index':
       return frameSelectors(expression.source);
-    case 'selector':
-      return [];
     case 'frame':
       return [expression.selector, ...frameSelectors(expression.source)];
   }

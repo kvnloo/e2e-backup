@@ -36,8 +36,8 @@ export interface ResolveExpressionOptions {
  * and `text` match the name (`text` the visible text too) and answer with
  * the innermost match, since a container echoing a descendant's text is not
  * a second match; `placeholder`, `displayValue`, and `testId` compare their
- * one field. `visible` drops hidden nodes from any kind. `scope` searches
- * strict descendants of the scope's matches; `filter` keeps a match whose
+ * one field. `visible` drops hidden nodes from any kind. `scope`, on a query
+ * or a selector, searches strict descendants of the scope's matches; `filter` keeps a match whose
  * own or descendants' name, text, or value matches `hasText`, and whose
  * descendants answer `has`; `index` picks `first`, `last`, or a position.
  * `frame` is `FRAME_NOT_FOUND`: a semantic tree has no nested documents.
@@ -145,7 +145,12 @@ function resolve(
           { retryable: false },
         );
       }
-      return [...options.selector(expression.selector, tree.all.slice(within.start, within.end))];
+      const ranges =
+        expression.scope === undefined
+          ? [within]
+          : descendantRanges(resolve(expression.scope, within, tree, options), within, tree);
+      // One call over every candidate, even none, so the hook still parses the selector.
+      return [...options.selector(expression.selector, ranges.flatMap(({ start, end }) => tree.all.slice(start, end)))];
     }
     case 'frame':
       throw new EngineError(

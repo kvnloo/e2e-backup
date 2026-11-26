@@ -238,6 +238,13 @@ return (await browser.reload()) === undefined;`);
     expect(either.text).toContain('Test lines: 1.\n');
   });
 
+  it("mixes the code's screen and the session's browser in one locator, as a test would", async () => {
+    const mixed = await runCode(`await expect(browser.locator('li', { within: screen.getByTestId('items') })).toHaveCount(3);
+await expect(screen.getByTestId('items').or(browser.locator('#nowhere'))).toBeVisible();`);
+    expect(mixed.isError, mixed.text).toBe(false);
+    expect(mixed.text).toContain('Test lines: 2.\n');
+  });
+
   it('measures a node against the viewport with toBeInViewport', async () => {
     const inside = await runCode("await expect(screen.getByRole('button', 'Increment')).toBeInViewport({ ratio: 1 });");
     expect(inside.isError, inside.text).toBe(false);

@@ -359,18 +359,30 @@ class ScreenImpl implements Screen {
    * evaluated through this target's engine, so it is refused before any step.
    */
   protected ownLocator(candidate: unknown, api: string): LocatorInternals {
-    const internals = locatorInternals(candidate);
-    if (internals === undefined) {
-      throw new TestError('INVALID_LOCATOR', `${api} requires an e2e locator`);
-    }
-    if (internals.context !== this.context) {
-      throw new TestError(
-        'INVALID_LOCATOR',
-        `${api} requires a locator made by this screen; the one given belongs to another target's screen or another attempt`,
-      );
-    }
-    return internals;
+    return ownedLocator(this.context, candidate, api);
   }
+}
+
+/**
+ * The internals of `candidate` when it is an e2e locator made by a screen over
+ * the same engine session as `context`; `INVALID_LOCATOR` naming `api` for
+ * anything else, since a locator from another target or attempt would resolve
+ * through the wrong engine. The session decides, not the screen: `e2e mcp`'s
+ * `run_code` gives its `screen` its own timeouts over the attempt's session,
+ * beside the attempt's own `browser`.
+ */
+export function ownedLocator(context: ScreenContext, candidate: unknown, api: string): LocatorInternals {
+  const internals = locatorInternals(candidate);
+  if (internals === undefined) {
+    throw new TestError('INVALID_LOCATOR', `${api} requires an e2e locator`);
+  }
+  if (internals.context.engine.session !== context.engine.session) {
+    throw new TestError(
+      'INVALID_LOCATOR',
+      `${api} requires a locator made by this screen; the one given belongs to another target's screen or another attempt`,
+    );
+  }
+  return internals;
 }
 
 class LocatorImpl extends ScreenImpl implements Locator {

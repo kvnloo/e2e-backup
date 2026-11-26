@@ -668,9 +668,26 @@ const conditions = browser.locator(
   takes `>>` chains, so the example scopes CSS to one row.
 - Use `filter({ has })` for an element that contains another.
 
+Pass `within` to run the selector inside another locator, as Playwright's
+`within.locator(selector)` does:
+
+```ts
+const row = screen.getByRole('row', { name: /Ada Lovelace/ });
+await expect(browser.locator('td.price', { within: row })).toHaveText('$12');
+```
+
+- The selector runs from each element `within` matches. The locator matches
+  every element it reaches from any of them, each one time, in document order.
+- A leading `//`, `:scope`, and `xpath=..` start at that element, as in
+  Playwright.
+- `within` is any locator from `screen` or `browser`, filtered or not. One
+  from `frameLocator` keeps its frame, so the result is inside that frame.
+
 | Throws | When |
 | --- | --- |
 | `INVALID_LOCATOR` | An empty selector, or a `*` capture before the last part (`*css=article >> text=Hello`). |
+| `INVALID_LOCATOR` | `within` is not an e2e locator from this test's `screen` or `browser`, or the options have another key. |
+| `UNSUPPORTED_CAPABILITY` | `within` is a `getByDisplayValue` query, when the locator resolves. |
 
 <Note>
 Every `screen` query searches its scope and each closed shadow root the page
@@ -678,7 +695,10 @@ attached under it, with Playwright's own role, name, text, label, and
 attribute matching and each node found once. A control the observed tree
 lists inside a closed root resolves and takes actions and reads. `locator`,
 `frameLocator`, and `filter({ hasText })` keep Playwright's reach and stop at
-a closed root; the [browser guide](/browser#shadow-dom) has the details.
+a closed root; the [browser guide](/browser#shadow-dom) has the details. A
+`within` a `screen` query found inside a closed root still works, except a
+`:scope` combinator (`:scope > li`) on the root's direct child: use `li` or
+`xpath=./li` there.
 </Note>
 
 #### `frameLocator`
@@ -1727,8 +1747,12 @@ export interface Browser extends Expectable<BrowserExpectation> {
   title(): Promise<string>;
   /** Waits for the current URL to match. */
   waitForURL(url: string | RegExp, options?: { timeout?: number }): Promise<void>;
-  /** Creates a web-only CSS or XPath locator. */
-  locator(selector: string): Locator;
+  /**
+   * Creates a web-only CSS or XPath locator. With `within`, the selector runs
+   * from each element that locator matches, like Playwright's
+   * `within.locator(selector)`, and inside its frame.
+   */
+  locator(selector: string, options?: { within?: Locator }): Locator;
   /** Creates a screen query scope inside one iframe. */
   frameLocator(selector: string): FrameScreen;
   /** Evaluates trusted test code in the page: a function, or a string expression whose value is returned, called first if it is a function. */

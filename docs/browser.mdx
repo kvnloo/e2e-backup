@@ -119,6 +119,8 @@ await expect(editor.frameLocator('#preview').getByRole('heading', 'Uploaded')).t
 `browser.locator('css or xpath')` does the same on the page. Use a selector
 only when role, label, and test-id queries can't find the element. For a
 match made ambiguous by a hidden duplicate, try `{ visible: true }` first.
+To run a selector inside another locator, pass it as `within`:
+`browser.locator('td.price', { within: row })`.
 
 The agent's semantic tree shows a frame from another site, such as a hosted
 card field, as an `iframe` element with none of its content

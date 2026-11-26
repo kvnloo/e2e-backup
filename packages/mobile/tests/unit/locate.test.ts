@@ -137,6 +137,12 @@ describe('locator expressions over a device snapshot', () => {
     expect(names({ kind: 'selector', selector: 'id=ABOUT' })).toEqual(['About']);
     expect(names({ kind: 'selector', selector: 'id=NOPE || label="Airplane Mode"' })).toEqual(['Airplane Mode']);
     expect(() => names({ kind: 'selector', selector: '@e3' })).toThrow(/invalid agent-device selector/);
+    // A scoped selector matches among the scope's descendants only, and still parses when the scope matches nothing.
+    const bar = query('testId', 'General');
+    expect(names({ kind: 'selector', selector: 'label="Back"', scope: bar })).toEqual(['Back']);
+    expect(names({ kind: 'selector', selector: 'id=ABOUT', scope: bar })).toEqual([]);
+    expect(names({ kind: 'selector', selector: 'id=General', scope: bar })).toEqual([]);
+    expect(() => names({ kind: 'selector', selector: '@e3', scope: query('testId', 'NOPE') })).toThrow(/invalid agent-device selector/);
     expect(() => names({ kind: 'frame', selector: 'iframe', source: query('role', 'button') })).toThrowError(
       expect.objectContaining({ code: 'FRAME_NOT_FOUND' }),
     );
