@@ -1538,6 +1538,15 @@ describe('DesktopSurface: quitting', () => {
     expect(fake.pid).not.toBe(first);
   });
 
+  it('kills nothing on a desktop.closeApp() cancelled before the kill, and quits the app on the next try', async () => {
+    const { surface, fake } = await launched({}, { observe: false });
+    const cancelled = AbortSignal.abort();
+    await expect(surface.closeApp(cancelled, 5_000)).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(await gone(fake.pid, 300)).toBe(false);
+    await surface.closeApp(signal, 5_000);
+    expect(await gone(fake.pid)).toBe(true);
+  });
+
   it("presses a key into the app's window through desktop.press(), for an app with no control that takes focus", async () => {
     const { surface, fake } = await launched({});
     const context = { operation: () => operation(), fixture: <T,>(_name: string, value: T) => value } as unknown as Parameters<typeof createDesktopFixture>[1];

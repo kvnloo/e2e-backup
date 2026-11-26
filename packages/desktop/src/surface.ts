@@ -1600,8 +1600,13 @@ async function keepOnlyRecord(directory: string): Promise<void> {
   }
 }
 
-/** Kills each process and waits until all of them exited; false when one still runs at `until`. */
+/**
+ * Kills each process and waits until all of them exited; false when one still runs at `until`. A quit cancelled, or out
+ * of time, before the kill sends none: the caller gave the app up as running, and keeps it to quit again.
+ */
 async function killed(pids: readonly number[], until: number, signal: AbortSignal): Promise<boolean> {
+  if (pids.length > 0 && signal.aborted) throw new EngineError('CANCELLED', 'quitting the app was cancelled before it was killed', { retryable: false });
+  if (pids.length > 0 && Date.now() >= until) throw new EngineError('OPERATION_TIMEOUT', 'quitting the app ran out of time before it was killed', { retryable: false });
   for (const pid of pids) {
     try {
       process.kill(pid, 'SIGKILL');
