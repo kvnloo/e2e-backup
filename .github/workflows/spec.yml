@@ -209,9 +209,11 @@ jobs:
         working-directory: packages/desktop/native
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
+          cache: pnpm
       - name: Rust toolchain
         run: |
           if ! command -v rustup >/dev/null; then
@@ -225,6 +227,13 @@ jobs:
       - run: node ../scripts/build-native.ts --target x86_64-apple-darwin
       - name: Load the addon
         run: node -e "const status = require('./desktop.darwin-arm64.node').status(); if (typeof status.accessibility !== 'boolean') process.exit(1)"
+      # The engine's loader on the addon just built: the test that runs it is skipped wherever no addon was built.
+      - uses: ./.github/actions/workspace-install
+      - name: Load the addon through the engine
+        working-directory: ${{ github.workspace }}
+        env:
+          REQUIRE_DESKTOP_NATIVE: '1'
+        run: pnpm --filter @e2e-dev/core run build && pnpm --filter @e2e-dev/desktop exec vitest run tests/unit/driver.test.ts
 
   # The one check the ruleset requires from this workflow. A skipped job
   # passes (the change cannot reach it); a failed or cancelled one fails it.
