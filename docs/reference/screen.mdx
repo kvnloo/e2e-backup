@@ -1106,7 +1106,8 @@ the other's value there: an element with a test id and no label reads its test
 id as `label`. For the text a field holds, use `inputValue()`.
 
 On macOS (`@e2e-dev/desktop`), a node carries `label` (a control's
-accessible name; text has none, since `textContent` reads it), `identifier`
+accessible name, up to 1,000 characters; text has none, since `textContent`
+reads it), `identifier`
 (the developer's accessibility identifier, also its test id), `description`,
 `placeholder`, and `hint` (its help text), each when the app reports it. On a
 password field, `getAttribute` throws `POLICY_DENIED`, as it does on every
