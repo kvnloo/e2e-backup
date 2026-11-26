@@ -1,6 +1,6 @@
 import { EngineError } from '@e2e-dev/core/engine';
 import { describe, expect, it } from 'vitest';
-import { call, DriverFailure, translate, type Envelope } from '../../src/driver.ts';
+import { call, DriverFailure, loadNativeDriver, translate, type Envelope } from '../../src/driver.ts';
 
 const signal = new AbortController().signal;
 const later = <T>(answer: Envelope<T>, ms: number): Promise<Envelope<T>> => new Promise((resolve) => setTimeout(() => resolve(answer), ms));
@@ -72,5 +72,17 @@ describe('translate', () => {
     const engineError = new EngineError('CANCELLED', 'cancelled', { retryable: false });
     expect(translate(engineError, 'click', true)).toBe(engineError);
     expect(translate('odd', 'click', true)).toMatchObject({ code: 'ENGINE_FAILURE' });
+  });
+});
+
+describe('loadNativeDriver', () => {
+  it.each(['linux', 'win32'] as const)('reports %s as unsupported: no driver is built for it', (platform) => {
+    const real = Object.getOwnPropertyDescriptor(process, 'platform');
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    try {
+      expect(() => loadNativeDriver()).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY', message: expect.stringContaining(`no native driver for ${platform}`) }));
+    } finally {
+      if (real !== undefined) Object.defineProperty(process, 'platform', real);
+    }
   });
 });

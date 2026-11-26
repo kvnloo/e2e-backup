@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { ConfigurationError, defineEngine, type EngineAppCheckInfo, type EngineAppDeclaration, type EngineHandle, type EngineIsolation, type LocatorActionKind, type PointerActionKind } from '@e2e-dev/core/engine';
 import { createDesktopFixture } from './desktop.ts';
 import type { DesktopFixtures } from './fixtures.ts';
-import { requireMacOS, resolveOptions, type DesktopOptions } from './options.ts';
+import { requireMacOS, resolveOptions, unsupportedPlatform, type DesktopOptions } from './options.ts';
 import { DesktopSurface } from './surface.ts';
 
 /**
@@ -56,7 +56,7 @@ export function desktop(options: DesktopOptions = {}): DesktopEngine<'macos', 'a
       return surface.prepare();
     },
     doctor: async (info) =>
-      process.platform === 'darwin' ? await surface.doctor(info) : [{ id: 'platform', status: 'fail' as const, message: `desktop() drives macOS apps only for now; this machine runs ${process.platform}` }],
+      process.platform === 'darwin' ? await surface.doctor(info) : [{ id: 'platform', status: 'fail' as const, message: unsupportedPlatform() }],
     init: (info) => {
       requireMacOS();
       return surface.init(info);

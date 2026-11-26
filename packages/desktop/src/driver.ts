@@ -111,14 +111,15 @@ const ownRequire = createRequire(import.meta.url);
 /**
  * Loads the driver built for this machine: the platform package npm
  * installed beside this one, else a build in this package's `native/`
- * directory (`pnpm build:native` in a checkout). Throws `ENGINE_FAILURE`
- * naming what is missing.
+ * directory (`pnpm build:native` in a checkout). Throws
+ * `UNSUPPORTED_CAPABILITY` on a platform no driver is built for, and
+ * `ENGINE_FAILURE` naming what is missing on one that has a driver.
  */
 export function loadNativeDriver(): DesktopDriver {
   const platform = `${process.platform}-${process.arch}`;
   const packageName = PLATFORM_PACKAGES[platform];
   if (packageName === undefined) {
-    throw new EngineError('ENGINE_FAILURE', `@e2e-dev/desktop has no native driver for ${process.platform} on ${process.arch}; it drives macOS apps only`, { retryable: false });
+    throw new EngineError('UNSUPPORTED_CAPABILITY', `@e2e-dev/desktop has no native driver for ${process.platform} on ${process.arch}: it drives macOS apps only`, { retryable: false });
   }
   const failures: string[] = [];
   for (const specifier of [packageName, path.join(import.meta.dirname, '..', 'native', `desktop.${platform}.node`)]) {

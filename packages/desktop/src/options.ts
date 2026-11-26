@@ -91,9 +91,12 @@ export function resolveOptions(options: DesktopOptions | undefined): ResolvedDes
   };
 }
 
-/** Fails on any OS but macOS, the only one the native driver is built for. */
+/** Why the engine refuses this machine: it drives macOS only, and the native driver is built for nothing else. */
+export function unsupportedPlatform(): string {
+  return `desktop() is not supported on ${process.platform}: it drives macOS apps only`;
+}
+
+/** Fails with `UNSUPPORTED_CAPABILITY` on any OS but macOS, the only one the native driver is built for. */
 export function requireMacOS(): void {
-  if (process.platform !== 'darwin') {
-    throw new ConfigurationError('INVALID_CONFIG', `desktop() drives macOS apps only for now; this machine runs ${process.platform}`);
-  }
+  if (process.platform !== 'darwin') throw new ConfigurationError('UNSUPPORTED_CAPABILITY', unsupportedPlatform());
 }

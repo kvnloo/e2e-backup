@@ -44,10 +44,25 @@ describe('desktop()', () => {
     expect(check({ appPath: 'build/App.app' })).not.toThrow();
   });
 
-  it.skipIf(process.platform === 'darwin')('loads anywhere, and refuses to start a target on any OS but macOS', async () => {
+  it.each(['linux', 'win32'] as const)('loads on %s, and reports a target there as unsupported before it starts', async (platform) => {
     const engine = desktop();
     expect(engine.platform).toBe('macos');
-    await expect(Promise.resolve().then(() => engine.prepare?.({} as never))).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
-    await expect(Promise.resolve().then(() => engine.init?.({} as never))).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
+    await onPlatform(platform, async () => {
+      const unsupported = { code: 'UNSUPPORTED_CAPABILITY', message: `desktop() is not supported on ${platform}: it drives macOS apps only` };
+      await expect(Promise.resolve().then(() => engine.prepare?.({} as never))).rejects.toMatchObject(unsupported);
+      await expect(Promise.resolve().then(() => engine.init?.({} as never))).rejects.toMatchObject(unsupported);
+      await expect(engine.doctor?.({} as never)).resolves.toEqual([{ id: 'platform', status: 'fail', message: unsupported.message }]);
+    });
   });
 });
+
+/** Runs `body` while `process.platform` reads `platform`. */
+async function onPlatform(platform: NodeJS.Platform, body: () => Promise<void>): Promise<void> {
+  const real = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+  try {
+    await body();
+  } finally {
+    if (real !== undefined) Object.defineProperty(process, 'platform', real);
+  }
+}
