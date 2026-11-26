@@ -1099,8 +1099,11 @@ lock(): Promise<void>;
 ```
 
 ```ts
-await device.lock();
-await device.unlock();
+try {
+  await device.lock();
+} finally {
+  await device.unlock();
+}
 await expect(screen.getByText('Welcome back')).toBeVisible();
 ```
 
