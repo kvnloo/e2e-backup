@@ -197,8 +197,9 @@ jobs:
           AGENT_DEVICE_VERSION: ${{ inputs.agent-device-version }}
         run: node scripts/install-smoke.ts ${{ matrix.pnpm }}
 
-  # The desktop engine's native driver: formatted, lint-clean, and building
-  # for both Mac architectures. The toolchain is pinned in its
+  # The desktop engine's native driver: formatted, lint-clean, tested, and
+  # building for both Mac architectures through the script the release runs,
+  # and the arm64 addon loading in Node. The toolchain is pinned in its
   # rust-toolchain.toml, which rustup installs on first use.
   native:
     runs-on: blacksmith-6vcpu-macos-26
@@ -208,6 +209,9 @@ jobs:
         working-directory: packages/desktop/native
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
       - name: Rust toolchain
         run: |
           if ! command -v rustup >/dev/null; then
@@ -216,7 +220,11 @@ jobs:
           fi
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
-      - run: cargo build --locked --release --target aarch64-apple-darwin --target x86_64-apple-darwin
+      - run: cargo test --locked
+      - run: node ../scripts/build-native.ts --target aarch64-apple-darwin
+      - run: node ../scripts/build-native.ts --target x86_64-apple-darwin
+      - name: Load the addon
+        run: node -e "const status = require('./desktop.darwin-arm64.node').status(); if (typeof status.accessibility !== 'boolean') process.exit(1)"
 
   # The one check the ruleset requires from this workflow. A skipped job
   # passes (the change cannot reach it); a failed or cancelled one fails it.

@@ -35,6 +35,10 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
             echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           fi
+      # build-native.ts is TypeScript run directly, which needs a Node newer than a runner image may ship.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
       - name: Build the driver
         run: |
           node packages/desktop/scripts/build-native.ts --target aarch64-apple-darwin
