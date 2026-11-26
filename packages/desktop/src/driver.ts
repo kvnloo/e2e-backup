@@ -101,6 +101,8 @@ export interface DesktopDriver {
     timeoutMs: number;
     /** How long that search may take once `open` has exited. */
     claimMs: number;
+    /** Names the launch, so `cancelInput` can stop it before it starts the app. */
+    inputId?: number;
   }): Promise<Envelope<Launched>>;
   listWindows(pid: number): Promise<Envelope<readonly RawWindow[]>>;
   snapshot(options: { pid: number; windowId: string; maxDepth: number; interactive: boolean; timeoutMs: number }): Promise<Envelope<RawSnapshot>>;

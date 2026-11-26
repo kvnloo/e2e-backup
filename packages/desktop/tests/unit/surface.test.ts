@@ -231,6 +231,9 @@ describe('DesktopSurface: launching', () => {
     // The process carries no token: only the driver's late answer names it.
     const { surface, fake } = await initialized({ launch: [spawnApp({ token: false, sleepMs: 1_500 })] });
     await expect(surface.restart({ ...operation(), timeoutMs: 600 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    // The cut-off launch is cancelled, so a driver whose `open` had not run yet starts nothing.
+    const { inputId } = last(fake, 'launch') as { inputId: number };
+    expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
     const pid = fake.pid;
     expect(alive(pid)).toBe(true);
     await surface.endAttempt({ signal, timeoutMs: 5_000 });

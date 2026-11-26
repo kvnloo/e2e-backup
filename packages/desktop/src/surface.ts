@@ -436,6 +436,8 @@ export class DesktopSurface {
     if (operation.timeoutMs <= 0) throw new EngineError('OPERATION_TIMEOUT', `launch ${target.label}: the operation's budget ran out before it was sent`, { retryable: false, cause: NOT_SENT });
     // Started by `call`, which starts nothing once the signal aborted: a cancelled open never launches the app.
     let started: Promise<Envelope<Launched>> | undefined;
+    // A cut-off launch whose `open` has not run yet starts no app.
+    const inputId = nextInputId();
     const start = (): Promise<Envelope<Launched>> =>
       (started = driver.launch({
         ...('path' in target ? { path: target.path } : { bundleId: target.bundleId }),
@@ -446,10 +448,11 @@ export class DesktopSurface {
         activate: this.foreground,
         timeoutMs: operation.timeoutMs,
         claimMs: LAUNCH_READY_MS,
+        inputId,
       }));
     let launched: Launched;
     try {
-      launched = await call(start, { label: `launch ${target.label}`, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
+      launched = await call(start, { label: `launch ${target.label}`, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs, onCutOff: () => driver.cancelInput(inputId) });
     } catch (cause) {
       // A launch the driver refused started nothing; any other may have started the app, which the next quit looks for.
       if (started !== undefined && !(cause instanceof DriverFailure && cause.notDelivered)) {
