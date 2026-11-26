@@ -112,6 +112,9 @@ const INHERITED_ENV = new Set(['HOME', 'USER', 'LOGNAME', 'SHELL', 'PATH', 'TMPD
 /** Launch arguments every launch gets first: no window or document the app saved at its last quit comes back. */
 const FRESH_STATE_ARGUMENTS = ['-ApplePersistenceIgnoreState', 'YES'];
 
+/** The most elements one driver snapshot reads (`MAX_NODES` in `native/src/snapshot.rs`): a larger window is read in part. */
+const MAX_SNAPSHOT_NODES = '8,000';
+
 /** How much sooner than the call's cut-off the driver stops a read, so a read cut short still answers with what it read. */
 const READ_ANSWER_MARGIN_MS = 200;
 
@@ -912,7 +915,7 @@ export class DesktopSurface {
     if (screen.truncated) {
       throw new EngineError(
         'NODE_STALE',
-        `the window was read only in part (it ran out of time, or is deeper than the ${this.options.maxDepth} levels a snapshot reads; desktop({ maxDepth }) raises that), so the matches cannot be counted`,
+        `the window was read only in part (it ran out of time, is deeper than the ${this.options.maxDepth} levels a snapshot reads, which desktop({ maxDepth }) raises, or holds more than the ${MAX_SNAPSHOT_NODES} elements it reads), so the matches cannot be counted`,
         { retryable: true },
       );
     }
@@ -1326,7 +1329,7 @@ export class DesktopSurface {
       throw unmasked(
         screen.cutShort
           ? 'the snapshot did not read the whole window, so a secure field may be missing from it'
-          : `the window is deeper than desktop({ maxDepth }) reads (${this.options.maxDepth} levels), so a secure field may be missing from the read; raise maxDepth`,
+          : `the window is deeper than desktop({ maxDepth }) reads (${this.options.maxDepth} levels), or holds more than the ${MAX_SNAPSHOT_NODES} elements a snapshot reads, so a secure field may be missing from the read`,
       );
     }
     // The capture lands unmasked on disk first: in the worker's private directory, removed below.
