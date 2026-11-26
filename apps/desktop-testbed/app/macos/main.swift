@@ -111,7 +111,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
 
   func show() {
     if let window { window.makeKeyAndOrderFront(nil); return }
-    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 500),
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 580),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Controls"
     window.isReleasedWhenClosed = false
@@ -146,6 +146,18 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     opener.delegate = self
     opener.widthAnchor.constraint(equalToConstant: 260).isActive = true
 
+    // An NSTabView's items are AXRadioButtons with the AXTabButton subrole: they read as tabs, the active one selected.
+    let tabs = NSTabView()
+    for title in ["First", "Second"] {
+      let item = NSTabViewItem(identifier: title)
+      item.label = title
+      item.view = NSView()
+      tabs.addTabViewItem(item)
+    }
+    tabs.setAccessibilityIdentifier("tabs")
+    tabs.widthAnchor.constraint(equalToConstant: 260).isActive = true
+    tabs.heightAnchor.constraint(equalToConstant: 60).isActive = true
+
     let options = NSButton(title: "Options", target: nil, action: nil)
     options.setAccessibilityIdentifier("options")
     let menu = NSMenu(title: "Options")
@@ -177,7 +189,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
     hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
-    let stack = NSStackView(views: [scroll, note, opener, options, volume, disabled, double, hover, status])
+    let stack = NSStackView(views: [scroll, note, opener, tabs, options, volume, disabled, double, hover, status])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)

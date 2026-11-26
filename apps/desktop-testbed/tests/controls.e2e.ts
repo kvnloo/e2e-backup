@@ -71,6 +71,16 @@ test.describe('controls window', () => {
     await expect(screen.getByRole('textbox', 'Popup field')).toHaveValue('');
   });
 
+  test('reads native tabs as tabs, the active one selected, and switches between them', async ({ screen }) => {
+    const first = screen.getByRole('tab', 'First');
+    const second = screen.getByRole('tab', 'Second');
+    await expect(first).toBeSelected();
+    await expect(second).not.toBeSelected();
+    await second.tap();
+    await expect(second).toBeSelected();
+    await expect(first).not.toBeSelected();
+  });
+
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
     // One key event per character, a surrogate pair in one. AppKit would rejoin a split pair, so this checks such text
