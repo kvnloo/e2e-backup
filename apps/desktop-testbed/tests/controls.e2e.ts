@@ -28,15 +28,17 @@ test.describe('controls window', () => {
     await note.fill('hello');
     await note.press('Enter');
     await expect(screen.getByTestId('controls-status')).toHaveText('Submitted: hello');
+    // Return can leave the text selected, so a second entry starts from an empty field and is checked whole.
+    await note.clear();
     await note.pressSequentially('typed');
     await note.press('Enter');
-    await expect(screen.getByTestId('controls-status')).toContainText('typed');
+    await expect(screen.getByTestId('controls-status')).toHaveText('Submitted: typed');
   });
 
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
-    // The 16th unit is the first half of the emoji, where key events would split it: the driver keeps a pair in one event,
-    // since AppKit rejoins a split pair but other toolkits may not.
+    // The 16th unit is the first half of the emoji, where key events would split it. AppKit rejoins a split pair, so this
+    // passes either way: it checks such text types whole, not the driver's boundary rule, which its unit tests cover.
     const text = '123456789012345😀 café 👍🏽';
     await note.pressSequentially(text);
     await expect(note).toHaveValue(text);
@@ -52,6 +54,8 @@ test.describe('controls window', () => {
   test('sets a slider and reads a disabled button', async ({ screen }) => {
     await screen.getByRole('slider', 'Volume').fill('40');
     await expect(screen.getByRole('slider', 'Volume')).toHaveValue('40');
+    // A value set through accessibility does not always fire the control's action: the status line shows the app saw it.
+    await expect(screen.getByTestId('controls-status')).toHaveText('Volume 40');
     await expect(screen.getByRole('button', 'Disabled')).toBeDisabled();
   });
 });
