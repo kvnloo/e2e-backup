@@ -1,10 +1,12 @@
 import { test } from '@e2e-dev/desktop';
 import { expect } from 'e2e';
+import { frontmost, TESTBED_APP } from './frontmost.ts';
 
 /**
  * The controls window: one test per capability the sign-in form does not
- * reach, all without physical input. The app activates itself at launch, so
- * these do not test delivery to an app in the background.
+ * reach, all without physical input. The engine launches the app in the
+ * background and the app does not activate itself, so these drive an app
+ * that is not in front.
  */
 test.describe('controls window', () => {
   test.beforeEach(async ({ app, screen, desktop }) => {
@@ -24,8 +26,9 @@ test.describe('controls window', () => {
     await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 40');
   });
 
-  // The app activates itself at launch, so this covers keys into a field, not delivery to an app in the background.
-  test('presses keys into a field, and types into it', async ({ screen }) => {
+  test('presses keys into a field of an app in the background, and types into it', async ({ screen }) => {
+    // The keys go into the app's own event queue: it must not be the app in front, before or after.
+    expect(frontmost()).not.toBe(TESTBED_APP);
     const note = screen.getByRole('textbox', 'Note');
     await note.fill('hello');
     await note.press('Enter');
@@ -35,6 +38,7 @@ test.describe('controls window', () => {
     await note.pressSequentially('typed');
     await note.press('Enter');
     await expect(screen.getByTestId('controls-status')).toHaveText('Submitted: typed');
+    expect(frontmost()).not.toBe(TESTBED_APP);
   });
 
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {

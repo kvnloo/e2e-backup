@@ -46,8 +46,8 @@ final class Controller: NSObject, NSApplicationDelegate {
     password.widthAnchor.constraint(equalToConstant: 260).isActive = true
     status.widthAnchor.constraint(equalToConstant: 360).isActive = true
     window.contentView = stack
+    // No activation: the engine launches the app in the background unless the run is headed, and the suites drive it there.
     window.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
   }
 
   @objc func signIn(_ sender: NSButton) {
