@@ -21,6 +21,15 @@ test.describe('sign-in form', () => {
     await expect(screen.getByTestId('status')).toHaveText('Signed in as ada on Team, remembered (password: 7 characters)');
   });
 
+  test('types a username with an uppercase letter and a password through key events', async ({ screen }) => {
+    // Typing goes key by key, as a person types: a capital takes its key with Shift, and a password field takes keystrokes.
+    await screen.getByRole('textbox', 'Username').pressSequentially('Ada');
+    await expect(screen.getByRole('textbox', 'Username')).toHaveValue('Ada');
+    await screen.getByRole('textbox', 'Password').pressSequentially('testing');
+    await screen.getByRole('button', 'Sign in').tap();
+    await expect(screen.getByTestId('status')).toHaveText('Signed in as Ada on Pro (password: 7 characters)');
+  });
+
   test('reads controls by test id and refuses an empty password', async ({ screen }) => {
     await screen.getByTestId('username').fill('grace');
     await expect(screen.getByTestId('username')).toHaveValue('grace');
