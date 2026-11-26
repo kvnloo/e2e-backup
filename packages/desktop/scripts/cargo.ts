@@ -35,6 +35,10 @@ export function cargo(directory: string): Cargo {
     // With no toolchain named, rustup installs the one the crate's `rust-toolchain.toml` pins.
     spawnSync('rustup', ['toolchain', 'install'], { cwd: directory, stdio: 'inherit' });
   }
-  if (spawnSync('rustup', ['which', 'cargo'], { cwd: directory, stdio: 'ignore' }).status !== 0) throw new Error('rustup could not install the toolchain native/rust-toolchain.toml pins');
-  return { file: 'rustup', prefix: ['run', channel, 'cargo'], env: process.env };
+  const pinned = spawnSync('rustup', ['which', '--toolchain', channel, 'cargo'], { cwd: directory, encoding: 'utf8' });
+  if (pinned.status !== 0) throw new Error('rustup could not install the toolchain native/rust-toolchain.toml pins');
+  // `rustup run` alone leaves the toolchain off PATH where rustup is the only tool there (Homebrew's), and cargo then
+  // finds no rustc: its bin goes first too.
+  const bin = path.dirname(pinned.stdout.trim());
+  return { file: 'rustup', prefix: ['run', channel, 'cargo'], env: { ...process.env, PATH: [bin, process.env.PATH].filter(Boolean).join(path.delimiter) } };
 }
