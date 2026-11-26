@@ -813,6 +813,16 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(still.fake)).toEqual(['focusWindow', 'pointer']);
   });
 
+  it('double-clicks a node with a stable id where a fresh read finds it, never the box it was read with', async () => {
+    const at = (x: number) =>
+      screen('w-mine', { name: 'Form', bounds: { x: 0, y: 0, width: 200, height: 200 }, children: [{ role: 'statictext', value: 'Hello', native_id: { kind: 'ax_identifier', value: 'hello' }, bounds: { x, y: 10, width: 50, height: 20 } }, ...(x === 10 ? [] : [{ role: 'button', name: 'Delete', ref_id: '@s:e9', bounds: { x: 10, y: 10, width: 50, height: 20 } }])] });
+    const placed = windows(() => [{ id: 'w-mine', is_focused: true, bounds: { x: 0, y: 0, width: 200, height: 200 } }]);
+    const { surface, fake } = await launched({ snapshot: [at(10), at(10), at(100)], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const [hello] = (await surface.observe(operation(), undefined)).root.children!;
+    await surface.perform(hello!.ref, { kind: 'doubleTap' }, operation());
+    expect(fake.of('pointer').at(-1)?.args).toEqual([125, 20, 'doubleTap']);
+  });
+
   it('reports a click the driver may have delivered as possibly committed, and one it refused by its code', async () => {
     const { surface, byTestId } = await launched({ act: [failure('ACTION_FAILED', 'delivered_unverified'), failure('ACTION_NOT_SUPPORTED', 'not_delivered'), failure('STALE_REF', 'not_delivered')] });
     await expect(surface.perform(byTestId('sign-in'), { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });

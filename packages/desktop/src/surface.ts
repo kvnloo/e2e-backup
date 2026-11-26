@@ -1143,15 +1143,18 @@ export class DesktopSurface {
 
   /** A pointer action at the center of a node the driver gave no ref, through the checks a point action makes: the node's window forward, the point inside it. */
   private async pointAtNode(binding: NodeBinding, kind: 'hover' | 'doubleTap', operation: OperationContext): Promise<void> {
-    const rect = binding.rect;
-    if (rect === undefined || rect.width <= 0 || rect.height <= 0 || binding.windowId === undefined) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${kind === 'hover' ? 'hover' : 'double-click'}`);
+    const what = kind === 'hover' ? 'hover' : 'double-click';
+    if (binding.windowId === undefined) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
     if (binding.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
-    // With no ref, the driver cannot check the node is still there: a fresh read of its window must still hold it, in the same place, or the pointer could land on what replaced it.
+    // With no ref, the driver cannot check the node is still there: the pointer goes where a fresh read of its window finds it now, or nowhere.
+    // The box it was read with could hold what replaced it, and a node with a stable id may have moved.
     const now = await this.capture(operation, binding.windowId, false, !binding.interactive);
     if (now?.cutShort === true) throw partialRead(`whether node ${binding.id} is still on screen`);
-    if (![...(now?.bindings.values() ?? [])].some((candidate) => sameNode(candidate, binding))) {
-      throw new EngineError('NODE_STALE', `node ${binding.id} (${binding.role ?? 'unknown'}) is no longer where it was read; observe again`, { retryable: true });
-    }
+    const fresh = [...(now?.bindings.values() ?? [])].find((candidate) => sameNode(candidate, binding));
+    if (fresh === undefined) throw new EngineError('NODE_STALE', `node ${binding.id} (${binding.role ?? 'unknown'}) is no longer on screen; observe again`, { retryable: true });
+    if (fresh.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
+    const rect = fresh.rect;
+    if (rect === undefined || rect.width <= 0 || rect.height <= 0) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
     this.pointWindow = binding.windowId;
     await this.performAt({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, { kind }, operation);
   }
