@@ -52,6 +52,8 @@ export interface PointerTarget {
   readonly windowId: string;
   readonly sheet: boolean;
   readonly sheetId?: string;
+  /** The point is on a node with no ref, which takes no click of its own: no control may be under it when it goes. */
+  readonly content?: boolean;
 }
 
 /** One window of a process, as `listWindows` answers. */

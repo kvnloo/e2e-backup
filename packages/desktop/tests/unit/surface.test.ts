@@ -865,6 +865,8 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(fake)).toEqual([]);
     await surface.perform(group!.ref, { kind: 'hover' }, operation());
     expect(fake.of('pointer').at(-1)?.args).toEqual([60, 35, 'hover']);
+    // Coming forward could reveal a control over the node: the driver is told the point takes none.
+    expect(fake.pointerOptions.at(-1)?.target).toMatchObject({ content: true });
     // A child button that reaches past its group's box is inside it all the same.
     const wide = screen('w-mine', {
       name: 'Form',

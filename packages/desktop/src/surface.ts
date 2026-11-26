@@ -1199,11 +1199,20 @@ export class DesktopSurface {
       if (other !== undefined) throw notActionable(`a ${other.role ?? 'control'} is at the center of node ${binding.id}, so a double-click there would press it; act on that control instead`);
     }
     this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet };
-    await this.performAt(center, { kind }, operation);
+    // Coming forward can reveal a control over the node: the driver checks after the move that none is under the pointer.
+    await this.pointerAt(center, { kind }, operation, true);
   }
 
   /** Physical pointer input at a point in the window: only with `headed`, and only then declared. */
   async performAt(point: ViewportPoint, action: PointerAction, context: OperationContext): Promise<void> {
+    await this.pointerAt(point, action, context, false);
+  }
+
+  /**
+   * `performAt`, and `content` when the point is on a node with no ref, which takes no click of its own: the driver
+   * then refuses a control under the pointer after the move, not only another window.
+   */
+  private async pointerAt(point: ViewportPoint, action: PointerAction, context: OperationContext, content: boolean): Promise<void> {
     const operation = withDeadline(context);
     if (action.kind !== 'hover' && action.kind !== 'tap' && action.kind !== 'doubleTap' && action.kind !== 'secondaryTap') {
       throw unsupported(`the desktop engine cannot perform ${action.kind} at a point`);
@@ -1249,7 +1258,7 @@ export class DesktopSurface {
     // As for `tryRef`: pointer input still unsent once the call is given up is never sent.
     const inputId = this.requireDriver().inputId();
     // The driver checks the window again after the move, before the click: a sheet or window that opens meanwhile would take it.
-    const takes = { pid, windowId: target.id, sheet: sheetNow !== undefined, ...(sheetNow === undefined || sheetNow === UNKNOWN_SHEET ? {} : { sheetId: sheetNow }) };
+    const takes = { pid, windowId: target.id, sheet: sheetNow !== undefined, ...(sheetNow === undefined || sheetNow === UNKNOWN_SHEET ? {} : { sheetId: sheetNow }), ...(content ? { content } : {}) };
     await this.input((driver, timeoutMs) => driver.pointer(focused.x + point.x, focused.y + point.y, kind, inputId, timeoutMs, takes), {
       label: kind,
       input: true,
