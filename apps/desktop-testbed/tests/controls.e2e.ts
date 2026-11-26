@@ -37,8 +37,8 @@ test.describe('controls window', () => {
 
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
-    // The 16th unit is the first half of the emoji, where key events would split it. AppKit rejoins a split pair, so this
-    // passes either way: it checks such text types whole, not the driver's boundary rule, which its unit tests cover.
+    // One key event per character, a surrogate pair in one. AppKit would rejoin a split pair, so this checks such text
+    // types whole, not how the driver cuts it, which its unit tests cover.
     const text = '123456789012345😀 café 👍🏽';
     await note.pressSequentially(text);
     await expect(note).toHaveValue(text);
