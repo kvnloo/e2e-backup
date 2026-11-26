@@ -139,8 +139,7 @@ export function loadNativeDriver(): DesktopDriver {
   ];
   for (const [specifier, version] of builds) {
     try {
-      // The addon's exports are not enumerable, so the version goes on an object that inherits them.
-      return Object.assign(Object.create(ownRequire(specifier) as object) as Omit<DesktopDriver, 'version'>, { version: version() });
+      return { ...(ownRequire(specifier) as Omit<DesktopDriver, 'version'>), version: version() };
     } catch (cause) {
       failures.push(`${specifier}: ${(cause as Error).message.split('\n')[0] ?? ''}`);
     }
