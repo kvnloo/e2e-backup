@@ -34,7 +34,9 @@ if (platform === undefined) throw new Error(`no native driver build for ${target
 
 const crate = path.join(import.meta.dirname, '..', 'native');
 execFileSync('cargo', ['build', '--release', '--locked', '--target', target], { cwd: crate, stdio: 'inherit', env: { ...process.env, MACOSX_DEPLOYMENT_TARGET: DEPLOYMENT_TARGET } });
-const built = path.join(crate, 'target', target, 'release', 'libe2e_desktop_native.dylib');
+// Where cargo wrote it: `CARGO_TARGET_DIR` or a cargo config can move the target directory off `native/target`.
+const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: crate, encoding: 'utf8' })) as { target_directory: string };
+const built = path.join(metadata.target_directory, target, 'release', 'libe2e_desktop_native.dylib');
 const name = `desktop.${platform}.node`;
 copyFileSync(built, path.join(crate, name));
 if (values.out !== undefined) {
