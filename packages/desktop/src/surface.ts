@@ -1095,13 +1095,7 @@ export class DesktopSurface {
     const now = await this.capture(operation, window, false, !binding.interactive);
     // A read that ran out of time gives every control a fresh id, so it cannot tell which one holds focus: that is no lost focus.
     if (now?.cutShort === true) throw partialRead('which control holds focus');
-    return [...(now?.bindings.values() ?? [])].some(
-      (candidate) =>
-        candidate.states?.focused === true &&
-        (binding.stable
-          ? candidate.id === binding.id
-          : candidate.role === binding.role && candidate.name === binding.name && candidate.testId === binding.testId && sameRect(candidate.rect, binding.rect) && candidate.likeness === binding.likeness),
-    );
+    return [...(now?.bindings.values() ?? [])].some((candidate) => candidate.states?.focused === true && sameNode(candidate, binding));
   }
 
   /**
@@ -1140,6 +1134,12 @@ export class DesktopSurface {
     const rect = binding.rect;
     if (rect === undefined || rect.width <= 0 || rect.height <= 0 || binding.windowId === undefined) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${kind === 'hover' ? 'hover' : 'double-click'}`);
     if (binding.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
+    // With no ref, the driver cannot check the node is still there: a fresh read of its window must still hold it, in the same place, or the pointer could land on what replaced it.
+    const now = await this.capture(operation, binding.windowId, false, !binding.interactive);
+    if (now?.cutShort === true) throw partialRead(`whether node ${binding.id} is still on screen`);
+    if (![...(now?.bindings.values() ?? [])].some((candidate) => sameNode(candidate, binding))) {
+      throw new EngineError('NODE_STALE', `node ${binding.id} (${binding.role ?? 'unknown'}) is no longer where it was read; observe again`, { retryable: true });
+    }
     this.pointWindow = binding.windowId;
     await this.performAt({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, { kind }, operation);
   }
@@ -1375,6 +1375,17 @@ export class DesktopSurface {
     const driverMs = options.input ? options.timeoutMs : Math.max(options.timeoutMs - READ_ANSWER_MARGIN_MS, options.timeoutMs / 2);
     return await call(() => start(driver, driverMs), options);
   }
+}
+
+/**
+ * Whether a node of a fresh read is the one a binding names: by its id when
+ * that comes from its identity, else by its role, name, developer id, place,
+ * and as many twins around it as before.
+ */
+function sameNode(candidate: NodeBinding, binding: NodeBinding): boolean {
+  return binding.stable
+    ? candidate.id === binding.id
+    : candidate.role === binding.role && candidate.name === binding.name && candidate.testId === binding.testId && sameRect(candidate.rect, binding.rect) && candidate.likeness === binding.likeness;
 }
 
 /**

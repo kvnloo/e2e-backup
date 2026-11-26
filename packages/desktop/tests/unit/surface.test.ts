@@ -786,6 +786,21 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(fake)).toEqual([]);
   });
 
+  it('double-clicks a node with no ref only while a fresh read still holds it where it was, never what replaced it', async () => {
+    const form = (child: Record<string, unknown>) => screen('w-mine', { name: 'Form', bounds: { x: 0, y: 0, width: 200, height: 200 }, children: [{ bounds: { x: 10, y: 10, width: 50, height: 20 }, ...child }] });
+    const label = form({ role: 'statictext', value: 'Hello' });
+    const replaced = form({ role: 'button', name: 'Delete', ref_id: '@s:e9' });
+    const swapped = await launched({ snapshot: [label, label, replaced] }, { observe: false, options: { headed: true } });
+    const [hello] = (await swapped.surface.observe(operation(), undefined)).root.children!;
+    await expect(swapped.surface.perform(hello!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true });
+    expect(inputs(swapped.fake)).toEqual([]);
+    const placed = windows(() => [{ id: 'w-mine', is_focused: true, bounds: { x: 0, y: 0, width: 200, height: 200 } }]);
+    const still = await launched({ snapshot: [label], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const [shown] = (await still.surface.observe(operation(), undefined)).root.children!;
+    await still.surface.perform(shown!.ref, { kind: 'doubleTap' }, operation());
+    expect(inputs(still.fake)).toEqual(['focusWindow', 'pointer']);
+  });
+
   it('reports a click the driver may have delivered as possibly committed, and one it refused by its code', async () => {
     const { surface, byTestId } = await launched({ act: [failure('ACTION_FAILED', 'delivered_unverified'), failure('ACTION_NOT_SUPPORTED', 'not_delivered'), failure('STALE_REF', 'not_delivered')] });
     await expect(surface.perform(byTestId('sign-in'), { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
