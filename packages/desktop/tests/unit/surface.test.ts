@@ -1297,6 +1297,15 @@ describe('DesktopSurface: points', () => {
     expect(open.fake.pointerOptions.at(-1)?.target).toEqual({ pid: open.fake.pid, windowId: 'w-mine', sheet: true });
   });
 
+  it('refuses a tap at an observed point when a sheet opened over its window after the observation', async () => {
+    const at = (sheet: boolean) => windows(() => [{ id: 'w-8032', is_focused: true, ...(sheet ? { sheet_focused: true } : {}), bounds: { x: 100, y: 100, width: 400, height: 300 } }]);
+    // The launch, the observation, then the tap's two reads of the window.
+    const { surface, fake } = await launched({ listWindows: [at(false), at(false), at(true), at(true)] }, { observe: false, options: { headed: true } });
+    await surface.observe(operation(), undefined);
+    await expect(surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/sheet opened/) });
+    expect(fake.of('pointer')).toHaveLength(0);
+  });
+
   it('taps, double-taps, secondary-taps, and hovers a point in the window where it is now, with no observation first', async () => {
     const { surface, fake } = await launched({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true, bounds: { x: 300, y: 200, width: 400, height: 300 } }])] }, { observe: false, options: { headed: true } });
     for (const kind of ['tap', 'doubleTap', 'secondaryTap', 'hover'] as const) await surface.performAt({ x: 20, y: 30 }, { kind }, operation());

@@ -273,8 +273,12 @@ export class DesktopSurface {
   private lifecycle: Promise<unknown> = Promise.resolve();
   /** The window a test chose with `desktop.useWindow`, which every read and command then uses until the app quits. */
   private chosenWindow: string | undefined;
-  /** The window of the newest screen handed to the harness, by observe or locate: the one a point is measured in, the agent's as core hit-tests it, against the newest observation. */
-  private pointWindow: string | undefined;
+  /**
+   * The window of the newest screen handed to the harness, by observe or locate: the one a point is measured in, the
+   * agent's as core hit-tests it, against the newest observation. `sheet` says whether a sheet held its focus then: one
+   * that opened since was not where the point was taken.
+   */
+  private pointWindow: { readonly id: string; readonly sheet: boolean } | undefined;
   /** The newest binding of every node id an observation or a locate handed out, newest last. */
   private readonly bindings = new Map<string, NodeBinding>();
   /** The id handed out for each node identity since the app launched; see `projectSnapshot`. */
@@ -814,7 +818,10 @@ export class DesktopSurface {
           (driver, timeoutMs) => driver.snapshot({ pid, windowId: window.id, maxDepth: this.options.maxDepth, interactive, timeoutMs }),
           { label: 'snapshot', input: false, signal: operation.signal, timeoutMs: operation.timeoutMs },
         );
-        if (!forMask) return this.projectWindow(raw, window.minimized === true, interactive);
+        if (!forMask) {
+          const projected = this.projectWindow(raw, window.minimized === true, interactive);
+          return window.sheet_focused === true ? { ...projected, sheet: true } : projected;
+        }
         let scratch = 0;
         return projectSnapshot(raw, () => `mask${(scratch += 1)}`);
       } catch (cause) {
@@ -904,7 +911,7 @@ export class DesktopSurface {
       withheld = cause instanceof Error && cause.cause === UNMASKED;
       return undefined;
     }) : undefined;
-    this.pointWindow = screen.windowId;
+    this.pointWindow = pointIn(screen);
     // Pixels withheld for their secure fields still report the regions masked, none, so the harness reads masking it could not prove (MASKING_UNPROVEN), not a missing screenshot.
     return {
       ...this.snapshotOf(screen),
@@ -949,7 +956,7 @@ export class DesktopSurface {
       );
     }
     const matches = resolveExpression(expression, [screen.root]);
-    this.pointWindow = screen.windowId;
+    this.pointWindow = pointIn(screen);
     this.remember(matches.flatMap((match) => screen.bindings.get(match.ref.id) ?? []));
     return matches;
   }
@@ -1181,7 +1188,7 @@ export class DesktopSurface {
     if (fresh.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
     const rect = fresh.rect;
     if (rect === undefined || rect.width <= 0 || rect.height <= 0) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
-    this.pointWindow = binding.windowId;
+    this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet === true };
     await this.performAt({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, { kind }, operation);
   }
 
@@ -1193,7 +1200,7 @@ export class DesktopSurface {
     }
     // The point is in the observed window's coordinates: find that window where it is now (it may have moved), or the app's own window before any observation.
     const observed = this.pointWindow;
-    const target = observed === undefined ? await this.ownWindow(operation) : (await this.ownWindows(operation)).find((candidate) => candidate.id === observed);
+    const target = observed === undefined ? await this.ownWindow(operation) : (await this.ownWindows(operation)).find((candidate) => candidate.id === observed.id);
     const window = target?.bounds;
     if (target === undefined || window === undefined) throw notActionable('the window the point was taken from is no longer on screen; observe again');
     if (point.x < 0 || point.y < 0 || point.x >= window.width || point.y >= window.height) {
@@ -1209,8 +1216,9 @@ export class DesktopSurface {
     if (forward === undefined || focused === undefined) throw notActionable('the window the point was taken from closed as it was brought forward; observe again');
     // A click carries no window, only screen coordinates: if another window (a sheet, a panel the app raised) took focus as this one came forward, it could be the one under the point.
     if (forward.is_focused !== true) throw notActionable('another window took focus as the window the point was taken from was brought forward, and could be under the point; observe again');
-    // A sheet counts as its window's focus, for keys. One that took focus only as the window came forward was not where the point was taken, and could cover it.
-    if (forward.sheet_focused === true && target.sheet_focused !== true) throw notActionable('a sheet opened over the window as it was brought forward, and could be under the point; observe again');
+    // A sheet counts as its window's focus, for keys. One that opened since the point was taken (in the observation, or as this action began when none came first) was not where it was taken, and could cover it.
+    const sheetThen = observed === undefined ? target.sheet_focused === true : observed.sheet;
+    if (forward.sheet_focused === true && !sheetThen) throw notActionable('a sheet opened over the window since the point was taken, and could be under the point; observe again');
     if (point.x >= focused.width || point.y >= focused.height) {
       throw notActionable(`(${point.x}, ${point.y}) is outside the ${focused.width}x${focused.height} window; a click there would land on another app`);
     }
@@ -1593,6 +1601,11 @@ async function ownDirectory(directory: string): Promise<boolean> {
 async function abandon(directory: string): Promise<void> {
   await keepOnlyRecord(directory);
   await writeFile(path.join(directory, OWNER_FILE), ABANDONED);
+}
+
+/** The window a screen was read from, and whether a sheet held its focus then: where a point taken in it was taken. */
+function pointIn(screen: ProjectedScreen): { readonly id: string; readonly sheet: boolean } | undefined {
+  return screen.windowId === undefined ? undefined : { id: screen.windowId, sheet: screen.sheet === true };
 }
 
 /** Removes everything in a state directory but its owner file and launch record. */

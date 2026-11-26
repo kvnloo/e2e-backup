@@ -95,6 +95,8 @@ export interface ProjectedScreen {
   /** The read ran out of time (`complete: false`), which the next read may not; a tree cut only at its depth limit is cut the same way every time. */
   readonly cutShort: boolean;
   readonly windowId?: string;
+  /** Set by the surface: a sheet on the window held its focus when the window was read. */
+  readonly sheet?: boolean;
   readonly title?: string;
   /** The first scrollable node, which the observation root's swipe scrolls. */
   readonly scrollTarget?: string;
