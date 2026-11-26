@@ -40,7 +40,9 @@ const MASK_MARGIN = 2;
  * A capture within a pixel of `expected` (the window's size in image
  * pixels) is the window already; any other is cropped to its opaque box,
  * which must then be within a pixel of it, or hold the window inside an
- * outline of even width on either axis (`insideOutline`). Undefined
+ * outline of even width on either axis (`insideOutline`). An outline's
+ * width is not seen side by side, so its crop may sit off by up to half the
+ * extra on each axis: every mask then reaches that much further. Undefined
  * otherwise: the rectangles would land somewhere else, and an image whose
  * masking cannot be proven must not leave the engine.
  */
@@ -49,18 +51,22 @@ export function windowImage(bytes: Uint8Array, expected: { width: number; height
   const fits = (width: number, height: number): boolean =>
     Math.abs(width - expected.width) <= SIZE_TOLERANCE && Math.abs(height - expected.height) <= SIZE_TOLERANCE;
   let window = image;
+  let reachX = MASK_MARGIN;
+  let reachY = MASK_MARGIN;
   if (!fits(image.width, image.height)) {
     const box = opaqueBox(image);
     if (box === undefined) return undefined;
     const inner = fits(box.width, box.height) ? box : insideOutline(box, expected);
     if (inner === undefined) return undefined;
+    reachX += inner.x - box.x;
+    reachY += inner.y - box.y;
     window = crop(image, inner);
   }
   for (const rect of rects) {
-    const x0 = Math.max(0, Math.floor(rect.x) - MASK_MARGIN);
-    const y0 = Math.max(0, Math.floor(rect.y) - MASK_MARGIN);
-    const x1 = Math.min(window.width, Math.ceil(rect.x + rect.width) + MASK_MARGIN);
-    const y1 = Math.min(window.height, Math.ceil(rect.y + rect.height) + MASK_MARGIN);
+    const x0 = Math.max(0, Math.floor(rect.x) - reachX);
+    const y0 = Math.max(0, Math.floor(rect.y) - reachY);
+    const x1 = Math.min(window.width, Math.ceil(rect.x + rect.width) + reachX);
+    const y1 = Math.min(window.height, Math.ceil(rect.y + rect.height) + reachY);
     for (let y = y0; y < y1; y += 1) {
       for (let x = x0; x < x1; x += 1) {
         const at = (y * window.width + x) * 4;

@@ -35,6 +35,22 @@ describe('windowImage', () => {
     expect(image).toMatchObject({ width: 16, height: 10 });
   });
 
+  it('masks a secure field wherever an outline of even width puts the window, on one side only too', () => {
+    // A 108x100 opaque capture of a 100x100 window that starts 1 px in, not at the 4 px a centered outline would give.
+    const width = 108;
+    const height = 100;
+    const data = new Uint8Array(width * height * 4);
+    for (let at = 0; at < data.length; at += 4) data.set([200, 200, 200, 255], at);
+    const field = { x: 10, y: 20, width: 4, height: 3 };
+    for (let y = field.y; y < field.y + field.height; y += 1) {
+      for (let x = field.x + 1; x < field.x + 1 + field.width; x += 1) data.set([255, 0, 0, 255], (y * width + x) * 4);
+    }
+    const png = Transformer.fromRgbaPixels(data, width, height).pngSync();
+    const image = windowImage(new Uint8Array(png.buffer, png.byteOffset, png.byteLength), { width: 100, height: 100 }, [field]);
+    expect(image).toMatchObject({ width: 100, height: 100 });
+    for (let at = 0; at < image!.data.length; at += 4) expect([...image!.data.subarray(at, at + 4)]).not.toEqual([255, 0, 0, 255]);
+  });
+
   it('withholds a capture with a border of odd width, rather than mask it in the wrong place', () => {
     const bordered = capture(13, 10, { x: 0, y: 0, width: 13, height: 10 });
     expect(windowImage(bordered, { width: 10, height: 10 }, [{ x: 7, y: 2, width: 3, height: 3 }])).toBeUndefined();
