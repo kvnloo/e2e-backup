@@ -23,7 +23,8 @@ test.describe('controls window', () => {
     await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 40');
   });
 
-  test('presses keys into a field of an app in the background', async ({ screen }) => {
+  // The app activates itself at launch, so this covers keys into a field, not delivery to an app in the background.
+  test('presses keys into a field, and types into it', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
     await note.fill('hello');
     await note.press('Enter');
