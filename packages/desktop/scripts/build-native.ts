@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -38,10 +38,10 @@ execFileSync('cargo', ['build', '--release', '--locked', '--target', target], { 
 const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: crate, encoding: 'utf8' })) as { target_directory: string };
 const built = path.join(metadata.target_directory, target, 'release', 'libe2e_desktop_native.dylib');
 const name = `desktop.${platform}.node`;
-copyFileSync(built, path.join(crate, name));
+replace(built, path.join(crate, name));
 if (values.out !== undefined) {
   mkdirSync(values.out, { recursive: true });
-  copyFileSync(built, path.join(values.out, name));
+  replace(built, path.join(values.out, name));
   const manifest = path.join(values.out, 'package.json');
   if (existsSync(manifest)) {
     const { version } = JSON.parse(readFileSync(manifest, 'utf8')) as { version: string };
@@ -49,3 +49,13 @@ if (values.out !== undefined) {
   }
 }
 process.stdout.write(`built ${path.join(crate, name)}\n`);
+
+/**
+ * Copies an addon over an older one as a new file. macOS keeps the code
+ * signature it checked for a file, so an addon overwritten in place gets the
+ * next process that loads it killed (exit 137).
+ */
+function replace(from: string, to: string): void {
+  rmSync(to, { force: true });
+  copyFileSync(from, to);
+}
