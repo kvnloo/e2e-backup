@@ -1195,17 +1195,23 @@ export class DesktopSurface {
     const rect = fresh.rect;
     if (rect === undefined || rect.width <= 0 || rect.height <= 0) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
     const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    // A point names no element: the driver's check takes any control of the window there. Any other control at this node's center (a button inside it, even one reaching past its box, or one laid over it) would take the double-click, so it is refused here, from the same read; the node's ancestors hold the point by being around it. A hover presses nothing.
+    // A point names no element: the driver's check takes any control of the window there. Any other control at this node's center (a button inside it, even one reaching past its box, or one laid over it) would take the double-click, so it is refused here, from the same read. The node's ancestors hold the point by being around it, and only one that takes a press of its own (a button the text is in) takes the click, as the driver judges it. A hover presses nothing.
     if (kind === 'doubleTap') {
       const around = new Set(now === undefined ? [] : ancestors(now.root, fresh.id));
       const other = [...(now?.bindings.values() ?? [])].find(
-        (candidate) => candidate.id !== fresh.id && !around.has(candidate.id) && candidate.ref !== undefined && candidate.states?.hidden !== true && candidate.rect !== undefined && holds(candidate.rect, center),
+        (candidate) =>
+          candidate.id !== fresh.id &&
+          (!around.has(candidate.id) || pressable(candidate)) &&
+          candidate.ref !== undefined &&
+          candidate.states?.hidden !== true &&
+          candidate.rect !== undefined &&
+          holds(candidate.rect, center),
       );
       if (other !== undefined) throw notActionable(`a ${other.role ?? 'control'} is at the center of node ${binding.id}, so a double-click there would press it; act on that control instead`);
     }
     this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet };
-    // Coming forward can reveal a control over the node: the driver checks after the move that none is under the pointer.
-    await this.pointerAt(center, { kind }, operation, true);
+    // Coming forward can reveal a control over the node: the driver checks after the move that none is under a double-click.
+    await this.pointerAt(center, { kind }, operation, kind === 'doubleTap');
   }
 
   /** Physical pointer input at a point in the window: only with `headed`, and only then declared. */
@@ -1637,6 +1643,14 @@ async function ownDirectory(directory: string): Promise<boolean> {
 async function abandon(directory: string): Promise<void> {
   await keepOnlyRecord(directory);
   await writeFile(path.join(directory, OWNER_FILE), ABANDONED);
+}
+
+/** Roles whose `Click` may be a selection (`AXSelected`), not a press of their own. */
+const SELECTED_BY_CLICK = new Set(['row', 'cell', 'treeitem', 'option', 'tab']);
+
+/** Whether a node takes a press of its own, as the driver's hit test judges an element under the pointer. */
+function pressable(binding: NodeBinding): boolean {
+  return binding.actions.includes('Click') && !SELECTED_BY_CLICK.has(binding.role ?? '');
 }
 
 /** The ids of the nodes above the node `id` in a tree, from the root down; none when the tree does not hold it. */

@@ -865,8 +865,8 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(fake)).toEqual([]);
     await surface.perform(group!.ref, { kind: 'hover' }, operation());
     expect(fake.of('pointer').at(-1)?.args).toEqual([60, 35, 'hover']);
-    // Coming forward could reveal a control over the node: the driver is told the point takes none.
-    expect(fake.pointerOptions.at(-1)?.target).toMatchObject({ content: true });
+    // A hover presses nothing: the driver is not told to refuse a control under it.
+    expect(fake.pointerOptions.at(-1)?.target?.content).toBeUndefined();
     // A child button that reaches past its group's box is inside it all the same.
     const wide = screen('w-mine', {
       name: 'Form',
@@ -913,6 +913,20 @@ describe('DesktopSurface: acting', () => {
     const shallow = every((await cut.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Row');
     await expect(cut.surface.perform(shallow!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NODE_STALE', message: expect.stringMatching(/read only in part/) });
     expect(inputs(cut.fake)).toEqual([]);
+    // Text inside a button is the button's: a double-click there presses it. Text in a selectable row is not.
+    const labelled = (role: string, actions: string[]) =>
+      screen('w-mine', {
+        name: 'Form',
+        bounds: { x: 0, y: 0, width: 200, height: 200 },
+        children: [{ role, name: 'Holder', ref_id: '@s:e9', available_actions: actions, bounds: { x: 10, y: 10, width: 100, height: 20 }, children: [{ role: 'statictext', value: 'Inner', bounds: { x: 10, y: 10, width: 100, height: 20 } }] }],
+      });
+    const button = await launched({ snapshot: [labelled('button', ['Click'])], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const inButton = every((await button.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Inner');
+    await expect(button.surface.perform(inButton!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+    const selectable = await launched({ snapshot: [labelled('row', ['Click'])], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const inRow = every((await selectable.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Inner');
+    await selectable.surface.perform(inRow!.ref, { kind: 'doubleTap' }, operation());
+    expect(selectable.fake.pointerOptions.at(-1)?.target).toMatchObject({ content: true });
   });
 
   it('double-clicks a node with a stable id where a fresh read finds it, never the box it was read with', async () => {
