@@ -1038,11 +1038,21 @@ describe('DesktopSurface: typing', () => {
     setTimeout(() => controller.abort(), 100);
     await expect(surface.typeText('ada', { replace: false }, { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
     const { inputId } = last(fake, 'act') as { inputId: number };
-    expect(fake.of('cancelTyping').map((entry) => entry.args)).toEqual([[inputId]]);
+    expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
     // A typing call that answers in time cancels nothing.
     const quick = await launched({});
     await quick.surface.typeText('ada', { replace: false }, operation());
-    expect(quick.fake.of('cancelTyping')).toEqual([]);
+    expect(quick.fake.of('cancelInput')).toEqual([]);
+  });
+
+  it('cancels a tap the call gave up on, so the driver sends no press after the step moved on', async () => {
+    const { surface, fake, byTestId } = await launched({ act: [{ ok: true, data: {}, sleepMs: 2_000 }] });
+    const signIn = byTestId('sign-in');
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    await expect(surface.perform(signIn, { kind: 'tap' }, { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
+    const { inputId } = last(fake, 'act') as { inputId: number };
+    expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
   });
 
   it('replaces the focused field as a keyboard does, select all and delete, and never by an accessibility clear', async () => {

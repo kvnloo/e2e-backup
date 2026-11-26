@@ -1070,17 +1070,14 @@ export class DesktopSurface {
   /** One action on a node's ref, a failure left as the driver reported it so a caller can tell what was sent. */
   private async tryRef(action: string, binding: NodeBinding, operation: OperationContext, extra: { value?: string; direction?: string; pages?: number; physical?: boolean } = {}): Promise<unknown> {
     const ref = this.refOf(binding, action);
-    if (action !== 'type') {
-      return await this.input((driver, timeoutMs) => driver.act({ ref, action, timeoutMs, ...extra }), { label: action, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
-    }
-    // Text still to type once the call is given up is never sent: another app may have the keyboard by then.
+    // Input still to send once the call is given up is never sent: the app may be another's by then, or the step over.
     const inputId = nextInputId();
     return await this.input((driver, timeoutMs) => driver.act({ ref, action, inputId, timeoutMs, ...extra }), {
       label: action,
       input: true,
       signal: operation.signal,
       timeoutMs: operation.timeoutMs,
-      onCutOff: () => this.driver?.cancelTyping(inputId),
+      onCutOff: () => this.driver?.cancelInput(inputId),
     });
   }
 

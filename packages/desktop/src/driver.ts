@@ -100,10 +100,10 @@ export interface DesktopDriver {
   }): Promise<Envelope<Launched>>;
   listWindows(pid: number): Promise<Envelope<readonly RawWindow[]>>;
   snapshot(options: { pid: number; windowId: string; maxDepth: number; interactive: boolean; timeoutMs: number }): Promise<Envelope<RawSnapshot>>;
-  /** `inputId` names a `type` run, so `cancelTyping` can stop it. */
+  /** `inputId` names the action, so `cancelInput` can stop it before it sends input. */
   act(options: { ref: string; action: string; value?: string; direction?: string; pages?: number; physical?: boolean; inputId?: number; timeoutMs: number }): Promise<Envelope<unknown>>;
-  /** Stops the `type` run given `inputId`: it sends no more text. */
-  cancelTyping(inputId: number): void;
+  /** Stops the action given `inputId`: it sends no input from then on. */
+  cancelInput(inputId: number): void;
   press(options: { pid: number; windowId: string; combo: string; physical: boolean }): Promise<Envelope<unknown>>;
   focusWindow(pid: number, windowId: string): Promise<Envelope<unknown>>;
   pointer(x: number, y: number, kind: string): Promise<Envelope<unknown>>;
@@ -183,7 +183,7 @@ export interface DriverCall {
 
 let lastInputId = 0;
 
-/** A fresh id for a `type` run: one counter for the process, since every engine in it shares one driver. */
+/** A fresh id for an action's input: one counter for the process, since every engine in it shares one driver. */
 export function nextInputId(): number {
   lastInputId = lastInputId >= 0xffff_ffff ? 1 : lastInputId + 1;
   return lastInputId;
@@ -196,7 +196,7 @@ export function nextInputId(): number {
  * contract. A call cut off by the budget or the signal keeps running on its
  * thread, and its answer is dropped: an input may still land, which is why
  * it is reported as one that may have committed. `onCutOff` then stops what
- * the driver can stop, such as the rest of the text a `type` sends.
+ * the driver can stop, such as any input an action had yet to send.
  */
 export async function call<T>(start: () => Promise<Envelope<T>>, options: DriverCall): Promise<T> {
   if (options.signal.aborted) throw new EngineError('CANCELLED', `${options.label} was cancelled`, { retryable: false });

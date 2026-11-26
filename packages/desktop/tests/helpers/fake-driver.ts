@@ -165,8 +165,8 @@ export class FakeDriver implements DesktopDriver {
     return this.answer('act', [options], ok({}));
   }
 
-  cancelTyping(inputId: number): void {
-    this.calls.push({ method: 'cancelTyping', args: [inputId] });
+  cancelInput(inputId: number): void {
+    this.calls.push({ method: 'cancelInput', args: [inputId] });
   }
 
   press(options: Parameters<DesktopDriver['press']>[0]): Promise<Envelope<unknown>> {
