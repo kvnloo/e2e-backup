@@ -84,7 +84,7 @@ await expect(screen.getByTestId('cart-empty'), 'the cart is empty').toBeVisible(
 | [`toBeEmpty`](#tobeempty) | खाली फ़ील्ड या बिना टेक्स्ट वाले नोड का इंतज़ार करता है |
 | [`toHaveText`](#tohavetext-and-tocontaintext) | ठीक नॉर्मलाइज़्ड टेक्स्ट का इंतज़ार करता है |
 | [`toContainText`](#tohavetext-and-tocontaintext) | अंदर मौजूद नॉर्मलाइज़्ड टेक्स्ट का इंतज़ार करता है |
-| [`toHaveValue`](#tohavevalue) | फ़ॉर्म कंट्रोल की वैल्यू का इंतज़ार करता है |
+| [`toHaveValue`](#tohavevalue) | कंट्रोल की वैल्यू का इंतज़ार करता है |
 | [`toHaveAttribute`](#tohaveattribute) | ऐट्रिब्यूट का इंतज़ार करता है |
 | [`toHaveCount`](#tohavecount) | ठीक मैच गिनती का इंतज़ार करता है |
 | [`toHaveAccessibleName`](#tohaveaccessiblename) | ऐक्सेसिबल नाम का इंतज़ार करता है |
@@ -268,7 +268,7 @@ await expect(screen.getByTestId('todo')).toContainText(['spec', 'Release']);
 
 #### `toHaveValue`
 
-फ़ॉर्म कंट्रोल की वैल्यू का इंतज़ार करता है, और बिना बदलाव के सीधी तुलना करता है।
+कंट्रोल की वैल्यू का इंतज़ार करता है, और बिना बदलाव के सीधी तुलना करता है।
 
 ```ts
 await expect(screen.getByLabel('Email')).toHaveValue('ada@example.test');
@@ -281,8 +281,19 @@ await expect(screen.getByLabel('Search')).toHaveValue('');
   रखी हुई। खाली एडिटर `''` पढ़ा जाता है।
 - जिस कंट्रोल को प्लेटफ़ॉर्म बिना वैल्यू के रिपोर्ट करे (जैसे डिवाइस पर साफ़ की
   गई फ़ील्ड), वह `''` पढ़ा जाता है।
-- जिस नोड के रोल में वैल्यू नहीं होती (जैसे हेडिंग या लिंक), वह कभी `toHaveValue`
-  को पूरा नहीं करता, नेगेट करने पर भी नहीं। मैसेज कहता है
+- वेब पर, जो `slider`, `spinbutton`, `progressbar`, `meter`, या `scrollbar`
+  नेटिव फ़ॉर्म कंट्रोल या एडिटर नहीं है, वह अपना `aria-valuetext` पढ़ता है, वरना
+  अपना `aria-valuenow`, और खाली वैल्यू को छोड़ देता है। दोनों न हों, तो `value`
+  ऐट्रिब्यूट वाला नेटिव `<progress>` या `<meter>` ब्राउज़र का बिल्ट-इन `.value`
+  पढ़ता है, उसकी रेंज में क्लैंप किया हुआ, तब भी जब कोई कस्टमाइज़्ड बिल्ट-इन
+  (`<progress is="...">`) उस गेटर को ओवरराइड करे। दोनों में से कुछ भी न होने पर
+  `slider` या `spinbutton` `''` पढ़ा जाता है। बाकी कोई भी विजेट, जैसे
+  इंडिटर्मिनेट `<progress>`, जिसमें दोनों न हों, उसकी कोई वैल्यू नहीं होती और वह
+  रिजेक्ट हो जाता है।
+- डिवाइस पर, नोड वह ऐक्सेसिबिलिटी वैल्यू पढ़ता है जो प्लेटफ़ॉर्म रिपोर्ट करता है।
+  Android नॉन-एडिटेबल नोड की वैल्यू छोड़ देता है जब वह नोड के लेबल को दोहराती है।
+- बाकी कोई भी बिना वैल्यू वाला नोड (जैसे हेडिंग या लिंक) कभी `toHaveValue` को
+  पूरा नहीं करता, नेगेट करने पर भी नहीं। मैसेज कहता है
   `no value (not a form control)`।
 
 #### `toHaveAttribute`
@@ -459,6 +470,7 @@ await expect(browser).toHaveClass(browser.locator('.card'), 'card active');
 | [`toBeGreaterThan` और बाकी](#numeric-comparisons) | संख्यात्मक सीमा पूरी हो |
 | [`toBeCloseTo`](#tobecloseto) | `10 ** -digits / 2` के अंदर |
 | [`toMatchSchema`](#matching-a-schema) | Standard Schema वैलिडेशन |
+| [`toBeOK`](#tobeok) | रिस्पॉन्स का स्टेटस 2xx है |
 
 जो मैचर अपनी वैल्यू को इवैल्यूएट न कर सके, वह मिसमैच की तरह `ASSERTION_FAILED`
 से फ़ेल होता है। उदाहरण: नंबर पर `toContain`, या बिना संख्यात्मक `length` वाली
@@ -618,6 +630,34 @@ expect(users.map((user) => user.name)).toContain('Ada');
 - मैचर किसी के await करने से पहले लौटता है, इसलिए असिंक्रोनस वैलिडेट करने वाला
   स्कीमा (async refinement) `INVALID_ARGUMENT` देता है।
 - नेगेट करने पर, वैल्यू मैच न होने पर यह पास होता है और कुछ नहीं लौटाता।
+
+#### `toBeOK`
+
+ऐसा [`WebResponse`](/reference/request#webresponse) माँगता है जिसका स्टेटस 2xx हो,
+यानी 200 से 299। यह वह लेता है जो `request`, `browser.waitForResponse`, और
+`route.fetch()` लौटाते हैं।
+
+```ts
+const created = await request.post('/api/orders', { json: { sku: 'A1' } });
+expect(created).toBeOK();
+// ASSERTION_FAILED: expected a 2xx status, got 404 from https://shop.test/api/orders
+```
+
+- फ़ेलियर स्टेटस और `response.url` का ऑरिजिन और पाथ बताता है, यानी जाँचे जा रहे
+  रिस्पॉन्स का URL। `request` के लिए यह रीडायरेक्ट के बाद का URL है। पाथ के सेगमेंट
+  दिखते हैं; क्रेडेंशियल, क्वेरी, और फ़्रैगमेंट नहीं दिखते। रिलेटिव URL, पार्स न होने
+  वाला URL, या `http` या `https` के अलावा कोई URL छोड़ दिया जाता है। बॉडी कभी नहीं
+  पढ़ी जाती।
+- स्टेटस नंबर और `WebResponse` के अलावा दूसरे टाइप कंपाइल नहीं होते, और
+  `strictNullChecks` में `WebResponse | undefined` भी नहीं। `any` टाइप वाली वैल्यू
+  कंपाइल होती है। किसी जेनेरिक हेल्पर में पैरामीटर का टाइप `WebResponse` रखें:
+  `R extends WebResponse` कंपाइल नहीं होता।
+- रनटाइम पर, न्यूमेरिक `status` और स्ट्रिंग `url` वाला ऑब्जेक्ट रिस्पॉन्स की तरह
+  जाँचा जाता है। जिस वैल्यू में इनमें से कोई फ़ील्ड गायब हो या दूसरे टाइप का हो, वह
+  `ASSERTION_FAILED` से फ़ेल होती है, नेगेट करने पर भी। थ्रो करने वाला `status` या
+  `url` गेटर अपना ही एरर देता है।
+- 2xx स्टेटस का इंतज़ार करना हो तो कॉल को पोल करें:
+  `await expect.poll(() => request.get('/api/jobs/7')).toBeOK()`।
 
 #### फ़ेलियर मैसेज
 
@@ -1055,7 +1095,7 @@ export interface AsyncExpectation {
   /** Waits for contained normalized text; a list waits for each entry to be contained by a distinct match, in order, extra matches allowed. */
   toContainText(expected: TextMatch, options?: TextMatcherOptions): Promise<void>;
   toContainText(expected: readonly TextMatch[], options?: TextMatcherOptions): Promise<void>;
-  /** Waits for a form control's value, compared as it is. */
+  /** Waits for a control's value, compared as it is. */
   toHaveValue(expected: TextMatch, options?: { timeout?: number }): Promise<void>;
   /** Waits for the attribute to be present; with `value`, for it to match. */
   toHaveAttribute(name: string, options?: { timeout?: number }): Promise<void>;
@@ -1169,6 +1209,12 @@ export interface ValueExpectation<T> {
    * A schema that validates asynchronously is `INVALID_ARGUMENT`.
    */
   toMatchSchema<Schema extends StandardSchemaV1>(schema: Schema): StandardSchemaV1.InferOutput<Schema>;
+  /**
+   * Requires a `WebResponse` whose status is 2xx (200 to 299), as `request`,
+   * `waitForResponse`, and `route.fetch()` return it. The failure names the
+   * status and the URL's origin and path; the body is never read.
+   */
+  toBeOK(...valueIsNotAResponse: [T] extends [WebResponse] ? [] : [never]): void;
 }
 
 /** `expect(value).not`: every value matcher inverted, none returning a value; `Back` is what `.not` returns to. */

@@ -385,6 +385,14 @@ export default {
 - हर परमिशन `grant`, `deny`, या `reset` होती है। iOS पर `deny` एक रिकॉर्ड किया हुआ मना
   होता है जहाँ ऐप को बिना प्रॉम्प्ट के मना कर दिया जाता है, और Android पर यह रिवोकेशन
   होता है जहाँ ऐप के दोबारा माँगने पर OS फिर पूछता है।
+- `permissions: 'all'` वे सारी परमिशन दे देता है जो प्लेटफ़ॉर्म सेट कर सकता है। यह मैप
+  की जगह लेता है; किसी परमिशन को `'deny'` या `'reset'` करना हो तो परमिशन के नाम दें।
+  - Android पर: ऐप के मैनिफ़ेस्ट में डिक्लेयर की गई हर रनटाइम परमिशन। जो परमिशन
+    रनटाइम पर नहीं दी जा सकतीं, जैसे `INTERNET`, वे छोड़ दी जाती हैं, इसलिए जो ऐप ऐसी
+    कोई परमिशन डिक्लेयर नहीं करता वह बिना किसी बदलाव के लॉन्च होता है।
+  - iOS सिम्युलेटर पर: हर प्राइवेसी सर्विस जो रनटाइम सेट कर सकता है, लोकेशन `always`
+    के साथ। सिम्युलेटर नोटिफ़िकेशन सेट करने से मना करता है, इसलिए वह प्रॉम्प्ट
+    `device.alert('accept')` से स्वीकार करें।
 - ऐप शुरू होने से पहले नाम से उस पर परमिशन सेट की जाती हैं, पहले खोले बिना, क्योंकि iOS
   चलते ऐप की परमिशन बदलने पर और Android परमिशन हटाने पर उसे बंद कर देता है।
 - वॉर्म-अप कोई लॉन्च आर्ग्युमेंट नहीं भेजता और किसी परमिशन को नहीं छूता।
@@ -448,7 +456,7 @@ export default {
 | --- | --- |
 | `observe` | रेक्ट्स के साथ ऐक्सेसिबिलिटी ट्री। एलिमेंट टाइप [रोल्स](#roles) में दी गई सूची के हिसाब से रोल पर मैप होते हैं; `Switch` या `CheckBox`, और Android का `RadioButton`, डिवाइस की बताई `checked` स्टेट रखते हैं, और `SecureTextField` या जिस Android फ़ील्ड को UIAutomator `password` मार्क करे वह सिक्योर `textbox` होता है। iOS फ़ील्ड अपने लेबल के बराबर वैल्यू रखता है (बिना लेबल वाले फ़ील्ड का नाम उसके टेक्स्ट से होता है); Android में टेक्स्ट व्यू के लेबल का उसकी वैल्यू के रूप में दोहराया जाना हटा दिया जाता है। ऐक्सेसिबिलिटी आइडेंटिफ़ायर (iOS) या रिसोर्स id (Android) नोड का `testId` बनता है। Android नोड का नाम ऐप के सेट किए कंटेंट डिस्क्रिप्शन (React Native का `accessibilityLabel`) से होता है, वरना उसके टेक्स्ट से, और उसका `text` वही होता है जो वह दिखाता है, इसलिए लेबल वाला टेक्स्ट व्यू या भरा हुआ फ़ील्ड लेबल से `getByLabel` और टेक्स्ट से `getByText` का जवाब देता है। फ़ील्ड का हिंट उसका `placeholder` ऐट्रिब्यूट होता है, चाहे दिख रहा हो या नहीं। Compose Multiplatform iOS पर कोई प्लेसहोल्डर रिपोर्ट नहीं करता: खाली फ़ील्ड जो टेक्स्ट ड्रॉ करता है उसे अपने लेबल में जोड़ देता है (`Name, Ada Lovelace`) और एक `StaticText` चाइल्ड रखता है, इसलिए वही टेक्स्ट फ़ील्ड का `placeholder` बनता है और उस चाइल्ड को छोड़ दिया जाता है। खाली फ़ील्ड की कोई वैल्यू नहीं होती: Android दिख रहे हिंट को मार्क करता है, और XCTest खाली iOS फ़ील्ड के प्लेसहोल्डर को उसकी वैल्यू के रूप में रिपोर्ट करता है, इसलिए जिस iOS फ़ील्ड की वैल्यू उसके प्लेसहोल्डर (ट्रिम की हुई) के बराबर हो वह खाली पढ़ा जाता है, भले ही ठीक प्लेसहोल्डर जैसा टेक्स्ट टाइप किया गया हो। एक Android बात agent-device की है, प्लेटफ़ॉर्म की नहीं: `rect` और हर पॉइंट स्क्रीन के फ़िज़िकल पिक्सल में होते हैं; वह जो डिस्प्ले डेंसिटी रिपोर्ट करता है वह अभी लागू नहीं होती। Android का स्टेटस बार और नेविगेशन बार, यानी स्क्रीन के किनारों पर पूरी चौड़ाई वाली `com.android.systemui` विंडो और उस किनारे की पट्टी में agent-device से अकेले रिपोर्ट किए गए संकरे स्टेटस आइकन (घड़ी, सिग्नल, बैटरी), इन्हें छोड़ दिया जाता है; नोटिफ़िकेशन शेड, सिस्टम डायलॉग, और किनारों से अंदर की तरफ़ आने वाले हेड्स-अप नोटिफ़िकेशन या दूसरे पॉपअप बने रहते हैं। माँगने पर पिक्सल मिलते हैं, जिनमें हर सिक्योर नोड की बाउंड्स काले रंग से ढकी होती हैं। |
 | `perform` | एडिटेबल फ़ील्ड पर `tap`, `doubleTap`, `multiTap`, `longPress`, `fill`, `clear`, `hover`, `check`, `uncheck`, `press` (`Enter`, `Space`, या एक कैरेक्टर), `swipe`, `dragTo`, और `focus`। `switch` या `checkbox` पर टैप उसके सबसे अंदरूनी कंट्रोल पर लगता है, क्योंकि UIKit सेटिंग्स रो को एक लेबल वाले स्विच के रूप में दिखाता है जिसमें असली टॉगल चाइल्ड होता है। `check` और `uncheck` को `checked` स्टेट चाहिए होती है। दोनों प्लेटफ़ॉर्म पर स्विच यह स्टेट रिपोर्ट करते हैं, और नेटिव Android `CheckBox` भी; React Native चेकबॉक्स या रेडियो यह तभी रिपोर्ट करता है जब ऐप `accessibilityState.checked` सेट करे। बिना स्टेट वाला कंट्रोल `UNSUPPORTED_CAPABILITY` देता है, इसलिए उस पर टैप करें। `doubleTap` दो प्रेस होते हैं, iOS पर 284 से 285 ms के अंतर पर (agent-device के XCTest टैप की यही गति है): agent-device का अपना डबल-टैप जेस्चर React Native के `Pressable` तक एक ही प्रेस के रूप में पहुँचता है। 300 ms या कम की विंडो वाला डिटेक्टर इस जोड़ी को दो सिंगल टैप पढ़ सकता है। `multiTap` `doubleTap` की ही गति से `count` प्रेस करता है, इसलिए वही छोटी-विंडो वाली बात यहाँ भी लागू होती है; agent-device की सीमा 200 से ऊपर का `count` किसी भी प्रेस से पहले `UNSUPPORTED_CAPABILITY` देता है। iOS पर लगभग 285 ms प्रति प्रेस के हिसाब से 200 प्रेस में लगभग एक मिनट लगता है, जो डिफ़ॉल्ट 30 s के एक्शन टाइमआउट से ज़्यादा है, इसलिए बड़े `count` के लिए ज़्यादा `timeout` पास करें। जब तक टेस्ट `duration` न दे, `longPress` एक सेकंड तक होल्ड करता है, जो React Native `Pressable` के 500 ms के `delayLongPress` और ऐप्स की लंबी सीमाओं से ज़्यादा है; agent-device का अपना डिफ़ॉल्ट होल्ड छोटा होता है और उन पर टैप गिना जाता है। `blur`, `selectOption`, `setInputFiles`, `scrollIntoView`, और `secondaryTap` डिक्लेयर नहीं हैं, न ही `tapModifiers`, इसलिए `modifiers` के साथ `tap`, `doubleTap`, या `multiTap` देने पर `UNSUPPORTED_CAPABILITY` आता है। किसी ऐसे नोड पर एक्शन जिसे नए स्नैपशॉट ने बदल दिया हो, किसी और एलिमेंट पर चलने के बजाय उस नोड को दोबारा ढूँढता है। |
-| `performAt` | स्क्रीन के सीधे पॉइंट पर `tap`, `doubleTap`, `longPress`, और `swipeTo`, ताकि `screen.tapAt`, `screen.doubleTapAt`, `tap({ position })`, `screen.swipe({ from, to })`, और एजेंट का `tap_at` ऐसे कंट्रोल तक पहुँच सकें जो ट्री में नहीं है। पॉइंट पर कोई `hover`, `secondaryTap`, या `dragTo` नहीं होता: टच में बिना नोड के ये नहीं होते, इसलिए `hover_at` को ट्री में शामिल कंट्रोल चाहिए। |
+| `performAt` | स्क्रीन के सीधे पॉइंट पर `tap`, `doubleTap`, `longPress`, और `swipeTo`, ताकि `screen.tapAt`, `screen.doubleTapAt`, `tap({ position })`, `screen.swipe({ from, to })`, और एजेंट का `tap_at` ऐसे कंट्रोल तक पहुँच सकें जो ट्री में नहीं है। iOS पर, जब सॉफ़्ट कीबोर्ड खुला हो, बिना `duration` वाला `screen.swipe({ from, to })` उसके ऊपर ही रहना चाहिए; ऐसा न हो तो कुछ भी भेजे जाने से पहले वह `ACTION_FAILED` से फ़ेल होता है। `duration` के साथ पाथ वैसे ही भेजा जाता है जैसा दिया गया है, कीबोर्ड के आर-पार, जैसा इंटरैक्टिव कीबोर्ड डिसमिसल के टेस्ट को चाहिए। पॉइंट पर कोई `hover`, `secondaryTap`, या `dragTo` नहीं होता: टच में बिना नोड के ये नहीं होते, इसलिए `hover_at` को ट्री में शामिल कंट्रोल चाहिए। |
 | `keyboard` | फ़ोकस्ड फ़ील्ड में `type` और `press`, एजेंट का बिना टारगेट वाला `type` और `press` और `type_at` और `press_at` का फ़ॉलबैक, और `dismiss`, जो एजेंट का `dismiss_keyboard` है। |
 | `locate` | हर `screen` क्वेरी। टेक्स्ट और लेबल क्वेरी सबसे अंदरूनी मैच लौटाती हैं, क्योंकि डिवाइस दोनों को ट्री में ऊपर दोहराता है (React Native इनपुट एक होस्ट व्यू और उसके अंदर का फ़ील्ड होता है, दोनों पर लेबल होता है)। Android पर टेस्ट id क्वेरी (स्ट्रिंग या RegExp), जब स्क्रीन पर पूरी id से कुछ मैच न हो, तो `<package>:id/` प्रीफ़िक्स के बिना भी रिसोर्स id से मैच करती है (फ़्रेमवर्क के `android` को छोड़कर किसी भी पैकेज के लिए)। `screen.locator('id=…')` agent-device का सेलेक्टर है और पूरी id लेता है। |
 | `validateApp` | `app.bundleId` या `app.appPath` ज़रूरी है और अभी `app.url` को मना करता है, साथ में यह नोट देता है कि प्लेटफ़ॉर्म के डिवाइस से इस मशीन तक कैसे पहुँचा जाए। |
@@ -1412,8 +1420,14 @@ await agent.act('Open About and read the iOS version');
 /** A permission's state: held, refused, or not asked for yet, so the OS asks again. */
 export type PermissionState = 'grant' | 'deny' | 'reset';
 
-/** Permissions an app holds when it launches, by name. */
-export type LaunchPermissions = Readonly<Partial<Record<DevicePermission, PermissionState>>>;
+/**
+ * Permissions an app holds when it launches, by name, or `'all'` to grant
+ * every one the platform can. On Android that is each runtime permission the
+ * app declares; the rest are skipped. On an iOS simulator it is each privacy
+ * service the runtime can set, location `always` included. The simulator
+ * refuses to set notifications.
+ */
+export type LaunchPermissions = Readonly<Partial<Record<DevicePermission, PermissionState>>> | 'all';
 ```
 
 ### डिवाइस फ़िक्स्चर
@@ -1435,8 +1449,8 @@ export interface OpenAppOptions {
   readonly launchArguments?: LaunchArguments;
   /**
    * Permissions the app holds before this launch, each granted, denied, or
-   * reset. Replaces the target's `app.permissions` for a relaunch of the
-   * pinned app.
+   * reset, or `'all'` to grant every one the platform can. Replaces the
+   * target's `app.permissions` for a relaunch of the pinned app.
    */
   readonly permissions?: LaunchPermissions;
 }

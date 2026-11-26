@@ -97,7 +97,7 @@ const shop = await launch(web(), {
 | `linkBase` | `mobile()` | वह बेस जिससे `app.open(path)` पाथ जोड़कर लिंक के रूप में खोलता है। [कॉन्फ़िग](/reference/config#linkbase) देखें। |
 | `identity` | दोनों | सेव स्टेट और रिकॉर्डिंग के लिए ऐप का नाम। डिफ़ॉल्ट: URL या बंडल id। |
 | `launchArguments` | `mobile()` | वे आर्ग्युमेंट जिनके साथ ऐप लॉन्च होता है, लिस्ट या ऑब्जेक्ट। [कॉन्फ़िग](/reference/config#launcharguments) देखें। |
-| `permissions` | दोनों | देने या मना करने वाली परमिशन। |
+| `permissions` | दोनों | देने या मना करने वाली परमिशन, या `'all'`, जिससे इंजन जितनी परमिशन दे सकता है वे सब मिल जाती हैं। देखें [कॉन्फ़िग](/reference/config#permissions)। |
 
 <a id="timeout" />
 

@@ -69,14 +69,26 @@ export default {
 ```ts
 import { defineEngine, isEngineHandle, type EngineHandle } from 'e2e/engine';
 
-export function defineEngine<Fixtures extends object = {}>(spec: Engine): EngineHandle<Fixtures>;
-// With a fixture beside screen, app, and platform, `spec.fixtures` must hold
-// a factory returning each one Fixtures names.
+export function defineEngine<
+  Fixtures extends object = {},
+  Platform extends string = string,
+  Isolation extends EngineIsolation = EngineIsolation,
+>(spec: Engine & { readonly platform?: Platform; readonly isolation?: Isolation }): EngineHandle<Fixtures, Platform, Isolation>;
+// With a fixture beside screen, app, and platform, `spec.fixtures` must have
+// a factory returning each one Fixtures names. If Platform is a literal
+// such as 'ios', `spec.platform` must be that value. If Isolation is
+// 'worker', `spec.isolation` must be 'worker'.
 export function isEngineHandle(value: unknown): value is EngineHandle;
 
 /** A validated engine: branded, frozen, capabilities computed. */
-export interface EngineHandle<Fixtures extends object = {}> extends Engine {
+export interface EngineHandle<
+  Fixtures extends object = {},
+  Platform extends string = string,
+  Isolation extends EngineIsolation = EngineIsolation,
+> extends Engine {
   readonly capabilities: ReadonlySet<EngineCapability>;
+  readonly platform?: Platform;
+  readonly isolation?: Isolation;
 }
 ```
 
@@ -91,9 +103,20 @@ export interface EngineHandle<Fixtures extends object = {}> extends Engine {
 लिखे आर्ग्युमेंट के सेशन के फ़िक्स्चर्स को टाइप कर देता है: फ़ैक्ट्री से
 `defineEngine<{ device: Device }>(...)` लौटाएँ।
 
+`Platform` और `Isolation` स्पेक के `platform` और `isolation` के लिटरल टाइप हैं, जैसे
+`'ios'` और `'worker'`। [कॉन्फ़िग के फ़िक्स्चर टाइप होने पर](/reference/test#engine-fixtures-across-targets)
+टारगेट को एक-दूसरे से अलग पहचानने के लिए इनकी ज़रूरत होती है। अगर आप `Fixtures` देते हैं,
+तो लिटरल बनाए रखने के लिए तीनों दें:
+`defineEngine<{ device: Device }, 'ios', 'worker'>(...)`। फिर स्पेक में वही `platform`
+सेट करें, और `'worker'` के लिए `isolation: 'worker'`।
+
 ऊपर `KioskEngine` की तरह फ़ैक्ट्री से अपना इंटरफ़ेस लौटाएँ। तब जो कॉन्फ़िग अपना टाइप
 इनफ़र करता है वह आपके पैकेज का नाम लेता है। `declaration: true` सेट करने वाले pnpm
 प्रोजेक्ट में सीधा `EngineHandle` TS2883 से फ़ेल हो सकता है।
+
+अपने इंटरफ़ेस पर लिटरल टाइप बनाए रखने के लिए उसे `Platform` और `Isolation` पैरामीटर दें,
+जिनके डिफ़ॉल्ट `string` और `EngineIsolation` हों, जैसे `WebEngine` और `MobileEngine` में
+है। फिर लिटरल फ़ैक्ट्री के रिटर्न टाइप में रखें: `web(): WebEngine<'web', 'attempt'>`।
 
 जब स्पेक इनमें से कोई नियम तोड़े, तो `defineEngine` `INVALID_CONFIG` थ्रो करता है:
 
@@ -113,6 +136,7 @@ export interface EngineHandle<Fixtures extends object = {}> extends Engine {
 | `performAt`, `pointerActions` | एक बिना दूसरे के हो। ऐसी `pointerActions` लिस्ट जो खाली हो, किसी काइंड को दोहराए, या `POINTER_ACTION_KINDS` से बाहर का नाम दे। |
 | `tapModifiers` | बूलियन न हो, या `perform` के बिना `true` हो। |
 | `selectsDevice` | बूलियन न हो, या `prepare` के बिना `true` हो। |
+| `grantsAllPermissions` | बूलियन न हो। |
 | `launchArgumentValues` | बूलियन न हो। |
 | `fileApps` | बूलियन न हो। |
 | `isolation` | `'attempt'` या `'worker'` के अलावा कुछ भी। |
@@ -146,6 +170,7 @@ export interface EngineHandle<Fixtures extends object = {}> extends Engine {
 | [`performAt`, `pointerActions`](#pointer-actions) | मेथड, काइंड्स |
 | [`tapModifiers`](#capabilities) | `boolean` |
 | [`selectsDevice`](#capabilities) | `boolean` |
+| [`grantsAllPermissions`](#capabilities) | `boolean` |
 | [`launchArgumentValues`](#engineappinfo) | `boolean` |
 | [`fileApps`](#capabilities) | `boolean` |
 | [`keyboard`](#keyboard) | `EngineKeyboard` |
@@ -257,6 +282,12 @@ export interface Engine {
    * for the target before anything is prepared.
    */
   readonly selectsDevice?: boolean;
+  /**
+   * The engine grants `app.permissions: 'all'`, which reaches it as
+   * `EngineAppInfo.allPermissions`. Without it the harness refuses `'all'` at
+   * config load, so an engine that predates the value never receives it.
+   */
+  readonly grantsAllPermissions?: boolean;
   /**
    * The engine reads the object form of `app.launchArguments` from
    * `EngineAppInfo.launchArgumentValues`. Without it the harness refuses an
@@ -421,6 +452,7 @@ export interface OperationContext {
 | `viewportIntersection` | `viewport-intersection` | `locate` | `expect(locator).toBeInViewport()`। |
 | `tapModifiers: true` | - | `perform` | `tap`, `doubleTap`, `multiTap`, और `secondaryTap` पर `modifiers`। |
 | `selectsDevice: true` | - | `prepare` | `e2e run --device`, वह डिवाइस जिसे `prepare` बाइंड करता है। |
+| `grantsAllPermissions: true` | - | - | `app.permissions: 'all'`, जो इंजन को `EngineAppInfo.allPermissions` के रूप में मिलता है। इसके बिना कॉन्फ़िग लोड `'all'` रिजेक्ट कर देता है, इसलिए इससे पहले रिलीज़ हुए इंजन को यह स्ट्रिंग कभी नहीं मिलती। |
 | `launchArgumentValues: true` | - | - | `EngineAppInfo.launchArgumentValues` में `app.launchArguments` का ऑब्जेक्ट रूप। |
 | `fileApps: true` | - | - | ऐसा टारगेट जिसका `app.url` `file:` URL हो। `validateApp` को `fileApp: true` बताया जाता है। |
 | `performAt` + `pointerActions` | `pointer` | `observe` | बिना किसी नोड के व्यूपोर्ट पॉइंट पर एक पॉइंटर एक्शन। |
@@ -1555,6 +1587,12 @@ export interface EngineAppInfo {
   readonly launchArgumentValues?: LaunchArgumentValues;
   /** Permissions the app holds, by name; what each state means is the engine's (a device sets them before every fresh launch). */
   readonly permissions?: Readonly<Record<string, AppPermissionState>>;
+  /**
+   * `app.permissions: 'all'`: grant every permission the engine can grant,
+   * in place of `permissions`. Only an engine that declares
+   * `grantsAllPermissions` receives it; for any other, the config is refused.
+   */
+  readonly allPermissions?: true;
 }
 ```
 

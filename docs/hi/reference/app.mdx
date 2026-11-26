@@ -201,8 +201,9 @@ if ('path' in video) console.log(video.path);
 - वीडियो या तो अटेम्प्ट की `recordings/` डायरेक्टरी में एक फ़ाइल (`path`,
   एब्सोल्यूट) होता है जिसका नाम `001-<name>.<ext>` होता है, या फिर एक `url` जब
   कोई होस्टेड ब्राउज़र या डिवाइस रिकॉर्डिंग रखता है।
-- एक ही वीडियो होता है, सिवाय वेब पर जब रिकॉर्डिंग के दौरान पेज बदल
-  जाए (`app.restart()`, `app.clearState()`): तब हर पेज के लिए एक वीडियो बनता है।
+- एक ही वीडियो होता है। वेब स्क्रीनकास्ट इसके बजाय दिखाए गए हर पेज का एक
+  वीडियो लिखता है: एक्टिव टैब बदलने पर या पेज बदल दिए जाने पर
+  (`app.restart()`, `app.clearState()`) नया वीडियो शुरू होता है।
 - स्टेप हर वीडियो को ट्रेस में लिंक करता है।
 
 | क्या थ्रो होता है | कब |
@@ -250,7 +251,7 @@ export interface App {
   startRecording(options?: RecordingOptions): Promise<void>;
   /**
    * Stops the recording and returns its videos in play order: one, or on the
-   * web one per page when the page was replaced while it recorded.
+   * web one per page it showed: a tab switch or a replaced page starts another.
    */
   stopRecording(): Promise<readonly [RecordedVideo, ...RecordedVideo[]]>;
 }

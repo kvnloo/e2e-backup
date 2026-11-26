@@ -66,8 +66,8 @@ web({ viewport: { width: 390, height: 844 }, locale: 'de-DE' });
 
 - `web()` टारगेट को `app.url` चाहिए होता है और यह डिवाइस की (`bundleId`,
   `appPath`, `launchArguments`) को मना कर देता है। इसका `app.permissions` सिर्फ़
-  `'grant'` लेता है, उन नामों के लिए जिन्हें इसका ब्राउज़र ग्रांट करता है;
-  [`permissions`](/reference/config#permissions) देखें।
+  `'grant'` लेता है, उन नामों के लिए जिन्हें इसका ब्राउज़र ग्रांट करता है, या सबके लिए
+  `'all'`; [`permissions`](/reference/config#permissions) देखें।
 - JSDoc के साथ पूरा डिक्लेरेशन नीचे टाइप सेक्शन में [`WebOptions`](#weboptions) में है।
 
 | थ्रो करता है | कब |
@@ -477,6 +477,7 @@ export type WebInitScript = string | { readonly path: string } | (() => unknown)
   `clearCookies`, `route`, `unroute`, `unrouteAll`, `onDialog`, और `addInitScript`।
 - `setViewport` एक्टिव टैब और उसके बाद खुलने वाले हर टैब का साइज़ सेट करता है।
 - [`emulateMedia`](#media-emulation) सभी खुले और आने वाले टैब पर मीडिया बदलता है।
+- [`setNetwork`](#setnetwork) हर टैब और सर्विस वर्कर को ऑफ़लाइन कर देता है।
 - ऐप `target="_blank"` लिंक या `window.open` से जो टैब खोलता है, वह बैकग्राउंड में
   खुलता है: एक्टिव टैब वहीं रहता है जब तक `waitForPopup` या `activate` किसी दूसरे को
   एक्टिव न बना दे। [टैब](#tabs) देखें।
@@ -512,6 +513,7 @@ export type WebInitScript = string | { readonly path: string } | (() => unknown)
 | [`clearCookies`](#clearcookies) | `Promise<void>` |
 | [`setViewport`](#setviewport) | `Promise<void>` |
 | [`emulateMedia`](#media-emulation) | `Promise<void>` |
+| [`setNetwork`](#setnetwork) | `Promise<void>` |
 | [`onDialog`](#ondialog) | `Promise<() => Promise<void>>` |
 | [`tabs`](#tabs) | `readonly BrowserTab[]` |
 | [`waitForPopup`](#tabs) | `Promise<BrowserTab>` |
@@ -535,8 +537,8 @@ export type WebInitScript = string | { readonly path: string } | (() => unknown)
 है, जो टेस्ट डेडलाइन (`afterEach` में `cleanupTimeout`) तक सीमित रहता है; `0` उस
 डेडलाइन तक इंतज़ार करता है। `url`, `title`, `evaluate`, `addInitScript`, `route`,
 `unroute`, `unrouteAll`, `cookies`, `setCookies`, `clearCookies`, `setViewport`,
-`emulateMedia`, `onDialog`, `newTab`, `BrowserTab` के मेथड, `keyboard.*`, `mouse.*`,
-और `webmcp.*` कोई ओवरराइड नहीं लेते।
+`emulateMedia`, `setNetwork`, `onDialog`, `newTab`, `BrowserTab` के मेथड, `keyboard.*`,
+`mouse.*`, और `webmcp.*` कोई ओवरराइड नहीं लेते।
 
 #### `goto`
 
@@ -894,11 +896,25 @@ export interface WebResponse {
 
 #### `cookies`
 
-मौजूदा कॉन्टेक्स्ट को दिखने वाली कुकी लौटाता है।
+ब्राउज़र की सारी कुकी लौटाता है, या सिर्फ़ वे कुकी जो किसी URL पर जाने वाली रिक्वेस्ट
+साथ ले जाएगी।
 
 ```ts
-const cookies = await browser.cookies();
+const all = await browser.cookies();
+const sent = await browser.cookies('/api/orders');
+const either = await browser.cookies(['/api/orders', 'https://auth.example.com']);
 ```
+
+- कुकी URL से अपने डोमेन, अपने पाथ, और `Secure` के हिसाब से मैच होती है: `Secure`
+  कुकी `https` URL से मैच होती है, और `localhost` जैसे लूपबैक होस्ट पर `http` URL से भी।
+- रिलेटिव URL बेस URL के हिसाब से रिज़ॉल्व होता है, जैसे `goto` उसे रिज़ॉल्व करता है।
+- खाली लिस्ट कोई कुकी नहीं लौटाती।
+
+| थ्रो करता है | कब |
+| --- | --- |
+| `INVALID_ARGUMENT` | ऐसी वैल्यू जो स्ट्रिंग या स्ट्रिंग की ऐरे न हो। |
+| `POLICY_DENIED` | पार्स न होने वाला URL, या ऐसा URL जो `http(s)` न हो। |
+| `APP_URL_REQUIRED` | ऐसे टारगेट पर URL, जो कोई `app.url` डिक्लेयर नहीं करता। |
 
 #### `setCookies`
 
@@ -972,6 +988,45 @@ await app.open('/');
   लेआउट रेंडर नहीं करता।
 - यह साइज़ अटेम्प्ट के बाकी समय के लिए बना रहता है, `app.restart()` और `app.clearState()`
   के बाद भी।
+
+#### `setNetwork`
+
+अटेम्प्ट के बाकी समय के लिए ब्राउज़र को ऑफ़लाइन करता है, या वापस ऑनलाइन।
+
+```ts
+await app.open('/');
+await browser.setNetwork('offline');
+await screen.getByRole('button', 'Refresh').tap();
+await expect(screen.getByText('You are offline')).toBeVisible();
+await browser.setNetwork('online');
+```
+
+- ऑफ़लाइन होने पर नेटवर्क तक पहुँचने वाली रिक्वेस्ट वैसे ही फ़ेल होती है जैसे
+  कनेक्शन न होने पर, और `navigator.onLine` `false` होता है। खुले पेज को `offline`
+  इवेंट मिलता है।
+- यह हर टैब, बाद में खुलने वाले हर टैब, और पेज के सर्विस वर्कर पर लागू होता है।
+  वर्कर फिर भी अपने कैश से जवाब दे सकता है, इसलिए `browser.reload()` वह पेज लोड कर
+  देता है जो उसने कैश किया था।
+- ब्राउज़र का HTTP कैश भी जवाब देता रहता है। Chromium सिर्फ़ वह रिस्पॉन्स देता है जो
+  अब भी फ़्रेश है, Firefox हर वह रिस्पॉन्स जो उसने स्टोर किया है, और WebKit कोई नहीं।
+  जो पेज किसी कैश में नहीं है, उस पर नेविगेशन फ़ेल होता है।
+- पहले से खुला कनेक्शन, जैसे इवेंट स्ट्रीम, खुला रहता है।
+- नेविगेशन फ़ेल होने के बाद Chromium अपना एरर पेज दिखाता है, और उस पेज का `reload()`
+  रिज़ॉल्व हो जाता है। स्क्रीन पर असर्ट करें।
+- यह `app.restart()` और `app.clearState()` के बाद भी बना रहता है। हर अटेम्प्ट ऑनलाइन
+  शुरू होता है, रीट्राई भी।
+- यह पहले नेविगेशन से पहले भी काम करता है।
+- Chromium और WebKit अब भी वह रिक्वेस्ट पूरी करते हैं जिसका जवाब [`route`](#route)
+  देता है। Firefox उसे फ़ेल कर देता है।
+- [`headers`](#headers) कॉन्फ़िगर होने पर सर्विस वर्कर ब्लॉक होते हैं, इसलिए कोई वर्कर
+  कैश किया हुआ पेज नहीं देता।
+- [`request`](/reference/request) फ़िक्स्चर रनर के प्रोसेस में चलता है और ऑनलाइन
+  रहता है।
+
+| थ्रो करता है | कब |
+| --- | --- |
+| `INVALID_ARGUMENT` | `'online'` या `'offline'` के अलावा कोई स्टेट। |
+| `ACTION_FAILED` | ब्राउज़र ऑफ़लाइन रहते हुए कोई नेविगेशन फ़ेल होता है। |
 
 #### `onDialog`
 
@@ -1289,7 +1344,7 @@ live!.context();                  // its BrowserContext
 
 | थ्रो करता है | कब |
 | --- | --- |
-| `INVALID_STATE` | एक्टिव अटेम्प्ट के बाहर किसी एक्सेसर को कॉल करना। |
+| `INVALID_STATE` | एक्टिव अटेम्प्ट के बाहर किसी एक्सेसर को कॉल करना, या ऐसे हैंडल पर जो इस प्रोसेस में शुरू नहीं हुआ, जैसे दूसरा `web()`। |
 
 ## टाइप
 
@@ -1480,8 +1535,12 @@ export interface Browser extends Expectable<BrowserExpectation> {
     pattern: string | RegExp | RouteMatcher,
     options?: { timeout?: number },
   ): Promise<WebResponse>;
-  /** Returns cookies visible to the current context. */
-  cookies(): Promise<Cookie[]>;
+  /**
+   * Returns every cookie of the browser, or only those a request to `urls`
+   * (one URL or several) would carry. A relative URL resolves against the
+   * base URL.
+   */
+  cookies(urls?: string | readonly string[]): Promise<Cookie[]>;
   /** Sets cookies after URL validation. */
   setCookies(cookies: readonly Cookie[]): Promise<void>;
   /** Removes matching cookies only; without filters removes every cookie, preserving other storage. */
@@ -1490,6 +1549,8 @@ export interface Browser extends Expectable<BrowserExpectation> {
   setViewport(size: { width: number; height: number }): Promise<void>;
   /** Emulates CSS media features on every open tab and every tab opened after them. */
   emulateMedia(media: WebMedia): Promise<void>;
+  /** Takes the browser offline or back online for the rest of the attempt: every tab and the page's service workers. */
+  setNetwork(state: 'online' | 'offline'): Promise<void>;
   /** Registers an attempt-scoped dialog handler and returns an unsubscribe function. */
   onDialog(handler: DialogHandler): Promise<() => Promise<void>>;
   /** Returns the open tabs, in the order they opened. */

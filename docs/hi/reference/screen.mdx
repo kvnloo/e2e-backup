@@ -1072,6 +1072,10 @@ const email = await screen.getByLabel('Email').inputValue();
 पढ़ते हैं (न होने पर `on`), चाहे उसका चेक्ड स्टेट कुछ भी हो। स्टेट पढ़ने के लिए
 `isChecked()` इस्तेमाल करें।
 
+`inputValue()` रेंज विजेट को वैसे ही पढ़ता है जैसे
+[`toHaveValue`](/reference/expect#tohavevalue) पढ़ता है। Playwright का
+`inputValue()` ARIA विजेट पर थ्रो करता है।
+
 | क्या थ्रो होता है | कब |
 | --- | --- |
 | `ACTION_FAILED` | बिना वैल्यू वाला नोड, जैसे हेडिंग या बटन। खाली फ़ील्ड `""` पढ़ी जाती है। |

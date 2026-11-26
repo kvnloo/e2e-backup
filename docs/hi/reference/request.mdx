@@ -106,7 +106,8 @@ const found = await request.get('/api/orders?reference=r1');
   जब तक आप टाइप न दें यह `unknown` होता है। उस टाइप को कुछ भी जाँचता नहीं है:
   जाँचने के लिए [`toMatchSchema`](/reference/expect#matching-a-schema) इस्तेमाल
   करें।
-- स्टेटस को वैल्यू मैचर से जाँचें: `expect(response.status).toBe(201)`।
+- 2xx स्टेटस [`toBeOK`](/reference/expect#tobeok) से जाँचें, और कोई तय स्टेटस
+  वैल्यू मैचर से: `expect(response.status).toBe(201)`।
 
 ## URL
 

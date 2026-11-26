@@ -207,6 +207,8 @@ export interface EngineManifest {
   readonly tapModifiers?: boolean;
   /** Requires `lifecycle/prepare`: `prepare` binds the device `e2e run --device` names. */
   readonly selectsDevice?: boolean;
+  /** See `Engine.grantsAllPermissions`. */
+  readonly grantsAllPermissions?: boolean;
   /** The engine reads the object form of `app.launchArguments` from `EngineAppInfo.launchArgumentValues`. */
   readonly launchArgumentValues?: boolean;
   /** The engine opens an app whose `url` is a `file:` URL, read from the disk of the machine the harness runs on. */
@@ -255,6 +257,9 @@ export interface EngineManifest {
 जब सर्वर अटेम्प्ट की आर्टिफ़ैक्ट डायरेक्टरी में लिख न सके (जैसे डिवाइस पर चल रहा
 सर्वर), तब `artifacts/screenshot` `{ data, mediaType: 'image/png' }` लौटाता है,
 जहाँ इमेज base64 में होती है। क्लाइंट इसे `screenshots/` के अंदर लिख देता है।
+जिस अटेम्प्ट ने इमेज माँगी थी, उसके लिए `lifecycle/endAttempt` भेजे जाने के बाद
+या उस अटेम्प्ट के खत्म होने के बाद पहुँचे बाइट्स छोड़ दिए जाते हैं, और कॉल
+`INVALID_STATE` से फ़ेल होती है।
 ऑब्ज़र्वेशन के पिक्सल भी इसी तरह जाते हैं: `pixels.data` base64 होता है।
 `engine/perform` में फ़ाइल पेलोड बफ़र भी base64 की तरह जाते हैं; इंजन को वे
 `Uint8Array` बाइट्स के रूप में मिलते हैं।

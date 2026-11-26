@@ -7,9 +7,9 @@ description: हर कॉन्फ़िगरेशन key, उसका ड�
 
 `e2e.config.ts` रनर को कॉन्फ़िगर करता है: जिन टारगेट्स पर टेस्ट चलते हैं, हर टारगेट जो
 ऐप टेस्ट करता है, एजेंट्स, और रीप्ले कैश। `satisfies E2EConfig` के साथ एक ऑब्जेक्ट
-एक्सपोर्ट करें, जो इसका शेप चेक करता है और इसके इनफ़र्ड टाइप बनाए रखता है। लोड होने पर
-रनर कॉन्फ़िग को फिर से जाँचता है, उन रेंज और नियमों के साथ जिन्हें TypeScript चेक नहीं
-कर सकता। ज़्यादातर प्रोजेक्ट जो ऑप्शन बदलते हैं, उनके लिए
+एक्सपोर्ट करें, जो इसका शेप चेक करता है और इसके इनफ़र्ड टाइप बनाए रखता है, या उसे
+[`defineConfig`](#defineconfig) को दें। लोड होने पर रनर कॉन्फ़िग को फिर से जाँचता है,
+उन रेंज और नियमों के साथ जिन्हें TypeScript चेक नहीं कर सकता। ज़्यादातर प्रोजेक्ट जो ऑप्शन बदलते हैं, उनके लिए
 [प्रोजेक्ट कॉन्फ़िगर करें](/quickstart#configure-the-project) देखें।
 
 ```ts title="e2e.config.ts"
@@ -29,6 +29,32 @@ export default {
 
 ## रेफ़रेंस
 
+### `defineConfig`
+
+जो कॉन्फ़िग इसे दिया जाता है, वही लौटाता है। इसे `satisfies E2EConfig` की जगह इस्तेमाल करें।
+
+```ts title="e2e.config.ts"
+import { defineConfig } from 'e2e';
+import { web } from '@e2e-dev/web';
+
+export default defineConfig({
+  targets: [{ engine: web(), app: { url: 'http://localhost:3000' } }],
+});
+```
+
+- `satisfies E2EConfig` की तरह, एडिटर हर key कंप्लीट करता है, और अनजान टॉप-लेवल
+  key टाइप एरर है।
+- कॉन्फ़िग अपना इनफ़र्ड टाइप बनाए रखता है, इसलिए `typeof config` अब भी
+  [`test.extend`](/reference/test#test-extend) के टाइप आर्ग्युमेंट की तरह काम करता है।
+- नीचे का हर नियम तब लागू होता है जब रनर कॉन्फ़िग रिज़ॉल्व करता है, तब नहीं जब
+  `defineConfig` कॉल होता है।
+
+```ts
+export function defineConfig<const Config extends E2EConfig>(
+  config: Config & { readonly [Key in Exclude<keyof Config, keyof E2EConfig>]: never },
+): Config;
+```
+
 ### टॉप लेवल
 
 | ऑप्शन | टाइप | डिफ़ॉल्ट |
@@ -46,6 +72,7 @@ export default {
 | [`failOnSkippedFailure`](#failonskippedfailure) | `boolean` | `false` |
 | [`maxDuration`](#maxduration) | `number` | - |
 | [`workers`](#workers) | `number` | आधे कोर, CI में `1` |
+| [`fullyParallel`](#fullyparallel) | `boolean` | `false` |
 | [`reporters`](#reporters) | `(BuiltinReporter \| Reporter)[]` | `['list']` |
 | [`output`](#output) | `string` | `'.e2e'` |
 | [`artifacts`](#artifacts) | `ArtifactsConfig` | सिर्फ़ लोकल |
@@ -257,6 +284,23 @@ workers: 4, // default: 1 in CI, else half the cores
   पहले शुरू होती हैं, जैसा [सबसे ज़्यादा संभावना वाले पहले चलाएँ](/filters#start-the-likeliest-first)
   में बताया गया है।
 
+#### `fullyParallel`
+
+हर फ़ाइल में, एक फ़ाइल के टेस्ट अलग-अलग वर्कर पर एक साथ चलाता है।
+
+```ts
+fullyParallel: true, // default: false
+```
+
+- डिफ़ॉल्ट रूप से फ़ाइलें पैरेलल में चलती हैं, और एक फ़ाइल के टेस्ट एक वर्कर पर क्रम से
+  चलते हैं।
+- यह हर फ़ाइल पर [`parallel: true`](/reference/test#parallel) की तरह काम करता है।
+  हुक, सीरियल ग्रुप, और `parallel: false` के नियम उसी एंट्री में हैं।
+- टारगेट का `fullyParallel` इस पर भारी पड़ता है। `--fully-parallel` दोनों पर भारी
+  पड़ता है।
+- एक वर्कर के साथ, जो CI में डिफ़ॉल्ट है, टेस्ट अब भी एक-एक करके चलते हैं।
+  [`workers`](#workers) 1 से ज़्यादा सेट करें।
+
 #### `reporters`
 
 रन के रिपोर्टर: बिल्ट-इन id, और `e2e/reporters` की फ़ैक्ट्री जैसे रिपोर्टर ऑब्जेक्ट।
@@ -300,6 +344,7 @@ targets: [
 | [`app`](#the-app-under-test) | `TargetApp` | - |
 | [`trace`](#trace) | `RecordingMode` | कॉन्फ़िग का `trace` |
 | [`video`](#video) | `RecordingMode` | कॉन्फ़िग का `video` |
+| [`fullyParallel`](#fullyparallel) | `boolean` | कॉन्फ़िग वाला |
 
 - `{ engine: web(), app: { url } }` एक पूरा टारगेट है।
 - जिस टेस्ट के `platforms` में टारगेट का प्लेटफ़ॉर्म न हो, वह उसके लिए स्किप हो जाता है।
@@ -382,7 +427,7 @@ targets: [
 | [`identity`](#identity) | `string` | ऐप से निकाला गया |
 | [`environment`](#environment) | `'test' \| 'staging' \| 'production'` | `'test'` या `'production'` |
 | [`launchArguments`](#launcharguments) | `string[] \| Record<string, LaunchArgumentValue>` | - |
-| [`permissions`](#permissions) | `Record<string, AppPermissionState>` | - |
+| [`permissions`](#permissions) | `Record<string, AppPermissionState> \| 'all'` | - |
 | [`command`](#command) | `CommandConfig` | - |
 | [`readyUrl`](#readyurl) | `string` | `url` |
 
@@ -549,13 +594,15 @@ type LaunchArguments = readonly string[] | Readonly<Record<string, LaunchArgumen
 permissions: { camera: 'grant' },
 ```
 
-हर एक `'grant'`, `'deny'`, या `'reset'` होती है।
+हर एक `'grant'`, `'deny'`, या `'reset'` होती है। `permissions: 'all'` वे सारी परमिशन
+दे देता है जो टारगेट का इंजन दे सकता है।
 
 - `mobile()` टारगेट हर नए लॉन्च से पहले इनमें से हर एक को सेट करता है।
   [परमिशन](/reference/mobile#engine) देखें।
 - `web()` टारगेट सिर्फ़ `'grant'` लेता है और इसे अटेम्प्ट के हर पेज पर, किसी भी ऑरिजिन के
   लिए ग्रांट कर देता है। हेडलेस Chromium छोड़ी गई परमिशन को मना कर देता है।
-  [ब्राउज़र परमिशन ग्रांट करना](/web#granting-browser-permissions) देखें।
+  [ब्राउज़र परमिशन ग्रांट करना](/web#granting-browser-permissions) देखें। `'all'`
+  नीचे की टेबल में उस ब्राउज़र का हर नाम ग्रांट कर देता है।
 
 | ब्राउज़र | नाम |
 | --- | --- |
@@ -1498,7 +1545,7 @@ cache: { strict: true }, // default: false
 | `retries` | `0` | `1` |
 | `workers` | `max(1, floor(availableParallelism() / 2))` | `1` |
 | `cache` | `read-write` | अनसेट होने पर `read-only` |
-| `test.only` | अलाउ है | `ONLY_IN_CI`, एग्ज़िट कोड 2 |
+| `test.only`, `describe.only` | अलाउ है | `ONLY_IN_CI`, एग्ज़िट कोड 2 |
 | `command.reuseExisting` | माना जाता है | नोटिस के साथ नज़रअंदाज़ |
 
 ## लोडिंग
@@ -1657,6 +1704,8 @@ export interface E2EConfig {
   maxDuration?: number;
   /** Parallel workers, 1 through 1024; default 1 in CI, else half the cores. An engine may cap it lower. */
   workers?: number;
+  /** Runs the tests of one file at the same time on separate workers; default false. */
+  fullyParallel?: boolean;
   /** `{ store }` hands every artifact to a host store as it is produced. */
   artifacts?: ArtifactsConfig;
   /** Which tests keep a trace page; default `retain-on-failure`. */
@@ -1700,6 +1749,8 @@ export interface Target {
   trace?: RecordingMode;
   /** Which attempts on this target record a video, in place of the config's `video`. */
   video?: RecordingMode;
+  /** Whether this target runs the tests of one file in parallel, in place of the config's `fullyParallel`. */
+  fullyParallel?: boolean;
 }
 ```
 
