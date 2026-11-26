@@ -4,7 +4,7 @@
  * The addon is a static library of them, and their licenses (MIT,
  * Apache-2.0, and the like) ask that their notices go with every copy.
  *
- * Usage: `node scripts/native-licenses.ts [--check]`. With `--check` it
+ * Usage: `pnpm --filter @e2e-dev/desktop licenses:native [--check]`. With `--check` it
  * writes nothing and fails when a committed file differs from what
  * `Cargo.lock` gives, which CI's `native` job runs.
  */
@@ -51,7 +51,7 @@ const text = notices(linked(metadata));
 if (process.argv.includes('--check')) {
   const stale = outputs.filter((file) => !existsSync(file) || readFileSync(file, 'utf8') !== text);
   if (stale.length > 0) {
-    console.error(`stale: ${stale.map((file) => path.relative(packages, file)).join(', ')}; run node packages/desktop/scripts/native-licenses.ts`);
+    console.error(`stale: ${stale.map((file) => path.relative(packages, file)).join(', ')}; run pnpm --filter @e2e-dev/desktop licenses:native`);
     process.exit(1);
   }
   console.log('third-party licenses are current');
