@@ -80,6 +80,19 @@ test.describe('control inventory', () => {
     await expect(screen.getByTestId('key-status')).toHaveText('key: Enter');
   });
 
+  test('device.keyboard types into the focused field and Backspace deletes', async ({ device, screen }) => {
+    const key = screen.getByTestId('key-input');
+    await key.tap();
+    await device.keyboard.type('abc');
+    await expect(key).toHaveValue('abc');
+    await device.keyboard.press('Backspace');
+    await expect(key).toHaveValue('ab');
+    await key.press('Backspace');
+    await expect(key).toHaveValue('a');
+    await device.keyboard.press('Enter');
+    await expect(screen.getByTestId('key-status')).toHaveText('key: Enter');
+  });
+
   test('a field autofocuses on mount and focus() moves the focus', async ({ screen }) => {
     await screen.getByRole('button', 'Show focus fields').tap();
     const status = screen.getByTestId('focus-status');
@@ -437,6 +450,9 @@ test.describe('refusals', () => {
     const named = await rejection(row.press('Escape'));
     expect(named?.code).toBe('UNSUPPORTED_CAPABILITY');
     expect(named?.message).toContain('cannot press Escape');
+    const tab = await rejection(row.press('Tab'));
+    expect(tab?.code).toBe('UNSUPPORTED_CAPABILITY');
+    expect(tab?.message).toContain('cannot press Tab');
   });
 
   test('a missing locator fails as not found once its timeout passes', async ({ screen }) => {
