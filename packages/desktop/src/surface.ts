@@ -1041,7 +1041,7 @@ export class DesktopSurface {
           }
           // Focusing can hand focus on (a dialog it opens): the key goes only when the control still holds it.
           if (!(await this.holdsFocus(binding, window, operation))) throw notActionable(`node ${binding.id} did not keep keyboard focus, so the key would land on another control`);
-          await this.sendKey(combo, window, `press ${action.key}`, operation);
+          await this.sendKey(combo, window, `press ${action.key}`, operation, binding.ref);
         } catch (cause) {
           // The focus already moved: a retry of the whole press would focus the control a second time, which an app's focus handler sees.
           if (cause instanceof EngineError && cause.retryable) {
@@ -1221,7 +1221,7 @@ export class DesktopSurface {
       // The app may move focus on select all: the delete goes only to the field that still holds it.
       await afterChange('delete the selection', async () => {
         if (!(await this.holdsFocus(focused, window, operation))) throw notActionable('the field lost keyboard focus after select all, so no delete was sent');
-        await this.sendKey('backspace', window, 'delete the selection', operation);
+        await this.sendKey('backspace', window, 'delete the selection', operation, focused.ref);
       });
     }
     // Keystrokes, so the app's key handlers run; with `headed` they go through the real keyboard.
@@ -1246,7 +1246,7 @@ export class DesktopSurface {
       if (!this.options.headed) {
         throw notActionable("the focused field's text cannot be selected through accessibility, and Cmd+A sent to an app in the background selects nothing; use fill(), or run headed");
       }
-      await this.sendKey('cmd+a', window, 'select all', operation);
+      await this.sendKey('cmd+a', window, 'select all', operation, focused.ref);
     }
   }
 
@@ -1262,20 +1262,21 @@ export class DesktopSurface {
   }
 
   /**
-   * Sends one key combo to the launched process's window. Without `headed`
+   * Sends one key combo to the launched process's window; with `focusedRef`, only while that control still holds the
+   * app's focus, checked by the driver right before the key goes. Without `headed`
    * the key goes into the process's event queue, which hands it to its key
    * window, so the driver sends it only while the window named is that one.
    * With `headed`, the driver brings the window forward and presses the key
    * on the real keyboard.
    */
-  private async sendKey(combo: string, window: string, label: string, operation: OperationContext): Promise<void> {
+  private async sendKey(combo: string, window: string, label: string, operation: OperationContext, focusedRef?: string): Promise<void> {
     const pid = this.pid;
     if (pid === undefined) throw invalidState('the app is not running; open it with app.open()');
     const physical = this.options.headed;
     // As for `tryRef`: a key still unsent once the call is given up is never sent.
     const inputId = nextInputId();
     try {
-      await this.input((driver, timeoutMs) => driver.press({ pid, windowId: window, combo, physical, inputId, timeoutMs }), {
+      await this.input((driver, timeoutMs) => driver.press({ pid, windowId: window, combo, physical, inputId, timeoutMs, ...(focusedRef === undefined ? {} : { focusedRef }) }), {
         label,
         input: true,
         signal: operation.signal,

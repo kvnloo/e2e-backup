@@ -977,7 +977,8 @@ describe('DesktopSurface: keys', () => {
     const { surface, fake, byTestId } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] });
     await surface.perform(byTestId('username'), { kind: 'press', key: 'Enter' }, operation());
     expect(inputs(fake)).toEqual(['focus', 'press return']);
-    expect(last(fake, 'press')).toMatchObject({ windowId: 'w-mine' });
+    // The driver sends the key only while the control's own element still holds the app's focus, checked right before it goes.
+    expect(last(fake, 'press')).toMatchObject({ windowId: 'w-mine', focusedRef: (last(fake, 'act') as { ref: string }).ref });
     await expect(surface.perform(byTestId('sign-in'), { kind: 'press', key: 'Enter' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
     expect(fake.of('press')).toHaveLength(1);
   });
