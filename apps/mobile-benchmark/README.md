@@ -111,6 +111,11 @@ node node_modules/e2e/dist/cli/bin.js run tests/login-form.e2e.ts --target ios-s
 Android note: the Android Gradle Plugin's prefab step fails on very new JDKs
 (observed on JDK 26). Build with JDK 17 through 21.
 
+The lock test in `tests/device.e2e.ts` needs an Android screen lock other
+than None, since `device.lock()` refuses a device that has no lock screen.
+Swipe needs no credential: set it in Settings > Security > Screen lock, or
+with `adb shell locksettings set-disabled false`.
+
 ## Scenario contract
 
 Every scenario ends in a deterministic success state. Where the
