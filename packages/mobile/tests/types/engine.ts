@@ -38,3 +38,11 @@ void device.pressRemote('menu');
 // @ts-expect-error pressRemote takes the lowercase remote keys, not the keyboard's capitalised names
 void device.pressRemote('Menu');
 void ('play-pause' satisfies RemoteKey);
+
+void (true satisfies Exact<Device['lock'], () => Promise<void>>);
+void (true satisfies Exact<Device['unlock'], () => Promise<void>>);
+void (true satisfies Exact<EntryDevice['lock'], () => Promise<void>>);
+void (true satisfies Exact<EntryDevice['unlock'], () => Promise<void>>);
+void (true satisfies Exact<MobileFixtures['device']['lock'], () => Promise<void>>);
+// @ts-expect-error lock takes no duration, unlike Appium's lock(seconds): wait between lock() and unlock().
+void device.lock(5);
