@@ -124,7 +124,8 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `tapOn: { point: "x,y" }`, `point: "50%,50%"` | `screen.tapAt({ x, y })`, `screen.tapAt({ x: '50%', y: '50%' })`; inside a node, `.tap({ position: { x, y } })` |
 | `doubleTapOn`, `longPressOn` | `.doubleTap()`, `.longPress({ duration })` |
 | `inputText`, `eraseText`, `pressKey: Enter` after a `tapOn` | `.fill('text')`, `.clear()`, `.press('Enter')` on the field's locator |
-| `inputText`, `pressKey: Enter`, `pressKey: backspace`, `eraseText: N` with no field | `device.keyboard.type('text')`, `device.keyboard.press('Enter')`, and `device.keyboard.press('Backspace')`, N times for `eraseText` |
+| `eraseText: N`, `pressKey: backspace` | `.press('Backspace')` on the field's locator, N times for `eraseText: N` |
+| `inputText`, `pressKey` with no field | `device.keyboard.type('text')`, `device.keyboard.press('Enter')`, `device.keyboard.press('Backspace')` |
 | `inputRandomEmail`, `inputRandomText`, `faker` | `unique()` around a value in `act` params, so the cache still replays; any npm faker for the rest |
 | `copyTextFrom`, `pasteText` | `await locator.textContent()`, then `.fill(text)` |
 | `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`; Maestro names the finger's direction, e2e the content's |
