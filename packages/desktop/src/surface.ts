@@ -1406,11 +1406,12 @@ async function sweepStateDirectories(driver: DesktopDriver): Promise<void> {
       else owned.push(...carriers);
     }
     const { pid, started } = launched;
-    if (typeof pid === 'number' && typeof started === 'number' && alive(pid)) {
+    if (typeof pid === 'number' && (typeof started === 'number' || typeof started === 'string') && alive(pid)) {
       const now = driver.processStarted(pid);
-      // Running, but when it started cannot be read: whether it is the launch's process is unknown.
-      if (now === null) known = false;
-      else if (now === started && !owned.includes(pid)) owned.push(pid);
+      const same = now === null ? undefined : sameStart(started, now);
+      // Running, but when it started cannot be read or matched: whether it is the launch's process is unknown.
+      if (same === undefined) known = false;
+      else if (same && !owned.includes(pid)) owned.push(pid);
     }
     const settled = known && (await killed(owned, Date.now() + 2_000, AbortSignal.timeout(5_000)));
     await (settled ? rm(directory, { recursive: true, force: true }) : keepOnlyRecord(directory)).catch(() => undefined);
@@ -1428,6 +1429,18 @@ function ownerRuns(driver: DesktopDriver, pid: number, started: string | undefin
   if (started === undefined || !/^\d+$/.test(started)) return true;
   const now = driver.processStarted(pid);
   return now === null || now === Number(started);
+}
+
+/**
+ * Whether a recorded start time names the process that started at `now`
+ * (microseconds since the epoch). This engine records the microseconds; the
+ * agent-desktop engine before it recorded `ps -o lstart=` printed in UTC, to
+ * the second. Undefined for a record in neither form.
+ */
+function sameStart(recorded: number | string, now: number): boolean | undefined {
+  if (typeof recorded === 'number') return recorded === now;
+  const at = Date.parse(`${recorded} UTC`);
+  return Number.isNaN(at) ? undefined : Math.floor(now / 1_000_000) === at / 1_000;
 }
 
 /** Whether `directory` is a real directory (not a symlink) that belongs to the user this process runs as. */

@@ -1397,6 +1397,28 @@ describe('DesktopSurface: sweeping what killed workers left', () => {
     }
   });
 
+  it("quits the process an agent-desktop engine's record names by its id and `ps` start time, and not a later one given that id", async () => {
+    const dead = await deadPid();
+    const fake = fakeDriver();
+    const leaked = standIn();
+    const reused = standIn();
+    // 2026-11-26T10:00:00.123456Z, which `ps -o lstart=` in UTC prints to the second.
+    fake.startTimes.set(leaked, 1_795_687_200_123_456);
+    fake.startTimes.set(reused, 1_795_690_800_000_000);
+    const directories = [
+      leftDirectory(String(dead), { token: 'token-1', pid: leaked, started: 'Thu Nov 26 10:00:00 2026' }, 'e2e-agent-desktop-'),
+      leftDirectory(String(dead), { token: 'token-2', pid: reused, started: 'Thu Nov 26 10:00:00 2026' }, 'e2e-agent-desktop-'),
+    ];
+    try {
+      await initialized(fake);
+      expect(await gone(leaked)).toBe(true);
+      expect(await gone(reused, 300)).toBe(false);
+      expect(existsSync(directories[0]!)).toBe(false);
+    } finally {
+      for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('sweeps the agent-desktop engine\'s state directories too, whose field text must not stay behind', async () => {
     const dead = await deadPid();
     const fake = fakeDriver();
