@@ -1189,8 +1189,14 @@ export class DesktopSurface {
     if (fresh.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
     const rect = fresh.rect;
     if (rect === undefined || rect.width <= 0 || rect.height <= 0) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
+    const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    // A point names no element: the driver's check takes any control of the window there. A control inside this node at its center (a group's button) would take the double-click, so it is refused here, from the same read; a hover presses nothing.
+    if (kind === 'doubleTap') {
+      const inner = [...(now?.bindings.values() ?? [])].find((candidate) => candidate !== fresh && candidate.ref !== undefined && candidate.rect !== undefined && within(candidate.rect, rect) && holds(candidate.rect, center));
+      if (inner !== undefined) throw notActionable(`a ${inner.role ?? 'control'} inside node ${binding.id} is at its center, so a double-click there would press it; act on that control instead`);
+    }
     this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet };
-    await this.performAt({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, { kind }, operation);
+    await this.performAt(center, { kind }, operation);
   }
 
   /** Physical pointer input at a point in the window: only with `headed`, and only then declared. */
@@ -1614,6 +1620,16 @@ async function ownDirectory(directory: string): Promise<boolean> {
 async function abandon(directory: string): Promise<void> {
   await keepOnlyRecord(directory);
   await writeFile(path.join(directory, OWNER_FILE), ABANDONED);
+}
+
+/** Whether `inner` lies within `outer`. */
+function within(inner: Rect, outer: Rect): boolean {
+  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
+}
+
+/** Whether a rect holds a point. */
+function holds(rect: Rect, point: { readonly x: number; readonly y: number }): boolean {
+  return point.x >= rect.x && point.y >= rect.y && point.x < rect.x + rect.width && point.y < rect.y + rect.height;
 }
 
 /** The window a screen was read from, and the sheet that held its focus then: where a point taken in it was taken. */

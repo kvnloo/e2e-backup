@@ -851,6 +851,22 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(still.fake)).toEqual(['focusWindow', 'pointer']);
   });
 
+  it('refuses to double-click a node with no ref whose center is a control inside it, and hovers it', async () => {
+    const row = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [{ role: 'group', name: 'Row', bounds: { x: 10, y: 10, width: 100, height: 50 }, children: [{ role: 'button', name: 'Delete', ref_id: '@s:e9', bounds: { x: 50, y: 25, width: 20, height: 20 } }] }],
+    });
+    const placed = windows(() => [{ id: 'w-mine', is_focused: true, bounds: { x: 0, y: 0, width: 200, height: 200 } }]);
+    const { surface, fake } = await launched({ snapshot: [row], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const every = (node: SemanticNode): SemanticNode[] => [node, ...(node.children ?? []).flatMap(every)];
+    const group = every((await surface.observe(operation(), undefined)).root).find((node) => node.role === 'group' && node.name === 'Row');
+    await expect(surface.perform(group!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/button inside node/) });
+    expect(inputs(fake)).toEqual([]);
+    await surface.perform(group!.ref, { kind: 'hover' }, operation());
+    expect(fake.of('pointer').at(-1)?.args).toEqual([60, 35, 'hover']);
+  });
+
   it('double-clicks a node with a stable id where a fresh read finds it, never the box it was read with', async () => {
     const at = (x: number) =>
       screen('w-mine', { name: 'Form', bounds: { x: 0, y: 0, width: 200, height: 200 }, children: [{ role: 'statictext', value: 'Hello', native_id: { kind: 'ax_identifier', value: 'hello' }, bounds: { x, y: 10, width: 50, height: 20 } }, ...(x === 10 ? [] : [{ role: 'button', name: 'Delete', ref_id: '@s:e9', bounds: { x: 10, y: 10, width: 50, height: 20 } }])] });
