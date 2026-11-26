@@ -1299,13 +1299,25 @@ describe('DesktopSurface: points', () => {
     expect(open.fake.pointerOptions.at(-1)?.target).toEqual({ pid: open.fake.pid, windowId: 'w-mine', sheet: true });
   });
 
-  it('refuses a tap at an observed point when a sheet opened over its window after the observation', async () => {
-    const at = (sheet: boolean) => windows(() => [{ id: 'w-8032', is_focused: true, ...(sheet ? { sheet_focused: true } : {}), bounds: { x: 100, y: 100, width: 400, height: 300 } }]);
-    // The launch, the observation, then the tap's two reads of the window.
-    const { surface, fake } = await launched({ listWindows: [at(false), at(false), at(true), at(true)] }, { observe: false, options: { headed: true } });
-    await surface.observe(operation(), undefined);
-    await expect(surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/sheet opened/) });
-    expect(fake.of('pointer')).toHaveLength(0);
+  it('refuses a tap at an observed point when the sheet on its window opened, closed, or changed after the observation', async () => {
+    const at = (sheet?: string) => windows(() => [{ id: 'w-8032', is_focused: true, ...(sheet === undefined ? {} : { sheet_focused: true, sheet_id: sheet }), bounds: { x: 100, y: 100, width: 400, height: 300 } }]);
+    const cases = [
+      { before: undefined, now: 's-1', message: /sheet opened/ },
+      { before: 's-1', now: undefined, message: /sheet the point was taken on closed/ },
+      { before: 's-1', now: 's-2', message: /another sheet took the place/ },
+    ];
+    for (const { before, now, message } of cases) {
+      // The launch, the observation, then the tap's two reads of the window.
+      const { surface, fake } = await launched({ listWindows: [at(before), at(before), at(now), at(now)] }, { observe: false, options: { headed: true } });
+      await surface.observe(operation(), undefined);
+      await expect(surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(message) });
+      expect(fake.of('pointer')).toHaveLength(0);
+    }
+    // The same sheet still there takes the tap, and the driver is told which sheet to check again after the move.
+    const same = await launched({ listWindows: [at('s-1'), at('s-1'), at('s-1'), at('s-1')] }, { observe: false, options: { headed: true } });
+    await same.surface.observe(operation(), undefined);
+    await same.surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation());
+    expect(same.fake.pointerOptions.at(-1)?.target).toEqual({ pid: same.fake.pid, windowId: 'w-8032', sheet: true, sheetId: 's-1' });
   });
 
   it('taps, double-taps, secondary-taps, and hovers a point in the window where it is now, with no observation first', async () => {

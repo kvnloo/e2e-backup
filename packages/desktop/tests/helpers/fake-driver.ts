@@ -9,7 +9,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
-import type { DesktopDriver, DriverError, Envelope, Launched, RawWindow } from '../../src/driver.ts';
+import type { DesktopDriver, DriverError, Envelope, Launched, PointerTarget, RawWindow } from '../../src/driver.ts';
 import type { RawSnapshot } from '../../src/nodes.ts';
 
 /** One scripted answer: an envelope, with what the fake does before it answers. */
@@ -182,9 +182,9 @@ export class FakeDriver implements DesktopDriver {
   }
 
   /** The input id and budget of each `pointer` call, in order; its `args` keep the point and kind. */
-  readonly pointerOptions: { readonly inputId: number | undefined; readonly timeoutMs: number | undefined; readonly target: { pid: number; windowId: string; sheet: boolean } | undefined }[] = [];
+  readonly pointerOptions: { readonly inputId: number | undefined; readonly timeoutMs: number | undefined; readonly target: PointerTarget | undefined }[] = [];
 
-  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number, target?: { pid: number; windowId: string; sheet: boolean }): Promise<Envelope<unknown>> {
+  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number, target?: PointerTarget): Promise<Envelope<unknown>> {
     this.pointerOptions.push({ inputId, timeoutMs, target });
     return this.answer('pointer', [x, y, kind], ok({}));
   }

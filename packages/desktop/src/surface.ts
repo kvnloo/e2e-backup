@@ -278,7 +278,7 @@ export class DesktopSurface {
    * agent's as core hit-tests it, against the newest observation. `sheet` says whether a sheet held its focus then: one
    * that opened since was not where the point was taken.
    */
-  private pointWindow: { readonly id: string; readonly sheet: boolean } | undefined;
+  private pointWindow: { readonly id: string; readonly sheet: string | undefined } | undefined;
   /** The newest binding of every node id an observation or a locate handed out, newest last. */
   private readonly bindings = new Map<string, NodeBinding>();
   /** The id handed out for each node identity since the app launched; see `projectSnapshot`. */
@@ -820,7 +820,8 @@ export class DesktopSurface {
         );
         if (!forMask) {
           const projected = this.projectWindow(raw, window.minimized === true, interactive);
-          return window.sheet_focused === true ? { ...projected, sheet: true } : projected;
+          const sheet = sheetKey(window);
+          return sheet === undefined ? projected : { ...projected, sheet };
         }
         let scratch = 0;
         return projectSnapshot(raw, () => `mask${(scratch += 1)}`);
@@ -1188,7 +1189,7 @@ export class DesktopSurface {
     if (fresh.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
     const rect = fresh.rect;
     if (rect === undefined || rect.width <= 0 || rect.height <= 0) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
-    this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet === true };
+    this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet };
     await this.performAt({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, { kind }, operation);
   }
 
@@ -1224,9 +1225,13 @@ export class DesktopSurface {
     if (forward === undefined || focused === undefined) throw notActionable('the window the point was taken from closed as it was brought forward; observe again');
     // A click carries no window, only screen coordinates: if another window (a sheet, a panel the app raised) took focus as this one came forward, it could be the one under the point.
     if (forward.is_focused !== true) throw notActionable('another window took focus as the window the point was taken from was brought forward, and could be under the point; observe again');
-    // A sheet counts as its window's focus, for keys. One that opened since the point was taken (in the observation, or as this action began when none came first) was not where it was taken, and could cover it.
-    const sheetThen = observed === undefined ? target.sheet_focused === true : observed.sheet;
-    if (forward.sheet_focused === true && !sheetThen) throw notActionable('a sheet opened over the window since the point was taken, and could be under the point; observe again');
+    // A sheet counts as its window's focus, for keys. The point was taken on the sheet there then (in the observation, or as this action began when none came first): one that opened since could cover it, one that closed uncovered what was under it, and one in its place is another.
+    const sheetThen = observed === undefined ? sheetKey(target) : observed.sheet;
+    const sheetNow = sheetKey(forward);
+    if (!sameSheet(sheetNow, sheetThen)) {
+      const what = sheetThen === undefined ? 'a sheet opened over the window' : sheetNow === undefined ? 'the sheet the point was taken on closed' : 'another sheet took the place of the one the point was taken on';
+      throw notActionable(`${what} since the point was taken, and the click could land on something else; observe again`);
+    }
     if (point.x >= focused.width || point.y >= focused.height) {
       throw notActionable(`(${point.x}, ${point.y}) is outside the ${focused.width}x${focused.height} window; a click there would land on another app`);
     }
@@ -1235,7 +1240,7 @@ export class DesktopSurface {
     // As for `tryRef`: pointer input still unsent once the call is given up is never sent.
     const inputId = this.requireDriver().inputId();
     // The driver checks the window again after the move, before the click: a sheet or window that opens meanwhile would take it.
-    const takes = { pid, windowId: target.id, sheet: forward.sheet_focused === true };
+    const takes = { pid, windowId: target.id, sheet: sheetNow !== undefined, ...(sheetNow === undefined || sheetNow === UNKNOWN_SHEET ? {} : { sheetId: sheetNow }) };
     await this.input((driver, timeoutMs) => driver.pointer(focused.x + point.x, focused.y + point.y, kind, inputId, timeoutMs, takes), {
       label: kind,
       input: true,
@@ -1611,9 +1616,24 @@ async function abandon(directory: string): Promise<void> {
   await writeFile(path.join(directory, OWNER_FILE), ABANDONED);
 }
 
-/** The window a screen was read from, and whether a sheet held its focus then: where a point taken in it was taken. */
-function pointIn(screen: ProjectedScreen): { readonly id: string; readonly sheet: boolean } | undefined {
-  return screen.windowId === undefined ? undefined : { id: screen.windowId, sheet: screen.sheet === true };
+/** The window a screen was read from, and the sheet that held its focus then: where a point taken in it was taken. */
+function pointIn(screen: ProjectedScreen): { readonly id: string; readonly sheet: string | undefined } | undefined {
+  return screen.windowId === undefined ? undefined : { id: screen.windowId, sheet: screen.sheet };
+}
+
+/** Stands for a sheet whose window server id the driver could not read. */
+const UNKNOWN_SHEET = '?';
+
+/** The sheet that holds a window's focus: its id, `UNKNOWN_SHEET` when it has none the driver read, undefined for no sheet. */
+function sheetKey(window: RawWindow): string | undefined {
+  if (window.sheet_focused !== true) return undefined;
+  return window.sheet_id ?? UNKNOWN_SHEET;
+}
+
+/** Whether two sheet keys name the same sheet: both none, or both sheets whose ids match or could not both be read. */
+function sameSheet(a: string | undefined, b: string | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a === UNKNOWN_SHEET || b === UNKNOWN_SHEET || a === b;
 }
 
 /** Removes everything in a state directory but its owner file and launch record. */

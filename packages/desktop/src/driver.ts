@@ -46,6 +46,14 @@ export interface DriverError {
 /** What a call resolves with. */
 export type Envelope<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: DriverError };
 
+/** The window a point was taken in, which must still take a click at it. */
+export interface PointerTarget {
+  readonly pid: number;
+  readonly windowId: string;
+  readonly sheet: boolean;
+  readonly sheetId?: string;
+}
+
 /** One window of a process, as `listWindows` answers. */
 export interface RawWindow {
   readonly id: string;
@@ -54,6 +62,8 @@ export interface RawWindow {
   readonly is_focused?: boolean;
   /** Focus is in a sheet or an alert on this window, not the window itself. */
   readonly sheet_focused?: boolean;
+  /** That sheet's window server id, when it has one. */
+  readonly sheet_id?: string;
   /** The app's main window, which an app in the background still names while none has focus. */
   readonly is_main?: boolean;
   /** On screen now: false for a minimized window, or one on another Space. */
@@ -118,10 +128,10 @@ export interface DesktopDriver {
   focusWindow(pid: number, windowId: string, inputId?: number, timeoutMs?: number): Promise<Envelope<unknown>>;
   /**
    * `inputId` names the pointer input, so `cancelInput` stops what it has yet to send. With `target`, the window the
-   * point was taken in, no click goes once another window, a sheet that was not there (`sheet` says whether one held
-   * the window's focus), or another app took the focus from it.
+   * point was taken in, no click goes once another window or app took the focus from it, or its sheet changed: `sheet`
+   * says whether one held the window's focus, and `sheetId` which.
    */
-  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number, target?: { pid: number; windowId: string; sheet: boolean }): Promise<Envelope<unknown>>;
+  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number, target?: PointerTarget): Promise<Envelope<unknown>>;
   screenshot(options: { windowId: string; path: string; timeoutMs: number }): Promise<Envelope<{ readonly scale_factor?: number }>>;
 }
 
