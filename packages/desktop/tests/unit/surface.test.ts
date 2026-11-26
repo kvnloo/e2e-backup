@@ -514,6 +514,14 @@ describe('DesktopSurface: reading', () => {
     await expect(surface.locate(testId('username'), operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/screen is locked/) });
   });
 
+  it('gives the driver a read budget that ends before the call is cut off, so a read cut short still answers', async () => {
+    const { surface, fake } = await launched({}, { observe: false });
+    await surface.observe({ ...operation(), timeoutMs: 5_000 }, undefined);
+    const { timeoutMs } = last(fake, 'snapshot') as { timeoutMs: number };
+    expect(timeoutMs).toBeLessThan(5_000);
+    expect(timeoutMs).toBeGreaterThanOrEqual(4_000);
+  });
+
   it('says the screen is locked when it lists the windows as ones accessibility cannot read', async () => {
     const unreadable = windows(() => [{ id: 'w-mine', is_focused: true, accessible: false }]);
     const fake = fakeDriver({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true }]), unreadable] });

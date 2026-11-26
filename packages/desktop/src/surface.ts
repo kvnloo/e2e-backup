@@ -112,6 +112,9 @@ const INHERITED_ENV = new Set(['HOME', 'USER', 'LOGNAME', 'SHELL', 'PATH', 'TMPD
 /** Launch arguments every launch gets first: no window or document the app saved at its last quit comes back. */
 const FRESH_STATE_ARGUMENTS = ['-ApplePersistenceIgnoreState', 'YES'];
 
+/** How much sooner than the call's cut-off the driver stops a read, so a read cut short still answers with what it read. */
+const READ_ANSWER_MARGIN_MS = 200;
+
 /** How many node bindings stay usable; the oldest go first. */
 const MAX_BINDINGS = 4096;
 
@@ -1356,7 +1359,9 @@ export class DesktopSurface {
     const driver = this.requireDriver();
     // Nothing is sent once the operation's budget is spent: a later step of an action never starts past the deadline.
     if (options.timeoutMs <= 0) throw new EngineError('OPERATION_TIMEOUT', `${options.label}: the operation's budget ran out before it was sent`, { retryable: false, cause: NOT_SENT });
-    return await call(() => start(driver, options.timeoutMs), options);
+    // A read the driver stops at its deadline answers with what it read, marked incomplete: it must answer before the call is cut off.
+    const driverMs = options.input ? options.timeoutMs : Math.max(options.timeoutMs - READ_ANSWER_MARGIN_MS, options.timeoutMs / 2);
+    return await call(() => start(driver, driverMs), options);
   }
 }
 
