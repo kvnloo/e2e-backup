@@ -1000,6 +1000,19 @@ describe('DesktopSurface: typing', () => {
     expect(last(headed.fake, 'act')).toMatchObject({ action: 'type', physical: true });
   });
 
+  it('stops the text still to type once the call is cut off, so no key lands after the step gave up', async () => {
+    const { surface, fake } = await launched({ act: [{ ok: true, data: {}, sleepMs: 2_000 }] });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    await expect(surface.typeText('ada', { replace: false }, { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
+    const { inputId } = last(fake, 'act') as { inputId: number };
+    expect(fake.of('cancelTyping').map((entry) => entry.args)).toEqual([[inputId]]);
+    // A typing call that answers in time cancels nothing.
+    const quick = await launched({});
+    await quick.surface.typeText('ada', { replace: false }, operation());
+    expect(quick.fake.of('cancelTyping')).toEqual([]);
+  });
+
   it('replaces the focused field as a keyboard does, select all and delete, and never by an accessibility clear', async () => {
     const { surface, fake } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] });
     await surface.typeText('ada', { replace: true }, operation());

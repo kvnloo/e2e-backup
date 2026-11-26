@@ -75,6 +75,21 @@ describe('translate', () => {
   });
 });
 
+describe('call: onCutOff', () => {
+  it('runs when the budget or the signal cuts the call off, and not when the driver answers', async () => {
+    let cutOff = 0;
+    const onCutOff = () => {
+      cutOff += 1;
+    };
+    await expect(call(() => later({ ok: true, data: {} }, 2_000), { label: 'type', input: true, signal, timeoutMs: 100, onCutOff })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 50);
+    await expect(call(() => later({ ok: true, data: {} }, 2_000), { label: 'type', input: true, signal: controller.signal, timeoutMs: 5_000, onCutOff })).rejects.toMatchObject({ code: 'CANCELLED' });
+    await call(() => Promise.resolve({ ok: true, data: {} }), { label: 'type', input: true, signal, timeoutMs: 1_000, onCutOff });
+    expect(cutOff).toBe(2);
+  });
+});
+
 describe('loadNativeDriver', () => {
   it.each(['linux', 'win32'] as const)('reports %s as unsupported: no driver is built for it', (platform) => {
     const real = Object.getOwnPropertyDescriptor(process, 'platform');

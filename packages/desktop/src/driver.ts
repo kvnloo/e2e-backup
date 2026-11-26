@@ -93,7 +93,10 @@ export interface DesktopDriver {
   }): Promise<Envelope<Launched>>;
   listWindows(pid: number): Promise<Envelope<readonly RawWindow[]>>;
   snapshot(options: { pid: number; windowId: string; maxDepth: number; interactive: boolean; timeoutMs: number }): Promise<Envelope<RawSnapshot>>;
-  act(options: { ref: string; action: string; value?: string; direction?: string; pages?: number; physical?: boolean; timeoutMs: number }): Promise<Envelope<unknown>>;
+  /** `inputId` names a `type` run, so `cancelTyping` can stop it. */
+  act(options: { ref: string; action: string; value?: string; direction?: string; pages?: number; physical?: boolean; inputId?: number; timeoutMs: number }): Promise<Envelope<unknown>>;
+  /** Stops the `type` run given `inputId`: it sends no more text. */
+  cancelTyping(inputId: number): void;
   press(options: { pid: number; windowId: string; combo: string; physical: boolean }): Promise<Envelope<unknown>>;
   focusWindow(pid: number, windowId: string): Promise<Envelope<unknown>>;
   pointer(x: number, y: number, kind: string): Promise<Envelope<unknown>>;
@@ -160,6 +163,16 @@ export interface DriverCall {
   readonly timeoutMs: number;
   /** Names the call in an error message. */
   readonly label: string;
+  /** Runs when the budget or the signal cuts the call off, to stop work the driver would otherwise go on with. */
+  readonly onCutOff?: () => void;
+}
+
+let lastInputId = 0;
+
+/** A fresh id for a `type` run: one counter for the process, since every engine in it shares one driver. */
+export function nextInputId(): number {
+  lastInputId = lastInputId >= 0xffff_ffff ? 1 : lastInputId + 1;
+  return lastInputId;
 }
 
 /**
@@ -168,7 +181,8 @@ export interface DriverCall {
  * another way when nothing was sent; `translate` turns it into the engine
  * contract. A call cut off by the budget or the signal keeps running on its
  * thread, and its answer is dropped: an input may still land, which is why
- * it is reported as one that may have committed.
+ * it is reported as one that may have committed. `onCutOff` then stops what
+ * the driver can stop, such as the rest of the text a `type` sends.
  */
 export async function call<T>(start: () => Promise<Envelope<T>>, options: DriverCall): Promise<T> {
   if (options.signal.aborted) throw new EngineError('CANCELLED', `${options.label} was cancelled`, { retryable: false });
@@ -188,6 +202,7 @@ export async function call<T>(start: () => Promise<Envelope<T>>, options: Driver
     clearTimeout(timer);
     if (onAbort !== undefined) options.signal.removeEventListener('abort', onAbort);
   }
+  if (outcome === 'aborted' || outcome === 'timeout') options.onCutOff?.();
   if (outcome === 'aborted') throw new EngineError('CANCELLED', `${options.label} was cancelled`, { retryable: false });
   if (outcome === 'timeout') {
     throw options.input

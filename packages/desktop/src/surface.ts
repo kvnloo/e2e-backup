@@ -39,7 +39,7 @@ import {
   type SemanticNode,
   type ViewportPoint,
 } from '@e2e-dev/core/engine';
-import { call, DriverFailure, loadNativeDriver, translate, type DesktopDriver, type Envelope, type Launched, type RawWindow } from './driver.ts';
+import { call, DriverFailure, loadNativeDriver, nextInputId, translate, type DesktopDriver, type Envelope, type Launched, type RawWindow } from './driver.ts';
 import { toCombo } from './keys.ts';
 import { launchArgumentList } from './launch-arguments.ts';
 import { ROOT_ID, projectSnapshot, type NodeBinding, type ProjectedScreen, type RawSnapshot, type Rect } from './nodes.ts';
@@ -1042,7 +1042,18 @@ export class DesktopSurface {
   /** One action on a node's ref, a failure left as the driver reported it so a caller can tell what was sent. */
   private async tryRef(action: string, binding: NodeBinding, operation: OperationContext, extra: { value?: string; direction?: string; pages?: number; physical?: boolean } = {}): Promise<unknown> {
     const ref = this.refOf(binding, action);
-    return await this.input((driver, timeoutMs) => driver.act({ ref, action, timeoutMs, ...extra }), { label: action, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
+    if (action !== 'type') {
+      return await this.input((driver, timeoutMs) => driver.act({ ref, action, timeoutMs, ...extra }), { label: action, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
+    }
+    // Text still to type once the call is given up is never sent: another app may have the keyboard by then.
+    const inputId = nextInputId();
+    return await this.input((driver, timeoutMs) => driver.act({ ref, action, inputId, timeoutMs, ...extra }), {
+      label: action,
+      input: true,
+      signal: operation.signal,
+      timeoutMs: operation.timeoutMs,
+      onCutOff: () => this.driver?.cancelTyping(inputId),
+    });
   }
 
   /**
@@ -1302,11 +1313,11 @@ export class DesktopSurface {
   }
 
   /** A driver call that sends input: refused once the budget is spent, its failure left untranslated for the caller. */
-  private input<T>(start: (driver: DesktopDriver, timeoutMs: number) => Promise<Envelope<T>>, options: { label: string; input: true; signal: AbortSignal; timeoutMs: number }): Promise<T> {
+  private input<T>(start: (driver: DesktopDriver, timeoutMs: number) => Promise<Envelope<T>>, options: { label: string; input: true; signal: AbortSignal; timeoutMs: number; onCutOff?: () => void }): Promise<T> {
     return this.driverCall(start, options);
   }
 
-  private async driverCall<T>(start: (driver: DesktopDriver, timeoutMs: number) => Promise<Envelope<T>>, options: { label: string; input: boolean; signal: AbortSignal; timeoutMs: number }): Promise<T> {
+  private async driverCall<T>(start: (driver: DesktopDriver, timeoutMs: number) => Promise<Envelope<T>>, options: { label: string; input: boolean; signal: AbortSignal; timeoutMs: number; onCutOff?: () => void }): Promise<T> {
     const driver = this.requireDriver();
     // Nothing is sent once the operation's budget is spent: a later step of an action never starts past the deadline.
     if (options.timeoutMs <= 0) throw new EngineError('OPERATION_TIMEOUT', `${options.label}: the operation's budget ran out before it was sent`, { retryable: false, cause: NOT_SENT });
