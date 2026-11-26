@@ -23,7 +23,11 @@ permissions:
 jobs:
   # The desktop engine's native driver for both Mac architectures, which the
   # publishing job puts in `@e2e-dev/desktop-darwin-*`. Built on macOS, since
-  # the publishing job must stay on a GitHub-hosted Linux runner.
+  # the publishing job must stay on a GitHub-hosted Linux runner. `release`
+  # and `nightly` wait for it on every run, including one that only updates
+  # the version pull request: whether a run publishes is known only inside
+  # changesets/action, and a publish must never go out without the driver. A
+  # failed build stops the run; running it again is the way past it.
   native:
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 20
