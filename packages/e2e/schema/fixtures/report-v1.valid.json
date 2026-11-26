@@ -178,6 +178,10 @@
         "platform": "web",
         "agent": "default",
         "repeat": 0,
+        "annotations": [
+          { "type": "issue", "description": "https://github.com/e2e-inc/e2e/issues/1233" },
+          { "type": "owner" }
+        ],
         "selected": true,
         "status": "passed",
         "expectedFailure": {
@@ -189,6 +193,10 @@
             "id": "018f0f5c-7b2a-7abc-8abc-1123456789ab",
             "index": 0,
             "status": "passed",
+            "annotations": [
+              { "type": "issue", "description": "https://github.com/e2e-inc/e2e/issues/1233" },
+              { "type": "owner" }
+            ],
             "expectedFailure": {
               "reason": "known gap: the cart badge does not update",
               "error": {

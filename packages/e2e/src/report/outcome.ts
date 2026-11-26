@@ -10,6 +10,7 @@ import type { SkipInfo } from '@e2e-dev/core/lib/run/records';
 import type { FailureEvidence } from '@e2e-dev/core/lib/run/records';
 import { memberRan } from '@e2e-dev/core/lib/run/records';
 import type { AppLogRecord } from '@e2e-dev/core/lib/run/steps';
+import type { TestAnnotation } from '@e2e-dev/core/lib/types';
 import { isCutSerialRetry } from '../run/retry.ts';
 import type { ReportError, ReportResult, ReportSerialGroup, ReportStep } from './build.ts';
 
@@ -63,6 +64,8 @@ export interface AttemptView {
   readonly environment?: Readonly<Record<string, string>> | undefined;
   /** Why the body skipped itself; on a failed attempt, a skip the failure outranked. */
   readonly skip: SkipInfo | undefined;
+  /** Annotations recorded on this attempt; absent when none. */
+  readonly annotations?: readonly TestAnnotation[] | undefined;
 }
 
 export interface Outcome {
@@ -128,6 +131,7 @@ function attemptViews(result: ReportResult, groups: ReadonlyMap<string, ReportSe
       secondaryErrors: attempt.secondaryErrors,
       environment: attempt.environment,
       skip: attempt.skip,
+      ...(attempt.annotations === undefined ? {} : { annotations: attempt.annotations }),
     }));
   }
   const attempts = groups.get(result.serialGroupId)?.attempts ?? [];
@@ -155,6 +159,7 @@ function attemptViews(result: ReportResult, groups: ReadonlyMap<string, ReportSe
       secondaryErrors: [...(member?.secondaryErrors ?? []), ...attempt.secondaryErrors],
       environment: attempt.environment,
       skip: member?.skip,
+      ...(member?.annotations === undefined ? {} : { annotations: member.annotations }),
     };
   });
 }

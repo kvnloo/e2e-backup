@@ -390,6 +390,15 @@
         }
       ]
     },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 8192 }
+      }
+    },
     "attempt": {
       "type": "object",
       "additionalProperties": false,
@@ -417,6 +426,7 @@
             "error": { "$ref": "#/$defs/error" }
           }
         },
+        "annotations": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/annotation" } },
         "secondaryErrors": { "type": "array", "items": { "$ref": "#/$defs/error" } },
         "cleanup": { "enum": ["complete", "failed", "forced"] },
         "environment": { "$ref": "#/$defs/environment" },
@@ -481,6 +491,7 @@
         "error": { "$ref": "#/$defs/error" },
         "failure": { "$ref": "#/$defs/failureEvidence" },
         "skip": { "$ref": "#/$defs/skip" },
+        "annotations": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/annotation" } },
         "secondaryErrors": { "type": "array", "items": { "$ref": "#/$defs/error" } },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
@@ -579,6 +590,7 @@
         "agent": { "type": "string", "minLength": 1 },
         "repeat": { "type": "integer", "minimum": 0 },
         "tags": { "type": "array", "items": { "type": "string", "pattern": "^[^\\s,](?:[^,]*[^\\s,])?$" }, "uniqueItems": true },
+        "annotations": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/annotation" } },
         "selected": { "type": "boolean" },
         "serialGroupId": { "type": "string", "minLength": 1 },
         "status": { "enum": ["passed", "flaky", "failed", "timed-out", "interrupted", "skipped"] },

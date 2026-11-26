@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { TargetSession } from '@e2e-dev/core/lib/engine/surface';
 import { isCiMode, type ResolvedConfig } from '@e2e-dev/core/lib/config/resolve';
 import { classifyError, ConfigurationError, E2EError, serializeError, sanitizeRecordedText, truncateUtf8, TestError, TestTimeoutError, withHint, type SerializedError } from '@e2e-dev/core/lib/internal/errors';
+import { buildWorkerInfo } from '@e2e-dev/core/lib/internal/test-info';
 import { attemptStep, isRuntimeSkip, runtimeSkipCause, type CaughtRuntimeSkip } from '../internal/skip.ts';
 import { lateExpectedFailureError } from '@e2e-dev/core/lib/internal/expected-failure';
 import { settleExpectedFailure } from './expected-failure.ts';
@@ -17,7 +18,8 @@ import { storedRecordingsFor, type StoredRecordings } from '@e2e-dev/core/lib/ca
 import { inLoadOf } from '../collect/collect-file.ts';
 import type { ModuleRegistration, RegisteredTest } from '../collect/registry.ts';
 import { pairRecordings, type TestTargetPair } from '../collect/select.ts';
-import type { ArtifactStore } from '@e2e-dev/core/lib/types';
+import type { ArtifactStore, WorkerInfo } from '@e2e-dev/core/lib/types';
+import { createAttemptTestInfo, type AttemptTestInfoHandle } from './attempt-test-info.ts';
 import { attemptSegments, createAttemptArtifacts, resultSegment } from '@e2e-dev/core/lib/run/artifacts';
 import { AttemptBudget, AttemptTimeout } from '@e2e-dev/core/lib/run/budget';
 import { planAttemptFixtures, WorkerFixturePool } from './fixture-pool.ts';
@@ -111,6 +113,10 @@ type ExecutorHold = {
 
 export interface TargetExecutorOptions extends EngineSessionsOptions {
   readonly artifactsRoot: string;
+  /** Monotonic 0-based worker index across the run; see `WorkerInfo.workerIndex`. */
+  readonly workerIndex: number;
+  /** 0-based parallel slot among live workers; see `WorkerInfo.parallelIndex`. */
+  readonly parallelIndex: number;
   /**
    * The directory under `artifactsRoot` a `--last-failed` rerun's attempts
    * write in (`claimRerunDir`), beside the evidence of the run it reruns;
@@ -164,6 +170,8 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
   readonly artifactsRoot: string;
   readonly rerunDir: string | undefined;
   readonly realms: RealmManager;
+  /** Read-only worker metadata passed to worker fixtures and suite hooks. */
+  readonly workerInfo: WorkerInfo;
   /** The worker-scoped `test.extend()` fixtures, torn down before the engine is disposed. */
   readonly workerFixtures: WorkerFixturePool;
   /** What suite hooks and worker fixture teardowns run on; see `SuiteAttempt`. */
@@ -187,7 +195,14 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
     this.models = new WorkerModels((error) => {
       options.events?.onRunAbort?.({ error: serializeError(error) });
     });
-    this.workerFixtures = new WorkerFixturePool(options.target, this.services);
+    this.workerInfo = buildWorkerInfo({
+      workerIndex: options.workerIndex,
+      parallelIndex: options.parallelIndex,
+      target: options.target,
+      config: options.config,
+      headed: options.headed,
+    });
+    this.workerFixtures = new WorkerFixturePool(options.target, this.workerInfo, this.services);
     this.suiteAttempts = { host: this, config: options.config, models: this.models, runErrors: this.runErrors };
     this.realms = new RealmManager({
       targetName: options.target.name,
@@ -600,6 +615,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
 
     let failure: E2EError | undefined;
     let failurePhase: AttemptPhase | undefined;
+    let infoHandle: AttemptTestInfoHandle | undefined;
     /** Set when the body (or a beforeEach) skipped the test with `test.skip(...)` or `test.fixme(...)`. */
     let skipped: CaughtRuntimeSkip | undefined;
     /** Why the attempt is expected to fail: the `fail` option, else the first `test.fail(...)` that marked it. */
@@ -810,9 +826,30 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
           readScreen: (signal: AbortSignal) => readHeldScreen(session, this.op(attemptId, this.config.actionTimeout, signal), screens),
         });
       }
-      // `expect.poll` and `expect.soft` take no fixture, so the attempt they
+      // `expect.poll`, `expect.soft`, and `test.info()` take no fixture, so the attempt they
       // run on is published here and cleared when `attemptEnd` fires in `finally`.
       const soft = new SoftFailures();
+      infoHandle = createAttemptTestInfo({
+        workerInfo: this.workerInfo,
+        projectRoot: this.config.projectRoot,
+        pair,
+        retry: attemptIndex,
+        outputDir: artifacts.dir,
+        startedMs,
+        timeout,
+        state: {
+          failure: () => failure,
+          skipped: () => skipped !== undefined,
+          settled: () => phase === 'afterEach',
+          timedOut: () => timedOut,
+          interrupted: () => this.interruptSignal.aborted,
+          expectedFailure: () => expectedFailure,
+          secondaryErrors,
+          serializeFailure: (currentFailure) =>
+            serializeError(currentFailure, { phase: failurePhase ?? phase, projectRoot: this.config.projectRoot, redact }),
+        },
+      });
+      const { testInfo } = infoHandle;
       publishAttempt(
         {
           attemptId,
@@ -827,6 +864,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
           },
           budget,
           soft,
+          testInfo,
           ...(context.kind === 'ordinary'
             ? {
                 expectFailure: (reason: string) => {
@@ -843,7 +881,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
         attemptEnd.signal,
       );
 
-      const fixtures = fixturePlan.open({ builtIns, pool: this.workerFixtures, signal: attemptAbort.signal });
+      const fixtures = fixturePlan.open({ builtIns, pool: this.workerFixtures, testInfo, signal: attemptAbort.signal });
       // Worker fixtures read their built-ins off this attempt until it ends.
       leaveWorkerFixtures = fixtures.enter();
 
@@ -1035,6 +1073,9 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
         secondaryErrors.push(serializeError(classifyError(cause), { phase: 'cleanup', projectRoot: this.config.projectRoot, redact }));
       }
 
+      const recordedAnnotations = infoHandle?.recordAnnotations(redact) ?? pair.test.annotations;
+      if (recordedAnnotations.length > 0) record.annotations = [...recordedAnnotations];
+
       // A serial member's recording ends with the member, not the group.
       if (openSession !== null && shared !== undefined) {
         await this.stopRunningRecording(openSession, attemptId, record, artifacts.sink, secondaryErrors);
@@ -1059,6 +1100,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
     await artifacts.settle();
     guests.release();
     record.durationMs = Date.now() - startedMs;
+    infoHandle?.finish(record.durationMs);
     record.steps = [...steps.all()];
     const appLog = steps.appLog();
     if (appLog.length > 0) record.appLog = [...appLog];

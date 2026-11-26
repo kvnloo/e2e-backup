@@ -112,6 +112,7 @@ describe('todos', () => {
 | `cy.request(method, url, body)` | `request.fetch(url, { method, json: body })`, or `{ body }` for a string. `cy.request` fails on a status outside 2xx and 3xx and `request` does not, so check `response.status`. See [`request`](/reference/request) |
 | `cy.task`, `cy.exec`, `cy.fixture` | Node code: `fs`, your database client, `import data from './fixture.json'` |
 | `Cypress.Commands.add` | A function, or a fixture from `test.extend` |
+| `Cypress.currentTest`, `Cypress.spec`, `Cypress.currentRetry`, `this.currentTest.state` in `afterEach` | [`test.info()`](/reference/test#test-info) or the `testInfo` parameter of tests, `beforeEach`, and `afterEach` (`title`, `titlePath`, `file`, `retry`, `status`, `error`) |
 
 ## What e2e doesn't have yet
 

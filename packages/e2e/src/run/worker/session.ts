@@ -54,6 +54,10 @@ export interface TargetWorkerDeps {
   readonly headed: boolean;
   /** See `TargetExecutorOptions.workerSlot`. */
   readonly workerSlot: number;
+  /** See `TargetExecutorOptions.workerIndex`. */
+  readonly workerIndex: number;
+  /** See `TargetExecutorOptions.parallelIndex`. */
+  readonly parallelIndex: number;
   /** See `TargetExecutorOptions.env`. */
   readonly env: Readonly<Record<string, string | undefined>>;
   /** Whether the worker has a process of its own; see `TargetExecutorOptions.isolated`. */
@@ -138,6 +142,8 @@ export class TargetWorker {
         sessionStore: deps.sessionStore,
         headed: deps.headed,
         workerSlot: deps.workerSlot,
+        workerIndex: deps.workerIndex,
+        parallelIndex: deps.parallelIndex,
         env: deps.env,
         isolated: deps.isolated,
         services: deps.services,

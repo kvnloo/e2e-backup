@@ -34,7 +34,9 @@ export interface HostedReport {
 }
 
 /** The runner's sessions on a standalone worker: a `TargetExecutor` that runs no units. */
-const runnerSessions: WorkerPolicy<TargetExecutor, never>['sessions'] = (options) => new TargetExecutor({ ...options, isolated: false });
+// A standalone/hosted worker runs one session at a time in its host process, so it is always worker 0 / parallel slot 0.
+const runnerSessions: WorkerPolicy<TargetExecutor, never>['sessions'] = (options) =>
+  new TargetExecutor({ ...options, workerIndex: 0, parallelIndex: 0, isolated: false });
 
 /** Prepares, starts app processes, and initializes one worker for a hosted test runner. */
 export function openStandaloneHost(options: StandaloneHostOptions): Promise<StandaloneHost<HostedReport>> {

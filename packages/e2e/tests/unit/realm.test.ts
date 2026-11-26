@@ -3,7 +3,7 @@ import { collectModule, test } from '../../src/collect/registry.ts';
 import type { TestTargetPair } from '../../src/collect/select.ts';
 import { RealmManager, findRegistered, type Realm } from '../../src/run/realm.ts';
 import type { RunError } from '@e2e-dev/core/lib/run/records';
-import { plainSuiteHooks } from '../helpers/suite-hooks.ts';
+import { plainSuiteHooks, toyTestInfo } from '../helpers/suite-hooks.ts';
 
 /**
  * The hook lifecycle contract, checked on the realm
@@ -63,8 +63,9 @@ describe('realm hook lifecycle', () => {
     );
     const target = registered(realm, 'group', 'inner', 't');
     const fixtures = {} as never;
-    for (const hook of manager().hooksFor(realm, target, 'beforeEach')) await hook.fn(fixtures);
-    for (const hook of manager().hooksFor(realm, target, 'afterEach')) await hook.fn(fixtures);
+    const testInfo = toyTestInfo();
+    for (const hook of manager().hooksFor(realm, target, 'beforeEach')) await hook.fn(fixtures, testInfo);
+    for (const hook of manager().hooksFor(realm, target, 'afterEach')) await hook.fn(fixtures, testInfo);
     expect(log).toEqual([
       'beforeEach:file',
       'beforeEach:group',

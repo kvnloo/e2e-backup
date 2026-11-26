@@ -98,6 +98,7 @@ function serialPairs(target: ResolvedTarget): TestTargetPair[] {
       options: {},
       sessions: [],
       tags: [],
+      annotations: [],
       fn: () => undefined,
       fixtures: [],
       group: undefined,

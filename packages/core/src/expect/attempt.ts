@@ -5,7 +5,7 @@ import { InfrastructureError, type TestError } from '../internal/errors.ts';
 import { realmSlot } from '../internal/realm-slot.ts';
 import type { AttemptBudget } from '../run/budget.ts';
 import type { AttemptGuests } from '../run/guest-steps.ts';
-import type { PassOptions } from '../types.ts';
+import type { PassOptions, TestInfo } from '../types.ts';
 import type { TimeoutChange, TimeoutUpdate } from '../internal/test-timeout.ts';
 import type { SoftFailures } from './soft.ts';
 import type { PollScope } from './poll-scope.ts';
@@ -37,6 +37,8 @@ export interface PublishedAttempt {
   readonly setTimeout?: (update: TimeoutUpdate) => TimeoutChange;
   /** Runs `body` as one named step of the attempt (`test.step`); absent where the attempt runs no e2e test. */
   readonly step?: <T>(title: string, body: () => T | Promise<T>) => Promise<T>;
+  /** Information about the running test attempt, read by `test.info()`. Absent in hosted sessions that run no e2e test. */
+  readonly testInfo?: TestInfo;
   /** Hosted callers have no runner-owned body lineage; their polls belong to the session. */
   readonly polls?: PollScope;
   /**

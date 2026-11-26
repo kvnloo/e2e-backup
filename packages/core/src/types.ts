@@ -896,6 +896,151 @@ export interface TestOptions {
    * records as one unit. A mode set here is required of the target's engine.
    */
   video?: RecordingMode;
+  /**
+   * Annotations attached to the test (or every test in a group), carried in
+   * the report. One `{ type, description? }` or a list; enclosing describe
+   * annotations come first, then the test's own.
+   */
+  annotation?: TestAnnotation | readonly TestAnnotation[];
+}
+
+/** One annotation attached to a test: a category (`type`) and optional detail (`description`). */
+export interface TestAnnotation {
+  /** Category or label, e.g. `'issue'`, `'owner'`, `'slow'`. Must be non-blank. */
+  readonly type: string;
+  /** Optional detail, e.g. an issue URL or explanation. */
+  readonly description?: string | undefined;
+}
+
+/** Read-only summary of a resolved target, exposed on `WorkerInfo` and `TestInfo`. */
+export interface TestTargetInfo {
+  /** Target name (`target.name`, defaulting to `platform`). */
+  readonly name: string;
+  /** Target platform label (`'web'`, `'ios'`, `'android'`, or an engine's own string). */
+  readonly platform: string;
+  /** Normalized app base URL on the run's port, or `undefined` when the target declares none. */
+  readonly url: string | undefined;
+  /** App environment label (`'test'`, `'staging'`, or `'production'`). */
+  readonly environment: 'test' | 'staging' | 'production';
+  /** Resolved `fullyParallel` for this target. */
+  readonly fullyParallel: boolean;
+}
+
+/** Read-only summary of the resolved configuration for the current run, without secrets or live handles. */
+export interface TestConfigInfo {
+  /** Stable project identifier. */
+  readonly projectId: string;
+  /** Absolute project root directory. */
+  readonly projectRoot: string;
+  /** Absolute output directory (`.e2e` unless `output` or `--output` overrides it). */
+  readonly outputDir: string;
+  /** Default test attempt timeout in milliseconds. */
+  readonly timeout: number;
+  /** Engine init and attempt start timeout in milliseconds. */
+  readonly launchTimeout: number;
+  /** Default engine action timeout in milliseconds. */
+  readonly actionTimeout: number;
+  /** Default assertion timeout in milliseconds. */
+  readonly assertionTimeout: number;
+  /** Teardown and cleanup timeout in milliseconds. */
+  readonly cleanupTimeout: number;
+  /** Default retries per test. */
+  readonly retries: number;
+  /** Configured parallel worker count for this run. */
+  readonly workers: number;
+  /** Whether the run was started in headed mode. */
+  readonly headed: boolean;
+  /** Resolved targets in config order. */
+  readonly targets: readonly TestTargetInfo[];
+}
+
+/** Information about the running worker, passed to worker-scoped fixtures and `beforeAll` / `afterAll` hooks. */
+export interface WorkerInfo {
+  /** Monotonic 0-based index of this worker in the run; a replacement worker gets a new index. */
+  readonly workerIndex: number;
+  /** 0-based parallel slot among live workers (`0` to `workers - 1`); never shared by two workers running at once. */
+  readonly parallelIndex: number;
+  /** The target this worker is bound to. */
+  readonly target: TestTargetInfo;
+  /** Read-only summary of the resolved configuration for this run. */
+  readonly config: TestConfigInfo;
+}
+
+/** One error recorded on a test attempt, as `testInfo.error` and `testInfo.errors` expose it (with secrets redacted). */
+export interface TestInfoError {
+  /** Error code, e.g. `'ASSERTION_FAILED'`, `'TEST_TIMEOUT'`, `'LOCATOR_NOT_FOUND'`. */
+  readonly code: string;
+  /** Error message, redacted of configured secrets. */
+  readonly message: string;
+  /** Stack trace when available, redacted of configured secrets. */
+  readonly stack?: string | undefined;
+  /** Phase in which the error occurred, when known. */
+  readonly phase?: 'launch' | 'beforeEach' | 'body' | 'afterEach' | 'cleanup' | undefined;
+}
+
+/** Outcome status of a test attempt on `TestInfo`. */
+export type TestInfoStatus = 'passed' | 'failed' | 'timed-out' | 'interrupted' | 'skipped';
+
+/**
+ * Information about the running test attempt, returned by `test.info()` and
+ * passed to test bodies, `beforeEach`, `afterEach`, and test-scoped fixtures.
+ */
+export interface TestInfo extends WorkerInfo {
+  /** Stable test id (`<file>::<titles>`). */
+  readonly testId: string;
+  /** Test title. */
+  readonly title: string;
+  /** Enclosing describe titles outermost first, followed by the test title. */
+  readonly titlePath: readonly string[];
+  /** Absolute path of the test file. */
+  readonly file: string;
+  /** 1-based line number where the test was declared. */
+  readonly line: number;
+  /** 1-based column number where the test was declared. */
+  readonly column: number;
+  /** Declared tags: enclosing describe tags outermost first, then the test's own. */
+  readonly tags: readonly string[];
+  /** Configured agent name this attempt runs with. */
+  readonly agent: string;
+  /** 0-based retry index: `0` on the first attempt, `1` on the first retry, etc. */
+  readonly retry: number;
+  /** 0-based repeat index under `--repeat-each`: `0` on the first repeat. */
+  readonly repeatEachIndex: number;
+  /**
+   * Current attempt timeout in milliseconds; reflects changes made by
+   * `test.setTimeout()` and `test.slow()`.
+   */
+  readonly timeout: number;
+  /** Elapsed time since the attempt started, in milliseconds. */
+  readonly duration: number;
+  /**
+   * Expected outcome of this attempt: `'failed'` when marked with `{ fail }`
+   * or `test.fail()`, otherwise `'passed'`.
+   */
+  readonly expectedStatus: 'passed' | 'failed';
+  /**
+   * Outcome of the attempt so far: `undefined` until a failure or verdict is
+   * recorded; always set once `afterEach` hooks and fixture teardowns run.
+   * Compare against `expectedStatus` when `test.fail()` is used.
+   */
+  readonly status: TestInfoStatus | undefined;
+  /** Primary error recorded on this attempt (secrets redacted), or `undefined` if none. */
+  readonly error: TestInfoError | undefined;
+  /** All errors recorded on this attempt so far (primary first, then secondary; secrets redacted). */
+  readonly errors: readonly TestInfoError[];
+  /**
+   * Annotations for this test attempt, initialized from `{ annotation }` on
+   * enclosing describes and the test. Push entries here to add annotations at
+   * runtime; they are redacted and included in the report.
+   */
+  readonly annotations: TestAnnotation[];
+  /** Absolute per-attempt directory for test artifacts and custom files. */
+  readonly outputDir: string;
+  /**
+   * Resolves a path inside `outputDir` for writing test-specific files.
+   * Throws `INVALID_ARGUMENT` if the resolved path escapes `outputDir`.
+   */
+  outputPath(...pathSegments: string[]): string;
 }
 
 export interface DescribeOptions extends TestOptions {
@@ -929,17 +1074,19 @@ export interface SetupOptions extends Omit<TestOptions, 'session' | 'only' | 'sk
  * parameter (`async ({ app, screen }) => {}`), and the runner sets up only
  * those; a body that takes the whole object (`async (fixtures) => {}`) or a
  * rest property is a `COLLECTION_ERROR`. The same holds for a hook and for
- * the first parameter of a `test.extend()` fixture.
+ * the first parameter of a `test.extend()` fixture. The optional second
+ * parameter receives `TestInfo`.
  */
-export type TestFn<Fixtures = TestFixtures> = (fixtures: Fixtures) => void | Promise<void>;
-/** A setup test body; `session.save` is the extra fixture. */
+export type TestFn<Fixtures = TestFixtures> = (fixtures: Fixtures, testInfo: TestInfo) => void | Promise<void>;
+/** A setup test body; `session.save` is the extra fixture, and the optional second parameter receives `TestInfo`. */
 export type SetupFn<Fixtures = TestFixtures> = (
   fixtures: Fixtures & SetupFixtures,
+  testInfo: TestInfo,
 ) => void | Promise<void>;
-/** A hook body: `beforeEach` and `afterEach` get the test's fixtures, `beforeAll` and `afterAll` its worker fixtures. */
-export type TestHookFn<Fixtures = TestFixtures> = (fixtures: Fixtures) => void | Promise<void>;
-/** @deprecated use `TestHookFn<WorkerFixtures>`. */
-export type SuiteHookFn = TestHookFn<WorkerFixtures>;
+/** A hook body: `beforeEach` and `afterEach` get the test's fixtures and `TestInfo`, `beforeAll` and `afterAll` its worker fixtures and `WorkerInfo`. */
+export type TestHookFn<Fixtures = TestFixtures, Info = TestInfo> = (fixtures: Fixtures, info: Info) => void | Promise<void>;
+/** @deprecated use `TestHookFn<WorkerFixtures, WorkerInfo>`. */
+export type SuiteHookFn = TestHookFn<WorkerFixtures, WorkerInfo>;
 /** A `describe` body. An async body is a type error. */
 export type SynchronousBody<Result> = Extract<Result, PromiseLike<unknown>> extends never
   ? () => Result
@@ -993,15 +1140,16 @@ export interface TestRegistrar<Fixtures = TestFixtures & WorkerFixtures> {
 
 /**
  * The `test.each` body arguments for the rows' type: array rows spread, then
- * the fixtures. Rows that are not all arrays are passed whole. Not
- * distributive, so a mixed table is decided once, as at run time. An
- * `unknown` row may be either at run time, so only the fixtures, last, are known.
+ * the fixtures, then `TestInfo`. Rows that are not all arrays are passed whole.
+ * Not distributive, so a mixed table is decided once, as at run time. An
+ * `unknown` row may be either at run time, so only the fixtures and `TestInfo`,
+ * last, are known.
  */
 export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]]
-  ? [...Row, Fixtures]
+  ? [...Row, Fixtures, TestInfo]
   : unknown extends Row
-    ? [...unknown[], Fixtures]
-    : [Row, Fixtures];
+    ? [...unknown[], Fixtures, TestInfo]
+    : [Row, Fixtures, TestInfo];
 
 /** A `test.each` or `test.for` body: the row's arguments, then the fixtures. */
 export type EachFn<Args extends readonly unknown[]> = (...args: Args) => void | Promise<void>;
@@ -1084,14 +1232,14 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
    * fail as duplicate titles. As in a test body, destructure the fixtures
    * (`{ app }`): e2e sets up only the ones named there.
    */
-  each<Row extends readonly unknown[] | [unknown]>(rows: readonly Row[]): EachRegistrar<[...Row, Fixtures & Worker]>;
+  each<Row extends readonly unknown[] | [unknown]>(rows: readonly Row[]): EachRegistrar<[...Row, Fixtures & Worker, TestInfo]>;
   each<Row>(rows: readonly Row[]): EachRegistrar<EachArgs<Row, Fixtures & Worker>>;
   /**
-   * `test.each` that never spreads: the body takes `(row, fixtures)` for
-   * every row, an array row included. Titles format as in `test.each`.
+   * `test.each` that never spreads: the body takes `(row, fixtures, testInfo)`
+   * for every row, an array row included. Titles format as in `test.each`.
    */
-  for<Row extends readonly unknown[] | [unknown]>(rows: readonly Row[]): EachRegistrar<[Row, Fixtures & Worker]>;
-  for<Row>(rows: readonly Row[]): EachRegistrar<[Row, Fixtures & Worker]>;
+  for<Row extends readonly unknown[] | [unknown]>(rows: readonly Row[]): EachRegistrar<[Row, Fixtures & Worker, TestInfo]>;
+  for<Row>(rows: readonly Row[]): EachRegistrar<[Row, Fixtures & Worker, TestInfo]>;
   /** Registers one test that is expected to fail. */
   fail(title: string, fn: TestFn<Fixtures & Worker>): TestCase;
   /**
@@ -1139,6 +1287,12 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
    * Outside a test the call is `COLLECTION_ERROR`.
    */
   step<T>(title: string, body: () => T | Promise<T>): Promise<T>;
+  /**
+   * Returns `TestInfo` for the currently running test attempt. Available inside
+   * a test body, `beforeEach`, `afterEach`, and test-scoped fixtures. Outside a
+   * running test, or inside a suite hook or worker-scoped fixture, throws an error.
+   */
+  info(): TestInfo;
   /** Registers one focused local test. CI rejects focused tests. */
   only(title: string, fn: TestFn<Fixtures & Worker>): TestCase;
   /** Registers one setup test with statically declared session outputs. */
@@ -1220,13 +1374,13 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
   /** Declares a group synchronously; `describe.fail` declares one whose tests are expected to fail, `describe.only` a focused one. */
   describe: DescribeAPI;
   /** Registers a test-attempt setup hook: it runs after the test's fixtures are set up. */
-  beforeEach(fn: TestHookFn<Fixtures & Worker>): void;
+  beforeEach(fn: TestHookFn<Fixtures & Worker, TestInfo>): void;
   /** Registers a test-attempt teardown hook: it runs before the test's fixtures are torn down. */
-  afterEach(fn: TestHookFn<Fixtures & Worker>): void;
-  /** Registers a suite setup hook, run once per describe between attempts, with the worker fixtures. */
-  beforeAll(fn: TestHookFn<Worker>): void;
-  /** Registers a suite teardown hook, run once per describe between attempts, with the worker fixtures. */
-  afterAll(fn: TestHookFn<Worker>): void;
+  afterEach(fn: TestHookFn<Fixtures & Worker, TestInfo>): void;
+  /** Registers a suite setup hook, run once per describe between attempts, with the worker fixtures and `WorkerInfo`. */
+  beforeAll(fn: TestHookFn<Worker, WorkerInfo>): void;
+  /** Registers a suite teardown hook, run once per describe between attempts, with the worker fixtures and `WorkerInfo`. */
+  afterAll(fn: TestHookFn<Worker, WorkerInfo>): void;
 }
 
 /**

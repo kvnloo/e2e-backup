@@ -30,10 +30,19 @@ export interface UnitRunner {
   kill(): void;
 }
 
+/** Numeric slots assigned to a worker when the scheduler spawns it. */
+export interface WorkerSlots {
+  /** 0-based slot among live workers of this target; see `EngineInitInfo.workerSlot`. */
+  readonly workerSlot: number;
+  /** Monotonic 0-based worker index across the run; incremented for every spawned worker, never reused. */
+  readonly workerIndex: number;
+  /** 0-based parallel slot among all live workers across targets (`0` to `workers - 1`); reused when a worker exits. */
+  readonly parallelIndex: number;
+}
+
 /**
  * Starts one worker for a target; run-wide settings are closed over.
- * `workerSlot` is the worker's 0-based slot among that target's live workers,
- * the lowest one free at spawn time, so an engine can hand each slot its own
- * device.
+ * `slots` carries the target-local `workerSlot`, the run-wide monotonic
+ * `workerIndex`, and the run-wide reusable `parallelIndex`.
  */
-export type SpawnUnitRunner = (targetName: string, workerSlot: number, events: UnitRunnerEvents) => UnitRunner;
+export type SpawnUnitRunner = (targetName: string, slots: WorkerSlots, events: UnitRunnerEvents) => UnitRunner;

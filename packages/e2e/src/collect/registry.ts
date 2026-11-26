@@ -5,15 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { testCaseBrand } from '@e2e-dev/core/lib/internal/brands';
 import { describeValue } from '@e2e-dev/core/lib/config/validate';
-import { isRecordingMode, legacyTraceSpelling, RECORDING_MODES } from '@e2e-dev/core/lib/internal/recording-modes';
 import { CollectionError } from '@e2e-dev/core/lib/internal/errors';
-import { MAX_TIMER_MS } from '@e2e-dev/core/lib/internal/time';
 import { validateTitle } from '@e2e-dev/core/lib/internal/ids';
 import { realmSlot } from '@e2e-dev/core/lib/internal/realm-slot';
 import { registrarModuleSlot } from '../internal/registrar-modules.ts';
-import { expectedFailureOption, markRunningTestExpectedToFail } from '@e2e-dev/core/lib/internal/expected-failure';
+import { markRunningTestExpectedToFail } from '@e2e-dev/core/lib/internal/expected-failure';
 import { setRunningTestTimeout, slowRunningTest } from '@e2e-dev/core/lib/internal/test-timeout';
 import { runTestStep } from '@e2e-dev/core/lib/internal/test-step';
+import { currentTestInfo } from '@e2e-dev/core/lib/internal/test-info';
 import { fixmeReason, parseModifierCall, skipRunningTest } from '../internal/skip.ts';
 import { formatEachTitle, readRows } from './each.ts';
 import { unknownKeyMessage } from '@e2e-dev/core/lib/internal/options';
@@ -23,6 +22,13 @@ import { checkDeclaredFixtures, describeFixture, describeUser } from './fixture-
 import { evaluatingModule } from './evaluating-module.ts';
 import { fixtureIdentities } from './fixture-identity.ts';
 import { checkParallel, checkParallelNesting, configuredParallel } from './parallel.ts';
+import {
+  declaredAnnotations,
+  declaredTags,
+  validateDescribeOptions,
+  validateTestOptions,
+  type GroupMark,
+} from './validate-options.ts';
 import type {
   DescribeAPI,
   DescribeConfigureOptions,
@@ -33,11 +39,14 @@ import type {
   FixtureFn,
   FixtureScope,
   SetupOptions,
+  TestAnnotation,
   TestAPI,
   TestCase,
   TestHookFn,
+  TestInfo,
   TestOptions,
   TestRegistrar,
+  WorkerInfo,
 } from '@e2e-dev/core/lib/types';
 
 export interface GroupNode {
@@ -56,10 +65,13 @@ export interface GroupNode {
 export type TestMode = 'normal' | 'skip' | 'fixme' | 'todo';
 
 /**
- * A registered test or hook body. `TestAPI` types what each receives; at run
- * time it gets the object its attempt or suite hook binds (`bindFixtures`).
+ * A registered test or per-test hook body. `TestAPI` types what each receives;
+ * at run time it gets the object its attempt binds (`bindFixtures`) and `TestInfo`.
  */
-export type TestBody = TestHookFn<object>;
+export type TestBody = TestHookFn<object, TestInfo>;
+
+/** A registered suite hook body (`beforeAll` / `afterAll`), receiving worker fixtures and `WorkerInfo`. */
+export type SuiteBody = TestHookFn<object, WorkerInfo>;
 
 /**
  * One fixture a `test.extend()` call defined: its name, its setup/teardown
@@ -71,7 +83,7 @@ export type TestBody = TestHookFn<object>;
  */
 export interface FixtureDefinition {
   readonly name: string;
-  readonly fn: FixtureFn<object, unknown>;
+  readonly fn: FixtureFn<object, unknown, TestInfo | WorkerInfo>;
   /** The fixtures `fn` names in its first parameter: what it depends on. */
   readonly names: readonly string[];
   /**
@@ -105,6 +117,8 @@ export interface RegisteredTest {
   readonly sessions: readonly string[];
   /** The tags the test declares: its describe chain's, outermost first, then its own, each once. */
   readonly tags: readonly string[];
+  /** The annotations the test declares: its describe chain's, outermost first, then its own, redacted. */
+  readonly annotations: readonly TestAnnotation[];
   /** The body, called with the fixtures it names; its `test` typed what those are. */
   readonly fn: TestBody;
   /** The fixtures `fn` names in its first parameter: the ones its attempt sets up for it. */
@@ -116,10 +130,10 @@ export interface RegisteredTest {
   readonly source: SourceLocation | undefined;
 }
 
-interface HookBase {
+interface HookBase<Fn = TestBody> {
   readonly group: GroupNode | undefined;
   readonly declarationIndex: number;
-  readonly fn: TestBody;
+  readonly fn: Fn;
   /** The fixtures `fn` names in its first parameter. */
   readonly names: readonly string[];
   /** The `test.extend()` chain the hook was registered through. */
@@ -132,7 +146,7 @@ interface HookBase {
  * A per-test hook: runs with the attempt's fixtures. At run time the hook
  * receives the test's fixture object, which the test's own chain shapes.
  */
-export interface TestHook extends HookBase {
+export interface TestHook extends HookBase<TestBody> {
   readonly kind: 'beforeEach' | 'afterEach';
 }
 
@@ -140,12 +154,14 @@ export interface TestHook extends HookBase {
  * A suite hook: runs once per scope instance with worker fixtures only, the
  * built-in ones and the worker fixtures of the chain it was registered through.
  */
-export interface SuiteHook extends HookBase {
+export interface SuiteHook extends HookBase<SuiteBody> {
   readonly kind: 'beforeAll' | 'afterAll';
 }
 
 export type RegisteredHook = TestHook | SuiteHook;
-type HookDeclaration = Pick<RegisteredHook, 'kind' | 'fn' | 'fixtures'>;
+type HookDeclaration =
+  | Pick<TestHook, 'kind' | 'fn' | 'fixtures'>
+  | Pick<SuiteHook, 'kind' | 'fn' | 'fixtures'>;
 
 export interface ModuleRegistration {
   readonly tests: readonly RegisteredTest[];
@@ -205,7 +221,7 @@ class Collector {
 
   /** Whether registration is inside a serial group, at any depth. */
   get inSerialGroup(): boolean {
-    return insideSerial(this.currentGroup);
+    return outermostSerialGroup(this.currentGroup) !== undefined;
   }
 
   /**
@@ -250,7 +266,8 @@ class Collector {
         throw new CollectionError('duplicate session names in one setup declaration');
       }
     }
-    validateTestOptions(options, this.currentGroup, kind);
+    const chain = groupChain(this.currentGroup);
+    validateTestOptions(options, chain, kind);
     const titlePath = [...groupTitles(this.currentGroup), normalizedTitle];
     const source = captureSource(this.moduleFile);
     const registered: RegisteredTest = {
@@ -260,7 +277,8 @@ class Collector {
       declarationIndex: this.declarationCounter,
       options,
       sessions,
-      tags: declaredTags(this.currentGroup, options),
+      tags: declaredTags(chain, options),
+      annotations: declaredAnnotations(chain, options, this.redactTitle),
       fn,
       names: fixtureNames(namedBy?.fn ?? fn, describeUser({ kind, titlePath }), source, namedBy?.position),
       fixtures,
@@ -278,7 +296,7 @@ class Collector {
     const normalizedTitle = this.title(title);
     if (typeof body !== 'function') throw new CollectionError('describe body must be a function');
     // The caller's own options are checked, not the copy that adds the mark, which keeps only enumerable keys.
-    validateDescribeOptions(given, this.currentGroup, mark);
+    validateDescribeOptions(given, groupChain(this.currentGroup), mark);
     checkParallel('describe options', given.parallel, given.serial === true);
     const options = mark === undefined ? given : { ...given, [mark]: true };
     const group: GroupNode = {
@@ -365,12 +383,6 @@ export function groupTitles(group: GroupNode | undefined): string[] {
   return groupChain(group).map((node) => node.title);
 }
 
-/** The tags along the describe chain and the test's own, outermost first, each once. */
-function declaredTags(group: GroupNode | undefined, options: TestOptions): string[] {
-  const layers = [...groupChain(group).map((node) => node.options), options];
-  return [...new Set(layers.flatMap((layer) => layer.tags ?? []))];
-}
-
 /**
  * A suite scope: a describe group, or `undefined` for the file scope. Scopes
  * are the registration's own group nodes, so two sibling groups that happen
@@ -395,211 +407,6 @@ export function hooksFor(registration: Pick<ModuleRegistration, 'hooks'>, test: 
 /** Finds the outermost serial group enclosing a node, if any. */
 export function outermostSerialGroup(group: GroupNode | undefined): GroupNode | undefined {
   return groupChain(group).find((node) => node.serial);
-}
-
-/** The keys `test()` takes. */
-const TEST_OPTION_KEYS: readonly string[] = Object.keys({
-  timeout: true,
-  retries: true,
-  tags: true,
-  skip: true,
-  fail: true,
-  only: true,
-  platforms: true,
-  session: true,
-  agentContext: true,
-  agent: true,
-  trace: true,
-  video: true,
-} satisfies Record<keyof TestOptions, true>);
-
-/** The keys `test.setup()` takes beside `sessions`, which registration lifts out first. */
-const SETUP_OPTION_KEYS: readonly string[] = Object.keys({
-  timeout: true,
-  retries: true,
-  tags: true,
-  platforms: true,
-  agentContext: true,
-  agent: true,
-  trace: true,
-  video: true,
-} satisfies Record<Exclude<keyof SetupOptions, 'sessions'>, true>);
-
-/** The keys `test.describe()` takes. */
-const DESCRIBE_OPTION_KEYS: readonly string[] = Object.keys({
-  timeout: true,
-  retries: true,
-  tags: true,
-  skip: true,
-  fail: true,
-  platforms: true,
-  session: true,
-  agentContext: true,
-  agent: true,
-  trace: true,
-  video: true,
-  serial: true,
-  parallel: true,
-  only: true,
-} satisfies Record<keyof DescribeOptions, true>);
-
-/** The option a `describe` variant sets on its group: `describe.fail` sets `fail`, `describe.only` sets `only`. */
-type GroupMark = 'fail' | 'only';
-
-/**
- * The checks tests and groups share: only the option `keys` the call takes,
- * so a misspelled `timout` fails instead of leaving the default in place,
- * and each known option's value.
- */
-function validateCommonOptions(options: TestOptions | DescribeOptions, label: string, keys: readonly string[]): void {
-  if (Object.hasOwn(options, 'requires')) {
-    throw new CollectionError(`${label}: requires was removed; scope the test to targets with platforms, e.g. platforms: ['web']`);
-  }
-  const unknown = unknownKeyMessage(label, options, keys);
-  if (unknown !== undefined) throw new CollectionError(unknown);
-  if (options.only !== undefined && typeof options.only !== 'boolean') {
-    throw new CollectionError(`${label}: only must be true or false, got ${describeValue(options.only)}`);
-  }
-  if (options.timeout !== undefined) {
-    if (!Number.isSafeInteger(options.timeout) || options.timeout <= 0) {
-      throw new CollectionError(`${label}: timeout must be a positive safe integer`);
-    }
-    if (options.timeout > MAX_TIMER_MS) {
-      throw new CollectionError(`${label}: timeout must be at most ${MAX_TIMER_MS} milliseconds, got ${options.timeout}`);
-    }
-  }
-  if (options.retries !== undefined) {
-    if (!Number.isInteger(options.retries) || options.retries < 0 || options.retries > 10) {
-      throw new CollectionError(`${label}: retries must be an integer from 0 through 10`);
-    }
-  }
-  if (options.agent !== undefined) validateAgentOption(options.agent, label);
-  if (options.tags !== undefined) validateTagsOption(options.tags, label);
-  for (const kind of ['trace', 'video'] as const) {
-    const mode = options[kind];
-    if (mode !== undefined && !isRecordingMode(mode)) {
-      const legacy = kind === 'trace' ? legacyTraceSpelling(mode) : undefined;
-      throw new CollectionError(
-        legacy === undefined
-          ? `${label}: ${kind} must be one of ${RECORDING_MODES.join(', ')}, got ${describeValue(mode)}`
-          : `${label}: trace ${legacy.was} is the old spelling of trace: '${legacy.mode}'; the modes are ${RECORDING_MODES.join(', ')}`,
-      );
-    }
-  }
-}
-
-/**
- * `tags` lists distinct tag names, checked here beside `timeout`, `retries`,
- * and `agent`. Unchecked, the mistake is silent: a bare string is iterable,
- * so `tags: 'smoke'` would register the tags `s`, `m`, `o`, `k`, `e` and
- * `--tag smoke` would never select the test.
- */
-function validateTagsOption(tags: unknown, label: string): void {
-  if (!Array.isArray(tags)) {
-    throw new CollectionError(
-      `${label}: tags must be a list of tag names, e.g. tags: ['smoke'], got ${describeValue(tags)}`,
-    );
-  }
-  const seen = new Set<string>();
-  for (const tag of tags) {
-    if (!isTagName(tag)) {
-      throw new CollectionError(
-        `${label}: every tag must be a non-blank string with no comma and no leading or trailing whitespace, got ${describeValue(tag)}`,
-      );
-    }
-    if (seen.has(tag)) throw new CollectionError(`${label}: tags lists ${JSON.stringify(tag)} twice`);
-    seen.add(tag);
-  }
-}
-
-/**
- * A tag name is whatever `--tag` can spell back: the flag splits its values
- * on commas and trims them, so a name holds no comma and no leading or
- * trailing whitespace. Inner spaces are fine (`'Login Form'`, quoted).
- */
-function isTagName(tag: unknown): tag is string {
-  return typeof tag === 'string' && tag !== '' && tag.trim() === tag && !tag.includes(',');
-}
-
-/** `agent` names one configured agent, or lists several distinct ones to run the test once each. */
-function validateAgentOption(agent: unknown, label: string): void {
-  if (typeof agent === 'string') {
-    if (agent === '') throw new CollectionError(`${label}: agent must be the name of a configured agent`);
-    return;
-  }
-  if (!Array.isArray(agent) || agent.length === 0) {
-    throw new CollectionError(
-      `${label}: agent must be the name of a configured agent, or a non-empty list of names`,
-    );
-  }
-  for (const name of agent) {
-    if (typeof name !== 'string' || name === '') {
-      throw new CollectionError(`${label}: every entry of agent must be the name of a configured agent`);
-    }
-  }
-  if (new Set(agent).size !== agent.length) {
-    throw new CollectionError(`${label}: agent lists each name once`);
-  }
-}
-
-function insideSerial(group: GroupNode | undefined): boolean {
-  return outermostSerialGroup(group) !== undefined;
-}
-
-function validateTestOptions(options: TestOptions, group: GroupNode | undefined, kind: 'test' | 'setup'): void {
-  if (kind === 'setup') validateCommonOptions(options, 'setup options', SETUP_OPTION_KEYS);
-  else validateCommonOptions(options, 'test options', TEST_OPTION_KEYS);
-  validateFailOption(options.fail, 'test options');
-  if (insideSerial(group)) {
-    const forbidden: (keyof TestOptions)[] = [
-      'retries',
-      'trace',
-      'video',
-      'session',
-      'platforms',
-      'skip',
-      'fail',
-      'only',
-    ];
-    for (const key of forbidden) {
-      if (options[key] !== undefined) {
-        throw new CollectionError(
-          `test option "${key}" cannot be overridden inside a serial group; it belongs to the unit`,
-        );
-      }
-    }
-  }
-}
-
-function validateFailOption(fail: unknown, label: string): void {
-  if (fail !== undefined && typeof fail !== 'boolean' && typeof fail !== 'string') {
-    throw new CollectionError(`${label}: fail must be true, false, or a reason string, got ${describeValue(fail)}`);
-  }
-}
-
-function validateDescribeOptions(options: DescribeOptions, parent: GroupNode | undefined, mark: GroupMark | undefined): void {
-  validateCommonOptions(options, 'describe options', DESCRIBE_OPTION_KEYS);
-  validateFailOption(options.fail, 'describe options');
-  if (options.serial === true && insideSerial(parent)) {
-    throw new CollectionError('nested serial groups are collection errors');
-  }
-  // Focus inside a serial group would run part of a unit; the serial group itself can be focused.
-  if ((mark === 'only' || options.only !== undefined) && insideSerial(parent)) {
-    throw new CollectionError('describe option "only" cannot be set inside a serial group, which runs as one unit; focus the serial group instead');
-  }
-  // A serial group's members cannot be marked expected to fail, so neither can the group.
-  if ((mark === 'fail' || options.fail !== undefined) && (options.serial === true || insideSerial(parent))) {
-    throw new CollectionError('describe option "fail" cannot be set on or inside a serial group, which runs as one unit');
-  }
-  if (options.serial === true && groupChain(parent).some((group) => expectedFailureOption(group.options.fail) !== undefined)) {
-    throw new CollectionError('a serial group cannot sit inside a group marked fail; its members cannot be expected to fail');
-  }
-  // The serial group records as one unit, so a describe inside it cannot choose its own recordings.
-  for (const kind of ['trace', 'video'] as const) {
-    if (options[kind] !== undefined && insideSerial(parent)) {
-      throw new CollectionError(`describe option "${kind}" cannot be set inside a serial group; set it on the serial group or a group around it`);
-    }
-  }
 }
 
 /**
@@ -782,7 +589,7 @@ function validateFixtureDefinitions(
 /** The function, scope, and `auto` of one `test.extend()` entry: `fn`, or `[fn, { scope, auto }]`. */
 function fixtureDefinition(name: string, entry: unknown): Pick<FixtureDefinition, 'fn' | 'scope' | 'auto'> {
   const shape = `test.extend(): fixture "${name}" must be a function ({ ...fixtures }, use) => Promise<void>, or [fn, { scope: 'test' | 'worker', auto: boolean }]`;
-  if (typeof entry === 'function') return { fn: entry as FixtureFn<object, unknown>, scope: undefined, auto: undefined };
+  if (typeof entry === 'function') return { fn: entry as FixtureDefinition['fn'], scope: undefined, auto: undefined };
   if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'function') throw new CollectionError(shape);
   const options: unknown = entry[1];
   if (typeof options !== 'object' || options === null || Array.isArray(options)) throw new CollectionError(shape);
@@ -795,7 +602,7 @@ function fixtureDefinition(name: string, entry: unknown): Pick<FixtureDefinition
   if (auto !== undefined && typeof auto !== 'boolean') {
     throw new CollectionError(`test.extend(): fixture "${name}" auto must be true or false, got ${describeValue(auto)}`);
   }
-  return { fn: entry[0] as FixtureFn<object, unknown>, scope: scope as FixtureScope | undefined, auto };
+  return { fn: entry[0] as FixtureDefinition['fn'], scope: scope as FixtureScope | undefined, auto };
 }
 
 /**
@@ -870,8 +677,8 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
       return Array.from(rows, (row, index) => {
         const args: unknown[] = spreadRows ? [...(row as unknown[])] : [row];
         const rowTitle = typeof title === 'string' ? formatEachTitle(title, row, index) : title;
-        // The row comes first, so the body names its fixtures in the parameter after it.
-        return registerOne(api, undefined, rowTitle, options, (fixtures) => body(...args, fixtures), {
+        // The row comes first, so the body names its fixtures in the parameter after it, followed by TestInfo.
+        return registerOne(api, undefined, rowTitle, options, (fixtures, info) => body(...args, fixtures, info), {
           fn: body,
           position: args.length,
         });
@@ -965,6 +772,9 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     for(rows: unknown): EachRegistrar<unknown[]> {
       return eachRegistrar('test.for()', readRows('test.for()', rows), false);
     },
+    info(): TestInfo {
+      return currentTestInfo();
+    },
     only(title: string, fn: TestBody): TestCase {
       return requireCollector('test.only()').registerTest('test', 'normal', title, { only: true }, [], fn, chain);
     },
@@ -982,10 +792,10 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     afterEach(fn: TestBody): void {
       requireCollector('afterEach()').registerHook({ kind: 'afterEach', fn, fixtures: chain });
     },
-    beforeAll(fn: TestBody): void {
+    beforeAll(fn: SuiteBody): void {
       requireCollector('beforeAll()').registerHook({ kind: 'beforeAll', fn, fixtures: chain });
     },
-    afterAll(fn: TestBody): void {
+    afterAll(fn: SuiteBody): void {
       requireCollector('afterAll()').registerHook({ kind: 'afterAll', fn, fixtures: chain });
     },
     // Without definitions this is a type-only refinement: contributed

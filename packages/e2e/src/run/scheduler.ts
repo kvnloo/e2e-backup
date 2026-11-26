@@ -29,7 +29,7 @@ import { SerialGroupProgress, serialGroupId } from './serial.ts';
 import type { HeldStep, HoldReads, StepHold, StepHoldContext } from './step-hold.ts';
 import { StepAttachmentRelay } from './step-attachment-relay.ts';
 import type { StepProgress } from '@e2e-dev/core/lib/run/steps';
-import type { SpawnUnitRunner, UnitRunner } from './unit-runner.ts';
+import type { SpawnUnitRunner, UnitRunner, WorkerSlots } from './unit-runner.ts';
 import {
   INTERRUPTED_BEFORE_START,
   countsTowardFailureLimit,
@@ -237,14 +237,21 @@ class SchedulerWorker {
   private watchTimer: NodeJS.Timeout | undefined;
   private awaitingPong = false;
 
+  readonly workerSlot: number;
+  readonly workerIndex: number;
+  readonly parallelIndex: number;
+
   constructor(
     readonly targetName: string,
-    readonly workerSlot: number,
+    slots: WorkerSlots,
     spawn: SpawnUnitRunner,
     onMessage: (worker: SchedulerWorker, message: WorkerToMain) => void,
     onExit: (worker: SchedulerWorker, detail: string, signal: NodeJS.Signals | null, active: WatchedAttempt | undefined) => void,
   ) {
-    this.runner = spawn(targetName, workerSlot, {
+    this.workerSlot = slots.workerSlot;
+    this.workerIndex = slots.workerIndex;
+    this.parallelIndex = slots.parallelIndex;
+    this.runner = spawn(targetName, slots, {
       onMessage: (message) => onMessage(this, message),
       onExit: (detail, signal) => {
         this.clearKillTimer();
@@ -441,6 +448,8 @@ class Scheduler {
   private heldSince: number | undefined;
   /** Time in completed intervals when all running workers were held. */
   private heldMs = 0;
+  /** Next monotonic worker index assigned to a newly spawned worker. */
+  private nextWorkerIndex = 0;
 
   constructor(private readonly options: RunUnitsOptions) {}
 
@@ -952,14 +961,19 @@ class Scheduler {
     );
   }
 
-  /** Starts a worker on the lowest slot none of the target's workers holds, so a replacement takes over the slot of the one that exited. */
+  /** Starts a worker on the lowest target slot and global parallel slot free, with a fresh monotonic worker index. */
   private spawn(state: TargetState): SchedulerWorker {
     const taken = new Set(this.workersOf(state.target.name).map((worker) => worker.workerSlot));
     let workerSlot = 0;
     while (taken.has(workerSlot)) workerSlot += 1;
+    const takenParallel = new Set(this.workers.map((worker) => worker.parallelIndex));
+    let parallelIndex = 0;
+    while (takenParallel.has(parallelIndex)) parallelIndex += 1;
+    const workerIndex = this.nextWorkerIndex;
+    this.nextWorkerIndex += 1;
     const worker = new SchedulerWorker(
       state.target.name,
-      workerSlot,
+      { workerSlot, workerIndex, parallelIndex },
       this.options.spawn,
       (target, message) => this.onMessage(target, message),
       (target, detail, signal, active) => this.onExit(target, detail, signal, active),

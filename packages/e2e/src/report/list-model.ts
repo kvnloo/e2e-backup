@@ -5,6 +5,7 @@
  */
 
 import type { ResultStatus } from '@e2e-dev/core/lib/run/records';
+import type { TestAnnotation } from '@e2e-dev/core/lib/types';
 import type { RecordedModel } from '@e2e-dev/core/lib/cache/trace';
 import type { SerializedError } from '@e2e-dev/core/lib/internal/errors';
 import type { RunEventOf } from '../run/events.ts';
@@ -202,6 +203,8 @@ export interface TestLine {
   readonly skipReason: string | undefined;
   /** Set when a test marked `test.fail` passed by failing: the reason and the first line of the failure it covered. */
   readonly expectedFailure?: { readonly reason: string; readonly errorLine: string } | undefined;
+  /** Annotations recorded on the test's verdict attempt (or declared annotations); absent when none. */
+  readonly annotations?: readonly TestAnnotation[] | undefined;
   /** Cleanup-phase secondary errors of attempts whose cleanup failed. */
   readonly cleanupErrors: readonly SerializedError[];
   readonly steps: readonly ListedStep[];

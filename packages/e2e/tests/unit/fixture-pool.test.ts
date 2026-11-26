@@ -2,10 +2,11 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { checkDeclaredFixtures, planAttempt, planSuiteHook, type FixturePlan } from '../../src/collect/fixture-plan.ts';
-import type { FixtureDefinition, SuiteHook, TestBody, TestHook } from '../../src/collect/registry.ts';
+import type { FixtureDefinition, SuiteBody, SuiteHook, TestBody, TestHook } from '../../src/collect/registry.ts';
 import { attemptBuiltIns, attemptlessBuiltIns, bindFixtures, WorkerFixturePool, type BoundFixtures } from '../../src/run/fixture-pool.ts';
 import type { BuiltInTarget } from '@e2e-dev/core/lib/run/fixtures';
-import type { FixtureScope } from '@e2e-dev/core/lib/types';
+import type { FixtureScope, TestInfo, WorkerInfo } from '@e2e-dev/core/lib/types';
+import { toyTestInfo, toyWorkerInfo } from '../helpers/suite-hooks.ts';
 
 /** A web-like target, whose attempts are isolated, or a device-like one, whose state outlives them. */
 function toyTarget(isolation: 'attempt' | 'worker' = 'attempt'): BuiltInTarget {
@@ -53,16 +54,16 @@ function logged(log: string[], name: string, value: unknown, options: FixtureOpt
 
 /** A test whose body names `names`, registered through `chain`. */
 /** What each test body or hook built here was handed when the pool called it. */
-const received = new WeakMap<TestBody, Fixtures>();
+const received = new WeakMap<TestBody | SuiteBody, Fixtures>();
 
 /** A body that keeps what it is handed, reading every fixture the way destructuring them all would. */
-function receiving(): TestBody {
-  const fn: TestBody = (fixtures) => void received.set(fn, { ...(fixtures as Fixtures) });
+function receiving(): SuiteBody {
+  const fn: SuiteBody = (fixtures) => void received.set(fn, { ...(fixtures as Fixtures) });
   return fn;
 }
 
 function testNaming(chain: readonly FixtureDefinition[], names: readonly string[]) {
-  return { kind: 'test' as const, titlePath: ['suite', 'case'], fn: receiving(), names, source: { file: '/repo/tests/a.e2e.ts', line: 3, column: 1 }, fixtures: chain };
+  return { kind: 'test' as const, titlePath: ['suite', 'case'], fn: receiving() as TestBody, names, source: { file: '/repo/tests/a.e2e.ts', line: 3, column: 1 }, fixtures: chain };
 }
 
 function hookNaming<Kind extends 'beforeEach' | 'afterEach' | 'beforeAll' | 'afterAll'>(kind: Kind, chain: readonly FixtureDefinition[], names: readonly string[]) {
@@ -70,9 +71,9 @@ function hookNaming<Kind extends 'beforeEach' | 'afterEach' | 'beforeAll' | 'aft
 }
 
 /** Has the pool call `user`, and returns the fixtures it was handed. */
-async function call(bound: BoundFixtures, user: Parameters<BoundFixtures['call']>[0]): Promise<Fixtures> {
+async function call<Info extends WorkerInfo>(bound: BoundFixtures<Info>, user: Parameters<BoundFixtures<Info>['call']>[0]): Promise<Fixtures> {
   await bound.call(user);
-  return received.get(user.fn)!;
+  return received.get(user.fn as TestBody | SuiteBody)!;
 }
 
 const plannedNames = (plan: FixturePlan): string[] => plan.order.map(({ definition }) => definition.name);
@@ -94,10 +95,11 @@ interface AttemptOptions {
 function attempt(chain: readonly FixtureDefinition[], names: readonly string[], options: AttemptOptions = {}) {
   const target = options.target ?? toyTarget();
   const test = testNaming(chain, names);
-  const bound = bindFixtures({
+  const bound = bindFixtures<TestInfo>({
     plan: planAttempt(target, test, options.hooks ?? []),
     builtIns: attemptBuiltIns(options.builtIns ?? { platform: 'toy' }),
-    pool: options.pool ?? new WorkerFixturePool(target),
+    pool: options.pool ?? new WorkerFixturePool(target, toyWorkerInfo('toy')),
+    info: toyTestInfo('toy'),
     signal: options.signal,
   });
   return { ...bound, body: () => call(bound, test) };
@@ -130,12 +132,12 @@ describe('planning', () => {
     };
     const chain = [logged([], 'a', 'A')];
     const test = { ...testNaming(chain, ['app', 'a']), fn: (() => undefined) as TestBody };
-    const bound = bindFixtures({ plan: planAttempt(toyTarget(), test, []), builtIns: attemptBuiltIns(builtIns), pool: new WorkerFixturePool(toyTarget()) });
+    const bound = bindFixtures<TestInfo>({ plan: planAttempt(toyTarget(), test, []), builtIns: attemptBuiltIns(builtIns), pool: new WorkerFixturePool(toyTarget(), toyWorkerInfo('toy')), info: toyTestInfo('toy') });
     await bound.setUp();
     await bound.call(test);
     expect(reads).toEqual([]);
     const reader = { ...test, fn: (({ app, a }: Fixtures) => void reads.push(`body:${String(app)}:${String(a)}`)) as TestBody };
-    const again = bindFixtures({ plan: planAttempt(toyTarget(), reader, []), builtIns: attemptBuiltIns(builtIns), pool: new WorkerFixturePool(toyTarget()) });
+    const again = bindFixtures<TestInfo>({ plan: planAttempt(toyTarget(), reader, []), builtIns: attemptBuiltIns(builtIns), pool: new WorkerFixturePool(toyTarget(), toyWorkerInfo('toy')), info: toyTestInfo('toy') });
     await again.setUp();
     await again.call(reader);
     expect(reads).toEqual(['app', 'body:the app:A']);
@@ -213,7 +215,7 @@ describe('planning', () => {
   it('sets an auto fixture up for every test, and its worker-scoped kind once per worker', async () => {
     const log: string[] = [];
     const target = toyTarget();
-    const pool = new WorkerFixturePool(target);
+    const pool = new WorkerFixturePool(target, toyWorkerInfo('toy'));
     const chain = [
       logged(log, 'install', undefined, { scope: 'worker', auto: true }),
       logged(log, 'needed', 'N'),
@@ -372,7 +374,7 @@ describe('fixtures that extend a built-in', () => {
   it("runs an override declared with scope 'worker' once per worker, where the engine's state outlives a test", async () => {
     const log: string[] = [];
     const target = toyTarget('worker');
-    const pool = new WorkerFixturePool(target);
+    const pool = new WorkerFixturePool(target, toyWorkerInfo('toy'));
     const chain = [wrapping(log, 'gadget', 'override', { scope: 'worker' })];
     const gadgetOf = (id: string) => ({ gadget: { id: () => id }, platform: 'toy' });
     const read = (fixtures: Fixtures): string => (fixtures['gadget'] as { wraps: { id(): string } }).wraps.id();
@@ -383,7 +385,7 @@ describe('fixtures that extend a built-in', () => {
     const hookPlan = planSuiteHook(target, hook);
     expect(plannedScope(hookPlan, chain[0]!)).toBe('worker');
     expect(hookPlan.usesEngine).toBe(true);
-    const boundHook = bindFixtures({ plan: hookPlan, builtIns: inHook, pool });
+    const boundHook = bindFixtures<WorkerInfo>({ plan: hookPlan, builtIns: inHook, pool, info: toyWorkerInfo('toy') });
     await boundHook.setUp();
     const fromHook = await call(boundHook, hook);
     expect(read(fromHook)).toBe('hook');
@@ -571,7 +573,7 @@ describe('worker fixtures', () => {
   it('sets one instance up for every attempt of the worker that names it and tears it down when the pool closes', async () => {
     const log: string[] = [];
     const target = toyTarget();
-    const pool = new WorkerFixturePool(target);
+    const pool = new WorkerFixturePool(target, toyWorkerInfo('toy'));
     const chain = [logged(log, 'database', { rows: 1 }, { scope: 'worker' }), logged(log, 'unused', 'U', { scope: 'worker' }), logged(log, 'page', 'P')];
     for (const _ of [1, 2]) {
       const bound = attempt(chain, ['database', 'page'], { pool, target });
@@ -588,7 +590,7 @@ describe('worker fixtures', () => {
 
   it('tries a failed setup again for the next attempt that needs it', async () => {
     const target = toyTarget();
-    const pool = new WorkerFixturePool(target);
+    const pool = new WorkerFixturePool(target, toyWorkerInfo('toy'));
     let tries = 0;
     const flaky = fixture('flaky', async (_fixtures, use) => {
       tries += 1;
@@ -618,7 +620,7 @@ describe('worker fixtures', () => {
 
   it('forwards a device-like built-in to whichever attempt is running, and marks the teardown as needing the engine', async () => {
     const target = toyTarget('worker');
-    const pool = new WorkerFixturePool(target);
+    const pool = new WorkerFixturePool(target, toyWorkerInfo('toy'));
     const held: { gadget?: { id(): string } } = {};
     const keeper = fixture('keeper', async ({ gadget }, use) => {
       held.gadget = gadget as { id(): string };
@@ -642,10 +644,11 @@ describe('suite hook fixtures', () => {
   /** Binds a `beforeAll` hook that names `names`; `builtIns` stands in for its attempt, and without one it has none. */
   function bindHook(target: BuiltInTarget, chain: readonly FixtureDefinition[], names: readonly string[], builtIns?: object) {
     const hook = suiteHook(chain, names);
-    const bound = bindFixtures({
+    const bound = bindFixtures<WorkerInfo>({
       plan: planSuiteHook(target, hook),
       builtIns: builtIns === undefined ? attemptlessBuiltIns(target, {}, noAttempt) : attemptBuiltIns(builtIns),
-      pool: new WorkerFixturePool(target),
+      pool: new WorkerFixturePool(target, toyWorkerInfo('toy')),
+      info: toyWorkerInfo('toy'),
     });
     return { ...bound, hook: () => call(bound, hook) };
   }

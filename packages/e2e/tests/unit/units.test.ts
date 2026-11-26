@@ -76,6 +76,7 @@ function makeTest(
     options: {},
     sessions: [],
     tags: [],
+    annotations: [],
     fn: () => undefined,
     fixtures: [],
     group: undefined,

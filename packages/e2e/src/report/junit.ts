@@ -128,6 +128,17 @@ export interface JunitReportOptions {
   readonly artifactsDir?: string | undefined;
 }
 
+/** The `<properties>` block for a test's annotations, or nothing when there are none. */
+function annotationProperties(result: ReportResult): string[] {
+  const annotations = result.annotations ?? [];
+  if (annotations.length === 0) return [];
+  return [
+    '  <properties>',
+    ...annotations.map((annotation) => `    <property ${attributes({ name: annotation.type, value: annotation.description ?? '' })}/>`),
+    '  </properties>',
+  ];
+}
+
 /** The `<system-out>` element holding `lines`, or nothing when there are none. */
 function systemOut(lines: readonly string[]): string[] {
   if (lines.length === 0) return [];
@@ -152,14 +163,15 @@ function renderResult(result: ReportResult, groups: ReadonlyMap<string, ReportSe
     time: seconds(final.durationMs),
   })}`;
   const expected = expectedNote(result);
+  const properties = annotationProperties(result);
   switch (result.status) {
     case 'passed': {
-      if (expected === undefined) return { lines: [`${open}/>`], outcome: 'passed', durationMs: final.durationMs };
+      if (expected === undefined && properties.length === 0) return { lines: [`${open}/>`], outcome: 'passed', durationMs: final.durationMs };
       // A test.fail pass failed as expected; its failure screenshot shows that failure.
-      const attachment = screenshotAttachment(toldAttempt(result, final), options);
-      const lines = [expected, ...(attachment === undefined ? [] : [`[[ATTACHMENT|${attachment}]]`])];
+      const attachment = expected === undefined ? undefined : screenshotAttachment(toldAttempt(result, final), options);
+      const lines = expected === undefined ? [] : [expected, ...(attachment === undefined ? [] : [`[[ATTACHMENT|${attachment}]]`])];
       return {
-        lines: [`${open}>`, ...systemOut(lines), '</testcase>'],
+        lines: [`${open}>`, ...properties, ...systemOut(lines), '</testcase>'],
         outcome: 'passed',
         durationMs: final.durationMs,
       };
@@ -170,7 +182,7 @@ function renderResult(result: ReportResult, groups: ReadonlyMap<string, ReportSe
       const attachment = screenshotAttachment(toldAttempt(result, final), options);
       const lines = [note, ...(expected === undefined ? [] : [expected]), ...(attachment === undefined ? [] : [`[[ATTACHMENT|${attachment}]]`])];
       return {
-        lines: [`${open}>`, ...systemOut(lines), '</testcase>'],
+        lines: [`${open}>`, ...properties, ...systemOut(lines), '</testcase>'],
         outcome: 'passed',
         durationMs: final.durationMs,
       };
@@ -180,7 +192,7 @@ function renderResult(result: ReportResult, groups: ReadonlyMap<string, ReportSe
       // JUnit has no interrupted outcome; a test the run stopped reached no verdict, so it reads as skipped with why.
       const message = result.status === 'skipped' ? skippedMessage(result) : `interrupted: ${final.final.error?.message ?? 'the run was stopped'}`;
       return {
-        lines: [`${open}>`, `  <skipped ${attributes({ message })}/>`, '</testcase>'],
+        lines: [`${open}>`, ...properties, `  <skipped ${attributes({ message })}/>`, '</testcase>'],
         outcome: 'skipped',
         durationMs: final.durationMs,
       };
@@ -197,6 +209,7 @@ function renderResult(result: ReportResult, groups: ReadonlyMap<string, ReportSe
       return {
         lines: [
           `${open}>`,
+          ...properties,
           `  <${element} ${attributes({ message, type })}>${text(body)}</${element}>`,
           ...systemOut(lines),
           '</testcase>',

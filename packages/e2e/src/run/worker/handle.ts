@@ -31,7 +31,7 @@ function resolveEntry(): { path: string; execArgv: string[] } {
 }
 
 /** Run-wide settings every child-process worker boots with. */
-export type ChildProcessSpawnOptions = Omit<WorkerBootstrap, 'targetName' | 'workerSlot'> & {
+export type ChildProcessSpawnOptions = Omit<WorkerBootstrap, 'targetName' | 'workerSlot' | 'workerIndex' | 'parallelIndex'> & {
   /** The environment each target's workers are spawned with. */
   readonly envFor: (targetName: string) => NodeJS.ProcessEnv;
   /** Handles a worker's call to a service function. */
@@ -41,9 +41,9 @@ export type ChildProcessSpawnOptions = Omit<WorkerBootstrap, 'targetName' | 'wor
 /** Creates the spawn factory the scheduler uses for child-process execution. */
 export function childProcessSpawner(options: ChildProcessSpawnOptions): SpawnUnitRunner {
   const { envFor, callService, ...bootstrap } = options;
-  return (targetName, workerSlot, events) =>
+  return (targetName, slots, events) =>
     new ChildProcessRunner(
-      { ...bootstrap, targetName, workerSlot },
+      { ...bootstrap, targetName, ...slots },
       { projectRoot: bootstrap.projectRoot, env: envFor(targetName), callService },
       events,
     );
@@ -66,7 +66,12 @@ class ChildProcessRunner implements UnitRunner {
       execArgv: entry.execArgv,
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
       // Collecting read the project's tsconfig.json files first; the worker warns only about ones it reaches on its own.
-      env: { ...spawn.env, [WARNED_TSCONFIGS_ENV]: warnedTsconfigs() },
+      env: {
+        ...spawn.env,
+        [WARNED_TSCONFIGS_ENV]: warnedTsconfigs(),
+        TEST_WORKER_INDEX: String(bootstrap.workerIndex),
+        TEST_PARALLEL_INDEX: String(bootstrap.parallelIndex),
+      },
     });
     this.child.on('message', (message) => {
       const outbound = message as ChildProcessOutbound;

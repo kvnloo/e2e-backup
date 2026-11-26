@@ -578,6 +578,21 @@ export function renderTracePage(report: Report1Document, result: ReportResult, f
   const ranOn = Object.entries(told.environment ?? {});
   if (ranOn.length > 0) lines.push(`Ran on: ${ranOn.map(([name, value]) => `${cell(name, MAX_ID_CHARS)} ${code(value, MAX_CELL_CHARS)}`).join(' · ')}`, '');
 
+  // An attempt that ran carries its own annotations; fall back to result.annotations only when no attempt ran.
+  const annotations = told.ran ? (told.annotations ?? []) : (result.annotations ?? []);
+  if (annotations.length > 0) {
+    lines.push(
+      `Annotations: ${annotations
+        .map((annotation) =>
+          annotation.description === undefined || annotation.description === ''
+            ? code(annotation.type, MAX_ID_CHARS)
+            : `${code(annotation.type, MAX_ID_CHARS)} ${cell(annotation.description, MAX_CELL_CHARS)}`,
+        )
+        .join(' · ')}`,
+      '',
+    );
+  }
+
   // A test that failed as `test.fail` expected tells that failure, also below an earlier attempt's.
   const mark = result.attempts.at(-1)?.expectedFailure;
   if (mark !== undefined) lines.push(`Expected to fail: ${cell(mark.reason)}`, '');

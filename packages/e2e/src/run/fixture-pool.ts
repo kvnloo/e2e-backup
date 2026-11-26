@@ -12,7 +12,8 @@
  */
 
 import { planAttempt, type FixtureInputs, type FixturePlan, type FixtureUser, type PlannedFixture } from '../collect/fixture-plan.ts';
-import type { FixtureDefinition, RegisteredTest, TestBody, TestHook } from '../collect/registry.ts';
+import type { FixtureDefinition, RegisteredTest, TestHook } from '../collect/registry.ts';
+import type { TestHookFn, TestInfo, WorkerInfo } from '@e2e-dev/core/lib/types';
 import { builtInFixtures, type BuiltInFixtures, type BuiltInTarget } from '@e2e-dev/core/lib/run/fixtures';
 import { pollLineage, type PollLineage } from '@e2e-dev/core/lib/expect/poll-scope';
 import { ConfigurationError } from '@e2e-dev/core/lib/internal/errors';
@@ -64,6 +65,7 @@ export interface WorkerFixtureTeardown extends FixtureTeardown {
 function startFixture(
   definition: FixtureDefinition,
   fixtures: object,
+  info: TestInfo | WorkerInfo,
   accept: (value: unknown, teardown: FixtureTeardown) => boolean,
   outlivesTest = false,
 ): Promise<void> {
@@ -112,7 +114,7 @@ function startFixture(
     return released;
   };
   const run = Promise.resolve()
-    .then(() => polls.run(() => definition.fn(fixtures, use)))
+    .then(() => polls.run(() => definition.fn(fixtures, use, info)))
     .then(
       () => {
         if (!used) {
@@ -154,8 +156,13 @@ export class WorkerFixturePool {
 
   private readonly builtInFixtures: BuiltInFixtures;
 
-  /** `services` holds the service values started by the worker's entry point for the `services` fixture. */
-  constructor(target: BuiltInTarget, services: Readonly<Record<string, unknown>> = {}) {
+  constructor(
+    target: BuiltInTarget,
+    /** Information about this worker, passed as the third argument to worker-scoped fixtures. */
+    readonly workerInfo: WorkerInfo,
+    /** The service values the worker's entry point started, for the `services` fixture. */
+    services: Readonly<Record<string, unknown>> = {},
+  ) {
     this.builtInFixtures = builtInFixtures(target, services);
   }
 
@@ -186,7 +193,7 @@ export class WorkerFixturePool {
     const known = this.instances.get(key);
     if (known !== undefined) return known;
     let value: unknown;
-    const instance = startFixture(definition, fixtures, (provided, teardown) => {
+    const instance = startFixture(definition, fixtures, this.workerInfo, (provided, teardown) => {
       if (this.closed) return false;
       value = provided;
       this.active.push({ ...teardown, usesEngine });
@@ -244,11 +251,11 @@ export class WorkerFixturePool {
   }
 }
 
-/** A registered test body or hook: what the pool calls with the fixtures it names. */
-type BoundUser = FixtureUser & { readonly fn: TestBody };
+/** A registered test body or hook: what the pool calls with the fixtures it names and its info object. */
+type BoundUser<Info extends WorkerInfo = WorkerInfo> = FixtureUser & { readonly fn: TestHookFn<object, Info> };
 
 /** The fixtures set up for one piece of user code, and the way to run that code with them. */
-export interface BoundFixtures {
+export interface BoundFixtures<Info extends WorkerInfo = WorkerInfo> {
   /**
    * Sets up the fixtures the plan lists, in its order: a worker fixture is
    * taken from the pool (set up there on first use), a test fixture set up
@@ -261,7 +268,7 @@ export interface BoundFixtures {
    * Runs the test body or hook `user` with the fixtures it names, and no
    * others. A built-in one is acquired as the function destructures it.
    */
-  call(user: BoundUser): void | Promise<void>;
+  call(user: BoundUser<Info>): void | Promise<void>;
   /**
    * Whether every chain fixture `user` names was set up. A hook that names
    * one whose setup failed, or was never reached, has nothing to run with.
@@ -277,12 +284,14 @@ export interface BoundFixtures {
   teardowns(): readonly FixtureTeardown[];
 }
 
-export interface BindOptions {
+export interface BindOptions<Info extends WorkerInfo = WorkerInfo> {
   /** What to set up, and what each function receives: `planAttempt` or `planSuiteHook`. */
   readonly plan: FixturePlan;
   /** The built-in fixtures of the attempt the code runs in; see `attemptlessBuiltIns`. */
   readonly builtIns: BuiltInReader;
   readonly pool: WorkerFixturePool;
+  /** `TestInfo` for a test attempt, or `WorkerInfo` for a suite hook. */
+  readonly info: Info;
   /** The attempt's abort signal: setup stops once it fires. */
   readonly signal?: AbortSignal | undefined;
 }
@@ -293,8 +302,8 @@ export interface BindOptions {
  * holding the fixtures it names: the value a chain fixture handed over, or a
  * built-in read off the attempt when the function destructures it.
  */
-export function bindFixtures(options: BindOptions): BoundFixtures {
-  const { plan, builtIns, pool, signal } = options;
+export function bindFixtures<Info extends WorkerInfo>(options: BindOptions<Info>): BoundFixtures<Info> {
+  const { plan, builtIns, pool, info, signal } = options;
   /** The value each fixture handed over. */
   const provided = new Map<FixtureDefinition, unknown>();
   const receive = (inputs: FixtureInputs, builtIn: BuiltInReader): object => {
@@ -331,7 +340,7 @@ export function bindFixtures(options: BindOptions): BoundFixtures {
       provided.set(definition, await pool.acquire(definition, receive(inputs, (name) => pool.builtIn(name)), usesEngine));
       return;
     }
-    await startFixture(definition, receive(inputs, builtIns), (value, teardown) => {
+    await startFixture(definition, receive(inputs, builtIns), info, (value, teardown) => {
       if (abandoned) return false;
       provided.set(definition, value);
       active.push(teardown);
@@ -348,7 +357,7 @@ export function bindFixtures(options: BindOptions): BoundFixtures {
         requireActive();
       }
     },
-    call: (user) => user.fn(receive(inputsOf(user), builtIns)),
+    call: (user) => user.fn(receive(inputsOf(user), builtIns), info),
     ready: (user) => [...inputsOf(user).values()].every((definition) => definition === undefined || provided.has(definition)),
     teardowns(): readonly FixtureTeardown[] {
       abandon();
@@ -404,12 +413,19 @@ export function planAttemptFixtures(
   target: BuiltInTarget,
   test: RegisteredTest,
   hooks: AttemptHooks,
-): { open(options: { readonly builtIns: object; readonly pool: WorkerFixturePool; readonly signal: AbortSignal }): TestAttemptFixtures } {
+): {
+  open(options: {
+    readonly builtIns: object;
+    readonly pool: WorkerFixturePool;
+    readonly testInfo: TestInfo;
+    readonly signal: AbortSignal;
+  }): TestAttemptFixtures;
+} {
   const plan = planAttempt(target, test, [...hooks.beforeEach, ...hooks.afterEach]);
   return {
-    open({ builtIns, pool, signal }) {
+    open({ builtIns, pool, testInfo, signal }) {
       const read = attemptBuiltIns(builtIns);
-      const bound = bindFixtures({ plan, builtIns: read, pool, signal });
+      const bound = bindFixtures({ plan, builtIns: read, pool, info: testInfo, signal });
       return {
         enter: () => pool.enter(read),
         async run(running, stop) {

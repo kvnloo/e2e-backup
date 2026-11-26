@@ -93,6 +93,7 @@ function makeTest(file: string, title: string, overrides: Partial<CollectedTest>
     options: {},
     sessions: [],
     tags: [],
+    annotations: [],
     fn: () => undefined,
     fixtures: [],
     group: undefined,
@@ -231,7 +232,7 @@ const WATCHDOG_MS = 20;
 const SLOW_TEARDOWN_MS = 12_000;
 
 class FakeFleet {
-  readonly spawned: { targetName: string; workerSlot: number }[] = [];
+  readonly spawned: { targetName: string; workerSlot: number; workerIndex: number; parallelIndex: number }[] = [];
   readonly killed: number[] = [];
   readonly completedDisposals: number[] = [];
   readonly unitsByWorker: RunUnitMessage[][] = [];
@@ -248,9 +249,9 @@ class FakeFleet {
 
   constructor(private readonly behaviour: FakeBehaviour = {}) {}
 
-  readonly spawn: SpawnUnitRunner = (targetName, workerSlot, events) => {
+  readonly spawn: SpawnUnitRunner = (targetName, slots, events) => {
     const index = this.spawned.length;
-    this.spawned.push({ targetName, workerSlot });
+    this.spawned.push({ targetName, ...slots });
     this.unitsByWorker.push([]);
     this.live += 1;
     this.peakLive = Math.max(this.peakLive, this.live);
@@ -2002,5 +2003,36 @@ describe('scheduler fault handling', () => {
     expect(collected.results).toHaveLength(2);
     expect(collected.results.find((result) => result.test.id === 'skip-me')!.selected).toBe(true);
     expect(collected.results.find((result) => result.test.id === 'filter-me')!.selected).toBe(false);
+  });
+
+  it('increments workerIndex on respawn while reusing parallelIndex, and keeps parallelIndex unique across concurrent targets', async () => {
+    const web = makeTarget('web', 0);
+    const mobile = makeTarget('mobile', 1);
+    const failFirst = makePair(makeTest('tests/a.e2e.ts', 'fails'), web);
+    const afterFail = makePair(makeTest('tests/b.e2e.ts', 'passes after'), web);
+    const onMobile = makePair(makeTest('tests/a.e2e.ts', 'mobile case'), mobile);
+
+    const fleet = new FakeFleet({
+      unitMs: 10,
+      status: { [failFirst.test.id]: 'failed' },
+    });
+
+    await run(
+      makeSelection([
+        { target: web, pairs: [failFirst, afterFail] },
+        { target: mobile, pairs: [onMobile] },
+      ]),
+      makeCollection(['tests/a.e2e.ts', 'tests/b.e2e.ts'], [failFirst, afterFail, onMobile]),
+      fleet,
+      { workers: 2 },
+    );
+
+    // Every spawned worker gets a unique, monotonically increasing workerIndex.
+    expect(fleet.spawned.map((entry) => entry.workerIndex)).toEqual(fleet.spawned.map((_, i) => i));
+    // First two workers run concurrently (one web, one mobile) so they get distinct parallelIndex values (0 and 1).
+    expect(new Set(fleet.spawned.slice(0, 2).map((entry) => entry.parallelIndex))).toEqual(new Set([0, 1]));
+    // Every worker stays within 0 .. workers - 1 for parallelIndex, reusing the freed slot on respawn.
+    expect(fleet.spawned.every((entry) => entry.parallelIndex >= 0 && entry.parallelIndex < 2)).toBe(true);
+    expect(fleet.spawned.length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -29,6 +29,7 @@ export interface AttemptView {
   readonly failure: Attempt['failure'];
   readonly artifacts: readonly Artifact[];
   readonly environment: Attempt['environment'];
+  readonly annotations?: Attempt['annotations'];
 }
 
 /** The page's whole model, built once from the payload. */
@@ -86,6 +87,7 @@ function attemptViews(result: Result, groups: ReadonlyMap<string, SerialGroup>):
       failure: attempt.failure,
       artifacts: attempt.artifacts,
       environment: attempt.environment,
+      annotations: attempt.annotations,
     }));
   }
   return (groups.get(result.serialGroupId)?.attempts ?? []).map((attempt) => {
@@ -103,6 +105,7 @@ function attemptViews(result: Result, groups: ReadonlyMap<string, SerialGroup>):
       failure: member?.failure,
       artifacts: attempt.artifacts,
       environment: attempt.environment,
+      annotations: member?.annotations,
     };
   });
 }

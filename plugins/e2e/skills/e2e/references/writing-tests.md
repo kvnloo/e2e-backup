@@ -233,6 +233,7 @@ beforeEach(async ({ app }) => {});     // per attempt, with test fixtures
 afterEach(async ({ screen }) => {});   // runs after failures too
 beforeAll(async ({ platform }) => {}); // worker fixtures only
 test.each([{ user: 'Ada' }, { user: 'Grace' }])('signs in as $user', async ({ user }, { app }) => {});
+test('issue', { annotation: { type: 'issue', description: 'https://example.com/1' } }, async ({ app }, testInfo) => {}); // testInfo or test.info(): retry, workerIndex, outputPath(), status in afterEach
 test.setup('sign in', { sessions: ['admin'] }, async ({ app, screen, session }) => {}); // see Sign-in sessions
 ```
 
@@ -250,7 +251,7 @@ test.setup('sign in', { sessions: ['admin'] }, async ({ app, screen, session }) 
   their state between tests. Naming a test fixture in a suite hook is a
   `COLLECTION_ERROR`.
 - `test.skip`, `test.fixme`, `test.fail`, `test.slow`, `test.setTimeout`, `test.step`,
-  `test.for`, `serial` and `parallel` groups, and every test option:
+  `test.info`, `test.for`, `serial` and `parallel` groups, and every test option:
   Full reference: docs/reference/test.mdx.
 
 ## Fixtures

@@ -27,6 +27,8 @@ export function TestView({ model, result, attemptParam }: { model: ReportModel; 
   const attempts = model.attempts(result);
   const chosen = attemptParam === null ? attempts.length - 1 : Number(attemptParam) - 1;
   const attempt = attempts[chosen] ?? attempts.at(-1);
+  // An attempt that ran carries its own annotations (declared + runtime); fall back to result.annotations only when no attempt ran.
+  const annotations = attempts.length === 0 ? (result.annotations ?? []) : (attempt?.annotations ?? []);
 
   return (
     <article className="flex flex-col gap-e2e-4">
@@ -46,6 +48,27 @@ export function TestView({ model, result, attemptParam }: { model: ReportModel; 
           ))}
           {result.skip === undefined ? null : <span className="type-caption text-shade-400">skipped: {result.skip.reason}</span>}
         </div>
+        {annotations.length > 0 ? (
+          <ul className="flex flex-col gap-e2e-1 type-caption text-shade-400">
+            {annotations.map((annotation, index) => (
+              <li key={`${annotation.type}-${index}`}>
+                <strong className="text-shade-300">{annotation.type}</strong>
+                {annotation.description === undefined || annotation.description === '' ? null : (
+                  <>
+                    {': '}
+                    {isHttpUrl(annotation.description) ? (
+                      <a href={annotation.description} target="_blank" rel="noopener noreferrer" className="e2e-action">
+                        {annotation.description}
+                      </a>
+                    ) : (
+                      annotation.description
+                    )}
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </header>
       {attempts.length > 1 ? (
         <nav aria-label="Attempts" className="flex gap-e2e-3 border-b border-shade-700 pb-e2e-1">
@@ -74,6 +97,16 @@ export function TestView({ model, result, attemptParam }: { model: ReportModel; 
       )}
     </article>
   );
+}
+
+/** Whether `value` is an `http:` or `https:` URL safe to render as a link. */
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 /** The web engine's default viewport, and a phone's screen in points: what a recording most likely measures before it loads. */

@@ -97,6 +97,7 @@ test('signs in', async ({ app, screen, browser }) => {
 | `getCapabilities().getPlatformName()` | `process.platform` for a browser on the runner's machine; for a hosted one, `browser.evaluate(() => navigator.platform)` |
 | `executeScript(script, args)` | `browser.evaluate(fn, arg)`, JSON in and out only |
 | Page objects | A fixture from `test.extend`, or a goal for `agent.act`, see [Page objects](/page-object-model) |
+| `ITestResult` in `@AfterMethod`, JUnit `TestInfo`, WebdriverIO `afterTest` | [`test.info()`](/reference/test#test-info) or the `testInfo` parameter of tests, `beforeEach`, `afterEach`, and test fixtures (`status`, `error`, `title`, `outputPath`, `annotations`) |
 
 ## What e2e doesn't have yet
 

@@ -27,6 +27,7 @@
         "shard": 0,
         "skip": { "cause": "filtered", "reason": "outside the shard", "otherShard": false },
         "tags": [""],
+        "annotations": [{ "type": "", "extra": true }],
         "attempts": [
           {
             "shard": 0,

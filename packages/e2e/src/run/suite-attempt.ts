@@ -28,6 +28,7 @@ import type { RunError } from '@e2e-dev/core/lib/run/records';
 import { redactForSession, sessionLedger } from '@e2e-dev/core/lib/run/secrecy';
 import { StepRecorder } from '@e2e-dev/core/lib/run/steps';
 import type { WorkerModels } from '@e2e-dev/core/lib/run/worker-models';
+import type { WorkerInfo } from '@e2e-dev/core/lib/types';
 import { planSuiteHook } from '../collect/fixture-plan.ts';
 import type { SuiteHook } from '../collect/registry.ts';
 import { attemptBuiltIns, attemptlessBuiltIns, bindFixtures, fixtureSetup, type BuiltInReader, type WorkerFixturePool } from './fixture-pool.ts';
@@ -46,6 +47,7 @@ export interface SuiteAttemptHost {
   /** Started service values exposed by the `services` fixture. */
   readonly services: Readonly<Record<string, unknown>>;
   readonly workerFixtures: WorkerFixturePool;
+  readonly workerInfo: WorkerInfo;
   launchSession(plan: SessionPlan, attemptId: string, artifactsDir: string, signal: AbortSignal): Promise<TargetSession>;
   closeSession(session: TargetSession, close: SessionClose, record: ClosingRecord, sink: ArtifactSink, secondaryErrors: SerializedError[]): Promise<void>;
 }
@@ -116,7 +118,7 @@ export class SuiteAttempt implements SuiteHookSession {
     const label = `${hook.kind} hook`;
     const running = hook.kind === 'beforeAll' ? { name: 'a beforeAll hook', settable: true } : { name: 'an afterAll hook', settable: false };
     await this.within(label, timeoutMs, plan.usesEngine, running, async (builtIns, owns) => {
-      const bound = bindFixtures({ plan, builtIns, pool: host.workerFixtures });
+      const bound = bindFixtures({ plan, builtIns, pool: host.workerFixtures, info: host.workerInfo });
       await bound.setUp((fixture) => owns(fixtureSetup(fixture)));
       owns(`the ${label}`);
       await bound.call(hook);

@@ -450,14 +450,22 @@ function row(cells: readonly string[]): string {
 function testRow({ result, final }: Entry, withAgent: boolean): string {
   const skipped = result.status === 'skipped';
   const expected = result.attempts.at(-1)?.expectedFailure;
-  const note = skipped
-    ? `skipped: ${cell(result.skip?.reason ?? 'skipped')}`
-    : expected?.error !== undefined
-      ? `failed as expected: ${cell(expected.reason)}, ${cell(expected.error.code)}: ${cell(expected.error.message)}`
-      : result.status === 'flaky'
-        ? `${plural(final.failedAttempts, 'failed attempt')} first`
-        : '';
-  const name = `${testName(result)}${note === '' ? '' : ` (${note})`}`;
+  const notes: string[] = [];
+  if (skipped) {
+    notes.push(`skipped: ${cell(result.skip?.reason ?? 'skipped')}`);
+  } else if (expected?.error !== undefined) {
+    notes.push(`failed as expected: ${cell(expected.reason)}, ${cell(expected.error.code)}: ${cell(expected.error.message)}`);
+  } else if (result.status === 'flaky') {
+    notes.push(`${plural(final.failedAttempts, 'failed attempt')} first`);
+  }
+  for (const annotation of result.annotations ?? []) {
+    notes.push(
+      annotation.description === undefined || annotation.description === ''
+        ? cell(annotation.type)
+        : `${cell(annotation.type)}: ${cell(annotation.description)}`,
+    );
+  }
+  const name = `${testName(result)}${notes.length === 0 ? '' : ` (${notes.join('; ')})`}`;
   return row([ICON[statusBucket(result.status)], name, ...(withAgent ? [agentCell(final.final.steps)] : []), skipped ? '' : formatDuration(final.durationMs)]);
 }
 

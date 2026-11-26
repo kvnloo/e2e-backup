@@ -15,7 +15,7 @@ import { AgentError, isAgentError } from '@e2e-dev/core/lib/agent/error';
 import { BLOCKABLE_CODES } from '@e2e-dev/core/lib/agent/executor';
 import { credentials } from '@e2e-dev/core/lib/secrets';
 import type { ReportExplore, ReportExploreStep } from '../report/build.ts';
-import type { Agent, AgentErrorCode, AgentParams, TestFn } from '@e2e-dev/core/lib/types';
+import type { Agent, AgentErrorCode, AgentParams, TestFixtures } from '@e2e-dev/core/lib/types';
 import { planNext, type PlanAccount, type PlanDecision } from './plan.ts';
 import type { ExploreState } from './state.ts';
 
@@ -80,7 +80,7 @@ interface Loop {
 }
 
 /** Builds the test body for one exploration. */
-export function createExploreBody(options: ExploreBodyOptions): TestFn {
+export function createExploreBody(options: ExploreBodyOptions): (fixtures: TestFixtures) => Promise<void> {
   const { state } = options;
   const now = options.now ?? Date.now;
   const accounts = options.accounts ?? [];

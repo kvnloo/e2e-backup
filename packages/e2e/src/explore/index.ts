@@ -368,6 +368,7 @@ function exploreRegistration(
     },
     sessions: [],
     tags: [],
+    annotations: [],
     fn: body,
     // Registered by hand, so parsed here the way `test()` parses a body.
     names: fixtureNames(body, 'the explore test'),

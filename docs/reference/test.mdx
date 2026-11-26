@@ -42,6 +42,7 @@ describe('checkout', { tags: ['billing'] }, () => {
 | [`test.setTimeout`](#test-settimeout) | `void` |
 | [`test.slow`](#test-slow) | `void` |
 | [`test.step`](#test-step) | `Promise<T>` |
+| [`test.info`](#test-info) | `TestInfo` |
 | [`test.only`](#test-only) | `TestCase` |
 | [`test.setup`](#test-setup) | `TestCase` |
 | [`test.extend`](#test-extend) | `TestAPI` |
@@ -426,6 +427,56 @@ test('buys a ticket', async ({ screen }) => {
 | `INVALID_ARGUMENT` | A title that is not a non-empty string, or no function. |
 | `COLLECTION_ERROR` | A call outside a running test, hook, or fixture. |
 
+#### `test.info`
+
+Returns [`TestInfo`](#testinfo) for the currently running test attempt. The
+same object is passed as the second parameter of `test`, `test.setup`,
+`beforeEach`, and `afterEach` (and after the fixtures in `test.each` and
+`test.for`), and as the third parameter of a test-scoped fixture.
+
+```ts
+import { writeFileSync } from 'node:fs';
+import { test } from '@e2e-dev/web';
+
+test('checks out', { annotation: { type: 'issue', description: 'https://example.com/42' } }, async ({ app }, testInfo) => {
+  testInfo.annotations.push({ type: 'worker', description: String(testInfo.parallelIndex) });
+  await app.open('/checkout');
+  writeFileSync(testInfo.outputPath('debug.txt'), `retry=${testInfo.retry}`);
+});
+```
+
+- `test.info()` returns the same `TestInfo` instance inside a test body,
+  `beforeEach`, `afterEach`, and test-scoped fixtures.
+- `beforeAll`, `afterAll`, and worker-scoped fixtures receive `WorkerInfo`
+  instead (`workerIndex`, `parallelIndex`, `target`, `config`), since they
+  outlive any single test.
+- Each worker process also sets `process.env.TEST_WORKER_INDEX` and
+  `process.env.TEST_PARALLEL_INDEX` to `String(workerIndex)` and
+  `String(parallelIndex)`. `workerIndex` increments for every worker spawned
+  in the run (including replacements after a failure); `parallelIndex` stays
+  within `0` to `workers - 1` and is never shared by two live workers at once.
+- `testInfo.status` is `undefined` until a failure or verdict is recorded, and
+  is always set (`'passed'`, `'failed'`, `'timed-out'`, `'interrupted'`, or
+  `'skipped'`) once `afterEach` hooks and fixture teardowns run. Compare
+  `testInfo.status` against `testInfo.expectedStatus` (`'passed' | 'failed'`)
+  when `test.fail()` is used. `testInfo.error` holds the primary error
+  (redacted) and `testInfo.errors` holds all errors recorded on the attempt so
+  far.
+- `testInfo.timeout` reflects changes made by `test.setTimeout()` and
+  `test.slow()`, and `testInfo.duration` reports elapsed milliseconds.
+- `testInfo.outputDir` is the attempt's artifact directory;
+  `testInfo.outputPath(...segments)` resolves a path inside it and refuses
+  paths that escape `outputDir`.
+- `testInfo.annotations` starts with the annotations declared on enclosing
+  describes and the test; entries pushed at runtime are redacted and carried
+  into `report.json`, JUnit `<properties>`, CTRF, Markdown, `trace.md`, the
+  HTML report, and the list reporter.
+
+| Throws | When |
+| --- | --- |
+| `INVALID_ARGUMENT` | Calling `test.info()` inside `beforeAll`, `afterAll`, a worker-scoped fixture, or a hosted session without a running test; or passing a path that escapes `outputDir` to `testInfo.outputPath()`. |
+| `COLLECTION_ERROR` | Calling `test.info()` outside a running test (such as at file top level or inside `describe`). |
+
 #### `test.only`
 
 Registers one focused local test.
@@ -754,6 +805,7 @@ blocked event loop hangs it.
 | [`agent`](#agent) | `string \| readonly string[]` | the run's agents |
 | [`trace`](#trace) | `RecordingMode` | the run's |
 | [`video`](#video) | `RecordingMode` | the run's |
+| [`annotation`](#annotation) | `TestAnnotation \| readonly TestAnnotation[]` | - |
 | [`serial`](#serial) | `boolean` | - |
 | [`parallel`](#parallel) | `boolean` | - |
 | [`sessions`](#sessions) | `readonly string[]` | required |
@@ -910,6 +962,23 @@ test('checkout', { video: 'on' }, async ({ agent }) => {
 | Throws | When |
 | --- | --- |
 | `UNSUPPORTED_ARTIFACT` | Before any test starts, naming the test: the mode records on some attempt and the target's engine cannot record video. |
+
+#### `annotation`
+
+Attaches one `{ type, description? }` annotation or a list of annotations to
+the test (or to every test in a `describe` group). Layers concatenate
+outermost first, and tests can push more entries at runtime through
+`testInfo.annotations`.
+
+```ts
+describe('checkout', { annotation: { type: 'area', description: 'billing' } }, () => {
+  test('applies coupon', { annotation: { type: 'issue', description: 'https://example.com/123' } }, async () => {});
+});
+```
+
+- `type` must be a non-blank string; `description`, when set, must be a string.
+- Annotation values are secret-redacted, sanitized, and length-bounded before
+  entering reports.
 
 #### `serial`
 
@@ -1750,6 +1819,76 @@ export type OmitEach<Worker, Names extends PropertyKey> = Worker extends unknown
 export type PickEach<Worker, Names extends PropertyKey> = Worker extends unknown ? Pick<Worker, Extract<Names | 'platform', keyof Worker>> : never;
 ```
 
+### TestInfo
+
+```ts
+export interface TestAnnotation {
+  readonly type: string;
+  readonly description?: string | undefined;
+}
+
+export interface TestTargetInfo {
+  readonly name: string;
+  readonly platform: string;
+  readonly url: string | undefined;
+  readonly environment: 'test' | 'staging' | 'production';
+  readonly fullyParallel: boolean;
+}
+
+export interface TestConfigInfo {
+  readonly projectId: string;
+  readonly projectRoot: string;
+  readonly outputDir: string;
+  readonly timeout: number;
+  readonly launchTimeout: number;
+  readonly actionTimeout: number;
+  readonly assertionTimeout: number;
+  readonly cleanupTimeout: number;
+  readonly retries: number;
+  readonly workers: number;
+  readonly headed: boolean;
+  readonly targets: readonly TestTargetInfo[];
+}
+
+export interface WorkerInfo {
+  readonly workerIndex: number;
+  readonly parallelIndex: number;
+  readonly target: TestTargetInfo;
+  readonly config: TestConfigInfo;
+}
+
+export interface TestInfoError {
+  readonly code: string;
+  readonly message: string;
+  readonly stack?: string | undefined;
+  readonly phase?: 'launch' | 'beforeEach' | 'body' | 'afterEach' | 'cleanup' | undefined;
+}
+
+export type TestInfoStatus = 'passed' | 'failed' | 'timed-out' | 'interrupted' | 'skipped';
+
+export interface TestInfo extends WorkerInfo {
+  readonly testId: string;
+  readonly title: string;
+  readonly titlePath: readonly string[];
+  readonly file: string;
+  readonly line: number;
+  readonly column: number;
+  readonly tags: readonly string[];
+  readonly agent: string;
+  readonly retry: number;
+  readonly repeatEachIndex: number;
+  readonly timeout: number;
+  readonly duration: number;
+  readonly expectedStatus: 'passed' | 'failed';
+  readonly status: TestInfoStatus | undefined;
+  readonly error: TestInfoError | undefined;
+  readonly errors: readonly TestInfoError[];
+  readonly annotations: TestAnnotation[];
+  readonly outputDir: string;
+  outputPath(...pathSegments: string[]): string;
+}
+```
+
 ### Function types
 
 ```ts
@@ -1758,20 +1897,22 @@ export type PickEach<Worker, Names extends PropertyKey> = Worker extends unknown
  * parameter (`async ({ app, screen }) => {}`), and the runner sets up only
  * those; a body that takes the whole object (`async (fixtures) => {}`) or a
  * rest property is a `COLLECTION_ERROR`. The same holds for a hook and for
- * the first parameter of a `test.extend()` fixture.
+ * the first parameter of a `test.extend()` fixture. The optional second
+ * parameter receives `TestInfo`.
  */
-export type TestFn<Fixtures = TestFixtures> = (fixtures: Fixtures) => void | Promise<void>;
+export type TestFn<Fixtures = TestFixtures> = (fixtures: Fixtures, testInfo: TestInfo) => void | Promise<void>;
 
-/** A setup test body; `session.save` is the extra fixture. */
+/** A setup test body; `session.save` is the extra fixture, and the optional second parameter receives `TestInfo`. */
 export type SetupFn<Fixtures = TestFixtures> = (
   fixtures: Fixtures & SetupFixtures,
+  testInfo: TestInfo,
 ) => void | Promise<void>;
 
-/** A hook body: `beforeEach` and `afterEach` get the test's fixtures, `beforeAll` and `afterAll` its worker fixtures. */
-export type TestHookFn<Fixtures = TestFixtures> = (fixtures: Fixtures) => void | Promise<void>;
+/** A hook body: `beforeEach` and `afterEach` get the test's fixtures and `TestInfo`, `beforeAll` and `afterAll` its worker fixtures and `WorkerInfo`. */
+export type TestHookFn<Fixtures = TestFixtures, Info = TestInfo> = (fixtures: Fixtures, info: Info) => void | Promise<void>;
 
-/** @deprecated use `TestHookFn<WorkerFixtures>`. */
-export type SuiteHookFn = TestHookFn<WorkerFixtures>;
+/** @deprecated use `TestHookFn<WorkerFixtures, WorkerInfo>`. */
+export type SuiteHookFn = TestHookFn<WorkerFixtures, WorkerInfo>;
 
 /** A `describe` body. An async body is a type error. */
 export type SynchronousBody<Result> = Extract<Result, PromiseLike<unknown>> extends never
@@ -1780,15 +1921,16 @@ export type SynchronousBody<Result> = Extract<Result, PromiseLike<unknown>> exte
 
 /**
  * The `test.each` body arguments for the rows' type: array rows spread, then
- * the fixtures. Rows that are not all arrays are passed whole. Not
- * distributive, so a mixed table is decided once, as at run time. An
- * `unknown` row may be either at run time, so only the fixtures, last, are known.
+ * the fixtures, then `TestInfo`. Rows that are not all arrays are passed whole.
+ * Not distributive, so a mixed table is decided once, as at run time. An
+ * `unknown` row may be either at run time, so only the fixtures and `TestInfo`,
+ * last, are known.
  */
 export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]]
-  ? [...Row, Fixtures]
+  ? [...Row, Fixtures, TestInfo]
   : unknown extends Row
-    ? [...unknown[], Fixtures]
-    : [Row, Fixtures];
+    ? [...unknown[], Fixtures, TestInfo]
+    : [Row, Fixtures, TestInfo];
 
 /** A `test.each` or `test.for` body: the row's arguments, then the fixtures. */
 export type EachFn<Args extends readonly unknown[]> = (...args: Args) => void | Promise<void>;

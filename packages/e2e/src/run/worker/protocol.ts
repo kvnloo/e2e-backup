@@ -67,6 +67,10 @@ export interface WorkerBootstrap {
   readonly targetName: string;
   /** This worker's slot among the target's workers; see `EngineInitInfo.workerSlot`. */
   readonly workerSlot: number;
+  /** Monotonic 0-based worker index across the run; see `WorkerInfo.workerIndex`. */
+  readonly workerIndex: number;
+  /** 0-based parallel slot among live workers across targets; see `WorkerInfo.parallelIndex`. */
+  readonly parallelIndex: number;
   readonly runId: string;
   readonly artifactsRoot: string;
   /** See `TargetExecutorOptions.rerunDir`. */

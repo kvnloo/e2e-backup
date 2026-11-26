@@ -319,9 +319,11 @@ function renderResult(result: ReportResult, groups: ReadonlyMap<string, ReportSe
           : undefined;
   const files = represented === undefined ? [] : attachments(represented, options, clean);
   const steps = represented?.steps ?? [];
+  const annotations = result.annotations ?? [];
   const extra = {
     ...(status === 'failed' && error !== undefined && error.category !== 'test' ? { errorCategory: error.category } : {}),
     ...(expected === undefined ? {} : { expectedFailure: { reason: clean(expected.reason), ...(expected.error === undefined ? {} : { code: clean(expected.error.code), message: clean(expected.error.message) }) } }),
+    ...(annotations.length === 0 ? {} : { annotations: annotations.map((annotation) => ({ type: clean(annotation.type), ...(annotation.description === undefined ? {} : { description: clean(annotation.description) }) })) }),
     ...(after === 0 ? {} : { cutAttempts: after }),
     ...(result.skip === undefined ? {} : { skipCause: result.skip.cause }),
   };

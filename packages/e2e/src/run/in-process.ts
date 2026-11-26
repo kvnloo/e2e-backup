@@ -10,11 +10,11 @@ import type { ModuleRegistration } from '../collect/registry.ts';
 import type { Selection, TestTargetPair } from '../collect/select.ts';
 import type { ResolvedConfig, ResolvedTarget } from '@e2e-dev/core/lib/config/resolve';
 import { isAbandonedRejection } from '@e2e-dev/core/lib/internal/abandoned';
-import { classifyError, ConfigurationError, serializeError } from '@e2e-dev/core/lib/internal/errors';
+import { classifyError, ConfigurationError, InfrastructureError, serializeError } from '@e2e-dev/core/lib/internal/errors';
 import type { DebugTrace } from '@e2e-dev/core/lib/internal/debug';
 import type { InMemoryAttempts } from './execute.ts';
 import type { SessionStore } from '@e2e-dev/core/lib/run/sessions';
-import type { SpawnUnitRunner, UnitRunner, UnitRunnerEvents } from './unit-runner.ts';
+import type { SpawnUnitRunner, UnitRunner, UnitRunnerEvents, WorkerSlots } from './unit-runner.ts';
 import { pairKey } from './units.ts';
 import { copyServiceValues, type RunServices } from './services.ts';
 import type { MainToWorker, RunUnitMessage, WirePair } from './worker/protocol.ts';
@@ -47,6 +47,9 @@ export interface InProcessRunnerOptions {
   readonly envFor: (targetName: string) => Readonly<Record<string, string | undefined>>;
 }
 
+/** Number of live in-process runners; `runner.ts` caps in-process runs at 1 so `process.env` never interleaves. */
+let liveInProcessRunners = 0;
+
 class InProcessRunner implements UnitRunner {
   readonly exit: Promise<void>;
   private readonly worker: TargetWorker;
@@ -68,12 +71,27 @@ class InProcessRunner implements UnitRunner {
   };
   private readonly onException = (cause: unknown): void => this.fail(cause);
 
+  private readonly prevWorkerIndex: string | undefined;
+  private readonly prevParallelIndex: string | undefined;
+
   constructor(
     private readonly targetName: string,
-    private readonly workerSlot: number,
+    private readonly slots: WorkerSlots,
     private readonly events: UnitRunnerEvents,
     private readonly options: InProcessRunnerOptions,
   ) {
+    if (liveInProcessRunners > 0) {
+      throw new InfrastructureError(
+        'WORKER_PROTOCOL',
+        'cannot run more than one in-process worker at a time: process.env worker indices cannot overlap',
+      );
+    }
+    liveInProcessRunners += 1;
+    // Safe only while at most one in-process runner is live (`runner.ts` caps in-process runs at 1 worker).
+    this.prevWorkerIndex = process.env['TEST_WORKER_INDEX'];
+    this.prevParallelIndex = process.env['TEST_PARALLEL_INDEX'];
+    process.env['TEST_WORKER_INDEX'] = String(slots.workerIndex);
+    process.env['TEST_PARALLEL_INDEX'] = String(slots.parallelIndex);
     let finish = (): void => undefined;
     this.exit = new Promise<void>((resolve) => {
       finish = resolve;
@@ -163,6 +181,11 @@ class InProcessRunner implements UnitRunner {
   private end(detail: string): void {
     if (this.exited) return;
     this.exited = true;
+    liveInProcessRunners = Math.max(0, liveInProcessRunners - 1);
+    if (this.prevWorkerIndex === undefined) delete process.env['TEST_WORKER_INDEX'];
+    else process.env['TEST_WORKER_INDEX'] = this.prevWorkerIndex;
+    if (this.prevParallelIndex === undefined) delete process.env['TEST_PARALLEL_INDEX'];
+    else process.env['TEST_PARALLEL_INDEX'] = this.prevParallelIndex;
     process.off('unhandledRejection', this.onRejection);
     process.off('uncaughtException', this.onException);
     this.events.onExit(detail);
@@ -183,8 +206,14 @@ class InProcessRunner implements UnitRunner {
       artifactsRoot: this.options.artifactsRoot,
       rerunDir: this.options.rerunDir,
       headed: this.options.headed,
-      workerSlot: this.workerSlot,
-      env: this.options.envFor(this.targetName),
+      workerSlot: this.slots.workerSlot,
+      workerIndex: this.slots.workerIndex,
+      parallelIndex: this.slots.parallelIndex,
+      env: {
+        ...this.options.envFor(this.targetName),
+        TEST_WORKER_INDEX: String(this.slots.workerIndex),
+        TEST_PARALLEL_INDEX: String(this.slots.parallelIndex),
+      },
       isolated: false,
       debug: this.options.debug,
       holdSteps: this.options.holdSteps,
@@ -224,5 +253,5 @@ async function resolveFromSelection(
 
 /** Creates the spawn factory the scheduler uses for in-process execution. */
 export function inProcessSpawner(options: InProcessRunnerOptions): SpawnUnitRunner {
-  return (targetName, workerSlot, events) => new InProcessRunner(targetName, workerSlot, events, options);
+  return (targetName, slots, events) => new InProcessRunner(targetName, slots, events, options);
 }

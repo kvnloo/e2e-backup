@@ -190,6 +190,7 @@ run only in a browser, so a test that uses it declares
 | `test()`, `test.describe()`, `test.only`, `test.fail()`, `test.skip(title, fn)`, `test.skip(condition, reason)`, `test.fixme(title, fn)`, `test.fixme(condition, reason)` | the same, but a serial group takes `skip` on the group instead; the conditional forms work inside a test body or `beforeEach` |
 | `test.setTimeout()` | the same inside a test body, `beforeEach`, or `beforeAll` (that hook's own timeout); `afterEach` and `afterAll` cannot call it. In a `describe` callback, pass `{ timeout }` to `test.describe` instead. There is no `0` for no timeout: pass a large value |
 | `test.slow()`, `test.slow(condition, description)` | the same inside a test body or `beforeEach`: triples the test's timeout in force; in `beforeAll`, that hook's own timeout. Once per attempt, as in Playwright. At describe level (any form) it is a `COLLECTION_ERROR`: call it in a `beforeEach` |
+| `test.info()`, `testInfo` / `workerInfo`, `{ annotation }`, `TEST_WORKER_INDEX`, `TEST_PARALLEL_INDEX` | the same on tests, `beforeEach`, `afterEach`, and test-scoped fixtures (`beforeAll`, `afterAll`, and worker-scoped fixtures get `workerInfo`); `testInfo.target` stands in for `testInfo.project` and timeout status is `'timed-out'` |
 | `beforeEach`, `afterEach`, `beforeAll`, `afterAll` | the same, with no title; `beforeAll` and `afterAll` get worker fixtures, not `browser`, `app`, or `screen` |
 | `test.describe.skip`, `test.describe.serial`, `describe.configure({ mode: 'serial', retries, timeout })` | `test.describe(title, { skip, serial, retries, timeout }, fn)` |
 | `fullyParallel` in the config or a project, `--fully-parallel` | the same, in the config or on a target |
@@ -308,7 +309,6 @@ purpose. Use the workaround, or keep the test in Playwright.
 | Playwright | Use today |
 | --- | --- |
 | `testInfo.attach()` | `app.screenshot(label)` attaches a screenshot |
-| `test.info()`, `testInfo` in hooks and fixtures, `annotations` | Your own fixture or module state; an issue id in the title or a tag |
 | `mergeTests()` | One chain of `extend` calls |
 | `projects[].testMatch`, `testDir`, `testIgnore`, `grep` | `platforms` or tags on the tests, or one run for each target |
 | `--ui`, `npx playwright show-report`, `--reporter html` | `--watch --headed`; `npx e2e report` (opens `<output>/report.html` written by `htmlReporter()`) |

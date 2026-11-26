@@ -49,11 +49,18 @@ import {
   type StepTurn,
   type StoredArtifactLink,
   type Target,
+  type TestAnnotation,
+  type TestConfigInfo,
   type TestFilter,
   type TestFilterCandidate,
   type TestFilterContext,
+  type TestInfo,
+  type TestInfoError,
+  type TestInfoStatus,
   type TestOptions,
   type TestRegistrar,
+  type TestTargetInfo,
+  type WorkerInfo,
   type EachRegistrar,
   type Unique,
   type CacheStore,
@@ -2058,3 +2065,96 @@ void (blurTarget.blur satisfies (options?: ActionOptions) => Promise<void>);
 void blurTarget.blur('input');
 
 void (true satisfies (Exclude<import('e2e/engine').LocatorActionKind, (typeof import('e2e/engine').KNOWN_LOCATOR_ACTION_KINDS)[number]> extends never ? true : false));
+
+// TestInfo, WorkerInfo, test.info(), and annotations.
+const infoFromCall: TestInfo = test.info();
+void (infoFromCall.testId satisfies string);
+void (infoFromCall.title satisfies string);
+void (infoFromCall.titlePath satisfies readonly string[]);
+void (infoFromCall.file satisfies string);
+void (infoFromCall.line satisfies number);
+void (infoFromCall.column satisfies number);
+void (infoFromCall.tags satisfies readonly string[]);
+void (infoFromCall.agent satisfies string);
+void (infoFromCall.retry satisfies number);
+void (infoFromCall.repeatEachIndex satisfies number);
+void (infoFromCall.workerIndex satisfies number);
+void (infoFromCall.parallelIndex satisfies number);
+void (infoFromCall.timeout satisfies number);
+void (infoFromCall.duration satisfies number);
+void (infoFromCall.expectedStatus satisfies 'passed' | 'failed');
+void (infoFromCall.status satisfies TestInfoStatus | undefined);
+void (infoFromCall.error satisfies TestInfoError | undefined);
+void (infoFromCall.errors satisfies readonly TestInfoError[]);
+void (infoFromCall.target satisfies TestTargetInfo);
+void (infoFromCall.config satisfies TestConfigInfo);
+void (infoFromCall.outputDir satisfies string);
+void (infoFromCall.outputPath('logs', 'a.txt') satisfies string);
+infoFromCall.annotations.push({ type: 'issue', description: 'https://example.com/1' });
+infoFromCall.annotations.push({ type: 'smoke' });
+// @ts-expect-error title is read-only on TestInfo
+infoFromCall.title = 'other';
+// @ts-expect-error tags is a readonly array on TestInfo
+infoFromCall.tags.push('new');
+// @ts-expect-error workerIndex is read-only on TestInfo
+infoFromCall.workerIndex = 1;
+// @ts-expect-error TestAnnotation requires type
+infoFromCall.annotations.push({ description: 'missing type' });
+
+test('with testInfo and single annotation', { annotation: { type: 'issue', description: '#1' } }, async ({}, testInfo) => {
+  void (testInfo satisfies TestInfo);
+});
+test('with annotation array', { annotation: [{ type: 'a' }, { type: 'b', description: 'c' }] }, async ({}, testInfo) => {
+  void (testInfo.outputPath('out.txt') satisfies string);
+});
+describe('annotated group', { annotation: { type: 'area', description: 'billing' } }, () => {
+  beforeEach(async ({}, testInfo) => {
+    void (testInfo satisfies TestInfo);
+  });
+  afterEach(async ({}, testInfo) => {
+    void (testInfo.status satisfies TestInfoStatus | undefined);
+    void (testInfo.error?.message satisfies string | undefined);
+  });
+  beforeAll(async ({}, workerInfo) => {
+    void (workerInfo satisfies WorkerInfo);
+    // @ts-expect-error WorkerInfo has no test-level status
+    void workerInfo.status;
+    // @ts-expect-error WorkerInfo has no test-level outputDir
+    void workerInfo.outputDir;
+  });
+  afterAll(async ({}, workerInfo) => {
+    void (workerInfo.parallelIndex satisfies number);
+  });
+});
+test.setup('annotated setup', { sessions: ['auth'], annotation: { type: 'setup' } }, async ({ session: setupSession }, testInfo) => {
+  void setupSession;
+  void (testInfo satisfies TestInfo);
+});
+test.each([{ name: 'Ada' }])('each $name', async ({ name }, {}, testInfo) => {
+  void name;
+  void (testInfo satisfies TestInfo);
+});
+test.each([[1, 2]] as const)('each tuple %i %i', async (a, b, {}, testInfo) => {
+  void a;
+  void b;
+  void (testInfo satisfies TestInfo);
+});
+test.for([['a', 'b']] as const)('for %j', async (row, {}, testInfo) => {
+  void row;
+  void (testInfo satisfies TestInfo);
+});
+const infoExtended = test.extend<{ logFile: string }, { workerPort: number }>({
+  logFile: async ({}, use, testInfo) => {
+    void (testInfo satisfies TestInfo);
+    await use(testInfo.outputPath('app.log'));
+  },
+  workerPort: [async ({}, use, workerInfo) => {
+    void (workerInfo satisfies WorkerInfo);
+    // @ts-expect-error worker fixtures receive WorkerInfo, not TestInfo
+    void workerInfo.retry;
+    await use(4000 + workerInfo.parallelIndex);
+  }, { scope: 'worker' }],
+});
+void infoExtended;
+const annCheck: TestAnnotation = { type: 'owner', description: 'team' };
+void annCheck;
