@@ -2125,12 +2125,15 @@ describe('perform', () => {
     expect(h.fake.calls.slice(before).map((call) => call.method)).toEqual([]);
   });
 
-  it('taps an unfocused searchbox before Backspace, as it does a textbox', async () => {
+  it.each([
+    ['a searchbox', { type: 'searchbox', editable: true }],
+    ['an editable combobox', { type: 'android.widget.Spinner', editable: true }],
+  ] as const)('taps %s before Backspace, as it does a textbox', async (_name, field) => {
     const h = harness();
     h.fake.respond('capture.snapshot', () => ({
       nodes: [
         { ref: 'e1', index: 0, depth: 0, type: 'Application' },
-        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'searchbox', label: 'Find', value: 'abc', editable: true },
+        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, label: 'Find', value: 'abc', ...field },
       ],
     }));
     await openAttempt(h);
@@ -2138,6 +2141,21 @@ describe('perform', () => {
     const before = h.fake.calls.length;
     await h.engine.perform!(find.ref, { kind: 'press', key: 'Backspace' }, operation());
     expect(h.fake.calls.slice(before).map((call) => call.method)).toEqual(['interactions.press', 'interactions.type']);
+  });
+
+  it('refuses Backspace on a picker combobox, which takes no text, without tapping it', async () => {
+    const h = harness();
+    h.fake.respond('capture.snapshot', () => ({
+      nodes: [
+        { ref: 'e1', index: 0, depth: 0, type: 'Application' },
+        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'android.widget.Spinner', label: 'Country', value: 'Poland' },
+      ],
+    }));
+    await openAttempt(h);
+    const country = await observed(h, 'Country');
+    const before = h.fake.calls.length;
+    await expect(h.engine.perform!(country.ref, { kind: 'press', key: 'Backspace' }, operation())).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    expect(h.fake.calls.slice(before).map((call) => call.method)).toEqual([]);
   });
 
   it.each([
