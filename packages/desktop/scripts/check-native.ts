@@ -15,6 +15,11 @@ if (!existsSync(main)) {
   process.stderr.write(`${name}@${version}: ${main} is missing; build it with \`pnpm --filter @e2e-dev/desktop build:native --target <triple> --out <this package>\` first\n`);
   process.exit(1);
 }
+// The addon links MIT and Apache-2.0 crates, whose notices must go with every copy (`scripts/native-licenses.ts`).
+if (!existsSync('THIRD_PARTY_LICENSES.md')) {
+  process.stderr.write(`${name}@${version}: THIRD_PARTY_LICENSES.md is missing; write it with \`node packages/desktop/scripts/native-licenses.ts\`\n`);
+  process.exit(1);
+}
 const stamp = existsSync('.build.json') ? (JSON.parse(readFileSync('.build.json', 'utf8')) as { version?: string }) : {};
 if (stamp.version !== version) {
   process.stderr.write(`${name}@${version}: ${main} was built for ${stamp.version ?? 'an unknown version'}; build it again first\n`);

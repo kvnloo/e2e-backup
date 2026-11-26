@@ -34,7 +34,8 @@
   "main": "desktop.darwin-x64.node",
   "files": [
     "desktop.darwin-x64.node",
-    "NOTICE"
+    "NOTICE",
+    "THIRD_PARTY_LICENSES.md"
   ],
   "scripts": {
     "prepublishOnly": "node ../desktop/scripts/check-native.ts"
