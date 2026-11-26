@@ -21,6 +21,12 @@ export interface Desktop {
    * one.
    */
   useWindow(window?: DesktopWindow | string): Promise<void>;
+  /**
+   * Presses one key, or a combo such as `ControlOrMeta+2`, into the app's
+   * window, for an app with no control that takes keyboard focus. Without
+   * `headed` the window must be the app's key window.
+   */
+  press(key: string): Promise<void>;
   /** Quits the app. `app.open()` launches it again; every test ends with it quit. */
   closeApp(): Promise<void>;
 }
@@ -36,6 +42,9 @@ export function createDesktopFixture(surface: DesktopSurface, context: EngineFix
       const operation = context.operation();
       await surface.useWindow(typeof window === 'string' ? window : window?.id, operation.signal, operation.timeoutMs);
     },
+    async press(key) {
+      await surface.pressKey(key, context.operation());
+    },
     async closeApp() {
       const operation = context.operation();
       await surface.closeApp(operation.signal, operation.timeoutMs);
@@ -44,6 +53,7 @@ export function createDesktopFixture(surface: DesktopSurface, context: EngineFix
   return context.fixture('desktop', desktop, {
     windows: { kind: 'resource' },
     useWindow: { kind: 'resource' },
+    press: { kind: 'resource', label: (key) => key },
     closeApp: { kind: 'resource' },
   });
 }

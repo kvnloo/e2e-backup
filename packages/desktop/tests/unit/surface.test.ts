@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { EngineAppInfo, OperationContext, SemanticNode } from '@e2e-dev/core/engine';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createDesktopFixture } from '../../src/desktop.ts';
 import { resolveOptions } from '../../src/options.ts';
 import { DesktopSurface } from '../../src/surface.ts';
 import { alive, failure, fakeDriver, killSpawned, snapshotAnswer, spawnApp, standIn, type Answer, type FakeDriver, type Scenario } from '../helpers/fake-driver.ts';
@@ -1424,6 +1425,13 @@ describe('DesktopSurface: quitting', () => {
     expect(await gone(first)).toBe(true);
     await surface.restart(operation());
     expect(fake.pid).not.toBe(first);
+  });
+
+  it("presses a key into the app's window through desktop.press(), for an app with no control that takes focus", async () => {
+    const { surface, fake } = await launched({});
+    const context = { operation: () => operation(), fixture: <T,>(_name: string, value: T) => value } as unknown as Parameters<typeof createDesktopFixture>[1];
+    await createDesktopFixture(surface, context).press('ControlOrMeta+2');
+    expect(last(fake, 'press')).toMatchObject({ windowId: 'w-mine', combo: 'cmd+2', physical: false });
   });
 
   it('kills nothing when the app already quit on its own', async () => {
