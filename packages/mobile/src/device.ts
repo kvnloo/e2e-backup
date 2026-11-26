@@ -217,7 +217,9 @@ export interface Device {
    * `UNSUPPORTED_CAPABILITY` on a device agent-device cannot lock (a physical
    * iPhone or iPad, a TV, a device a provider drives through a backend that
    * has no lock command), and on an Android device whose screen lock is set
-   * to None, which has no lock screen to show.
+   * to None, which has no lock screen to show. Android 15 and older do not
+   * report that setting, so there the sleep key is sent, the display turns
+   * off, and the lock fails with `ENGINE_FAILURE` after about 5 seconds.
    */
   lock(): Promise<void>;
   /**

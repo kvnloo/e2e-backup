@@ -1085,7 +1085,9 @@ An app reads the shake the way it reads one on a real device: a React Native dev
  * `UNSUPPORTED_CAPABILITY` on a device agent-device cannot lock (a physical
  * iPhone or iPad, a TV, a device a provider drives through a backend that
  * has no lock command), and on an Android device whose screen lock is set
- * to None, which has no lock screen to show.
+ * to None, which has no lock screen to show. Android 15 and older do not
+ * report that setting, so there the sleep key is sent, the display turns
+ * off, and the lock fails with `ENGINE_FAILURE` after about 5 seconds.
  */
 lock(): Promise<void>;
 ```
@@ -1103,9 +1105,9 @@ The engine never unlocks the device for you. A test that fails while the screen 
 | Throws | When |
 | --- | --- |
 | `UNSUPPORTED_CAPABILITY` | The device is not one agent-device can lock: a physical iPhone or iPad, an Android TV or Apple TV, or a device a provider drives through its own backend with no lock command. |
-| `UNSUPPORTED_CAPABILITY` | The Android device's screen lock is set to None. The message says so; set any other screen lock, such as Swipe, in Settings > Security. |
+| `UNSUPPORTED_CAPABILITY` | The Android device's screen lock is set to None, on Android 16 or newer. The message says so; set any other screen lock, such as Swipe, in Settings > Security. |
 | `ACTION_FAILED` | `actionTimeout` expired before the device reported the screen locked. On an Android device with a PIN, pattern, or password and "Power button instantly locks" off, the keyguard waits for "Lock after screen timeout", up to one minute; raise `actionTimeout` or turn that setting on. |
-| `ENGINE_FAILURE` | The device did not report the screen locked: on Android within 5 seconds, plus the "Lock after screen timeout" delay up to one minute. |
+| `ENGINE_FAILURE` | The device did not report the screen locked: on Android within 5 seconds, plus the "Lock after screen timeout" delay up to one minute. On Android 15 or older with the screen lock set to None, this is the failure, with the message `still reports the keyguard hidden`, and the display is left off. |
 
 #### `unlock`
 
