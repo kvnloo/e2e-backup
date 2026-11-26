@@ -4,25 +4,26 @@ import { desktop } from '../../src/engine.ts';
 import { resolveOptions } from '../../src/options.ts';
 
 describe('desktop()', () => {
-  it('offers the pointer-only actions, and keys, with headed alone', () => {
+  it('offers keys without headed, and the pointer-only actions with headed alone', () => {
     const plain = desktop();
     const headed = desktop({ headed: true });
     expect(plain.actions).not.toContain('doubleTap');
     expect(plain.actions).not.toContain('hover');
-    // agent-desktop sends a key only to the active window, which an app in the background never has.
-    expect(plain.actions).not.toContain('press');
+    // A key goes into the app's own event queue, which reaches its key window while it stays in the background.
+    expect(plain.actions).toContain('press');
+    expect(plain.keyboard).toBeDefined();
     expect(plain.pointerActions).toBeUndefined();
     expect(headed.actions).toEqual(expect.arrayContaining(['doubleTap', 'hover', 'press']));
-    expect(headed.pointerActions).toEqual(expect.arrayContaining(['tap']));
+    expect(headed.pointerActions).toEqual(expect.arrayContaining(['tap', 'doubleTap', 'secondaryTap', 'hover']));
+    expect(headed.keyboard).toBeDefined();
     expect(plain.workers).toBe(1);
     expect(describeEngine(plain).launchArgumentValues).toBe(true);
-    expect(plain.keyboard).toBeUndefined();
-    expect(headed.keyboard).toBeDefined();
   });
 
   it('refuses options it does not take', () => {
     expect(() => resolveOptions({ settle: 1.5 })).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
-    expect(() => resolveOptions({ binary: '' })).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
+    // The agent-desktop executable is gone: a config that still names one fails to load, rather than run on something else.
+    expect(() => resolveOptions({ binary: '/usr/local/bin/agent-desktop' } as never)).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() => resolveOptions({ snapshot: 'all' as never })).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() => resolveOptions({ bogus: 1 } as never)).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(resolveOptions({ settle: false })).toMatchObject({ settleMs: 0, headed: false, interactiveOnly: false });

@@ -38,7 +38,6 @@
     "packages/moli/tests/types/options.ts",
     "packages/decision/tests/types/options.ts",
     "packages/acp/tests/fixtures/scripted-agent.ts",
-    "packages/desktop/tests/helpers/fake-agent-desktop.mjs",
     "packages/acp/tests/live/*.ts",
     "packages/e2e/tests/live/*.ts",
     "packages/e2e/src/config/register.ts",
@@ -53,6 +52,8 @@
     "packages/e2e/tests/tmp-projects/**"
   ],
   "ignoreDependencies": [
+    "@e2e-dev/desktop-darwin-arm64",
+    "@e2e-dev/desktop-darwin-x64",
     "e2e",
     "@e2e-dev/web",
     "@openrouter/ai-sdk-provider",

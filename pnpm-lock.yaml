@@ -558,6 +558,17 @@ importers:
       vitest:
         specifier: 5.1.2
         version: 5.1.2(@types/node@26.6.11)(vite@8.3.8(@types/node@26.6.11)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.51.2)(tsx@4.23.14)(yaml@2.9.1))
+    optionalDependencies:
+      '@e2e-dev/desktop-darwin-arm64':
+        specifier: workspace:*
+        version: link:../desktop-darwin-arm64
+      '@e2e-dev/desktop-darwin-x64':
+        specifier: workspace:*
+        version: link:../desktop-darwin-x64
+
+  packages/desktop-darwin-arm64: {}
+
+  packages/desktop-darwin-x64: {}
 
   packages/e2b:
     dependencies:

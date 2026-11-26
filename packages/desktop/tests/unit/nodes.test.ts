@@ -278,7 +278,7 @@ describe('projectSnapshot', () => {
     expect(projectSnapshot({ snapshot_id: 's', window: { id: 'w-1', title: 'Untitled' }, tree: { role: 'window', children: [] } }, minter()).title).toBe('Untitled');
   });
 
-  it('swipes the first visible, enabled node agent-desktop offers Scroll, past a list or table that cannot scroll', () => {
+  it('swipes the first visible, enabled node the driver offers Scroll, past a list or table that cannot scroll', () => {
     const screen = projectSnapshot(
       {
         snapshot_id: 's',

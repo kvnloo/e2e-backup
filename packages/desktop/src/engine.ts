@@ -1,5 +1,5 @@
 /**
- * The agent-desktop engine for e2e: a desktop body built with the public
+ * The desktop engine for e2e: a desktop body built with the public
  * `defineEngine`, validated by the same rules and graded by the same
  * capabilities as any other engine. Core imports nothing from here; this
  * package imports the contract from `@e2e-dev/core/engine` and contributes the
@@ -13,15 +13,15 @@ import type { DesktopFixtures } from './fixtures.ts';
 import { requireMacOS, resolveOptions, type DesktopOptions } from './options.ts';
 import { DesktopSurface } from './surface.ts';
 
-/** What `perform` honors through the accessibility API alone, on macOS. */
-const ACTIONS: readonly LocatorActionKind[] = ['tap', 'secondaryTap', 'fill', 'clear', 'check', 'uncheck', 'focus', 'scrollIntoView', 'selectOption', 'swipe'];
-
 /**
- * What physical input adds: a double click and the pointer over a control
- * (agent-desktop does both with the real pointer only), a key, which
- * agent-desktop sends only to the active window, and taps at a point.
+ * What `perform` honors without physical input, on macOS: the accessibility
+ * API, and keys sent into the app's own event queue, which reach its key
+ * window while it stays in the background.
  */
-const HEADED_ACTIONS: readonly LocatorActionKind[] = [...ACTIONS, 'press', 'doubleTap', 'hover'];
+const ACTIONS: readonly LocatorActionKind[] = ['tap', 'secondaryTap', 'fill', 'clear', 'check', 'uncheck', 'focus', 'scrollIntoView', 'selectOption', 'swipe', 'press'];
+
+/** What physical input adds: a double click and the pointer over a control, which need the real pointer, and taps at a point. */
+const HEADED_ACTIONS: readonly LocatorActionKind[] = [...ACTIONS, 'doubleTap', 'hover'];
 const HEADED_POINTER_ACTIONS: readonly PointerActionKind[] = ['tap', 'doubleTap', 'secondaryTap', 'hover'];
 
 /**
@@ -51,9 +51,9 @@ export function desktop(options: DesktopOptions = {}): DesktopEngine<'macos', 'a
     platform,
     workers: 1,
     launchArgumentValues: true,
-    prepare: (info) => {
+    prepare: () => {
       requireMacOS();
-      return surface.prepare(info);
+      return surface.prepare();
     },
     doctor: async (info) =>
       process.platform === 'darwin' ? await surface.doctor(info) : [{ id: 'platform', status: 'fail' as const, message: `desktop() drives macOS apps only for now; this machine runs ${process.platform}` }],
@@ -71,15 +71,11 @@ export function desktop(options: DesktopOptions = {}): DesktopEngine<'macos', 'a
     ...(headed
       ? { performAt: (point, action, operation) => surface.performAt(point, action, operation), pointerActions: HEADED_POINTER_ACTIONS }
       : {}),
-    // Typing into whatever has focus must send keystrokes, which agent-desktop does with physical input only.
-    ...(headed
-      ? {
-          keyboard: {
-            type: (text, keyboardOptions, operation) => surface.typeText(text, keyboardOptions, operation),
-            press: (key, operation) => surface.pressKey(key, operation),
-          },
-        }
-      : {}),
+    // Keystrokes into whatever has focus: into the app's event queue, or with `headed` through the real keyboard.
+    keyboard: {
+      type: (text, keyboardOptions, operation) => surface.typeText(text, keyboardOptions, operation),
+      press: (key, operation) => surface.pressKey(key, operation),
+    },
     validateApp: (app, info) => validateApp(app, info),
     // No `open`: a desktop app has no URL, so the runner serves `app.open()`
     // with `restart`, a fresh launch of the target's app.

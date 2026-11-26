@@ -26,6 +26,9 @@ export interface Rgba {
 /** How far, in image pixels, the window in a capture may differ from the size its bounds give: points times scale, rounded. */
 const SIZE_TOLERANCE = 1;
 
+/** The widest outline macOS draws around a window in a capture, in image pixels on each side. */
+const MAX_OUTLINE = 4;
+
 /** How far each mask reaches past its field, in image pixels, so a field off by the tolerance is still covered. */
 const MASK_MARGIN = 2;
 
@@ -36,9 +39,10 @@ const MASK_MARGIN = 2;
  * the box of fully opaque pixels, which the shadow never is, and cropped to.
  * A capture within a pixel of `expected` (the window's size in image
  * pixels) is the window already; any other is cropped to its opaque box,
- * which must then be within a pixel of it. Undefined otherwise: the
- * rectangles would land somewhere else, and an image whose masking cannot
- * be proven must not leave the engine.
+ * which must then be within a pixel of it, or hold the window inside an
+ * outline of even width on either axis (`insideOutline`). Undefined
+ * otherwise: the rectangles would land somewhere else, and an image whose
+ * masking cannot be proven must not leave the engine.
  */
 export function windowImage(bytes: Uint8Array, expected: { width: number; height: number }, rects: readonly Rect[]): Rgba | undefined {
   const image = decodeRgba(bytes);
@@ -47,8 +51,10 @@ export function windowImage(bytes: Uint8Array, expected: { width: number; height
   let window = image;
   if (!fits(image.width, image.height)) {
     const box = opaqueBox(image);
-    if (box === undefined || !fits(box.width, box.height)) return undefined;
-    window = crop(image, box);
+    if (box === undefined) return undefined;
+    const inner = fits(box.width, box.height) ? box : insideOutline(box, expected);
+    if (inner === undefined) return undefined;
+    window = crop(image, inner);
   }
   for (const rect of rects) {
     const x0 = Math.max(0, Math.floor(rect.x) - MASK_MARGIN);
@@ -68,9 +74,30 @@ export function windowImage(bytes: Uint8Array, expected: { width: number; height
   return window;
 }
 
+/** What a capture holds, for an error that says why it was refused: its size, and the box of its fully opaque pixels. */
+export function describeCapture(bytes: Uint8Array): string {
+  const image = decodeRgba(bytes);
+  const box = opaqueBox(image);
+  return `${image.width}x${image.height}${box === undefined ? ', none of it opaque' : `, its opaque box ${box.width}x${box.height} at (${box.x}, ${box.y})`}`;
+}
+
 /** PNG bytes of an image. */
 export function encodePng(image: Rgba): Uint8Array {
   return encodeRgba(image);
+}
+
+/**
+ * The window inside the outline macOS can draw around it, on some sides
+ * only: a box larger than the window by an even number of pixels on each
+ * axis, at most `MAX_OUTLINE` on each side, holds the window at its center.
+ * Undefined for a box of any other size.
+ */
+function insideOutline(box: { x: number; y: number; width: number; height: number }, expected: { width: number; height: number }): { x: number; y: number; width: number; height: number } | undefined {
+  const extraWidth = box.width - expected.width;
+  const extraHeight = box.height - expected.height;
+  const outline = (extra: number): boolean => extra >= 0 && extra % 2 === 0 && extra <= MAX_OUTLINE * 2;
+  if (!outline(extraWidth) || !outline(extraHeight)) return undefined;
+  return { x: box.x + extraWidth / 2, y: box.y + extraHeight / 2, width: expected.width, height: expected.height };
 }
 
 /** The smallest box holding every fully opaque pixel; undefined when there is none. */

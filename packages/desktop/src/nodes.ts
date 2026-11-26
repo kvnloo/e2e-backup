@@ -1,14 +1,15 @@
 /**
- * agent-desktop's snapshot tree projected onto the contract's semantic
- * nodes. agent-desktop already speaks one closed role and state vocabulary
- * on every OS; this maps it onto the ARIA names `screen.getByRole` and the
- * agent use on every other engine, so `getByRole('textbox')` means the same
- * field in a browser, on a phone, and in a desktop app.
+ * The native driver's snapshot tree projected onto the contract's semantic
+ * nodes. The driver speaks one closed role and state vocabulary (the one
+ * agent-desktop defined, which the engine was first built on); this maps
+ * it onto the ARIA names `screen.getByRole` and the agent use on every
+ * other engine, so `getByRole('textbox')` means the same field in a
+ * browser, on a phone, and in a desktop app.
  */
 
 import type { SemanticNode, ViewportSize } from '@e2e-dev/core/engine';
 
-/** A rectangle in screen points, as agent-desktop reports bounds. */
+/** A rectangle in screen points, as the driver reports bounds. */
 export interface Rect {
   readonly x: number;
   readonly y: number;
@@ -16,7 +17,7 @@ export interface Rect {
   readonly height: number;
 }
 
-/** One node of an agent-desktop snapshot (`snapshot --include-bounds`). */
+/** One node of a driver snapshot. */
 export interface RawNode {
   readonly ref_id?: string;
   readonly role: string;
@@ -30,12 +31,12 @@ export interface RawNode {
   readonly available_actions?: readonly string[];
   readonly bounds?: Rect;
   readonly subtree_truncated?: boolean;
-  /** How many children the element has, when agent-desktop stopped at the depth limit and listed none of them. */
+  /** How many children the element has, when the read stopped at the depth limit and listed none of them. */
   readonly children_count?: number;
   readonly children?: readonly RawNode[];
 }
 
-/** The `data` of an agent-desktop `snapshot`. */
+/** The `data` of a driver `snapshot`. */
 export interface RawSnapshot {
   readonly app?: string;
   readonly snapshot_id: string;
@@ -51,12 +52,12 @@ export const ROOT_ID = 'root';
 /** What an action needs to know about a node, kept beside the node the harness sees. */
 export interface NodeBinding {
   readonly id: string;
-  /** agent-desktop's snapshot-qualified ref (`@s8f3k2p9:e3`); absent for a node it gives none, such as static text. */
+  /** The driver's snapshot-qualified ref (`@s8f3k2p9:e3`); absent for a node it gives none, such as static text. */
   readonly ref?: string;
   readonly role?: string;
   readonly name?: string;
   readonly states: SemanticNode['states'];
-  /** The actions agent-desktop says the element takes (`Click`, `SetValue`, `Expand`, ...). */
+  /** The actions the driver says the element takes (`Click`, `SetValue`, `Expand`, ...). */
   readonly actions: readonly string[];
   /** The window the snapshot read the node in. */
   readonly windowId?: string;
@@ -95,8 +96,8 @@ export interface ProjectedScreen {
 }
 
 /**
- * ARIA's name for each agent-desktop role that has one. A role missing here
- * keeps agent-desktop's own token: it is still one closed vocabulary, just
+ * ARIA's name for each driver role that has one. A role missing here
+ * keeps the driver's own token: it is still one closed vocabulary, just
  * not one a browser shares.
  */
 const ROLE_MAP: Readonly<Record<string, string>> = {
@@ -171,7 +172,7 @@ const CHECKABLE_ROLES = new Set(['checkbox', 'switch', 'radiobutton']);
 /** Roles whose name labels what they hold, so it is never their text. */
 const INPUT_ROLES = new Set(['textfield', 'combobox', 'slider', 'incrementor', 'datefield', 'timefield', 'colorwell']);
 
-/** Roles agent-desktop reads text into `value`, which the contract calls `text`. */
+/** Roles the driver reads text into `value`, which the contract calls `text`. */
 const TEXT_ROLES = new Set(['statictext', 'heading']);
 
 const STATE_NAMES = ['focused', 'disabled', 'secure', 'expanded', 'selected', 'hidden', 'pressed'] as const;
@@ -226,7 +227,7 @@ const WINDOW_CONTROL_GAP = 30;
 /**
  * The window's own title-bar buttons among its direct children: each a
  * `windowControl` beside another of a different name, in one row, as macOS
- * draws Close, Minimize, and Zoom together. agent-desktop reports no subrole
+ * draws Close, Minimize, and Zoom together. The snapshot carries no subrole
  * that names them, so a lone small Close button, such as an app's own in a
  * corner of the title bar, is kept.
  */
@@ -237,7 +238,7 @@ function titleBarButtons(tree: RawNode): ReadonlySet<RawNode> {
   return new Set(candidates.filter((candidate) => candidates.some((other) => beside(candidate, other))));
 }
 
-/** A node agent-desktop reports but nothing reads: a wrapper with no name, value, id, ref, or text of its own. */
+/** A node the driver reports but nothing reads: a wrapper with no name, value, id, ref, or text of its own. */
 function transparent(raw: RawNode): boolean {
   // A secure node is never dropped: its bounds are what a screenshot masks.
   if (raw.ref_id !== undefined || raw.native_id !== undefined || raw.states?.includes('secure') === true) return false;
@@ -275,7 +276,7 @@ function identityOf(node: RawNode, named = false): string {
  * scaffolding, and the window's title-bar buttons are left out. Every node
  * of a `minimized` window is hidden: accessibility still reads its controls,
  * but nothing of it is on screen. `interactive` marks the bindings of a read
- * agent-desktop pruned (`-i`), whose tree, and so whose ids and look-alike
+ * the driver pruned (`interactive`), whose tree, and so whose ids and look-alike
  * counts, differ from a whole read's. `onLookAlike` hears each identity a
  * look-alike sibling made shared, for a caller that must retire it, keyed by
  * the id the parent held before (`priorIdOf` looks it up without handing one
@@ -307,7 +308,7 @@ export function projectSnapshot(
     const states: Record<string, boolean> = {};
     for (const state of STATE_NAMES) if (rawStates.has(state)) states[state] = true;
     if (rawStates.has('offscreen') || minimized || hiddenAbove) states.hidden = true;
-    // A control collapsed to no width or height draws nothing, and agent-desktop will not act on it. Only a leaf: a container with no box can still hold drawn children, listed or cut off at the depth limit.
+    // A control collapsed to no width or height draws nothing, and the driver will not act on it. Only a leaf: a container with no box can still hold drawn children, listed or cut off at the depth limit.
     if (id !== ROOT_ID && node.bounds !== undefined && (node.bounds.width <= 0 || node.bounds.height <= 0) && (node.children ?? []).length === 0 && (node.children_count ?? 0) === 0) states.hidden = true;
     // A mixed checkbox is neither checked nor unchecked: no state, so check() and uncheck() always reach the control.
     if (CHECKABLE_ROLES.has(node.role) && !rawStates.has('indeterminate')) states.checked = rawStates.has('checked') || node.value === '1';
@@ -315,7 +316,7 @@ export function projectSnapshot(
     if (node.role === 'combobox' || node.role === 'disclosure' || node.role === 'menubutton') {
       if (node.available_actions?.includes('Expand') === true || node.available_actions?.includes('Collapse') === true) states.expanded = rawStates.has('expanded');
     }
-    // agent-desktop marks a text field whose value cannot be set `readonly`, and offers SetValue on one whose value can. A combo box takes text only when its value can be set; a pop-up menu takes none, which is not read-only, so it gets no state, as on a device.
+    // The driver marks a text field whose value cannot be set `readonly`, and offers SetValue on one whose value can. A combo box takes text only when its value can be set; a pop-up menu takes none, which is not read-only, so it gets no state, as on a device.
     const settable = node.available_actions?.includes('SetValue') === true;
     if (node.role === 'textfield' && (settable || rawStates.has('readonly'))) states.readonly = !settable;
     else if (node.role === 'combobox' && settable) states.readonly = false;
@@ -324,7 +325,7 @@ export function projectSnapshot(
     // A control shows its name (a button's title) as its text, as on a device; an input's name is a label, not what it holds.
     const text = isText ? label(node.value ?? node.name) : INPUT_ROLES.has(node.role) ? undefined : name;
     // A checkbox's value is its state ("0", "1"), already in `checked`; a secure field's is never reported.
-    // agent-desktop leaves out the value of an empty text field; it is the empty string, as inputValue() reads it, so getByDisplayValue('') finds the field.
+    // A snapshot may leave out the value of an empty text field; it is the empty string, as inputValue() reads it, so getByDisplayValue('') finds the field.
     const value = secure || isText || CHECKABLE_ROLES.has(node.role) ? undefined : node.role === 'textfield' ? (node.value ?? '') : node.value;
     const rect = node.bounds === undefined ? undefined : { x: node.bounds.x - window.x, y: node.bounds.y - window.y, width: node.bounds.width, height: node.bounds.height };
     if (secure) {
@@ -340,7 +341,7 @@ export function projectSnapshot(
     const description = label(node.description);
     if (description !== undefined) attributes.description = description;
     if (node.native_id !== undefined) attributes['native-id-kind'] = node.native_id.kind;
-    // A swipe on the window scrolls the first node agent-desktop offers Scroll, which it scrolls only then and only while visible and enabled: a list with no scroll mechanism, or a pane off screen, would refuse it.
+    // A swipe on the window scrolls the first node the driver offers Scroll, which it scrolls only then and only while visible and enabled: a list with no scroll mechanism, or a pane off screen, would refuse it.
     if (scrollTarget === undefined && node.ref_id !== undefined && node.available_actions?.includes('Scroll') === true && states.hidden !== true && states.disabled !== true) scrollTarget = id;
     bindings.set(id, {
       id,
@@ -423,19 +424,19 @@ export function projectSnapshot(
     truncated: raw.complete === false || raw.truncated === true || hasTruncatedSubtree(raw.tree),
     cutShort: raw.complete === false || raw.truncated === true,
     ...(raw.window === undefined ? {} : { windowId: raw.window.id }),
-    // The window's accessibility root carries its title; the window list's, which agent-desktop copies here, is the app's name without Screen Recording permission.
+    // The window's accessibility root carries its title; the window server's is the app's name without Screen Recording permission.
     ...(title === undefined ? {} : { title }),
     ...(scrollTarget === undefined ? {} : { scrollTarget }),
   };
 }
 
-/** A heading's level, when agent-desktop names it in the node's description (`heading level 2`). */
+/** A heading's level, when the driver names it in the node's description (`heading level 2`). */
 function headingLevel(node: RawNode): { level?: number } {
   const match = /\blevel (\d)\b/i.exec(node.description ?? '');
   return match === null ? {} : { level: Number(match[1]) };
 }
 
-/** Whether the read listed only some of a node's children: agent-desktop flags the node, or counts more children than it listed at the depth limit. */
+/** Whether the read listed only some of a node's children: the driver flags the node, or counts more children than it listed at the depth limit. */
 function childrenCut(node: RawNode): boolean {
   return node.subtree_truncated === true || (node.children_count !== undefined && node.children_count > (node.children?.length ?? 0));
 }

@@ -4,9 +4,9 @@ description: Test a native desktop app on macOS through its accessibility tree.
 ---
 
 `@e2e-dev/desktop` runs tests on native desktop apps. It reads and drives
-the app through the OS accessibility tree with
-[agent-desktop](https://github.com/vercel-labs/agent-desktop). Tests use the
-same `agent`, `screen`, and `expect` APIs as browser tests.
+the app through the OS accessibility tree with a native driver that runs in
+the test process. Tests use the same `agent`, `screen`, and `expect` APIs as
+browser tests.
 
 <Note>
   The desktop engine is a prototype, and it runs on macOS only. A config with
@@ -39,9 +39,9 @@ On macOS, the app that starts e2e needs two permissions in **System Settings
 - **Accessibility**, to read and drive the app.
 - **Screen Recording**, for screenshots.
 
-The first run downloads agent-desktop and checks its SHA-256 digest. To use
-your own install, such as a Homebrew one, set
-`desktop({ binary: '/path/to/agent-desktop' })`.
+npm installs the driver for your Mac with the engine, as
+`@e2e-dev/desktop-darwin-arm64` or `@e2e-dev/desktop-darwin-x64`. You don't
+need Rust or Xcode.
 
 Check your setup:
 
@@ -59,7 +59,7 @@ bunx e2e doctor
 ```
 </CodeGroup>
 
-It checks agent-desktop, both permissions, and the `appPath` build.
+It checks the driver, both permissions, and the `appPath` build.
 
 ## Point at your app
 
@@ -72,10 +72,8 @@ object entry becomes `-name value`, as on iOS, so
 
 The launched app gets only a minimal environment (`HOME`, `USER`, `LOGNAME`,
 `SHELL`, `PATH`, `TMPDIR`, `LANG`, `LC_*`, `__CF_USER_TEXT_ENCODING`, plus
-`E2E_DESKTOP_LAUNCH` for process tracking, or `AGENT_DESKTOP_HOME` when
-launched by `bundleId`), so your secrets, model keys, and CI tokens never
-leak into it. Built-in macOS apps and builds signed with the `restrict` flag
-must be launched by `bundleId` rather than `appPath`.
+`E2E_DESKTOP_LAUNCH` for process tracking), so your secrets, model keys, and
+CI tokens never leak into it.
 
 ```ts title="e2e.config.ts"
 import type { E2EConfig } from 'e2e';
@@ -127,8 +125,8 @@ control's name is the one macOS accessibility gives it: its title, or its
 accessibility label. A button's title is its name and its text, so
 `getByText('Sign in')` finds the button as well as any static text that
 reads the same; `getByRole('button', 'Sign in')` finds only the button.
-`getByPlaceholder` is not supported: macOS reports no placeholder, and
-names a field with no label by its placeholder, so find that field with
+`getByPlaceholder` is not supported: the engine names a field with no label
+by its placeholder, so find that field with
 `getByRole('textbox', 'Username')`. `getByTestId` finds the control's
 `AXIdentifier` (`accessibilityIdentifier` in AppKit, SwiftUI's
 `.accessibilityIdentifier`).
@@ -141,37 +139,35 @@ the one `screen` reads (`desktop.useWindow(window)`), and quits the app
 
 | Area | On a desktop target |
 | --- | --- |
-| Input | The app runs in the background using the macOS Accessibility API, so your mouse and keyboard stay free. Apps that don't open a window in the background (like document-based apps) need `headed: true` or `--headed`. |
-| Physical input | `doubleTap`, `hover`, `press`, coordinate taps, and focused typing require `desktop({ headed: true })`, which brings the app forward and uses real pointer/keyboard input. Watch out for floating windows overlapping the target area. |
-| Keys | `press` sends keys only to the focused control in an active window (`headed: true`). It supports named keys, letters, digits, and ``, . / ; ' [ ] \ - = ` `` (other characters like `!` or `é` are rejected), and blocks system shortcuts like `ControlOrMeta+q` (use `desktop.closeApp()` instead). |
-| Select | `selectOption` matches by option label, not index. For editable combo boxes, use `fill()` instead. |
-| Windows | `screen` reads the window picked with `desktop.useWindow()`, otherwise the focused window, otherwise the first visible window. Sheets are included; window chrome (Close/Minimize/Zoom) is excluded. Minimized windows read as hidden, while windows on another macOS Space stay readable. |
+| Input | The app runs in the background. Actions use the macOS Accessibility API and keys go into the app's own event queue, so your mouse and keyboard stay free. Apps that don't open a window in the background (like document-based apps) need `headed: true` or `--headed`. |
+| Physical input | `doubleTap`, `hover`, and coordinate taps require `desktop({ headed: true })`, which brings the app forward and uses the real pointer. Keys and typing then use the real keyboard. Watch out for floating windows overlapping the target area. |
+| Keys | `press` sends keys only to the focused control in the app's key window. It supports named keys, letters, digits, and ``, . / ; ' [ ] \ - = ` `` (other characters like `!` or `é` are rejected), and blocks system shortcuts like `ControlOrMeta+q` (use `desktop.closeApp()` instead). |
+| Select | `selectOption` matches by option label, not index. On a pop-up button it checks that the button shows the chosen option. For editable combo boxes, use `fill()` instead. |
+| Windows | `screen` reads the window picked with `desktop.useWindow()`, otherwise the focused window, otherwise the first visible window. Sheets and open context or pop-up menus are included, so `getByRole('menuitem', 'Copy')` finds a menu's items; window chrome (Close/Minimize/Zoom) is excluded. Minimized windows and rows scrolled out of their list read as hidden, while windows on another macOS Space stay readable. |
 | Reading | Only an app with no open windows reads as empty. If the screen is locked or the window tree is deeper than `maxDepth`, locators keep retrying until timeout instead of returning false negatives, and `app.open()` fails on a locked screen. |
-| Menu bar | The app's menu bar isn't readable yet; trigger menu items with a key shortcut (`press` + `headed: true`). |
+| Menu bar | The app's menu bar isn't readable yet; trigger menu items with a key shortcut (`press`). |
 | Web content | Browser windows, Electron apps, and web views aren't supported. Use `@e2e-dev/web` for those. |
 | Workers | Limited to one worker per desktop target. If you run two desktop targets with `headed: true`, set `workers: 1` so they don't fight over the cursor and keyboard. |
 | State | `app.clearState()` isn't supported yet. |
-| Secrets | Password fields never expose their value and are painted black in screenshots (a field whose states can't be read isn't painted and shows dots instead). If a screenshot can't cover a readable password field, or the window exceeds `maxDepth`, it fails instead of saving. |
+| Secrets | Password fields never expose their value and are painted black in screenshots. If a screenshot can't cover a password field, or the window exceeds `maxDepth`, it fails instead of saving. Text a fill types stays in the test process. |
 
-Temporary accessibility state is cleaned up when the run exits, and if an
-app or worker gets killed mid-run, the next desktop run cleans up the
-leftover app process automatically.
+Temporary state is cleaned up when the run exits, and if an app or worker
+gets killed mid-run, the next desktop run cleans up the leftover app process
+automatically.
 
 <Accordion title="Additional desktop edge cases">
 - **Unreadable windows:** a window that can't be read never reads as empty,
   so `not.toBeVisible()` can't pass on it.
-- **Large field values:** a field value over 64 KiB, or one agent-desktop
-  couldn't read, reads as empty.
-- **Pop-up menus:** choosing a missing option in a pop-up button can leave
-  its menu open; e2e tries Escape to close it, which only reaches the app in
-  `headed: true` mode.
+- **Large field values:** a field value over a million characters reads as
+  its first million.
+- **Pop-up menus:** choosing a missing option in a pop-up button closes its
+  menu again; if the menu stays open, the error says so.
 </Accordion>
 
 ## Options
 
 | Option | Type | Default |
 | --- | --- | --- |
-| `binary` | `string` | the downloaded release |
 | `snapshot` | `'full' \| 'interactive'` | `'full'` |
 | `headed` | `boolean` | `false` |
 | `settle` | `number \| false` | `150` |

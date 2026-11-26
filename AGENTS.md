@@ -135,18 +135,28 @@ suites that consume the built packages the way a user would.
   installs a target's `app.appPath` through any lease's daemon; `eas` uses
   it too.
 - `packages/desktop` - the published `@e2e-dev/desktop` package: the
-  desktop engine on agent-desktop (native apps through the OS accessibility
-  tree), built with the same public `defineEngine`,
-  contributing the `desktop` fixture. It imports from `@e2e-dev/core/engine`
-  only, and a target names it as `engine: desktop()`. agent-desktop is not an
-  npm dependency (its `postinstall` would fail `check:install-scripts`): the
-  engine's `prepare` downloads the pinned release and checks its SHA-256
-  (`src/binary.ts`), and every command runs as one CLI process with a private
-  `AGENT_DESKTOP_HOME` per worker (`src/cli.ts`). Text a fill types goes on
-  stdin, never in the arguments, and agent-desktop and the app it launches get
-  only a few variables of the run's environment (`INHERITED_ENV` in
-  `src/surface.ts`). A prototype that runs on macOS only: `prepare` and
-  `init` refuse any other OS.
+  desktop engine (native apps through the OS accessibility tree), built with
+  the same public `defineEngine`, contributing the `desktop` fixture. It
+  imports from `@e2e-dev/core/engine` only, and a target names it as
+  `engine: desktop()`. The engine drives macOS through its own Rust driver,
+  `native/` (a NAPI-RS crate), loaded into the worker's process and called
+  directly (`src/driver.ts`): no CLI process and no JSON-RPC. Every native
+  call that talks to another process runs on a blocking thread and resolves
+  with an envelope that says whether input reached the app; `call` bounds it
+  by the operation's budget and translates it. Unit tests drive
+  `DesktopSurface` with a scripted driver (`tests/helpers/fake-driver.ts`)
+  and run on any OS. The app it launches gets only a few variables of the
+  run's environment (`INHERITED_ENV` in `src/surface.ts`): the driver
+  launches through `open -n` with exactly that environment, since
+  LaunchServices hands the app the environment of the process that asks.
+  `pnpm --filter @e2e-dev/desktop build:native` (needs `rustup`) builds
+  `native/desktop.<platform>-<arch>.node`, which the loader takes in a
+  checkout; a release ships it in `packages/desktop-darwin-arm64` and
+  `packages/desktop-darwin-x64`, optional dependencies with `os`/`cpu` set,
+  in a changesets `fixed` group with the engine. After a change under
+  `native/`, run `cargo clippy` and `cargo fmt --check` there, rebuild, and
+  run the desktop testbed. A prototype that runs on macOS only: `prepare`
+  and `init` refuse any other OS.
 - `packages/core/src/engine/protocol/` - the engine protocol: the engine
   contract as LSP-style JSON-RPC (`connectEngine` client, `serveEngine`
   server, spawn/socket/loopback transports), so an engine can run in

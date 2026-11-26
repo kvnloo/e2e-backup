@@ -1,8 +1,8 @@
 # @e2e-dev/desktop
 
-The desktop engine for [`e2e`](https://www.npmjs.com/package/e2e), built on
-[agent-desktop](https://github.com/vercel-labs/agent-desktop): native macOS
-apps, read and driven through the accessibility tree, through the same
+The desktop engine for [`e2e`](https://www.npmjs.com/package/e2e): native
+macOS apps, read and driven through the accessibility tree by a Rust driver
+loaded into the test process (NAPI-RS), through the same
 `@e2e-dev/core/engine` contract the browser and mobile engines implement. A
 test written against `screen`, `expect`, `app`, and `agent` runs on a desktop
 target unchanged.
@@ -19,9 +19,9 @@ target unchanged.
 npm install --save-dev e2e @e2e-dev/desktop
 ```
 
-The engine downloads its pinned agent-desktop release on the first run and
-checks it against its SHA-256 digest. To use an install of your own (Homebrew,
-a CI image), pass `desktop({ binary: '/path/to/agent-desktop' })`.
+npm installs the driver built for your Mac with it
+(`@e2e-dev/desktop-darwin-arm64` or `@e2e-dev/desktop-darwin-x64`); no Rust
+toolchain is needed.
 
 On macOS, the app that starts e2e (your terminal, IDE, or CI agent) needs
 Accessibility permission, and Screen Recording for screenshots, in System
@@ -60,25 +60,31 @@ test('signs in', async ({ app, screen }) => {
   driven, or quit. Every test ends with the app quit.
 - The app gets only `HOME`, `USER`, `LOGNAME`, `SHELL`, `PATH`, `TMPDIR`,
   `LANG`, `LC_*`, and `__CF_USER_TEXT_ENCODING` of the run's environment, and
-  `E2E_DESKTOP_LAUNCH`, the token the engine finds its copy by. An app
-  launched by `bundleId` also gets `AGENT_DESKTOP_HOME`, the path of the
-  worker's private agent-desktop directory.
-- An observation is one agent-desktop snapshot of the app's window. Roles map
+  `E2E_DESKTOP_LAUNCH`, the token the engine finds its copy by.
+- An observation is one snapshot of the app's window. Roles map
   onto the ARIA names other engines use (`textbox`, `checkbox`, `combobox`,
   `button`); the developer id (`AXIdentifier`) is the node's test id, so
   `getByTestId` finds it.
-- Actions go through the accessibility API and leave your pointer, focus, and
-  typing alone. `desktop({ headed: true })` brings the app forward and allows
-  physical input: `doubleTap`, `hover`, `press`, point-addressed taps, and
-  typing into whatever has focus.
-- A fill sends the text to agent-desktop on stdin, never in its arguments.
-  A secure field reports no value, and screenshots paint over its bounds; when
-  a secure field has no bounds, the screenshot is withheld.
+- Actions go through the accessibility API, and keys and typing into the
+  app's own event queue, so they leave your pointer, focus, and typing alone.
+  `desktop({ headed: true })` brings the app forward and allows physical
+  input: `doubleTap`, `hover`, point-addressed taps, and keys through the
+  real keyboard.
+- A fill passes its text to the driver in the test process, never to another
+  process. A secure field reports no value, and screenshots paint over its
+  bounds; when a secure field has no bounds, the screenshot is withheld.
 - Not supported yet: the menu bar, and web content (a browser window, an
   Electron app, a web view).
 - One worker per target: its workers would share one screen. Two desktop
   targets run at the same time. With `headed: true` they would share the
   pointer and keyboard too, so set the run's `workers: 1`.
+
+## Building the driver
+
+In a checkout, `pnpm --filter @e2e-dev/desktop build:native` builds the
+driver (`native/`, a Rust crate) with `cargo` for this Mac, and the engine
+loads it from there. It needs a Rust toolchain from
+[rustup](https://rustup.rs).
 
 ## License
 

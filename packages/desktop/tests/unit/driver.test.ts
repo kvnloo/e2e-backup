@@ -1,0 +1,76 @@
+import { EngineError } from '@e2e-dev/core/engine';
+import { describe, expect, it } from 'vitest';
+import { call, DriverFailure, translate, type Envelope } from '../../src/driver.ts';
+
+const signal = new AbortController().signal;
+const later = <T>(answer: Envelope<T>, ms: number): Promise<Envelope<T>> => new Promise((resolve) => setTimeout(() => resolve(answer), ms));
+const failed = (code: string, delivery: string, details?: Record<string, unknown>) => new DriverFailure({ code, message: `${code} from the driver`, disposition: { delivery }, ...(details === undefined ? {} : { details }) });
+
+describe('call', () => {
+  it("returns the envelope's data, and throws the failure the driver reported, untranslated", async () => {
+    await expect(call(() => Promise.resolve({ ok: true, data: 7 }), { label: 'read', input: false, signal, timeoutMs: 1_000 })).resolves.toBe(7);
+    const thrown = await call(() => Promise.resolve({ ok: false, error: { code: 'STALE_REF', message: 'gone', disposition: { delivery: 'not_delivered' } } }), { label: 'click', input: true, signal, timeoutMs: 1_000 }).catch((cause: unknown) => cause);
+    expect(thrown).toBeInstanceOf(DriverFailure);
+    expect(thrown).toMatchObject({ code: 'STALE_REF', notDelivered: true });
+  });
+
+  it('reports an input cut off by the budget as possibly committed, and a read as timed out', async () => {
+    await expect(call(() => later({ ok: true, data: {} }, 2_000), { label: 'click', input: true, signal, timeoutMs: 100 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    await expect(call(() => later({ ok: true, data: {} }, 2_000), { label: 'read', input: false, signal, timeoutMs: 100 })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT' });
+  });
+
+  it('gives an input at least half a second once started, so one that lands is not reported cut off, and a read exactly its budget', async () => {
+    await expect(call(() => later({ ok: true, data: 'landed' }, 300), { label: 'click', input: true, signal, timeoutMs: 50 })).resolves.toBe('landed');
+    await expect(call(() => later({ ok: true, data: 'late' }, 300), { label: 'read', input: false, signal, timeoutMs: 50 })).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT' });
+  });
+
+  it('cancels with the signal, and starts nothing once it aborted', async () => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 50);
+    await expect(call(() => later({ ok: true, data: {} }, 2_000), { label: 'read', input: false, signal: controller.signal, timeoutMs: 5_000 })).rejects.toMatchObject({ code: 'CANCELLED' });
+    let started = false;
+    await expect(
+      call(
+        () => {
+          started = true;
+          return later({ ok: true, data: {} }, 10);
+        },
+        { label: 'read', input: false, signal: controller.signal, timeoutMs: 5_000 },
+      ),
+    ).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(started).toBe(false);
+  });
+
+  it('reports a native call that threw as an engine failure', async () => {
+    await expect(call(() => Promise.reject(new Error('addon crashed')), { label: 'read', input: false, signal, timeoutMs: 1_000 })).rejects.toMatchObject({ code: 'ENGINE_FAILURE', message: expect.stringMatching(/addon crashed/) });
+  });
+});
+
+describe('translate', () => {
+  it('keeps only a refusal that sent nothing retryable or refusable', () => {
+    expect(translate(failed('STALE_REF', 'not_delivered'), 'click', true)).toMatchObject({ code: 'NODE_STALE', retryable: true });
+    expect(translate(failed('ELEMENT_NOT_FOUND', 'not_delivered'), 'click', true)).toMatchObject({ code: 'NODE_STALE', retryable: true });
+    expect(translate(failed('APP_UNRESPONSIVE', 'not_delivered', { retryable: true }), 'snapshot', false)).toMatchObject({ code: 'NODE_STALE', retryable: true });
+    expect(translate(failed('APP_UNRESPONSIVE', 'not_delivered'), 'snapshot', false)).toMatchObject({ code: 'ENGINE_FAILURE' });
+    expect(translate(failed('ACTION_NOT_SUPPORTED', 'not_delivered'), 'click', true)).toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    expect(translate(failed('POLICY_DENIED', 'not_delivered'), 'press', true)).toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    expect(translate(failed('WINDOW_NOT_FOUND', 'not_delivered'), 'snapshot', false)).toMatchObject({ code: 'INVALID_STATE', message: expect.stringMatching(/app\.open\(\)/) });
+    expect(translate(failed('ACTION_FAILED', 'not_delivered'), 'click', true)).toMatchObject({ code: 'NOT_ACTIONABLE' });
+    expect(translate(failed('TIMEOUT', 'not_delivered'), 'click', true)).toMatchObject({ code: 'NOT_ACTIONABLE' });
+    expect(translate(failed('TIMEOUT', 'not_delivered'), 'snapshot', false)).toMatchObject({ code: 'OPERATION_TIMEOUT' });
+    expect(translate(failed('INTERNAL', 'not_delivered'), 'snapshot', false)).toMatchObject({ code: 'ENGINE_FAILURE' });
+  });
+
+  it('never lets an input that may have landed look retryable', () => {
+    for (const code of ['STALE_REF', 'ACTION_FAILED', 'TIMEOUT', 'ELEMENT_NOT_FOUND']) {
+      expect(translate(failed(code, 'delivered_unverified'), 'click', true)).toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', retryable: false });
+    }
+  });
+
+  it('names the permission to grant, and passes an engine error through', () => {
+    expect(translate(failed('PERM_DENIED', 'not_delivered'), 'snapshot', false)).toMatchObject({ code: 'ENGINE_FAILURE', message: expect.stringMatching(/Grant Accessibility/) });
+    const engineError = new EngineError('CANCELLED', 'cancelled', { retryable: false });
+    expect(translate(engineError, 'click', true)).toBe(engineError);
+    expect(translate('odd', 'click', true)).toMatchObject({ code: 'ENGINE_FAILURE' });
+  });
+});

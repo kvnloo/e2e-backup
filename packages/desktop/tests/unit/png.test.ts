@@ -35,8 +35,8 @@ describe('windowImage', () => {
     expect(image).toMatchObject({ width: 16, height: 10 });
   });
 
-  it('withholds a capture with a border, rather than mask it in the wrong place', () => {
-    const bordered = capture(12, 10, { x: 0, y: 0, width: 12, height: 10 });
+  it('withholds a capture with a border of odd width, rather than mask it in the wrong place', () => {
+    const bordered = capture(13, 10, { x: 0, y: 0, width: 13, height: 10 });
     expect(windowImage(bordered, { width: 10, height: 10 }, [{ x: 7, y: 2, width: 3, height: 3 }])).toBeUndefined();
   });
 
@@ -44,6 +44,40 @@ describe('windowImage', () => {
     const image = windowImage(capture(16, 10, { x: 0, y: 0, width: 16, height: 10 }), { width: 16, height: 10 }, [{ x: 4, y: 4, width: 2, height: 2 }]);
     expect(pixel(image!, 3, 3)).toEqual([0, 0, 0, 255]);
     expect(pixel(image!, 6, 6)).toEqual([0, 0, 0, 255]);
+  });
+
+  it('crops a window out of the outline macOS draws around it, and masks in window coordinates', () => {
+    // An 844x708 capture: a 1-px transparent margin, a 1-px opaque outline, and the 840x704 window inside.
+    const width = 844;
+    const height = 708;
+    const data = new Uint8Array(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const at = (y * width + x) * 4;
+        const margin = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+        const outline = !margin && (x === 1 || y === 1 || x === width - 2 || y === height - 2);
+        data.set(margin ? [0, 0, 0, 0] : outline ? [90, 90, 90, 255] : [200, 200, 200, 255], at);
+      }
+    }
+    const png = Transformer.fromRgbaPixels(data, width, height).pngSync();
+    const image = windowImage(new Uint8Array(png.buffer, png.byteOffset, png.byteLength), { width: 840, height: 704 }, [{ x: 100, y: 100, width: 50, height: 20 }]);
+    expect(image).toMatchObject({ width: 840, height: 704 });
+    // The window's own corner, not the outline.
+    expect(pixel(image!, 0, 0)).toEqual([200, 200, 200, 255]);
+    expect(pixel(image!, 839, 703)).toEqual([200, 200, 200, 255]);
+    // The mask, in window coordinates, with its 2-px margin.
+    expect(pixel(image!, 98, 98)).toEqual([0, 0, 0, 255]);
+    expect(pixel(image!, 151, 121)).toEqual([0, 0, 0, 255]);
+    expect(pixel(image!, 153, 123)).toEqual([200, 200, 200, 255]);
+  });
+
+  it('withholds a capture whose opaque box is larger by an odd amount, or by more than an outline, and crops the center of an even one', () => {
+    // Odd: 3 px wider.
+    expect(windowImage(capture(19, 12, { x: 0, y: 0, width: 19, height: 12 }), { width: 16, height: 10 }, [])).toBeUndefined();
+    // Wider than any outline: 10 px on each side.
+    expect(windowImage(capture(36, 10, { x: 0, y: 0, width: 36, height: 10 }), { width: 16, height: 10 }, [])).toBeUndefined();
+    // Even on each axis, within an outline: the center, even where the axes differ.
+    expect(windowImage(capture(18, 14, { x: 0, y: 0, width: 18, height: 14 }), { width: 16, height: 10 }, [])).toMatchObject({ width: 16, height: 10 });
   });
 
   it('withholds a capture whose window is not the size expected', () => {
