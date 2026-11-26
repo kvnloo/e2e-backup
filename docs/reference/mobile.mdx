@@ -1110,10 +1110,13 @@ To lock the screen for a time, as Appium's `lock(seconds)` does, wait between `l
 /**
  * Unlocks the screen and resolves once the device reports it unlocked; the
  * app that was in front comes back. Android wakes the screen and dismisses
- * the keyguard, an iOS simulator swipes up from the bottom edge. A screen
- * that is not locked stays as it is. It never enters a PIN, pattern,
- * password, or passcode: a lock that asks for one is
- * `UNSUPPORTED_CAPABILITY`, and so is a device agent-device cannot lock.
+ * the keyguard, an iOS simulator swipes up from the bottom edge. On Android
+ * the wake key is always sent, so a display that is off turns on even when
+ * no keyguard is up; an unlocked iOS simulator stays as it is. It never
+ * enters a PIN, pattern, password, or passcode: a lock that asks for one is
+ * `UNSUPPORTED_CAPABILITY`, and so is a device agent-device cannot lock (a
+ * physical iPhone or iPad, a TV, a device a provider drives through a
+ * backend that has no lock command).
  */
 unlock(): Promise<void>;
 ```
@@ -1125,7 +1128,7 @@ await device.unlock();
 | Throws | When |
 | --- | --- |
 | `UNSUPPORTED_CAPABILITY` | The lock asks for a PIN, pattern, password, or passcode. The message names it; unlock the device by hand, or remove the credential. |
-| `UNSUPPORTED_CAPABILITY` | The device is one [`lock`](#lock) cannot lock. |
+| `UNSUPPORTED_CAPABILITY` | The device is not one agent-device can lock: a physical iPhone or iPad, an Android TV or Apple TV, or a device a provider drives through its own backend with no lock command. An Android device whose screen lock is set to None is not refused: `unlock()` wakes it. |
 | `ENGINE_FAILURE` | The device still reported the screen locked after the unlock. |
 
 #### `alert`

@@ -223,10 +223,13 @@ export interface Device {
   /**
    * Unlocks the screen and resolves once the device reports it unlocked; the
    * app that was in front comes back. Android wakes the screen and dismisses
-   * the keyguard, an iOS simulator swipes up from the bottom edge. A screen
-   * that is not locked stays as it is. It never enters a PIN, pattern,
-   * password, or passcode: a lock that asks for one is
-   * `UNSUPPORTED_CAPABILITY`, and so is a device agent-device cannot lock.
+   * the keyguard, an iOS simulator swipes up from the bottom edge. On Android
+   * the wake key is always sent, so a display that is off turns on even when
+   * no keyguard is up; an unlocked iOS simulator stays as it is. It never
+   * enters a PIN, pattern, password, or passcode: a lock that asks for one is
+   * `UNSUPPORTED_CAPABILITY`, and so is a device agent-device cannot lock (a
+   * physical iPhone or iPad, a TV, a device a provider drives through a
+   * backend that has no lock command).
    */
   unlock(): Promise<void>;
   /** Accepts or dismisses the visible system alert. */
