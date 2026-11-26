@@ -1118,10 +1118,14 @@ describe('DesktopSurface: typing', () => {
     const { surface, fake } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] });
     await surface.typeText('ada', { replace: true }, operation());
     expect(inputs(fake)).toEqual(['selectAll', 'press backspace', 'type']);
-    // A field whose selection accessibility cannot set gets the select-all key.
-    const keys = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')], act: [failure('ACTION_NOT_SUPPORTED', 'not_delivered'), { ok: true, data: {} }] });
+    // A field whose selection accessibility cannot set gets the select-all key through the real keyboard; in the background, nothing.
+    const refused = (): Scenario => ({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')], act: [failure('ACTION_NOT_SUPPORTED', 'not_delivered'), { ok: true, data: {} }] });
+    const keys = await launched(refused(), { options: { headed: true } });
     await keys.surface.typeText('ada', { replace: true }, operation());
     expect(inputs(keys.fake)).toEqual(['selectAll', 'press cmd+a', 'press backspace', 'type']);
+    const background = await launched(refused());
+    await expect(background.surface.typeText('ada', { replace: true }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/Cmd\+A/) });
+    expect(inputs(background.fake)).toEqual(['selectAll']);
   });
 
   it('sends nothing when the control with keyboard focus takes no text, so no select-all or delete reaches a list or button', async () => {

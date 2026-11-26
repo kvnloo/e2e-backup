@@ -1214,14 +1214,18 @@ export class DesktopSurface {
   /**
    * Selects all the text of the focused field. Through accessibility first:
    * Cmd+A sent to an app in the background goes to its menu bar, not the
-   * field, and selects nothing. A field whose selection cannot be set gets
-   * the key.
+   * field, and selects nothing, so the delete after it would remove one
+   * character. A field whose selection cannot be set gets the key only with
+   * `headed`, through the real keyboard; without it, nothing is sent.
    */
   private async selectAll(focused: NodeBinding, window: string, operation: OperationContext): Promise<void> {
     try {
       await this.tryRef('selectAll', focused, operation);
     } catch (cause) {
       if (!(cause instanceof DriverFailure && cause.notDelivered && cause.code === 'ACTION_NOT_SUPPORTED')) throw translate(cause, 'select all', true);
+      if (!this.options.headed) {
+        throw notActionable("the focused field's text cannot be selected through accessibility, and Cmd+A sent to an app in the background selects nothing; use fill(), or run headed");
+      }
       await this.sendKey('cmd+a', window, 'select all', operation);
     }
   }
