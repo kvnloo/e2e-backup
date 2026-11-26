@@ -327,7 +327,9 @@ git checkout -- packages .changeset
 ```
 
 The first script writes a changeset that bumps every public package, versions
-them as `<next version>-canary-<datetime>`, and builds. The second publishes
+them as `<next version>-canary-<datetime>`, and builds, the desktop engine's
+native driver for both Mac architectures included: run it on a Mac with
+[rustup](https://rustup.rs) installed. The second publishes
 with `--tag canary`; it is a separate step because npm's two-factor prompt
 (a hardware key, for instance) has to be answered at the terminal. Bumping all
 of them together is what keeps the engines installable: their peer ranges are

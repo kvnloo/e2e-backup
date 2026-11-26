@@ -197,11 +197,32 @@ jobs:
           AGENT_DEVICE_VERSION: ${{ inputs.agent-device-version }}
         run: node scripts/install-smoke.ts ${{ matrix.pnpm }}
 
+  # The desktop engine's native driver: formatted, lint-clean, and building
+  # for both Mac architectures. The toolchain is pinned in its
+  # rust-toolchain.toml, which rustup installs on first use.
+  native:
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/desktop/native
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          if ! command -v rustup >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo build --locked --release --target aarch64-apple-darwin --target x86_64-apple-darwin
+
   # The one check the ruleset requires from this workflow. A skipped job
   # passes (the change cannot reach it); a failed or cancelled one fails it.
   gate:
     name: spec gate
-    needs: [check, test, bun, install]
+    needs: [check, test, bun, install, native]
     if: ${{ always() }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
