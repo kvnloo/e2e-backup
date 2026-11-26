@@ -92,7 +92,8 @@ describe('call: onCutOff', () => {
 });
 
 describe('loadNativeDriver', () => {
-  it.skipIf(process.platform !== 'darwin' || !existsSync(new URL(`../../native/desktop.darwin-${process.arch}.node`, import.meta.url)))(
+  // Skipped wherever no addon was built, but never in CI's `native` job, which sets REQUIRE_DESKTOP_NATIVE once it built one.
+  it.skipIf(process.env.REQUIRE_DESKTOP_NATIVE !== '1' && (process.platform !== 'darwin' || !existsSync(new URL(`../../native/desktop.darwin-${process.arch}.node`, import.meta.url))))(
     'names the build it loaded and keeps every native function callable',
     () => {
       const driver = loadNativeDriver();
