@@ -108,9 +108,9 @@ export interface DesktopDriver {
   snapshot(options: { pid: number; windowId: string; maxDepth: number; interactive: boolean; timeoutMs: number }): Promise<Envelope<RawSnapshot>>;
   /** `inputId` names the action, so `cancelInput` can stop it before it sends input. */
   act(options: { ref: string; action: string; value?: string; direction?: string; pages?: number; physical?: boolean; inputId?: number; timeoutMs: number }): Promise<Envelope<unknown>>;
-  /** Stops the action given `inputId`: it sends no input from then on. */
   /** A fresh id for one call's input, unique across every worker thread of the process, which share the driver's cancel marks. */
   inputId(): number;
+  /** Stops the action given `inputId`: it sends no input from then on. */
   cancelInput(inputId: number): void;
   /** `inputId` names the press, so `cancelInput` can stop it before it sends the key. */
   press(options: { pid: number; windowId: string; combo: string; physical: boolean; inputId?: number; timeoutMs: number; focusedRef?: string }): Promise<Envelope<unknown>>;
