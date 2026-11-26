@@ -420,21 +420,24 @@ export class DesktopSurface {
     const token = randomUUID();
     // Written before anything is sent, so the app stays findable by its token if this worker is killed mid-launch.
     await this.writeRecord({ token });
-    const started = driver.launch({
-      ...('path' in target ? { path: target.path } : { bundleId: target.bundleId }),
-      arguments: [...FRESH_STATE_ARGUMENTS, ...launchArgumentList(this.app)],
-      environment: this.appEnv,
-      token,
-      // In the background unless `headed` or the run's `--headed`: otherwise the app takes the keyboard from whoever is at the Mac.
-      activate: this.foreground,
-      timeoutMs: Math.min(operation.timeoutMs, LAUNCH_READY_MS),
-    });
+    // Started by `call`, which starts nothing once the signal aborted: a cancelled open never launches the app.
+    let started: Promise<Envelope<Launched>> | undefined;
+    const start = (): Promise<Envelope<Launched>> =>
+      (started = driver.launch({
+        ...('path' in target ? { path: target.path } : { bundleId: target.bundleId }),
+        arguments: [...FRESH_STATE_ARGUMENTS, ...launchArgumentList(this.app)],
+        environment: this.appEnv,
+        token,
+        // In the background unless `headed` or the run's `--headed`: otherwise the app takes the keyboard from whoever is at the Mac.
+        activate: this.foreground,
+        timeoutMs: Math.min(operation.timeoutMs, LAUNCH_READY_MS),
+      }));
     let launched: Launched;
     try {
-      launched = await call(() => started, { label: `launch ${target.label}`, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
+      launched = await call(start, { label: `launch ${target.label}`, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
     } catch (cause) {
       // A launch the driver refused started nothing; any other may have started the app, which the next quit looks for.
-      if (!(cause instanceof DriverFailure && cause.notDelivered)) {
+      if (started !== undefined && !(cause instanceof DriverFailure && cause.notDelivered)) {
         this.pending = { target: target.label, token, settled: started.then((answer: Envelope<Launched>) => (answer.ok ? answer.data : undefined), () => undefined) };
       }
       throw this.launchFailure(cause, target);

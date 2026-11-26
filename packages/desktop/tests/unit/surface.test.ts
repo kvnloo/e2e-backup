@@ -203,6 +203,14 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(theirs, 300)).toBe(false);
   });
 
+  it('launches nothing for an open cancelled before the launch was sent', async () => {
+    const { surface, fake } = await initialized({});
+    const controller = new AbortController();
+    controller.abort();
+    await expect(surface.restart({ ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(fake.of('launch')).toEqual([]);
+  });
+
   it('reports an open LaunchServices refused as a failure that started nothing', async () => {
     const { surface } = await initialized({ launch: [failure('ACTION_FAILED', 'not_delivered', 'open could not start Built.app: its executable is missing', { kind: 'not_started' })] });
     await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ENGINE_FAILURE', message: expect.stringMatching(/its executable is missing$/) });
