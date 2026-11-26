@@ -3,7 +3,7 @@
  * for the target triple given, and puts it where the engine loads it from
  * in a checkout: `native/desktop.<platform>-<arch>.node`.
  *
- * Usage: `pnpm --filter @e2e-dev/desktop build:native [-- --target x86_64-apple-darwin] [--out <dir>]`.
+ * Usage: `pnpm --filter @e2e-dev/desktop build:native [--target x86_64-apple-darwin] [--out <dir>]`.
  * `--out` copies the addon into another directory too, the platform package
  * (`packages/desktop-darwin-*`) before it is published, with a stamp naming
  * that package's version, which its `prepublishOnly` checks. Needs a Rust
@@ -24,7 +24,9 @@ const TARGETS: Readonly<Record<string, string>> = {
 /** The oldest macOS the addon runs on. */
 const DEPLOYMENT_TARGET = '13.0';
 
-const { values } = parseArgs({ options: { target: { type: 'string' }, out: { type: 'string' } } });
+// pnpm passes a `--` before the script's own arguments through: it separates nothing here.
+const argv = process.argv.slice(2);
+const { values } = parseArgs({ args: argv[0] === '--' ? argv.slice(1) : argv, options: { target: { type: 'string' }, out: { type: 'string' } } });
 if (process.platform !== 'darwin') throw new Error('the native driver builds on macOS only');
 const target = values.target ?? (process.arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin');
 const platform = TARGETS[target];
