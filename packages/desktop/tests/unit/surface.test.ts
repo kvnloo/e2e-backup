@@ -203,15 +203,6 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(theirs, 300)).toBe(false);
   });
 
-  it('refuses a launch the driver says handed over to a copy already running', async () => {
-    const { surface } = await initialized({ launch: [failure('ACTION_FAILED', 'not_delivered', 'handed over', { kind: 'handed_over' })] });
-    await expect(surface.restart(operation())).rejects.toThrow(/handed over to a copy already running/);
-    // Nothing to look for at the end of the attempt: no wait, no error.
-    const started = Date.now();
-    await surface.endAttempt({ signal, timeoutMs: 5_000 });
-    expect(Date.now() - started).toBeLessThan(1_000);
-  });
-
   it('reports an open LaunchServices refused as a failure that started nothing', async () => {
     const { surface } = await initialized({ launch: [failure('ACTION_FAILED', 'not_delivered', 'open could not start Built.app: its executable is missing', { kind: 'not_started' })] });
     await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ENGINE_FAILURE', message: expect.stringMatching(/its executable is missing$/) });

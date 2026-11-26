@@ -453,9 +453,6 @@ export class DesktopSurface {
   private launchFailure(cause: unknown, target: LaunchTarget): Error {
     if (cause instanceof DriverFailure && cause.notDelivered) {
       if (cause.code === 'APP_NOT_FOUND') return new EngineError('ENGINE_FAILURE', `${cause.message}; check the target's app.bundleId or app.appPath`, { retryable: false, cause });
-      if (cause.details.kind === 'handed_over') {
-        return new EngineError('ENGINE_FAILURE', `launching ${target.label} handed over to a copy already running, which the engine does not drive or quit; quit that copy and run again`, { retryable: false, cause });
-      }
       if (cause.details.kind === 'not_started') return new EngineError('ENGINE_FAILURE', `launch ${target.label}: ${cause.message}`, { retryable: false, cause });
     }
     if (cause instanceof DriverFailure && cause.details.kind === 'unclaimed') {
