@@ -204,8 +204,8 @@ function keyboardShowing(raw: RawSnapshot): boolean {
   return keyboardShownIn(raw, isTruncated(raw)) === true;
 }
 
-/** What one pressed key sends: agent-device's keyboard Enter, or text typed into the focused field. */
-type SoftKey = { readonly kind: 'enter' } | { readonly kind: 'text'; readonly text: string };
+/** What one pressed key sends: agent-device's keyboard Enter, text typed into the focused field, or the delete key typed as `\b`. */
+type SoftKey = { readonly kind: 'enter' } | { readonly kind: 'delete' } | { readonly kind: 'text'; readonly text: string };
 
 /**
  * One key of the contract grammar on a touch surface. `Enter` submits
@@ -231,7 +231,7 @@ function softKey(key: string): SoftKey {
     case 'Space':
       return { kind: 'text', text: ' ' };
     case 'Backspace':
-      return { kind: 'text', text: '\b' };
+      return { kind: 'delete' };
     default:
       throw unsupported(
         `agent-device cannot press ${parsed.key.name} on a device surface; only Enter, Space, Backspace, and single characters reach the soft keyboard`,
@@ -241,7 +241,8 @@ function softKey(key: string): SoftKey {
 
 /** Sends a {@link softKey} to whatever holds focus. */
 function sendSoftKey(client: AgentDeviceClient, key: SoftKey): Promise<unknown> {
-  return key.kind === 'enter' ? client.command.keyboard({ action: 'enter' }) : client.interactions.type({ text: key.text });
+  if (key.kind === 'enter') return client.command.keyboard({ action: 'enter' });
+  return client.interactions.type({ text: key.kind === 'delete' ? '\b' : key.text });
 }
 
 /**
@@ -1730,11 +1731,35 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
   }
 
   /**
+   * {@link softKey} on this device. On Android, the typed `\b` becomes
+   * `KEYCODE_DEL` only through agent-device's adb backend; a device a cloud
+   * provider leases through agent-device (`leaseProvider`: BrowserStack,
+   * TestMu, Revyl) takes text through the provider's own backend, where a
+   * WebDriver session inserts the character instead, so Backspace is refused
+   * there before anything is sent.
+   */
+  private softKey(key: string): SoftKey {
+    const sent = softKey(key);
+    const provider = this.device?.client?.leaseProvider;
+    if (sent.kind === 'delete' && this.options.platform === 'android' && provider !== undefined) {
+      throw unsupported(
+        `agent-device cannot press Backspace on an Android device leased from ${provider}: only its own adb backend types \\b as the delete key; clear the field with locator.clear() or fill() instead`,
+      );
+    }
+    return sent;
+  }
+
+  /**
    * Keys on a touch surface, in the contract's key grammar, sent to the
    * field once it holds focus: see {@link softKey}.
    */
   private async pressKey(client: AgentDeviceClient, entry: NodeBinding, key: string, settle: SettleOptions, input: InputBudget): Promise<unknown> {
-    const sent = softKey(key);
+    const sent = this.softKey(key);
+    // Only a text field is focused before the key goes out, so Backspace on
+    // anything else would delete from whichever field kept focus.
+    if (sent.kind === 'delete' && entry.node.role !== 'textbox') {
+      throw unsupported(`agent-device can only press Backspace on an editable field; node ${entry.id} is ${entry.node.role ?? 'unknown'}`);
+    }
     // A key reaches the field through the soft keyboard, which is up only
     // while the field holds focus.
     if (entry.node.role === 'textbox' && entry.node.states?.focused !== true) {
@@ -1780,7 +1805,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    * {@link softKey}.
    */
   async pressFocusedKey(key: string, operation: OperationContext, input: InputBudget): Promise<void> {
-    const sent = softKey(key);
+    const sent = this.softKey(key);
     const before = this.latestScreen;
     await this.command('keyboard.press', (client) => input.send(() => sendSoftKey(client, sent)), operation.signal);
     this.markAction(before);

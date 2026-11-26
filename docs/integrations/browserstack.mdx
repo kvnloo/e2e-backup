@@ -141,3 +141,7 @@ the same video. Runs that overlap and share a fixed `build` and
   alerts, recording and device logs through agent-device, and port reverse
   are not available. Read logs on the BrowserStack dashboard, and use
   BrowserStack Local to reach a server on your network.
+- On Android, `press('Backspace')` and `device.keyboard.press('Backspace')`
+  fail with `UNSUPPORTED_CAPABILITY`: these devices take text through
+  WebDriver, and agent-device sends no delete key there. Use `clear()` or
+  `fill()`.

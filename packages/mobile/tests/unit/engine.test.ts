@@ -2084,6 +2084,25 @@ describe('perform', () => {
     ]);
   });
 
+  it('refuses Backspace on a control that is not a text field, so it cannot delete from the field that kept focus', async () => {
+    const h = harness();
+    h.fake.respond('capture.snapshot', () => ({
+      nodes: [
+        { ref: 'e1', index: 0, depth: 0, type: 'Application' },
+        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'TextField', label: 'Search', value: 'abc', focused: true },
+        { ref: 'e3', index: 2, parentIndex: 0, depth: 1, type: 'Button', label: 'Done' },
+      ],
+    }));
+    await openAttempt(h);
+    const done = await observed(h, 'Done');
+    const before = h.fake.calls.length;
+    await expect(h.engine.perform!(done.ref, { kind: 'press', key: 'Backspace' }, operation())).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('only press Backspace on an editable field'),
+    });
+    expect(h.fake.calls.slice(before).map((call) => call.method)).not.toContain('interactions.type');
+  });
+
   it.each([
     ['Enter', 'command.keyboard', { action: 'enter' }],
     ['Backspace', 'interactions.type', { text: '\b' }],

@@ -235,6 +235,10 @@ An attempt that records [video](/reference/config#video) gets:
   network, appearance), system alerts, recording and device logs through
   agent-device, and port reverse are not available. Read logs on the TestMu
   AI dashboard, and use TestMu AI Tunnel to reach a server on your network.
+- **Backspace on Android devices.** `press('Backspace')` and
+  `device.keyboard.press('Backspace')` fail with `UNSUPPORTED_CAPABILITY`:
+  these devices take text through WebDriver, and agent-device sends no delete
+  key there. Use `clear()` or `fill()`.
 - **60-second browser connect.** The web engine waits at most 60 seconds for
   a browser session to accept the CDP connection. A shorter `launchTimeout`
   ends the wait sooner, but a longer one does not extend it. A session still

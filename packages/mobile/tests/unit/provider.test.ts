@@ -327,6 +327,33 @@ describe('device provider', () => {
     expect(worker.connections.map((connection) => connection?.client)).toEqual([scope]);
   });
 
+  it.each([
+    ['android', [] as unknown[][]],
+    ['ios', [['interactions.type', { text: '\b' }]]],
+  ] as const)('on %s, Backspace on a device a cloud provider leases through agent-device sends %j', async (platform, sent) => {
+    const cloud: DeviceProvider = {
+      name: 'cloud',
+      async acquire() {
+        return { id: 'l-0', client: { leaseProvider: 'browserstack', leaseBackend: platform === 'ios' ? 'ios-instance' : 'android-instance' } };
+      },
+      async release() {},
+    };
+    const h = harness({ platform, device: cloud });
+    await h.prepare({ ...prepareInfo({}, 1), targetName: platform });
+    await boot(h, platform, 0);
+    await h.engine.startAttempt!({ attemptId: 'a1', artifactsDir: '', signal: new AbortController().signal, resolveSecret: noSecrets, ...ignoreTrace });
+    const operation: OperationContext = { signal: new AbortController().signal, timeoutMs: 30_000, runId: 'run-1', attemptId: 'a1', origin: 'test' };
+    const before = h.fake.calls.length;
+    const pressed = h.engine.keyboard!.press('Backspace', operation);
+    // A WebDriver session types the \b as text, so Android refuses it there.
+    if (platform === 'android') {
+      await expect(pressed).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY', message: expect.stringContaining('leased from browserstack') });
+    } else {
+      await pressed;
+    }
+    expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual(sent);
+  });
+
   it('refuses a lease that names neither a daemon nor client configuration, or a client with reserved keys, and still releases it', async () => {
     for (const lease of [
       { id: 'bare' },
