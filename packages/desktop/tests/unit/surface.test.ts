@@ -259,6 +259,17 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(late)).toBe(true);
   });
 
+  it('keeps a launch pending when the look for its late app is cancelled, so the next quit still finds it', async () => {
+    const { surface, fake } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified', 'no new process carries the token', { kind: 'unclaimed' })] });
+    await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    const { token } = last<{ token: string }>(fake, 'launch')!;
+    await expect(surface.endAttempt({ signal: AbortSignal.timeout(150), timeoutMs: 5_000 })).rejects.toMatchObject({ code: 'CANCELLED' });
+    const late = standIn();
+    fake.carriers.set(late, token);
+    await surface.endAttempt({ signal, timeoutMs: 5_000 });
+    expect(await gone(late)).toBe(true);
+  });
+
   it('never kills a process that has the app\'s id when its start cannot be read and it carries no token', async () => {
     const fake = fakeDriver({ launch: [spawnApp({ token: false })] });
     const { surface } = await launched(fake, { observe: false });

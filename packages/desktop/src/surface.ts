@@ -638,7 +638,7 @@ export class DesktopSurface {
       }
       // A launch that answered without a process may have started the app a moment later: look again, within the budget.
       if (owned.size === 0 && settled !== 'timeout') {
-        for (const pid of await this.lateCarriers(pending.token, Math.min(deadline - EXIT_WAIT_MS, Date.now() + LATE_APP_MS), signal)) owned.add(pid);
+        for (const pid of await this.lateCarriers(pending.token, Math.min(deadline - EXIT_WAIT_MS, Date.now() + LATE_APP_MS), signal, pending.target)) owned.add(pid);
       }
       if (!(await killed([...owned], deadline, signal))) {
         throw new EngineError('ENGINE_FAILURE', `the process a launch of ${pending.target} started did not exit; quitting tries again`, { retryable: false });
@@ -662,13 +662,22 @@ export class DesktopSurface {
     if (this.home !== undefined) await rm(path.join(this.home, APP_FILE), { force: true }).catch(() => undefined);
   }
 
-  /** The processes carrying a launch's token, looked for until one appears or `until` passes; none when none did. */
-  private async lateCarriers(token: string, until: number, signal: AbortSignal): Promise<readonly number[]> {
+  /**
+   * The processes carrying a launch's token, looked for until one appears or `until` passes; none when none did. A
+   * cancel throws `CANCELLED` and a scan that failed `ENGINE_FAILURE`, so the launch stays pending.
+   */
+  private async lateCarriers(token: string, until: number, signal: AbortSignal, target: string): Promise<readonly number[]> {
+    // None found is a finding only after a whole wait of scans that answered: a cancel, or a scan that failed, proves
+    // nothing, and the launch's record must stay for the next quit or sweep.
+    let failed = false;
     while (Date.now() < until && !signal.aborted) {
       await new Promise((resolve) => setTimeout(resolve, LATE_APP_POLL_MS));
       const carriers = await this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${token}`);
-      if (carriers !== null && carriers.length > 0) return carriers;
+      if (carriers === null) failed = true;
+      else if (carriers.length > 0) return carriers;
     }
+    if (signal.aborted) throw new EngineError('CANCELLED', `looking for the process a launch of ${target} started was cancelled`, { retryable: false });
+    if (failed) throw new EngineError('ENGINE_FAILURE', `could not tell whether a launch of ${target} started the app: looking for its token among the processes failed; quitting tries again`, { retryable: false });
     return [];
   }
 
