@@ -1175,6 +1175,8 @@ export class DesktopSurface {
     if (forward === undefined || focused === undefined) throw notActionable('the window the point was taken from closed as it was brought forward; observe again');
     // A click carries no window, only screen coordinates: if another window (a sheet, a panel the app raised) took focus as this one came forward, it could be the one under the point.
     if (forward.is_focused !== true) throw notActionable('another window took focus as the window the point was taken from was brought forward, and could be under the point; observe again');
+    // A sheet counts as its window's focus, for keys. One that took focus only as the window came forward was not where the point was taken, and could cover it.
+    if (forward.sheet_focused === true && target.sheet_focused !== true) throw notActionable('a sheet opened over the window as it was brought forward, and could be under the point; observe again');
     if (point.x >= focused.width || point.y >= focused.height) {
       throw notActionable(`(${point.x}, ${point.y}) is outside the ${focused.width}x${focused.height} window; a click there would land on another app`);
     }
