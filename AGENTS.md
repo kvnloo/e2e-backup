@@ -157,7 +157,7 @@ suites that consume the built packages the way a user would.
   `THIRD_PARTY_LICENSES.md` of the crates the addon links. After a change under
   `native/`, run `cargo clippy` and `cargo fmt --check` there, rebuild, and
   run the desktop testbed; after a dependency change, also
-  `node packages/desktop/scripts/native-licenses.ts`, which CI checks. A prototype that runs on macOS only: `prepare`
+  `pnpm --filter @e2e-dev/desktop licenses:native`, which CI checks. A prototype that runs on macOS only: `prepare`
   and `init` refuse any other OS.
 - `packages/core/src/engine/protocol/` - the engine protocol: the engine
   contract as LSP-style JSON-RPC (`connectEngine` client, `serveEngine`
