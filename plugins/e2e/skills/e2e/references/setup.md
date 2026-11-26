@@ -495,6 +495,10 @@ export default {
 - `selectOption`, `setInputFiles`, `scrollIntoView`, `secondaryTap`, and
   `modifiers` on `tap` or `doubleTap` are `UNSUPPORTED_CAPABILITY` on a
   device.
+- `press` on a device takes `Enter`, `Space`, `Backspace`, or one character;
+  `Tab`, other named keys, and modifiers are `UNSUPPORTED_CAPABILITY`. With
+  no locator for the field, `device.keyboard.type(text)` and
+  `device.keyboard.press(key)` go to whatever field holds focus.
 - `device.clipboard()` and `device.setClipboard()` are
   `UNSUPPORTED_CAPABILITY` on an Android build with no clipboard shell
   command (the Android 16 emulator is one); check a copy by pasting into a
