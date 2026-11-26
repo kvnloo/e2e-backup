@@ -22,7 +22,8 @@
  * The driver states delivery on every failure (`disposition.delivery`), so
  * the line between "refused" and "may have committed" is its own, never a
  * guess from the error code. Text a fill types is an argument of a function
- * call in this process: no other process can read it.
+ * call in this process, which the driver hands to the app under test through
+ * the Accessibility API: no helper process sees it.
  */
 
 import { createRequire } from 'node:module';

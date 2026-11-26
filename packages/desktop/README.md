@@ -73,8 +73,9 @@ test('signs in', async ({ app, screen }) => {
   `desktop({ headed: true })` brings the app forward and allows physical
   input: `doubleTap`, `hover`, point-addressed taps, and keys through the
   real keyboard.
-- A fill passes its text to the driver in the test process, never to another
-  process. A secure field reports no value, and screenshots paint over its
+- A fill passes its text to the driver in the test process, and the driver
+  hands it to the app under test through the Accessibility API; no helper
+  process sees it. A secure field reports no value, and screenshots paint over its
   bounds; when a secure field has no bounds, the screenshot is withheld.
 - Not supported yet: the menu bar, and web content (a browser window, an
   Electron app, a web view).
