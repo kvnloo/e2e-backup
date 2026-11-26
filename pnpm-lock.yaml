@@ -559,8 +559,8 @@ importers:
   packages/e2b:
     dependencies:
       agent-device:
-        specifier: 0.21.42
-        version: 0.21.42(ai@7.0.164(zod@4.6.7))
+        specifier: 0.21.43
+        version: 0.21.43(ai@7.0.164(zod@4.6.7))
     devDependencies:
       '@e2e-dev/mobile':
         specifier: workspace:*
@@ -801,8 +801,8 @@ importers:
   packages/limrun:
     dependencies:
       agent-device:
-        specifier: 0.21.42
-        version: 0.21.42(ai@7.0.134(zod@4.6.7))
+        specifier: 0.21.43
+        version: 0.21.43(ai@7.0.134(zod@4.6.7))
     devDependencies:
       '@e2e-dev/mobile':
         specifier: workspace:*
@@ -829,8 +829,8 @@ importers:
         specifier: 1.16.0
         version: 1.16.0
       agent-device:
-        specifier: 0.21.42
-        version: 0.21.42(ai@7.0.181(zod@4.6.7))
+        specifier: 0.21.43
+        version: 0.21.43(ai@7.0.181(zod@4.6.7))
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -896,8 +896,8 @@ importers:
   packages/revyl:
     dependencies:
       '@agent-device/revyl':
-        specifier: 0.21.42
-        version: 0.21.42
+        specifier: 0.21.43
+        version: 0.21.43
     devDependencies:
       '@e2e-dev/mobile':
         specifier: workspace:*
@@ -939,8 +939,8 @@ importers:
   packages/testmu:
     dependencies:
       '@agent-device/testmu':
-        specifier: 0.21.42
-        version: 0.21.42
+        specifier: 0.21.43
+        version: 0.21.43
     devDependencies:
       '@e2e-dev/mobile':
         specifier: workspace:*
@@ -988,11 +988,11 @@ importers:
 
 packages:
 
-  '@agent-device/revyl@0.21.42':
-    resolution: {integrity: sha512-0PMBNRMi1Ti510wiO3K/Gi74xd/MQywZCpdRWGHFnKqQ7jdPAjVAgKd7YbTf8QMsOHmMh2LVdJ1wH97Pk41buw==}
+  '@agent-device/revyl@0.21.43':
+    resolution: {integrity: sha512-l85eF+WqFjLiu6SmIPIKATo5+hkPutwyLBxiOl6EY/zlmfr4nzX8iIt3uVqbTALjuvpZVIQ3/0CPlAyCvSJK7w==}
 
-  '@agent-device/testmu@0.21.42':
-    resolution: {integrity: sha512-lA6GpnKuUK9KbqIqPlbbNO8bYrQ8AQQ+TtsHgI6vLCm/SIubRFlnJNI0hmM/JiOeZPqxhp4NEfvO+BOqV7XOfA==}
+  '@agent-device/testmu@0.21.43':
+    resolution: {integrity: sha512-5IpmAW4W3xckcE/4/RHi16gmmHNRyYMG12XyK6kj+uKi9hUfFIyONzZ2MjVSdoWVEshHKjrYJ/Ac5qkdAsIesQ==}
 
   '@agentclientprotocol/sdk@2.9.1':
     resolution: {integrity: sha512-8iJdxGa3SunLfzqLLb3RfQFmr4hnmWeAyeAK6MbkJiXJbrRlMRgKsVnDl/7Hu48yu/30gAlytNDzh5W77rv5SA==}
@@ -3300,8 +3300,8 @@ packages:
     engines: {node: '>=18.18'}
     hasBin: true
 
-  agent-device@0.21.42:
-    resolution: {integrity: sha512-EtLi20fyQfk6xRxpxFBSFwhfiC5J9NQWendT+K6ocPndz+CEMUGqYez+Pa+mfMF77EPG3RQfPdSbTc8MJKKiJw==}
+  agent-device@0.21.43:
+    resolution: {integrity: sha512-DrypBuG5+HnbL9E8sRoeq/QWphQA7u9pBF6L0cE7oxBprORz7ySnYo2RemxPvLLmD2AOwHsZxKv871cITdc83w==}
     engines: {node: '>=22.12'}
     hasBin: true
     peerDependencies:
@@ -5737,9 +5737,9 @@ packages:
 
 snapshots:
 
-  '@agent-device/revyl@0.21.42': {}
+  '@agent-device/revyl@0.21.43': {}
 
-  '@agent-device/testmu@0.21.42': {}
+  '@agent-device/testmu@0.21.43': {}
 
   '@agentclientprotocol/sdk@2.9.1(@modelcontextprotocol/server@2.4.0)(zod@4.6.7)':
     dependencies:
@@ -7938,15 +7938,15 @@ snapshots:
 
   agent-cli-detector@0.1.7: {}
 
-  agent-device@0.21.42(ai@7.0.134(zod@4.6.7)):
+  agent-device@0.21.43(ai@7.0.134(zod@4.6.7)):
     optionalDependencies:
       ai: 7.0.134(zod@4.6.7)
 
-  agent-device@0.21.42(ai@7.0.164(zod@4.6.7)):
+  agent-device@0.21.43(ai@7.0.164(zod@4.6.7)):
     optionalDependencies:
       ai: 7.0.164(zod@4.6.7)
 
-  agent-device@0.21.42(ai@7.0.181(zod@4.6.7)):
+  agent-device@0.21.43(ai@7.0.181(zod@4.6.7)):
     optionalDependencies:
       ai: 7.0.181(zod@4.6.7)
 
