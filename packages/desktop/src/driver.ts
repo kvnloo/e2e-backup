@@ -78,8 +78,6 @@ export interface DesktopDriver {
   status(): { readonly accessibility: boolean; readonly screenRecording: boolean };
   /** Whether the screen is locked; null when that cannot be told. */
   screenLocked(): boolean | null;
-  /** How many menus a process has open on screen. */
-  openMenus(pid: number): number;
   /** When a process started, in microseconds since the epoch; null when it is not running. */
   processStarted(pid: number): number | null;
   /** Every process whose environment holds `marker` (`NAME=value`); null when the processes cannot be listed. */

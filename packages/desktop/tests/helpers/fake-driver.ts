@@ -71,8 +71,6 @@ export class FakeDriver implements DesktopDriver {
   readonly calls: FakeCall[] = [];
   /** What `screenLocked` answers. */
   locked: boolean | null = false;
-  /** What `openMenus` answers. */
-  menus = 0;
   /** Whether `processesCarrying` cannot list the processes. */
   lookupFails = false;
   /** Whether `processStarted` cannot tell when any process started. */
@@ -128,10 +126,6 @@ export class FakeDriver implements DesktopDriver {
     return this.locked;
   }
 
-  openMenus(pid: number): number {
-    this.calls.push({ method: 'openMenus', args: [pid] });
-    return this.menus;
-  }
 
   processStarted(pid: number): number | null {
     if (this.startsUnreadable || !alive(pid)) return null;
