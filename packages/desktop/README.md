@@ -61,7 +61,7 @@ test('signs in', async ({ app, screen }) => {
 - The app gets only `HOME`, `USER`, `LOGNAME`, `SHELL`, `PATH`, `TMPDIR`,
   `LANG`, `LC_*`, and `__CF_USER_TEXT_ENCODING` of the run's environment, and
   `E2E_DESKTOP_LAUNCH`, the token the engine finds its copy by. An app whose
-  environment macOS hides (its own apps, Apple's Mac App Store apps, and
+  environment macOS hides (its own apps, Mac App Store apps, and
   builds signed with `restrict`) gets the token as its last arguments too,
   `-E2EDesktopLaunch <token>`.
 - An observation is one snapshot of the app's window. Roles map
