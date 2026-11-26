@@ -255,6 +255,19 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(late)).toBe(true);
   });
 
+  it('never kills a process that has the app\'s id when its start cannot be read and it carries no token', async () => {
+    const fake = fakeDriver({ launch: [spawnApp({ token: false })] });
+    const { surface } = await launched(fake, { observe: false });
+    const pid = fake.pid;
+    fake.startsUnreadable = true;
+    try {
+      await surface.endAttempt({ signal, timeoutMs: 2_000 });
+      expect(await gone(pid, 300)).toBe(false);
+    } finally {
+      fake.startsUnreadable = false;
+    }
+  });
+
   it('never takes a running copy without its launch token, and says the launch left nothing it could find', async () => {
     const theirs = standIn();
     const { surface } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified')] });

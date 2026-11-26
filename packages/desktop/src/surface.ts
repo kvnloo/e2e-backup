@@ -671,7 +671,9 @@ export class DesktopSurface {
     const driver = this.requireDriver();
     if (this.started !== undefined) {
       const now = driver.processStarted(pid);
-      return now === null ? alive(pid) : now === this.started;
+      if (now !== null) return now === this.started;
+      // Gone between the two looks; still there, its start unreadable, it is the app only if it carries the token.
+      if (!alive(pid)) return false;
     }
     const carriers = this.token === undefined ? null : driver.processesCarrying(`${LAUNCH_TOKEN}=${this.token}`);
     if (carriers === null) throw new EngineError('ENGINE_FAILURE', `could not tell whether process ${pid} is still the app the engine launched; quitting tries again`, { retryable: false });
