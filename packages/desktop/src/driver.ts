@@ -113,8 +113,12 @@ export interface DesktopDriver {
   /** `inputId` names the press, so `cancelInput` can stop it before it sends the key. */
   press(options: { pid: number; windowId: string; combo: string; physical: boolean; inputId?: number; timeoutMs: number; focusedRef?: string }): Promise<Envelope<unknown>>;
   focusWindow(pid: number, windowId: string): Promise<Envelope<unknown>>;
-  /** `inputId` names the pointer input, so `cancelInput` stops what it has yet to send. */
-  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number): Promise<Envelope<unknown>>;
+  /**
+   * `inputId` names the pointer input, so `cancelInput` stops what it has yet to send. With `target`, the window the
+   * point was taken in, no click goes once another window, a sheet that was not there (`sheet` says whether one held
+   * the window's focus), or another app took the focus from it.
+   */
+  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number, target?: { pid: number; windowId: string; sheet: boolean }): Promise<Envelope<unknown>>;
   screenshot(options: { windowId: string; path: string; timeoutMs: number }): Promise<Envelope<{ readonly scale_factor?: number }>>;
 }
 

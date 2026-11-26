@@ -172,10 +172,10 @@ export class FakeDriver implements DesktopDriver {
   }
 
   /** The input id and budget of each `pointer` call, in order; its `args` keep the point and kind. */
-  readonly pointerOptions: { readonly inputId: number | undefined; readonly timeoutMs: number | undefined }[] = [];
+  readonly pointerOptions: { readonly inputId: number | undefined; readonly timeoutMs: number | undefined; readonly target: { pid: number; windowId: string; sheet: boolean } | undefined }[] = [];
 
-  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number): Promise<Envelope<unknown>> {
-    this.pointerOptions.push({ inputId, timeoutMs });
+  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number, target?: { pid: number; windowId: string; sheet: boolean }): Promise<Envelope<unknown>> {
+    this.pointerOptions.push({ inputId, timeoutMs, target });
     return this.answer('pointer', [x, y, kind], ok({}));
   }
 

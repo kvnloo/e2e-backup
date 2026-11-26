@@ -1280,7 +1280,7 @@ describe('DesktopSurface: points', () => {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 100);
     await expect(surface.performAt({ x: 20, y: 30 }, { kind: 'doubleTap' }, { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
-    const [{ inputId, timeoutMs }] = fake.pointerOptions as [{ inputId: number; timeoutMs: number }];
+    const [{ inputId, timeoutMs }] = fake.pointerOptions as unknown as [{ inputId: number; timeoutMs: number }];
     expect(timeoutMs).toBeGreaterThan(0);
     expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
   });
@@ -1293,6 +1293,8 @@ describe('DesktopSurface: points', () => {
     const open = await launched({ listWindows: [at(true)] }, { observe: false, options: { headed: true } });
     await open.surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation());
     expect(open.fake.of('pointer').at(-1)?.args).toEqual([110, 150, 'tap']);
+    // The driver checks the window again after the move: it is told which window, and that its sheet was there.
+    expect(open.fake.pointerOptions.at(-1)?.target).toEqual({ pid: open.fake.pid, windowId: 'w-mine', sheet: true });
   });
 
   it('taps, double-taps, secondary-taps, and hovers a point in the window where it is now, with no observation first', async () => {

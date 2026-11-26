@@ -1218,7 +1218,9 @@ export class DesktopSurface {
     const kind = action.kind;
     // As for `tryRef`: pointer input still unsent once the call is given up is never sent.
     const inputId = nextInputId();
-    await this.input((driver, timeoutMs) => driver.pointer(focused.x + point.x, focused.y + point.y, kind, inputId, timeoutMs), {
+    // The driver checks the window again after the move, before the click: a sheet or window that opens meanwhile would take it.
+    const takes = { pid, windowId: target.id, sheet: forward.sheet_focused === true };
+    await this.input((driver, timeoutMs) => driver.pointer(focused.x + point.x, focused.y + point.y, kind, inputId, timeoutMs, takes), {
       label: kind,
       input: true,
       signal: operation.signal,
