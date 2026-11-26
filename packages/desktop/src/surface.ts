@@ -1209,7 +1209,15 @@ export class DesktopSurface {
     const pid = this.pid;
     if (pid === undefined) throw invalidState('the app is not running; open it with app.open()');
     // Physical input lands on whatever is frontmost at the point: bring the window forward first.
-    await this.input((driver) => driver.focusWindow(pid, target.id), { label: 'focus window', input: true, signal: operation.signal, timeoutMs: operation.timeoutMs }).catch((cause: unknown) => Promise.reject(translate(cause, 'focus window', true)));
+    // Finding the window can wait on the app: a call given up on must not bring it forward later, over what the user or the next step is doing.
+    const focusId = this.requireDriver().inputId();
+    await this.input((driver, timeoutMs) => driver.focusWindow(pid, target.id, focusId, timeoutMs), {
+      label: 'focus window',
+      input: true,
+      signal: operation.signal,
+      timeoutMs: operation.timeoutMs,
+      onCutOff: () => this.driver?.cancelInput(focusId),
+    }).catch((cause: unknown) => Promise.reject(translate(cause, 'focus window', true)));
     // Coming forward can move the window (onto another space, out from under the menu bar): the click is measured from where it is now.
     const forward = (await this.ownWindows(operation)).find((candidate) => candidate.id === target.id);
     const focused = forward?.bounds;

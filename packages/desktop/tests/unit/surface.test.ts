@@ -1293,6 +1293,8 @@ describe('DesktopSurface: points', () => {
     const open = await launched({ listWindows: [at(true)] }, { observe: false, options: { headed: true } });
     await open.surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation());
     expect(open.fake.of('pointer').at(-1)?.args).toEqual([110, 150, 'tap']);
+    // Bringing the window forward is input too: the call names it, so a cut-off cancels it.
+    expect(open.fake.focusOptions.at(-1)).toEqual({ inputId: expect.any(Number), timeoutMs: expect.any(Number) });
     // The driver checks the window again after the move: it is told which window, and that its sheet was there.
     expect(open.fake.pointerOptions.at(-1)?.target).toEqual({ pid: open.fake.pid, windowId: 'w-mine', sheet: true });
   });
