@@ -1444,15 +1444,16 @@ async function sweepStateDirectories(driver: DesktopDriver): Promise<void> {
 
 /**
  * Whether the worker process an owner file names still runs: one with its id
- * that started when the file says. A start time that cannot be read, or one
- * written in another form (the agent-desktop engine's), counts as the same
- * process, so a directory in use is never taken.
+ * that started when the file says, in this engine's form or the
+ * agent-desktop engine's (`sameStart`). A start time that cannot be read or
+ * compared counts as the same process, so a directory in use is never taken.
  */
 function ownerRuns(driver: DesktopDriver, pid: number, started: string | undefined): boolean {
   if (!alive(pid)) return false;
-  if (started === undefined || !/^\d+$/.test(started)) return true;
+  if (started === undefined) return true;
   const now = driver.processStarted(pid);
-  return now === null || now === Number(started);
+  if (now === null) return true;
+  return sameStart(/^\d+$/.test(started) ? Number(started) : started, now) ?? true;
 }
 
 /**

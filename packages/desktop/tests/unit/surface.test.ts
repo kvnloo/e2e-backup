@@ -1543,6 +1543,7 @@ describe('DesktopSurface: sweeping what killed workers left', () => {
     const worker = standIn();
     const app = standIn();
     fake.carriers.set(app, 'token-live');
+    fake.startTimes.set(worker, 1_795_687_200_500_000);
     const used = leftDirectory(`${worker}\nThu Nov 26 10:00:00 2026`, { token: 'token-live' }, 'e2e-agent-desktop-');
     try {
       await initialized(fake);
@@ -1550,6 +1551,19 @@ describe('DesktopSurface: sweeping what killed workers left', () => {
       expect(await gone(app, 300)).toBe(false);
     } finally {
       rmSync(used, { recursive: true, force: true });
+    }
+  });
+
+  it("sweeps an agent-desktop worker's directory whose process id another process took since", async () => {
+    const fake = fakeDriver();
+    const reused = standIn();
+    fake.startTimes.set(reused, 1_795_690_800_000_000);
+    const left = leftDirectory(`${reused}\nThu Nov 26 10:00:00 2026`, { token: 'token-gone' }, 'e2e-agent-desktop-');
+    try {
+      await initialized(fake);
+      expect(existsSync(left)).toBe(false);
+    } finally {
+      rmSync(left, { recursive: true, force: true });
     }
   });
 
