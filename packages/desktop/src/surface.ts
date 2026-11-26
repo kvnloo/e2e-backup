@@ -529,7 +529,7 @@ export class DesktopSurface {
       if (screen !== undefined) return;
       if (read) listedNone = true;
       // An app that quit (or crashed) on its own never shows a window.
-      if (this.pid !== undefined && !this.running(this.pid)) {
+      if (this.pid !== undefined && !(await this.running(this.pid))) {
         this.forget();
         this.dropProcess();
         throw new EngineError('ENGINE_FAILURE', `${this.appName ?? 'the app'} quit right after it launched, before it showed a window`, { retryable: false });
@@ -627,7 +627,7 @@ export class DesktopSurface {
       const settled = await settleWithin(pending.settled, wait, signal);
       if (signal.aborted) throw new EngineError('CANCELLED', `looking for the process a launch of ${pending.target} started was cancelled`, { retryable: false });
       // A process carrying the launch's token is its own, whether or not the driver reported it.
-      const carriers = this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${pending.token}`);
+      const carriers = await this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${pending.token}`);
       if (carriers === null) {
         throw new EngineError('ENGINE_FAILURE', `could not tell whether a launch of ${pending.target} started the app: looking for its token among the processes failed; quitting tries again`, { retryable: false });
       }
@@ -656,7 +656,7 @@ export class DesktopSurface {
     const { pid } = this;
     this.forget();
     if (pid === undefined) return;
-    if (this.running(pid) && !(await killed([pid], deadline, signal))) throw new EngineError('ENGINE_FAILURE', `the app (process ${pid}) did not exit`, { retryable: false });
+    if ((await this.running(pid)) && !(await killed([pid], deadline, signal))) throw new EngineError('ENGINE_FAILURE', `the app (process ${pid}) did not exit`, { retryable: false });
     this.driver?.forgetProcess(pid);
     this.dropProcess();
     if (this.home !== undefined) await rm(path.join(this.home, APP_FILE), { force: true }).catch(() => undefined);
@@ -666,7 +666,7 @@ export class DesktopSurface {
   private async lateCarriers(token: string, until: number, signal: AbortSignal): Promise<readonly number[]> {
     while (Date.now() < until && !signal.aborted) {
       await new Promise((resolve) => setTimeout(resolve, LATE_APP_POLL_MS));
-      const carriers = this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${token}`);
+      const carriers = await this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${token}`);
       if (carriers !== null && carriers.length > 0) return carriers;
     }
     return [];
@@ -679,7 +679,7 @@ export class DesktopSurface {
    * launch's token. A process that cannot be told either way throws, and
    * stays the engine's, so a quit tries again and the launch record stays.
    */
-  private running(pid: number): boolean {
+  private async running(pid: number): Promise<boolean> {
     if (!alive(pid)) return false;
     const driver = this.requireDriver();
     if (this.started !== undefined) {
@@ -688,7 +688,7 @@ export class DesktopSurface {
       // Gone between the two looks; still there, its start unreadable, it is the app only if it carries the token.
       if (!alive(pid)) return false;
     }
-    const carriers = this.token === undefined ? null : driver.processesCarrying(`${LAUNCH_TOKEN}=${this.token}`);
+    const carriers = this.token === undefined ? null : await driver.processesCarrying(`${LAUNCH_TOKEN}=${this.token}`);
     if (carriers === null) throw new EngineError('ENGINE_FAILURE', `could not tell whether process ${pid} is still the app the engine launched; quitting tries again`, { retryable: false });
     return carriers.includes(pid);
   }
@@ -824,9 +824,9 @@ export class DesktopSurface {
   }
 
   /** Throws `INVALID_STATE` unless the process the engine launched still runs. */
-  private requireRunning(): void {
+  private async requireRunning(): Promise<void> {
     const { pid } = this;
-    if (pid === undefined || this.running(pid)) return;
+    if (pid === undefined || (await this.running(pid))) return;
     throw new EngineError('INVALID_STATE', `${this.appName ?? 'the app'} quit (process ${pid}); open it again with app.open()`, { retryable: false, cause: QUIT });
   }
 
@@ -840,8 +840,8 @@ export class DesktopSurface {
     const { pid } = this;
     if (pid === undefined) return [];
     // An id another process took over since the app quit names none of its windows.
-    if (!this.running(pid)) {
-      if (strict) this.requireRunning();
+    if (!(await this.running(pid))) {
+      if (strict) await this.requireRunning();
       return [];
     }
     try {
@@ -849,7 +849,7 @@ export class DesktopSurface {
       return windows.filter((window) => window.pid === undefined || window.pid === pid);
     } catch (cause) {
       if (cause instanceof DriverFailure && NO_WINDOW_CODES.has(cause.code)) {
-        if (strict) this.requireRunning();
+        if (strict) await this.requireRunning();
         return [];
       }
       throw translate(cause, 'list windows', false);
@@ -1500,7 +1500,7 @@ async function sweepStateDirectories(driver: DesktopDriver): Promise<void> {
     const owned: number[] = [];
     let known = true;
     if (typeof launched.token === 'string' && launched.token !== '') {
-      const carriers = driver.processesCarrying(`${LAUNCH_TOKEN}=${launched.token}`);
+      const carriers = await driver.processesCarrying(`${LAUNCH_TOKEN}=${launched.token}`);
       if (carriers === null) known = false;
       else owned.push(...carriers);
     }

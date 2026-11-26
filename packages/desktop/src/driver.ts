@@ -87,7 +87,7 @@ export interface DesktopDriver {
   /** When a process started, in microseconds since the epoch; null when it is not running. */
   processStarted(pid: number): number | null;
   /** Every process whose environment holds `marker` (`NAME=value`); null when the processes cannot be listed. */
-  processesCarrying(marker: string): readonly number[] | null;
+  processesCarrying(marker: string): Promise<readonly number[] | null>;
   /** Drops the refs of a process that quit. */
   forgetProcess(pid: number): void;
   launch(options: {

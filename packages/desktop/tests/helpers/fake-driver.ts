@@ -132,11 +132,11 @@ export class FakeDriver implements DesktopDriver {
     return this.startTimes.get(pid) ?? 1_000_000 + pid;
   }
 
-  processesCarrying(marker: string): readonly number[] | null {
+  processesCarrying(marker: string): Promise<readonly number[] | null> {
     this.calls.push({ method: 'processesCarrying', args: [marker] });
-    if (this.lookupFails) return null;
+    if (this.lookupFails) return Promise.resolve(null);
     const token = marker.slice(marker.indexOf('=') + 1);
-    return [...this.carriers].filter(([pid, carried]) => carried === token && alive(pid)).map(([pid]) => pid);
+    return Promise.resolve([...this.carriers].filter(([pid, carried]) => carried === token && alive(pid)).map(([pid]) => pid));
   }
 
   forgetProcess(pid: number): void {
