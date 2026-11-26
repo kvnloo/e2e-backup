@@ -87,10 +87,12 @@ export function encodePng(image: Rgba): Uint8Array {
 }
 
 /**
- * The window inside the outline macOS can draw around it, on some sides
- * only: a box larger than the window by an even number of pixels on each
- * axis, at most `MAX_OUTLINE` on each side, holds the window at its center.
- * Undefined for a box of any other size.
+ * The window inside the outline macOS can draw around it: equally wide on
+ * both sides of an axis, and on one axis or both. A box larger than the
+ * window by an even number of pixels on each axis, at most `MAX_OUTLINE` on
+ * each side, holds the window at its center. Undefined for a box of any
+ * other size; a one-sided outline would put the crop off by its width, so it
+ * is not taken.
  */
 function insideOutline(box: { x: number; y: number; width: number; height: number }, expected: { width: number; height: number }): { x: number; y: number; width: number; height: number } | undefined {
   const extraWidth = box.width - expected.width;
