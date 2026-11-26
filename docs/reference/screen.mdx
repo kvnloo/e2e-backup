@@ -1105,7 +1105,7 @@ when an element has no identifier. So `resource-id` and `label` can each return
 the other's value there: an element with a test id and no label reads its test
 id as `label`. For the text a field holds, use `inputValue()`.
 
-On macOS (`@e2e-dev/desktop`), a node carries `label` (its accessible name),
+On macOS (`@e2e-dev/desktop`), a node carries `label` (a control's accessible name; text has none, since `textContent` reads it),
 `identifier` (the developer's accessibility identifier, also its test id),
 `description`, `placeholder`, and `hint` (its help text), each when the app
 reports it.

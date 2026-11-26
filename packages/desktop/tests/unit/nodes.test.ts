@@ -314,6 +314,12 @@ describe('projectSnapshot', () => {
     expect(root.children?.[0]?.attributes).toMatchObject({ label: 'Delete', identifier: 'delete' });
   });
 
+  it('gives a text node, and a name longer than any control has, no label, so no paragraph rides along whole in an observation', () => {
+    const paragraph = 'word '.repeat(20_000);
+    const { root } = projectSnapshot({ snapshot_id: 's', tree: { role: 'window', name: 'W', children: [{ role: 'statictext', value: paragraph }, { role: 'button', name: paragraph, ref_id: '@s:e1' }] } }, minter());
+    expect(root.children?.map((child) => child.attributes?.label)).toEqual([undefined, undefined]);
+  });
+
   it('keeps ids for siblings that share a developer id but not a name', () => {
     const mint = minter();
     const ids = (screen: ReturnType<typeof projectSnapshot>) => all(screen.root).filter((node) => node.role === 'menuitem').map((node) => node.ref.id);

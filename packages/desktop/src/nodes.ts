@@ -46,6 +46,9 @@ export interface RawSnapshot {
   readonly window?: { readonly id: string; readonly title?: string };
 }
 
+/** The longest accessible name a node carries as its `label` attribute, far past any control's. */
+const MAX_LABEL_CHARS = 1_000;
+
 /** The observation root's id: one window, the same id across observations, as the contract requires. */
 export const ROOT_ID = 'root';
 
@@ -334,8 +337,10 @@ export function projectSnapshot(
       else secureRects.push(rect);
     }
     const attributes: Record<string, string> = {};
-    // Under the names a device node uses: the accessible name, and the developer's identifier, which is also the test id.
-    if (name !== undefined && !secure) attributes.label = name;
+    // Under the names a device node uses: the accessible name, and the developer's identifier, which is also the test id. A text's
+    // name is its text, which textContent reads, and attributes are not cut as name and text are: a paragraph would ride along whole
+    // in every observation, so text, and a name longer than any control's, get no label.
+    if (name !== undefined && !secure && !isText && name.length <= MAX_LABEL_CHARS) attributes.label = name;
     if (node.native_id !== undefined) attributes.identifier = node.native_id.value;
     const placeholder = label(node.placeholder);
     if (placeholder !== undefined) attributes.placeholder = placeholder;
