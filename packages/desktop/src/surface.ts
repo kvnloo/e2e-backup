@@ -39,7 +39,7 @@ import {
   type SemanticNode,
   type ViewportPoint,
 } from '@e2e-dev/core/engine';
-import { call, DriverFailure, loadNativeDriver, nextInputId, translate, type DesktopDriver, type Envelope, type Launched, type RawWindow } from './driver.ts';
+import { call, DriverFailure, loadNativeDriver, translate, type DesktopDriver, type Envelope, type Launched, type RawWindow } from './driver.ts';
 import { toCombo } from './keys.ts';
 import { launchArgumentList } from './launch-arguments.ts';
 import { ROOT_ID, projectSnapshot, type NodeBinding, type ProjectedScreen, type RawSnapshot, type Rect } from './nodes.ts';
@@ -441,7 +441,7 @@ export class DesktopSurface {
     // Started by `call`, which starts nothing once the signal aborted: a cancelled open never launches the app.
     let started: Promise<Envelope<Launched>> | undefined;
     // A cut-off launch whose `open` has not run yet starts no app.
-    const inputId = nextInputId();
+    const inputId = this.requireDriver().inputId();
     const start = (): Promise<Envelope<Launched>> =>
       (started = driver.launch({
         ...('path' in target ? { path: target.path } : { bundleId: target.bundleId }),
@@ -1111,7 +1111,7 @@ export class DesktopSurface {
   private async tryRef(action: string, binding: NodeBinding, operation: OperationContext, extra: { value?: string; direction?: string; pages?: number; physical?: boolean } = {}): Promise<unknown> {
     const ref = this.refOf(binding, action);
     // Input still to send once the call is given up is never sent: the app may be another's by then, or the step over.
-    const inputId = nextInputId();
+    const inputId = this.requireDriver().inputId();
     return await this.input((driver, timeoutMs) => driver.act({ ref, action, inputId, timeoutMs, ...extra }), {
       label: action,
       input: true,
@@ -1217,7 +1217,7 @@ export class DesktopSurface {
     // Unrounded: the driver takes fractional points, and rounding could carry a point past the window's edge.
     const kind = action.kind;
     // As for `tryRef`: pointer input still unsent once the call is given up is never sent.
-    const inputId = nextInputId();
+    const inputId = this.requireDriver().inputId();
     // The driver checks the window again after the move, before the click: a sheet or window that opens meanwhile would take it.
     const takes = { pid, windowId: target.id, sheet: forward.sheet_focused === true };
     await this.input((driver, timeoutMs) => driver.pointer(focused.x + point.x, focused.y + point.y, kind, inputId, timeoutMs, takes), {
@@ -1305,7 +1305,7 @@ export class DesktopSurface {
     if (pid === undefined) throw invalidState('the app is not running; open it with app.open()');
     const physical = this.options.headed;
     // As for `tryRef`: a key still unsent once the call is given up is never sent.
-    const inputId = nextInputId();
+    const inputId = this.requireDriver().inputId();
     try {
       await this.input((driver, timeoutMs) => driver.press({ pid, windowId: window, combo, physical, inputId, timeoutMs, ...(focusedRef === undefined ? {} : { focusedRef }) }), {
         label,

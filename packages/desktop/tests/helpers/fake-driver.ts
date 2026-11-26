@@ -159,6 +159,12 @@ export class FakeDriver implements DesktopDriver {
     return this.answer('act', [options], ok({}));
   }
 
+  private lastInputId = 0;
+
+  inputId(): number {
+    return (this.lastInputId += 1);
+  }
+
   cancelInput(inputId: number): void {
     this.calls.push({ method: 'cancelInput', args: [inputId] });
   }

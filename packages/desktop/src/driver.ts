@@ -109,6 +109,8 @@ export interface DesktopDriver {
   /** `inputId` names the action, so `cancelInput` can stop it before it sends input. */
   act(options: { ref: string; action: string; value?: string; direction?: string; pages?: number; physical?: boolean; inputId?: number; timeoutMs: number }): Promise<Envelope<unknown>>;
   /** Stops the action given `inputId`: it sends no input from then on. */
+  /** A fresh id for one call's input, unique across every worker thread of the process, which share the driver's cancel marks. */
+  inputId(): number;
   cancelInput(inputId: number): void;
   /** `inputId` names the press, so `cancelInput` can stop it before it sends the key. */
   press(options: { pid: number; windowId: string; combo: string; physical: boolean; inputId?: number; timeoutMs: number; focusedRef?: string }): Promise<Envelope<unknown>>;
@@ -190,14 +192,6 @@ export interface DriverCall {
   readonly label: string;
   /** Runs when the budget or the signal cuts the call off, to stop work the driver would otherwise go on with. */
   readonly onCutOff?: () => void;
-}
-
-let lastInputId = 0;
-
-/** A fresh id for an action's input: one counter for the process, since every engine in it shares one driver. */
-export function nextInputId(): number {
-  lastInputId = lastInputId >= 0xffff_ffff ? 1 : lastInputId + 1;
-  return lastInputId;
 }
 
 /**
