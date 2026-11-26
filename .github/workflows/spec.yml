@@ -220,13 +220,12 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
             echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           fi
-      # A rustup that was already there, such as Homebrew's, may put no cargo on PATH: use the pinned toolchain's own.
+      # The pinned toolchain's own cargo, first on PATH: a rustup that was already there, such as Homebrew's, may put no
+      # cargo on PATH, and a standalone cargo there may lack the targets rust-toolchain.toml pins.
       - name: Put cargo on PATH
         run: |
-          if ! command -v cargo >/dev/null; then
-            rustup toolchain install
-            dirname "$(rustup which cargo)" >> "$GITHUB_PATH"
-          fi
+          rustup toolchain install
+          dirname "$(rustup which cargo)" >> "$GITHUB_PATH"
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
