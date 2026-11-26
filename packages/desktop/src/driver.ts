@@ -60,6 +60,8 @@ export interface RawWindow {
   readonly minimized?: boolean;
   readonly pid?: number;
   readonly bounds?: Rect;
+  /** A dialog macOS itself adds to the app's windows (Siri's, on macOS 27), which a test never means by default. */
+  readonly system?: boolean;
 }
 
 /** The process a launch started. */

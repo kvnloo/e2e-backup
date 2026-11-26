@@ -538,6 +538,16 @@ describe('DesktopSurface: reading', () => {
     await expect(surface.locate(testId('username'), operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/screen is locked/) });
   });
 
+  it("reads the app's own window, not the Siri dialog macOS put in focus over it, unless the test picks the dialog", async () => {
+    const list = windows(() => [{ id: 'w-siri', is_focused: true, system: true }, { id: 'w-doc', visible: true }]);
+    const { surface, fake } = await launched({ listWindows: [list] }, { observe: false });
+    await surface.observe(operation(), undefined);
+    expect((last(fake, 'snapshot') as { windowId: string }).windowId).toBe('w-doc');
+    await surface.useWindow('w-siri', signal, 5_000);
+    await surface.observe(operation(), undefined);
+    expect((last(fake, 'snapshot') as { windowId: string }).windowId).toBe('w-siri');
+  });
+
   it('reads the next window when the focused-first one is a panel accessibility cannot read', async () => {
     const { surface, fake } = await launched({ listWindows: [windows(() => [{ id: 'w-panel', visible: true }, { id: 'w-doc', visible: true }])], snapshot: [snapshotAnswer('macos/appkit-form'), failure('WINDOW_NOT_FOUND', 'not_delivered', 'no accessibility element', { kind: 'window_without_accessibility_element' }), snapshotAnswer('macos/appkit-form')] }, { observe: false });
     const observed = await surface.observe(operation(), undefined);

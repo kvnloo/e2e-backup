@@ -772,10 +772,7 @@ export class DesktopSurface {
     // A window the list no longer has is closed: its identities go, so windows opened and closed one after another do not pile them up.
     const open = new Set(windows.map((window) => window.id));
     for (const identity of this.ids.keys()) if (!open.has(identity.slice(0, identity.indexOf('|')))) this.ids.delete(identity);
-    const candidates =
-      windowId === undefined
-        ? [...windows.filter((window) => window.is_focused === true), ...windows.filter((window) => window.is_focused !== true && window.visible !== false), ...windows.filter((window) => window.is_focused !== true && window.visible === false)]
-        : windows.filter((window) => window.id === windowId);
+    const candidates = windowId === undefined ? byPreference(windows) : windows.filter((window) => window.id === windowId);
     const { pid } = this;
     for (const window of candidates) {
       if (pid === undefined || window.accessible === false) continue;
@@ -849,11 +846,11 @@ export class DesktopSurface {
     }
   }
 
-  /** The window of the launched process a command reads or acts in: the one the test chose, else the focused one, else the first visible one. */
+  /** The window of the launched process a command reads or acts in: the one the test chose, else the first by `byPreference`. */
   private async ownWindow(operation: OperationContext): Promise<RawWindow | undefined> {
     const windows = await this.ownWindows(operation);
     if (this.chosenWindow !== undefined) return windows.find((window) => window.id === this.chosenWindow);
-    return windows.find((window) => window.is_focused === true) ?? windows.find((window) => window.visible !== false) ?? windows[0];
+    return byPreference(windows)[0];
   }
 
   async observe(context: OperationContext, options: EngineObserveOptions | undefined): Promise<EngineSnapshot> {
@@ -1363,6 +1360,18 @@ export class DesktopSurface {
     const driverMs = options.input ? options.timeoutMs : Math.max(options.timeoutMs - READ_ANSWER_MARGIN_MS, options.timeoutMs / 2);
     return await call(() => start(driver, driverMs), options);
   }
+}
+
+/**
+ * The app's windows in the order a command reads them when the test chose
+ * none: the focused one, the visible ones, the rest. A dialog macOS adds
+ * (Siri's, which macOS 27 shows over an app after a press in a SwiftUI
+ * sheet) comes last, though it takes focus: `desktop.useWindow` still
+ * picks it.
+ */
+function byPreference(windows: readonly RawWindow[]): RawWindow[] {
+  const rank = (window: RawWindow): number => (window.system === true ? 3 : window.is_focused === true ? 0 : window.visible !== false ? 1 : 2);
+  return windows.toSorted((a, b) => rank(a) - rank(b));
 }
 
 /** The driver's answer within `ms`, or `timeout`; a cancelled wait answers at once. */
