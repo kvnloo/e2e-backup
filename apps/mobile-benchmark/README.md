@@ -112,7 +112,7 @@ Android note: the Android Gradle Plugin's prefab step fails on very new JDKs
 (observed on JDK 26). Build with JDK 17 through 21.
 
 The lock test in `tests/device.e2e.ts` needs the Android screen lock set to
-Swipe: `device.lock()` refuses None, and `device.unlock()` refuses a PIN,
+Swipe: `device.lock()` fails on None, and `device.unlock()` refuses a PIN,
 pattern, or password. A new emulator's lock is None; switch it to Swipe in
 Settings > Security > Screen lock, or with
 `adb shell locksettings set-disabled false`, as the CI job does.

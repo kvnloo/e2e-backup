@@ -465,7 +465,7 @@ export default {
   `@e2e-dev/mobile` types the `device` fixture (`installApp`, `openLink`,
   `setPermission`, `setNetwork`, `setAppearance`, `clearKeychain`, `fold`
   for a foldable's hinge (iPhone Duo, Android foldable emulators), `lock` and
-  `unlock` for the screen (Android, iOS simulator; `unlock` enters no PIN or
+  `unlock` for the screen (Android 11+, iOS simulator; `unlock` enters no PIN or
   passcode and refuses a lock that asks for one), `locator`, more). Portable suites declare
   `platforms: ['ios', 'android']`.
 - `device.viewport()` reads `{ width, height }` fresh on each call, in the coordinate space of `screen.tapAt()`.
