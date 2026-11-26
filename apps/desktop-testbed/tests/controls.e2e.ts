@@ -41,6 +41,20 @@ test.describe('controls window', () => {
     expect(frontmost()).not.toBe(TESTBED_APP);
   });
 
+  test('stops typing when a key opens another window, so the rest of the text does not follow the keyboard there', async ({ screen, desktop }) => {
+    const opener = screen.getByRole('textbox', 'Opener');
+    // The first character opens the Popup window and moves the keyboard into its field.
+    const failure = await opener.pressSequentially('xyz').then(
+      () => undefined,
+      (cause: unknown) => cause,
+    );
+    expect(String(failure)).toMatch(/typing stopped/);
+    await expect(opener).toHaveValue('x');
+    const popup = (await desktop.windows()).find((window) => window.title === 'Popup');
+    await desktop.useWindow(popup);
+    await expect(screen.getByRole('textbox', 'Popup field')).toHaveValue('');
+  });
+
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
     // One key event per character, a surrogate pair in one. AppKit would rejoin a split pair, so this checks such text

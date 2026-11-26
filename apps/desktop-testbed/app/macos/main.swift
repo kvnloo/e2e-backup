@@ -98,8 +98,11 @@ final class DoubleClickButton: NSButton {
 }
 
 /// The second window: one control per capability, and a status line.
-final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
+final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate, NSTextFieldDelegate {
   var window: NSWindow?
+  var popup: NSWindow?
+  let opener = NSTextField()
+  let popupField = NSTextField()
   let status = NSTextField(labelWithString: "Nothing yet")
   let items = (1...40).map { "Item \($0)" }
   let table = NSTableView()
@@ -108,7 +111,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
 
   func show() {
     if let window { window.makeKeyAndOrderFront(nil); return }
-    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 460),
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 500),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Controls"
     window.isReleasedWhenClosed = false
@@ -135,6 +138,13 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     note.target = self
     note.action = #selector(submit(_:))
     note.widthAnchor.constraint(equalToConstant: 260).isActive = true
+
+    // Its first character opens another window and moves the keyboard there: the rest of a typed text must not follow.
+    opener.placeholderString = "Opens a window"
+    opener.setAccessibilityLabel("Opener")
+    opener.setAccessibilityIdentifier("opener")
+    opener.delegate = self
+    opener.widthAnchor.constraint(equalToConstant: 260).isActive = true
 
     let options = NSButton(title: "Options", target: nil, action: nil)
     options.setAccessibilityIdentifier("options")
@@ -167,7 +177,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
     hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
-    let stack = NSStackView(views: [scroll, note, options, volume, disabled, double, hover, status])
+    let stack = NSStackView(views: [scroll, note, opener, options, volume, disabled, double, hover, status])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
@@ -195,6 +205,23 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
   @objc func chose(_ sender: NSMenuItem) { status.stringValue = "Chose \(sender.title)" }
 
   @objc func submit(_ sender: NSTextField) { status.stringValue = "Submitted: \(sender.stringValue)" }
+
+  func controlTextDidChange(_ notification: Notification) {
+    guard (notification.object as? NSTextField) === opener, popup == nil else { return }
+    let popup = NSWindow(contentRect: NSRect(x: 1040, y: 200, width: 300, height: 100),
+                         styleMask: [.titled, .closable], backing: .buffered, defer: false)
+    popup.title = "Popup"
+    popup.isReleasedWhenClosed = false
+    popupField.setAccessibilityLabel("Popup field")
+    popupField.setAccessibilityIdentifier("popup-field")
+    popupField.frame = NSRect(x: 20, y: 40, width: 260, height: 24)
+    let content = NSView()
+    content.addSubview(popupField)
+    popup.contentView = content
+    self.popup = popup
+    popup.makeKeyAndOrderFront(nil)
+    popup.makeFirstResponder(popupField)
+  }
 
   @objc func slid(_ sender: NSSlider) { status.stringValue = "Volume \(Int(sender.doubleValue))" }
 
