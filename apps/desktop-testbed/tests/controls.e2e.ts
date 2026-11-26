@@ -33,6 +33,15 @@ test.describe('controls window', () => {
     await expect(screen.getByTestId('controls-status')).toContainText('typed');
   });
 
+  test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
+    const note = screen.getByRole('textbox', 'Note');
+    // The 16th unit is the first half of the emoji, where key events would split it: the driver keeps a pair in one event,
+    // since AppKit rejoins a split pair but other toolkits may not.
+    const text = '123456789012345😀 café 👍🏽';
+    await note.pressSequentially(text);
+    await expect(note).toHaveValue(text);
+  });
+
   test('opens a context menu and chooses one of its items', async ({ screen }) => {
     await screen.getByRole('button', 'Options').secondaryTap();
     await expect(screen.getByTestId('controls-status')).toHaveText('Context menu opened');
