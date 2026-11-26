@@ -773,6 +773,10 @@ export class DesktopSurface {
     const open = new Set(windows.map((window) => window.id));
     for (const identity of this.ids.keys()) if (!open.has(identity.slice(0, identity.indexOf('|')))) this.ids.delete(identity);
     const candidates = windowId === undefined ? byPreference(windows) : windows.filter((window) => window.id === windowId);
+    // Only a dialog macOS put over the app is open: no screen of the app's own, and no empty one either.
+    if (candidates.length === 0 && windows.some((window) => window.system === true)) {
+      throw new EngineError('NODE_STALE', `only a system dialog is over ${this.appName ?? 'the app'}; reading again (desktop.useWindow() reads the dialog itself)`, { retryable: true, cause: UNREADABLE });
+    }
     const { pid } = this;
     for (const window of candidates) {
       if (pid === undefined || window.accessible === false) continue;
@@ -1397,13 +1401,13 @@ function sameNode(candidate: NodeBinding, binding: NodeBinding): boolean {
  * none: the focused one, the main one (an app in the background may have no
  * focused window), the visible ones, the rest. A dialog macOS adds (Siri's,
  * which macOS 27 shows over an app after a press in a SwiftUI sheet, and
- * lists first) comes last, though it may take focus: `desktop.useWindow`
- * still picks it.
+ * lists first) is left out, though it may take focus: read in place of an
+ * unreadable window of the app, it would let a negative assertion pass.
+ * `desktop.useWindow` still picks it.
  */
 function byPreference(windows: readonly RawWindow[]): RawWindow[] {
-  const rank = (window: RawWindow): number =>
-    window.system === true ? 4 : window.is_focused === true ? 0 : window.is_main === true ? 1 : window.visible !== false ? 2 : 3;
-  return windows.toSorted((a, b) => rank(a) - rank(b));
+  const rank = (window: RawWindow): number => (window.is_focused === true ? 0 : window.is_main === true ? 1 : window.visible !== false ? 2 : 3);
+  return windows.filter((window) => window.system !== true).toSorted((a, b) => rank(a) - rank(b));
 }
 
 /** The driver's answer within `ms`, or `timeout`; a cancelled wait answers at once. */

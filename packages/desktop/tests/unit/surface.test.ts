@@ -539,6 +539,15 @@ describe('DesktopSurface: reading', () => {
     await expect(surface.locate(testId('username'), operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/screen is locked/) });
   });
 
+  it('never reads the Siri dialog in place of a window of the app it cannot read', async () => {
+    const list = windows(() => [{ id: 'w-doc', visible: true, accessible: false }, { id: 'w-siri', is_focused: true, system: true }]);
+    const { surface, fake } = await launched({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true }]), list] }, { observe: false });
+    await expect(surface.observe(operation(), undefined)).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true });
+    expect(fake.of('snapshot').map((call) => (call.args[0] as { windowId: string }).windowId)).not.toContain('w-siri');
+    const alone = await launched({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true }]), windows(() => [{ id: 'w-siri', is_focused: true, system: true }])] }, { observe: false });
+    await expect(alone.surface.observe(operation(), undefined)).rejects.toMatchObject({ code: 'NODE_STALE', message: expect.stringMatching(/system dialog/) });
+  });
+
   it('reads the main window before the first one listed when the app in the background has none focused', async () => {
     const list = windows(() => [{ id: 'w-dialog', visible: true }, { id: 'w-doc', visible: true, is_main: true }]);
     const { surface, fake } = await launched({ listWindows: [list] }, { observe: false });
