@@ -213,7 +213,10 @@ export interface Device {
   /**
    * Locks the screen and resolves once the device reports it locked: the
    * sleep key on an Android phone or tablet, the lock button on an iPhone or
-   * iPad simulator. A screen that is already locked stays locked.
+   * iPad simulator. A screen that is already locked stays locked. A lock
+   * that asks for a PIN, pattern, password, or passcode is locked too, but
+   * `unlock()` refuses it, so the device stays locked until someone unlocks
+   * it by hand: use Swipe on Android and no passcode on iOS.
    * `UNSUPPORTED_CAPABILITY` on a device agent-device cannot lock (a physical
    * iPhone or iPad, a TV, a device a provider drives through a backend that
    * has no lock command), and on an Android device whose screen lock is set
