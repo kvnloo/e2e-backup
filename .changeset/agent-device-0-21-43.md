@@ -6,4 +6,4 @@
 "@e2e-dev/testmu": patch
 ---
 
-Update agent-device to 0.21.43, which adds the lock-screen command behind `device.lock()` and `device.unlock()`.
+Update agent-device to 0.21.43, which adds the lock-screen command behind `device.lock()` and `device.unlock()`. `@e2e-dev/revyl`, `@e2e-dev/testmu`, and `@e2e-dev/limrun` check that their agent-device matches the engine's, so they now need `@e2e-dev/mobile` 0.12.10 or newer.
