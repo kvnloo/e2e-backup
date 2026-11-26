@@ -334,6 +334,9 @@ export function projectSnapshot(
       else secureRects.push(rect);
     }
     const attributes: Record<string, string> = {};
+    // Under the names a device node uses: the accessible name, and the developer's identifier, which is also the test id.
+    if (name !== undefined && !secure) attributes.label = name;
+    if (node.native_id !== undefined) attributes.identifier = node.native_id.value;
     const placeholder = label(node.placeholder);
     if (placeholder !== undefined) attributes.placeholder = placeholder;
     const hint = label(node.hint);

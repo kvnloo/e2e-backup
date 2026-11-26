@@ -309,6 +309,11 @@ describe('projectSnapshot', () => {
     expect(root.children?.[0]?.attributes).toMatchObject({ placeholder: 'Email address', hint: 'column 1 of 2' });
   });
 
+  it('reads a node\'s name and developer id as its label and identifier attributes', () => {
+    const { root } = projectSnapshot({ snapshot_id: 's', tree: { role: 'window', name: 'W', children: [{ role: 'button', name: 'Delete', native_id: { kind: 'ax_identifier', value: 'delete' }, ref_id: '@s:e1' }] } }, minter());
+    expect(root.children?.[0]?.attributes).toMatchObject({ label: 'Delete', identifier: 'delete' });
+  });
+
   it('keeps ids for siblings that share a developer id but not a name', () => {
     const mint = minter();
     const ids = (screen: ReturnType<typeof projectSnapshot>) => all(screen.root).filter((node) => node.role === 'menuitem').map((node) => node.ref.id);
