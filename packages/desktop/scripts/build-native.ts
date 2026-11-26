@@ -10,7 +10,7 @@
  * toolchain (`rustup`), and runs on macOS only.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -33,9 +33,10 @@ const platform = TARGETS[target];
 if (platform === undefined) throw new Error(`no native driver build for ${target}; one of ${Object.keys(TARGETS).join(', ')}`);
 
 const crate = path.join(import.meta.dirname, '..', 'native');
-execFileSync('cargo', ['build', '--release', '--locked', '--target', target], { cwd: crate, stdio: 'inherit', env: { ...process.env, MACOSX_DEPLOYMENT_TARGET: DEPLOYMENT_TARGET } });
+const env = { ...cargoEnvironment(crate), MACOSX_DEPLOYMENT_TARGET: DEPLOYMENT_TARGET };
+execFileSync('cargo', ['build', '--release', '--locked', '--target', target], { cwd: crate, stdio: 'inherit', env });
 // Where cargo wrote it: `CARGO_TARGET_DIR` or a cargo config can move the target directory off `native/target`.
-const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: crate, encoding: 'utf8' })) as { target_directory: string };
+const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: crate, encoding: 'utf8', env })) as { target_directory: string };
 const built = path.join(metadata.target_directory, target, 'release', 'libe2e_desktop_native.dylib');
 const name = `desktop.${platform}.node`;
 replace(built, path.join(crate, name));
@@ -58,4 +59,26 @@ process.stdout.write(`built ${path.join(crate, name)}\n`);
 function replace(from: string, to: string): void {
   rmSync(to, { force: true });
   copyFileSync(from, to);
+}
+
+/**
+ * The environment cargo runs in: this one when `cargo` is on `PATH`, else
+ * one with the pinned toolchain's directory in front, which rustup names.
+ * A Homebrew rustup puts no `cargo` on `PATH` of its own, and the toolchain
+ * `rust-toolchain.toml` pins may not be installed yet.
+ */
+function cargoEnvironment(directory: string): NodeJS.ProcessEnv {
+  if (spawnSync('cargo', ['--version'], { cwd: directory, stdio: 'ignore' }).error === undefined) return process.env;
+  const which = (): string | undefined => {
+    const found = spawnSync('rustup', ['which', 'cargo'], { cwd: directory, encoding: 'utf8' });
+    return found.status === 0 ? found.stdout.trim() : undefined;
+  };
+  let cargo = which();
+  if (cargo === undefined && spawnSync('rustup', ['--version'], { stdio: 'ignore' }).error === undefined) {
+    // With no toolchain named, rustup installs the one the crate's `rust-toolchain.toml` pins.
+    spawnSync('rustup', ['toolchain', 'install'], { cwd: directory, stdio: 'inherit' });
+    cargo = which();
+  }
+  if (cargo === undefined) throw new Error('the native driver needs Rust: install rustup (https://rustup.rs), which installs the toolchain native/rust-toolchain.toml pins');
+  return { ...process.env, PATH: `${path.dirname(cargo)}${path.delimiter}${process.env.PATH ?? ''}` };
 }
