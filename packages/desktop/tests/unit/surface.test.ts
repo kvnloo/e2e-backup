@@ -885,7 +885,7 @@ describe('DesktopSurface: keys', () => {
   it('presses keys as driver combos into the window of the launched process, without physical input', async () => {
     const { surface, fake } = await launched({});
     await surface.pressKey('ControlOrMeta+a', operation());
-    expect(last(fake, 'press')).toEqual({ pid: fake.pid, windowId: 'w-mine', combo: 'cmd+a', physical: false });
+    expect(last(fake, 'press')).toEqual({ pid: fake.pid, windowId: 'w-mine', combo: 'cmd+a', physical: false, inputId: expect.any(Number), timeoutMs: expect.any(Number) });
   });
 
   it('presses keys through the real keyboard with headed', async () => {
@@ -1052,6 +1052,16 @@ describe('DesktopSurface: typing', () => {
     setTimeout(() => controller.abort(), 100);
     await expect(surface.perform(signIn, { kind: 'tap' }, { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
     const { inputId } = last(fake, 'act') as { inputId: number };
+    expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
+  });
+
+  it('cancels a key press the call gave up on, so the driver sends no key after the step moved on', async () => {
+    const { surface, fake } = await launched({ press: [{ ok: true, data: {}, sleepMs: 2_000 }] });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    await expect(surface.pressKey('Enter', { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
+    const { inputId, timeoutMs } = last(fake, 'press') as { inputId: number; timeoutMs: number };
+    expect(timeoutMs).toBeGreaterThan(0);
     expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
   });
 

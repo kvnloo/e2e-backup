@@ -102,7 +102,8 @@ export interface DesktopDriver {
   act(options: { ref: string; action: string; value?: string; direction?: string; pages?: number; physical?: boolean; inputId?: number; timeoutMs: number }): Promise<Envelope<unknown>>;
   /** Stops the action given `inputId`: it sends no input from then on. */
   cancelInput(inputId: number): void;
-  press(options: { pid: number; windowId: string; combo: string; physical: boolean }): Promise<Envelope<unknown>>;
+  /** `inputId` names the press, so `cancelInput` can stop it before it sends the key. */
+  press(options: { pid: number; windowId: string; combo: string; physical: boolean; inputId?: number; timeoutMs: number }): Promise<Envelope<unknown>>;
   focusWindow(pid: number, windowId: string): Promise<Envelope<unknown>>;
   pointer(x: number, y: number, kind: string): Promise<Envelope<unknown>>;
   screenshot(options: { windowId: string; path: string; timeoutMs: number }): Promise<Envelope<{ readonly scale_factor?: number }>>;

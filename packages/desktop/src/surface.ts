@@ -1231,8 +1231,16 @@ export class DesktopSurface {
     const pid = this.pid;
     if (pid === undefined) throw invalidState('the app is not running; open it with app.open()');
     const physical = this.options.headed;
+    // As for `tryRef`: a key still unsent once the call is given up is never sent.
+    const inputId = nextInputId();
     try {
-      await this.input((driver) => driver.press({ pid, windowId: window, combo, physical }), { label, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs });
+      await this.input((driver, timeoutMs) => driver.press({ pid, windowId: window, combo, physical, inputId, timeoutMs }), {
+        label,
+        input: true,
+        signal: operation.signal,
+        timeoutMs: operation.timeoutMs,
+        onCutOff: () => this.driver?.cancelInput(inputId),
+      });
     } catch (cause) {
       if (cause instanceof DriverFailure && cause.notDelivered && cause.details.cause === 'exact_window_focus_unconfirmed') {
         throw notActionable(`${label}: the window is not the app's key window, so a key sent to the app would land in another; nothing was sent`);
