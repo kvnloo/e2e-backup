@@ -268,6 +268,16 @@ describe('DesktopSurface: launching', () => {
     }
   });
 
+  it('never kills the process a late launch answer named once its id went to another process', async () => {
+    // The launch answers late with a process and its start; by the quit, that id is a process that started at another time.
+    const fake = fakeDriver({ launch: [(driver) => ({ ok: true, data: { app: 'SpikeForm', pid: driver.spawn({}), started: 7 }, sleepMs: 1_500 })] });
+    const { surface } = await initialized(fake);
+    await expect(surface.restart({ ...operation(), timeoutMs: 600 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    const pid = fake.pid;
+    await expect(surface.endAttempt({ signal, timeoutMs: 5_000 })).rejects.toThrow(/no process it started was found/);
+    expect(await gone(pid, 300)).toBe(false);
+  });
+
   it('never takes a running copy without its launch token, and says the launch left nothing it could find', async () => {
     const theirs = standIn();
     const { surface } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified')] });

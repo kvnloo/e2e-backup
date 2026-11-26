@@ -438,7 +438,8 @@ export class DesktopSurface {
         token,
         // In the background unless `headed` or the run's `--headed`: otherwise the app takes the keyboard from whoever is at the Mac.
         activate: this.foreground,
-        timeoutMs: Math.min(operation.timeoutMs, LAUNCH_READY_MS),
+        timeoutMs: operation.timeoutMs,
+        claimMs: LAUNCH_READY_MS,
       }));
     let launched: Launched;
     try {
@@ -453,7 +454,7 @@ export class DesktopSurface {
     this.appName = launched.app === '' ? target.label : launched.app;
     this.pid = launched.pid;
     this.token = token;
-    this.started = driver.processStarted(launched.pid) ?? undefined;
+    this.started = launched.started ?? driver.processStarted(launched.pid) ?? undefined;
     // The process and when it started, so a later run can quit it, and never a later process given the same id.
     await this.writeRecord({ token, pid: launched.pid, ...(this.started === undefined ? {} : { started: this.started }) });
     this.forget();
@@ -622,7 +623,10 @@ export class DesktopSurface {
         throw new EngineError('ENGINE_FAILURE', `could not tell whether a launch of ${pending.target} started the app: looking for its token among the processes failed; quitting tries again`, { retryable: false });
       }
       const owned = new Set(carriers);
-      if (settled !== 'timeout' && settled !== undefined) owned.add(settled.pid);
+      // The process the launch answered with, while it is still that process: its id may be another's by now.
+      if (settled !== 'timeout' && settled !== undefined && (carriers.includes(settled.pid) || (settled.started !== undefined && this.requireDriver().processStarted(settled.pid) === settled.started))) {
+        owned.add(settled.pid);
+      }
       // A launch that answered without a process may have started the app a moment later: look again, within the budget.
       if (owned.size === 0 && settled !== 'timeout') {
         for (const pid of await this.lateCarriers(pending.token, Math.min(deadline - EXIT_WAIT_MS, Date.now() + LATE_APP_MS), signal)) owned.add(pid);

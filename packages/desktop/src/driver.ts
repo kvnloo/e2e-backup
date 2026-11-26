@@ -67,6 +67,8 @@ export interface Launched {
   readonly pid: number;
   readonly app: string;
   readonly bundle_id?: string;
+  /** When the process started, in microseconds since the epoch, read as the driver claimed it. */
+  readonly started?: number;
 }
 
 /** What the driver can do: one function per native call. */
@@ -91,7 +93,10 @@ export interface DesktopDriver {
     environment: Readonly<Record<string, string>>;
     token: string;
     activate: boolean;
+    /** The whole launch's budget: `open`, then the search for the process it started. */
     timeoutMs: number;
+    /** How long that search may take once `open` has exited. */
+    claimMs: number;
   }): Promise<Envelope<Launched>>;
   listWindows(pid: number): Promise<Envelope<readonly RawWindow[]>>;
   snapshot(options: { pid: number; windowId: string; maxDepth: number; interactive: boolean; timeoutMs: number }): Promise<Envelope<RawSnapshot>>;

@@ -212,7 +212,7 @@ export function fakeDriver(scenario: Scenario = {}): FakeDriver {
 export function spawnApp({ token = true, exits = false, sleepMs, answer }: { token?: boolean; exits?: boolean; sleepMs?: number; answer?: Answer } = {}): Scripted {
   return (fake, args) => {
     const pid = fake.spawn({ token: token ? (args[0] as { token: string }).token : undefined, exits });
-    const reported = answer ?? { ok: true, data: { app: 'SpikeForm', pid, bundle_id: 'dev.e2e.spike.form' } };
+    const reported = answer ?? { ok: true, data: { app: 'SpikeForm', pid, bundle_id: 'dev.e2e.spike.form', started: fake.processStarted(pid) ?? undefined } };
     return sleepMs === undefined ? reported : { ...reported, sleepMs };
   };
 }
