@@ -861,7 +861,7 @@ describe('DesktopSurface: acting', () => {
     const { surface, fake } = await launched({ snapshot: [row], listWindows: [placed] }, { observe: false, options: { headed: true } });
     const every = (node: SemanticNode): SemanticNode[] => [node, ...(node.children ?? []).flatMap(every)];
     const group = every((await surface.observe(operation(), undefined)).root).find((node) => node.role === 'group' && node.name === 'Row');
-    await expect(surface.perform(group!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/button inside node/) });
+    await expect(surface.perform(group!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/button is at the center of node/) });
     expect(inputs(fake)).toEqual([]);
     await surface.perform(group!.ref, { kind: 'hover' }, operation());
     expect(fake.of('pointer').at(-1)?.args).toEqual([60, 35, 'hover']);
@@ -875,6 +875,19 @@ describe('DesktopSurface: acting', () => {
     const wideRow = every((await past.surface.observe(operation(), undefined)).root).find((node) => node.role === 'group' && node.name === 'Row');
     await expect(past.surface.perform(wideRow!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
     expect(inputs(past.fake)).toEqual([]);
+    // So is a sibling control laid over the node's center: it is what a click there reaches.
+    const laid = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [
+        { role: 'statictext', value: 'Notes', bounds: { x: 10, y: 10, width: 100, height: 20 } },
+        { role: 'button', name: 'Delete', ref_id: '@s:e9', bounds: { x: 50, y: 5, width: 20, height: 30 } },
+      ],
+    });
+    const over = await launched({ snapshot: [laid], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const notes = every((await over.surface.observe(operation(), undefined)).root).find((node) => node.role === 'text' || node.name === 'Notes');
+    await expect(over.surface.perform(notes!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+    expect(inputs(over.fake)).toEqual([]);
   });
 
   it('double-clicks a node with a stable id where a fresh read finds it, never the box it was read with', async () => {

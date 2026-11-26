@@ -1190,12 +1190,13 @@ export class DesktopSurface {
     const rect = fresh.rect;
     if (rect === undefined || rect.width <= 0 || rect.height <= 0) throw notActionable(`node ${binding.id} (${binding.role ?? 'unknown'}) has no box on screen to ${what}`);
     const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    // A point names no element: the driver's check takes any control of the window there. A control inside this node at its center (a group's button) would take the double-click, so it is refused here, from the same read; a hover presses nothing.
+    // A point names no element: the driver's check takes any control of the window there. Any other control at this node's center (a button inside it, even one reaching past its box, or one laid over it) would take the double-click, so it is refused here, from the same read; the node's ancestors hold the point by being around it. A hover presses nothing.
     if (kind === 'doubleTap') {
-      // Inside by the read's tree, not by boxes: a child control may reach past its parent's box.
-      const below = new Set(now === undefined ? [] : descendants(now.root, fresh.id));
-      const inner = [...(now?.bindings.values() ?? [])].find((candidate) => below.has(candidate.id) && candidate.ref !== undefined && candidate.rect !== undefined && holds(candidate.rect, center));
-      if (inner !== undefined) throw notActionable(`a ${inner.role ?? 'control'} inside node ${binding.id} is at its center, so a double-click there would press it; act on that control instead`);
+      const around = new Set(now === undefined ? [] : ancestors(now.root, fresh.id));
+      const other = [...(now?.bindings.values() ?? [])].find(
+        (candidate) => candidate.id !== fresh.id && !around.has(candidate.id) && candidate.ref !== undefined && candidate.rect !== undefined && holds(candidate.rect, center),
+      );
+      if (other !== undefined) throw notActionable(`a ${other.role ?? 'control'} is at the center of node ${binding.id}, so a double-click there would press it; act on that control instead`);
     }
     this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet };
     await this.performAt(center, { kind }, operation);
@@ -1624,12 +1625,17 @@ async function abandon(directory: string): Promise<void> {
   await writeFile(path.join(directory, OWNER_FILE), ABANDONED);
 }
 
-/** The ids of every node below the node `id` in a tree, none when the tree does not hold it. */
-function descendants(root: SemanticNode, id: string): string[] {
-  const below = (node: SemanticNode): string[] => (node.children ?? []).flatMap((child) => [child.ref.id, ...below(child)]);
-  const find = (node: SemanticNode): SemanticNode | undefined => (node.ref.id === id ? node : (node.children ?? []).map(find).find((found) => found !== undefined));
-  const node = find(root);
-  return node === undefined ? [] : below(node);
+/** The ids of the nodes above the node `id` in a tree, from the root down; none when the tree does not hold it. */
+function ancestors(root: SemanticNode, id: string): string[] {
+  const above = (node: SemanticNode): string[] | undefined => {
+    if (node.ref.id === id) return [];
+    for (const child of node.children ?? []) {
+      const below = above(child);
+      if (below !== undefined) return [node.ref.id, ...below];
+    }
+    return undefined;
+  };
+  return above(root) ?? [];
 }
 
 /** Whether a rect holds a point. */
