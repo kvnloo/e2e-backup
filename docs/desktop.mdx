@@ -151,7 +151,7 @@ the one `screen` reads (`desktop.useWindow(window)`), and quits the app
 | Web content | Browser windows, Electron apps, and web views aren't supported. Use `@e2e-dev/web` for those. |
 | Workers | Limited to one worker per desktop target. If you run two desktop targets with `headed: true`, set `workers: 1` so they don't fight over the cursor and keyboard. |
 | State | `app.clearState()` isn't supported yet. |
-| Secrets | Password fields never expose their value and are painted black in screenshots. If a screenshot can't cover a password field, or the window exceeds `maxDepth`, it fails instead of saving. Text a fill types stays in the test process. |
+| Secrets | Password fields never expose their value and are painted black in screenshots. If a screenshot can't cover a password field, or the window exceeds `maxDepth`, it fails instead of saving. |
 
 Temporary state is cleaned up when the run exits, and if an app or worker
 gets killed mid-run, the next desktop run cleans up the leftover app process
