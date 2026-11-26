@@ -114,9 +114,9 @@ const PLATFORM_PACKAGES: Readonly<Record<string, string>> = {
 const ownRequire = createRequire(import.meta.url);
 
 /**
- * Loads the driver built for this machine: the platform package npm
- * installed beside this one, else a build in this package's `native/`
- * directory (`pnpm build:native` in a checkout). Throws
+ * Loads the driver built for this machine: a build in this package's
+ * `native/` directory (`pnpm build:native` in a checkout), else the
+ * platform package npm installed beside this one. Throws
  * `UNSUPPORTED_CAPABILITY` on a platform no driver is built for, and
  * `ENGINE_FAILURE` naming what is missing on one that has a driver.
  */
@@ -127,9 +127,11 @@ export function loadNativeDriver(): DesktopDriver {
     throw new EngineError('UNSUPPORTED_CAPABILITY', `@e2e-dev/desktop has no native driver for ${process.platform} on ${process.arch}: it drives macOS apps only`, { retryable: false });
   }
   const failures: string[] = [];
+  // A build in `native/` exists only in a checkout (the package ships `dist` alone), and is the one just built there:
+  // a platform package placed by a canary build stays in the checkout, and must not hide it.
   const builds: readonly [string, () => string][] = [
-    [packageName, () => (ownRequire(`${packageName}/package.json`) as { version: string }).version],
     [path.join(import.meta.dirname, '..', 'native', `desktop.${platform}.node`), () => 'checkout build'],
+    [packageName, () => (ownRequire(`${packageName}/package.json`) as { version: string }).version],
   ];
   for (const [specifier, version] of builds) {
     try {
