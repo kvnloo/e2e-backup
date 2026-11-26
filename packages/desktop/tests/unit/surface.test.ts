@@ -1364,7 +1364,7 @@ describe('DesktopSurface: points', () => {
   });
 
   it('refuses a tap at a point when a sheet took focus as the window came forward, and taps one on a sheet already open', async () => {
-    const at = (sheet: boolean) => windows(() => [{ id: 'w-mine', is_focused: true, ...(sheet ? { sheet_focused: true } : {}), bounds: { x: 100, y: 100, width: 400, height: 300 } }]);
+    const at = (sheet: boolean) => windows(() => [{ id: 'w-mine', is_focused: true, ...(sheet ? { sheet_focused: true, sheet_id: 's-1' } : {}), bounds: { x: 100, y: 100, width: 400, height: 300 } }]);
     const opened = await launched({ listWindows: [at(false), at(false), at(true)] }, { observe: false, options: { headed: true } });
     await expect(opened.surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/sheet opened/) });
     expect(opened.fake.of('pointer')).toHaveLength(0);
@@ -1374,7 +1374,12 @@ describe('DesktopSurface: points', () => {
     // Bringing the window forward is input too: the call names it, so a cut-off cancels it.
     expect(open.fake.focusOptions.at(-1)).toEqual({ inputId: expect.any(Number), timeoutMs: expect.any(Number) });
     // The driver checks the window again after the move: it is told which window, and that its sheet was there.
-    expect(open.fake.pointerOptions.at(-1)?.target).toEqual({ pid: open.fake.pid, windowId: 'w-mine', sheet: true });
+    expect(open.fake.pointerOptions.at(-1)?.target).toEqual({ pid: open.fake.pid, windowId: 'w-mine', sheet: true, sheetId: 's-1' });
+    // A sheet the driver gave no key is never known to be the one the point was taken on.
+    const unnamed = windows(() => [{ id: 'w-mine', is_focused: true, sheet_focused: true, bounds: { x: 100, y: 100, width: 400, height: 300 } }]);
+    const keyless = await launched({ listWindows: [unnamed] }, { observe: false, options: { headed: true } });
+    await expect(keyless.surface.performAt({ x: 10, y: 50 }, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+    expect(keyless.fake.of('pointer')).toHaveLength(0);
   });
 
   it('refuses a tap at an observed point when the sheet on its window opened, closed, or changed after the observation', async () => {

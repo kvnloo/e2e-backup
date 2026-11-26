@@ -1676,19 +1676,19 @@ function pointIn(screen: ProjectedScreen): { readonly id: string; readonly sheet
   return screen.windowId === undefined ? undefined : { id: screen.windowId, sheet: screen.sheet };
 }
 
-/** Stands for a sheet whose window server id the driver could not read. */
+/** Stands for a sheet the driver gave no key: it is never known to be the same sheet as any. */
 const UNKNOWN_SHEET = '?';
 
-/** The sheet that holds a window's focus: its id, `UNKNOWN_SHEET` when it has none the driver read, undefined for no sheet. */
+/** The sheet that holds a window's focus: its key, `UNKNOWN_SHEET` when the driver gave none, undefined for no sheet. */
 function sheetKey(window: RawWindow): string | undefined {
   if (window.sheet_focused !== true) return undefined;
   return window.sheet_id ?? UNKNOWN_SHEET;
 }
 
-/** Whether two sheet keys name the same sheet: both none, or both sheets whose ids match or could not both be read. */
+/** Whether two sheet keys name the same sheet: both none, or both sheets with the same key. A sheet with no key matches none. */
 function sameSheet(a: string | undefined, b: string | undefined): boolean {
   if (a === undefined || b === undefined) return a === b;
-  return a === UNKNOWN_SHEET || b === UNKNOWN_SHEET || a === b;
+  return a !== UNKNOWN_SHEET && a === b;
 }
 
 /** Removes everything in a state directory but its owner file and launch record. */

@@ -64,7 +64,7 @@ export interface RawWindow {
   readonly is_focused?: boolean;
   /** Focus is in a sheet or an alert on this window, not the window itself. */
   readonly sheet_focused?: boolean;
-  /** That sheet's window server id, when it has one. */
+  /** A key naming that sheet: its window server id, else one for its accessibility element. */
   readonly sheet_id?: string;
   /** The app's main window, which an app in the background still names while none has focus. */
   readonly is_main?: boolean;
