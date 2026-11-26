@@ -1212,6 +1212,17 @@ describe('DesktopSurface: points', () => {
     expect(fake.of('pointer').at(-1)?.args).toEqual([600, 50, 'tap']);
   });
 
+  it('cancels pointer input at a point the call gave up on, so the driver sends no click after the step moved on', async () => {
+    const placed = windows(() => [{ id: 'w-mine', is_focused: true, bounds: { x: 300, y: 200, width: 400, height: 300 } }]);
+    const { surface, fake } = await launched({ listWindows: [placed], pointer: [{ ok: true, data: {}, sleepMs: 2_000 }] }, { observe: false, options: { headed: true } });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    await expect(surface.performAt({ x: 20, y: 30 }, { kind: 'doubleTap' }, { ...operation(), signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
+    const [{ inputId, timeoutMs }] = fake.pointerOptions as [{ inputId: number; timeoutMs: number }];
+    expect(timeoutMs).toBeGreaterThan(0);
+    expect(fake.of('cancelInput').map((entry) => entry.args)).toEqual([[inputId]]);
+  });
+
   it('taps, double-taps, secondary-taps, and hovers a point in the window where it is now, with no observation first', async () => {
     const { surface, fake } = await launched({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true, bounds: { x: 300, y: 200, width: 400, height: 300 } }])] }, { observe: false, options: { headed: true } });
     for (const kind of ['tap', 'doubleTap', 'secondaryTap', 'hover'] as const) await surface.performAt({ x: 20, y: 30 }, { kind }, operation());

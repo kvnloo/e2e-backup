@@ -1177,9 +1177,15 @@ export class DesktopSurface {
     }
     // Unrounded: the driver takes fractional points, and rounding could carry a point past the window's edge.
     const kind = action.kind;
-    await this.input((driver) => driver.pointer(focused.x + point.x, focused.y + point.y, kind), { label: kind, input: true, signal: operation.signal, timeoutMs: operation.timeoutMs }).catch((cause: unknown) =>
-      Promise.reject(translate(cause, kind, true)),
-    );
+    // As for `tryRef`: pointer input still unsent once the call is given up is never sent.
+    const inputId = nextInputId();
+    await this.input((driver, timeoutMs) => driver.pointer(focused.x + point.x, focused.y + point.y, kind, inputId, timeoutMs), {
+      label: kind,
+      input: true,
+      signal: operation.signal,
+      timeoutMs: operation.timeoutMs,
+      onCutOff: () => this.driver?.cancelInput(inputId),
+    }).catch((cause: unknown) => Promise.reject(translate(cause, kind, true)));
     await this.settle(operation);
   }
 

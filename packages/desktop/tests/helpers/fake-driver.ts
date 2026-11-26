@@ -171,7 +171,11 @@ export class FakeDriver implements DesktopDriver {
     return this.answer('focusWindow', [pid, windowId], ok({}));
   }
 
-  pointer(x: number, y: number, kind: string): Promise<Envelope<unknown>> {
+  /** The input id and budget of each `pointer` call, in order; its `args` keep the point and kind. */
+  readonly pointerOptions: { readonly inputId: number | undefined; readonly timeoutMs: number | undefined }[] = [];
+
+  pointer(x: number, y: number, kind: string, inputId?: number, timeoutMs?: number): Promise<Envelope<unknown>> {
+    this.pointerOptions.push({ inputId, timeoutMs });
     return this.answer('pointer', [x, y, kind], ok({}));
   }
 
