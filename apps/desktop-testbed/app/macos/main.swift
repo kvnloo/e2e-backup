@@ -1,7 +1,10 @@
 // The desktop testbed's sign-in form: AppKit controls with accessibility
-// identifiers, the same form the agent-desktop spike measured. Sign in
-// writes what it read into the status line, so a test can check every
-// control reached the app.
+// identifiers. Sign in writes what it read into the status line, so a test
+// can check every control reached the app. "Controls…" opens a second
+// window with one control per engine capability the form does not reach
+// (a scrolling list, a key handler, a context menu, a slider, a disabled
+// button, and double-click and hover targets for physical input), each
+// writing what happened into that window's status line.
 
 import AppKit
 
@@ -33,7 +36,9 @@ final class Controller: NSObject, NSApplicationDelegate {
     status.setAccessibilityIdentifier("status")
     let signIn = NSButton(title: "Sign in", target: self, action: #selector(signIn(_:)))
     signIn.setAccessibilityIdentifier("sign-in")
-    let stack = NSStackView(views: [heading, username, password, remember, plan, signIn, status])
+    let more = NSButton(title: "Controls…", target: self, action: #selector(openControls(_:)))
+    more.setAccessibilityIdentifier("open-controls")
+    let stack = NSStackView(views: [heading, username, password, remember, plan, signIn, status, more])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
@@ -55,7 +60,144 @@ final class Controller: NSObject, NSApplicationDelegate {
     status.stringValue = "Signed in as \(username.stringValue) on \(plan.titleOfSelectedItem ?? "?")\(remembered) (password: \(password.stringValue.count) characters)"
   }
 
+  let controls = ControlsWindow()
+
+  @objc func openControls(_ sender: NSButton) {
+    controls.show()
+  }
+
   func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { true }
+}
+
+/// A view that reports the pointer entering it, for `hover`.
+final class HoverTarget: NSView {
+  var onHover: () -> Void = {}
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    for area in trackingAreas { removeTrackingArea(area) }
+    addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+  }
+
+  override func mouseEntered(with event: NSEvent) { onHover() }
+
+  override func draw(_ dirtyRect: NSRect) {
+    NSColor.systemTeal.setFill()
+    bounds.fill()
+  }
+}
+
+/// A button that reports a double click, which only the real pointer sends.
+final class DoubleClickButton: NSButton {
+  var onDoubleClick: () -> Void = {}
+
+  override func mouseDown(with event: NSEvent) {
+    if event.clickCount == 2 { onDoubleClick() }
+    super.mouseDown(with: event)
+  }
+}
+
+/// The second window: one control per capability, and a status line.
+final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
+  var window: NSWindow?
+  let status = NSTextField(labelWithString: "Nothing yet")
+  let items = (1...40).map { "Item \($0)" }
+  let table = NSTableView()
+  let note = NSTextField()
+  let volume = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)
+
+  func show() {
+    if let window { window.makeKeyAndOrderFront(nil); return }
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 460),
+                          styleMask: [.titled, .closable], backing: .buffered, defer: false)
+    window.title = "Controls"
+    window.isReleasedWhenClosed = false
+    status.setAccessibilityIdentifier("controls-status")
+
+    let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("item"))
+    column.width = 280
+    table.addTableColumn(column)
+    table.headerView = nil
+    table.dataSource = self
+    table.delegate = self
+    table.setAccessibilityLabel("Items")
+    table.setAccessibilityIdentifier("items")
+    let scroll = NSScrollView()
+    scroll.documentView = table
+    scroll.hasVerticalScroller = true
+    scroll.setAccessibilityIdentifier("items-scroll")
+    scroll.heightAnchor.constraint(equalToConstant: 120).isActive = true
+    scroll.widthAnchor.constraint(equalToConstant: 300).isActive = true
+
+    note.placeholderString = "Note"
+    note.setAccessibilityLabel("Note")
+    note.setAccessibilityIdentifier("note")
+    note.target = self
+    note.action = #selector(submit(_:))
+    note.widthAnchor.constraint(equalToConstant: 260).isActive = true
+
+    let options = NSButton(title: "Options", target: nil, action: nil)
+    options.setAccessibilityIdentifier("options")
+    let menu = NSMenu(title: "Options")
+    menu.delegate = self
+    menu.addItem(withTitle: "Copy", action: #selector(chose(_:)), keyEquivalent: "").target = self
+    menu.addItem(withTitle: "Delete", action: #selector(chose(_:)), keyEquivalent: "").target = self
+    options.menu = menu
+
+    volume.setAccessibilityLabel("Volume")
+    volume.setAccessibilityIdentifier("volume")
+    volume.target = self
+    volume.action = #selector(slid(_:))
+    volume.widthAnchor.constraint(equalToConstant: 200).isActive = true
+
+    let disabled = NSButton(title: "Disabled", target: nil, action: nil)
+    disabled.isEnabled = false
+    disabled.setAccessibilityIdentifier("disabled")
+
+    let double = DoubleClickButton(title: "Double-click me", target: nil, action: nil)
+    double.setAccessibilityIdentifier("double")
+    double.onDoubleClick = { [weak self] in self?.status.stringValue = "Double-clicked" }
+
+    let hover = HoverTarget()
+    hover.setAccessibilityElement(true)
+    hover.setAccessibilityRole(.group)
+    hover.setAccessibilityLabel("Hover target")
+    hover.setAccessibilityIdentifier("hover")
+    hover.onHover = { [weak self] in self?.status.stringValue = "Hovered" }
+    hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
+    hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
+
+    let stack = NSStackView(views: [scroll, note, options, volume, disabled, double, hover, status])
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+    status.widthAnchor.constraint(equalToConstant: 320).isActive = true
+    window.contentView = stack
+    self.window = window
+    window.makeKeyAndOrderFront(nil)
+  }
+
+  func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+
+  func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    let cell = NSTextField(labelWithString: items[row])
+    cell.identifier = NSUserInterfaceItemIdentifier("cell")
+    return cell
+  }
+
+  func tableViewSelectionDidChange(_ notification: Notification) {
+    guard table.selectedRow >= 0 else { return }
+    status.stringValue = "Selected \(items[table.selectedRow])"
+  }
+
+  func menuWillOpen(_ menu: NSMenu) { status.stringValue = "Context menu opened" }
+
+  @objc func chose(_ sender: NSMenuItem) { status.stringValue = "Chose \(sender.title)" }
+
+  @objc func submit(_ sender: NSTextField) { status.stringValue = "Submitted: \(sender.stringValue)" }
+
+  @objc func slid(_ sender: NSSlider) { status.stringValue = "Volume \(Int(sender.doubleValue))" }
+
 }
 
 let app = NSApplication.shared

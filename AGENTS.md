@@ -323,10 +323,13 @@ suites that consume the built packages the way a user would.
   diffs against the source minimal, and name no company a scenario was
   distilled from.
 - `apps/desktop-testbed` (`@e2e-dev/desktop-testbed`, private) - a native
-  AppKit sign-in form (`app/macos/main.swift`, built by `pnpm build:app`
-  into `build/SignInForm.app`) and the e2e suites on `@e2e-dev/desktop`
-  (`tests/` locators only, `tests-agent/` one `agent.act`). Hand-run on a
-  Mac with Accessibility permission; no CI job runs it yet.
+  AppKit app (`app/macos/main.swift`, built by `pnpm build:app` into
+  `build/SignInForm.app`): a sign-in form, and a Controls window with one
+  control per engine capability the form does not reach. Its e2e suites on
+  `@e2e-dev/desktop`: `tests/` locators only, `tests-headed/` the physical
+  pointer and keyboard (`pnpm test:headed`, which moves your pointer), and
+  `tests-agent/` one `agent.act`. Hand-run on a Mac with Accessibility
+  permission and the native driver built; no CI job runs it yet.
 - `examples/` — standalone user-facing projects, one per technology
   (`with-vite`, `with-next`, `with-astro`, `with-angular`, `with-expo`, `with-swiftui`,
   `with-compose`, `with-kotlin-multiplatform`, `with-flutter`, `with-maui`), each the same
