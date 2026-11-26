@@ -124,6 +124,7 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `tapOn: { point: "x,y" }`, `point: "50%,50%"` | `screen.tapAt({ x, y })`, `screen.tapAt({ x: '50%', y: '50%' })`; inside a node, `.tap({ position: { x, y } })` |
 | `doubleTapOn`, `longPressOn` | `.doubleTap()`, `.longPress({ duration })` |
 | `inputText`, `eraseText`, `pressKey: Enter` after a `tapOn` | `.fill('text')`, `.clear()`, `.press('Enter')` on the field's locator |
+| `inputText`, `pressKey: Enter`, `pressKey: backspace` with no field, `eraseText: N` | `device.keyboard.type('text')`, `device.keyboard.press('Enter')`, `device.keyboard.press('Backspace')`, and `press('Backspace')` N times to erase |
 | `inputRandomEmail`, `inputRandomText`, `faker` | `unique()` around a value in `act` params, so the cache still replays; any npm faker for the rest |
 | `copyTextFrom`, `pasteText` | `await locator.textContent()`, then `.fill(text)` |
 | `swipe: { direction: UP }`, `scroll` | `screen.swipe({ direction: 'down' })`; Maestro names the finger's direction, e2e the content's |
@@ -171,7 +172,7 @@ on purpose.
 | Maestro | Use today |
 | --- | --- |
 | The grant-all default, names such as `bluetooth` and `storage` | `app.permissions: 'all'`, which on Android grants every runtime permission the app declares, or accept the prompt with `device.alert('accept')` |
-| `inputText` and `pressKey: Enter` with no field, `eraseText: N`, `pressKey: backspace`, `tab` | `fill` or `press` on the field's locator; `fill` a shortened `inputValue()` to erase; tap the next field for Tab |
+| `pressKey: tab` | Tap the next field |
 | `addMedia` | On an iOS simulator, `xcrun simctl addmedia` before `app.open()`; Android is unchecked. See "Photos for a picker test" under [The device fixture](/mobile#the-device-fixture) |
 | `label` on a command | `-`. The call names each step |
 | `scrollUntilVisible: { centerElement, visibilityPercentage }` | No exact match. After it resolves, read `boundingBox()`, then `screen.swipe({ direction, momentum: 'slow' })` if the node is off center |

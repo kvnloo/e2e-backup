@@ -118,7 +118,7 @@ test('shows the home screen', async ({ agent, app, screen }) => {
 | `.atIndex(n)` | `.nth(n)` |
 | `.tap()`, `.tap({ x, y })`, `.longPress()`, `.multiTap(2)`, `.multiTap(3)` | `.tap()`, `.tap({ position: { x, y } })`, `.longPress()`, `.doubleTap()`, `.tap({ count: 3 })` |
 | `.typeText(t)` | `.pressSequentially(t)` |
-| `.replaceText(t)`, `.clearText()`, `.tapReturnKey()` | `.fill(t)`, `.clear()`, `.press('Enter')` |
+| `.replaceText(t)`, `.clearText()`, `.tapReturnKey()`, `.tapBackspaceKey()` | `.fill(t)`, `.clear()`, `.press('Enter')`, `.press('Backspace')` |
 | `.swipe('up', 'fast')` | `.swipe({ direction: 'down', momentum: 'fast' })`. Detox names the finger's direction, e2e the content's |
 | `list.scroll(200, 'down')` | `list.swipe({ direction: 'down' })`, with no offset |
 | `waitFor(el).toBeVisible().whileElement(list).scroll(...)` | `list.scrollUntilVisible(el)`, with `{ direction: 'up' }` when Detox scrolls up |
@@ -170,7 +170,6 @@ on purpose.
 | `system.element(by.system.label('Allow'))` | `device.alert('accept' \| 'dismiss')`, or `app.permissions` so no prompt shows |
 | `.longPressAndDrag()`, `.swipe()` offset | `.dragTo(target)`, `screen.swipe({ from, to })` |
 | `.scrollTo('bottom')` | `list.scrollUntilVisible(lastRow)`, or the first row with `{ direction: 'up' }` |
-| `.tapBackspaceKey()` | `.fill(t)` with the shorter text |
 | `.setDatePickerDate()`, `.setColumnToValue()`, `.adjustSliderToPosition()` | An `agent.act` goal, or `screen.swipe({ from, to })` on a slider |
 | `permissions` for `health`, `homekit`, `speech`, `faceid`, `userTracking`; values `always`, `inuse`, `limited` | Tap the prompt's button, or `device.alert('accept')` |
 | `device.sendUserNotification()`, `.pinch()` | `client.apps.push()`, `client.interactions.pinch()` on [`unstable_raw`](/reference/mobile#unstable_raw) |

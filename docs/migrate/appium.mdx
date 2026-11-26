@@ -170,7 +170,8 @@ declares `platforms: ['ios', 'android']` on those tests.
 | `mobile: longClickGesture`, `mobile: touchAndHold` on an element | `.longPress({ duration })` |
 | `.setValue(t)`, `.clearValue()` | `.fill(t)`, which replaces the content, and `.clear()` |
 | `.addValue(t)` | `.pressSequentially(t)`, which types key by key at the cursor |
-| `driver.keys('Enter')`, `pressKeyCode(66)` | `.press('Enter')` on the field |
+| `driver.keys('Enter')`, `pressKeyCode(66)`, `driver.keys('Backspace')`, `pressKeyCode(67)` | `.press('Enter')`, `.press('Backspace')` on the field |
+| `driver.keys(text)`, `mobile: type`, `driver.getActiveElement().sendKeys()` | `device.keyboard.type(text)`, and `device.keyboard.press(key)` for one key, into the focused field |
 | `.getText()`, `.getValue()`, `.getAttribute('value')` | `.textContent()`, `.inputValue()` |
 | `.isDisplayed()`, `.isEnabled()`, `.getAttribute('checked')` | `.isVisible()`, `.isEnabled()`, `.isChecked()` |
 | `.isExisting()` | `(await locator.count()) > 0` |
@@ -310,7 +311,7 @@ is not a step, so it skips the report and secret redaction.
 | Appium | Use today |
 | --- | --- |
 | `.getAttribute()` for a label, id, or class, `.isSelected()`, `.getTagName()` | `toHaveAccessibleName` for a label, `toBeSelected` for the selected state. No read for an id, class, or tag name |
-| `pressKeyCode(code)`, `driver.keys('Backspace')` | `.press()` takes `Enter`, `Space`, or one character. Use `.clear()` and `.fill()` |
+| `pressKeyCode(code)`, `longPressKeyCode()`, `mobile: pressKey` for any other key, such as Tab, DPAD, or SEARCH | `.press()` takes `Enter`, `Space`, `Backspace`, or one character. On a TV, `device.pressRemote()` sends the D-pad |
 | `driver.getWindowRect()`, `mobile: deviceInfo` | `device.viewport()` returns size only. Window position and full device information have no equivalent |
 | `UiScrollable` `scrollToEnd()`, `scrollToBeginning()` | Loop `locator.swipe({ direction: 'down' })` until `allTextContents()` stops changing; `'up'` for the beginning |
 | `mobile: selectPickerWheelValue`, date and time pickers, slider values | Swipe the wheel and read `.inputValue()`, or use an `agent.act` goal |

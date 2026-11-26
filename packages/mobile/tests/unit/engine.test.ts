@@ -2072,6 +2072,39 @@ describe('perform', () => {
     expect(h.fake.calls.slice(before).map((call) => call.method)).toEqual([key === 'Enter' ? 'command.keyboard' : 'interactions.type']);
   });
 
+  it('presses Backspace on a field as the delete key agent-device types for \\b, tapping an unfocused field first', async () => {
+    const h = harness();
+    await openAttempt(h);
+    const search = await observed(h, 'Search');
+    const before = h.fake.calls.length;
+    await h.engine.perform!(search.ref, { kind: 'press', key: 'Backspace' }, operation());
+    expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([
+      ['interactions.press', { ref: '@e7', settle: true, settleQuietMs: 150 }],
+      ['interactions.type', { text: '\b' }],
+    ]);
+  });
+
+  it.each([
+    ['Enter', 'command.keyboard', { action: 'enter' }],
+    ['Backspace', 'interactions.type', { text: '\b' }],
+    ['Space', 'interactions.type', { text: ' ' }],
+    ['a', 'interactions.type', { text: 'a' }],
+  ] as const)('presses %s on the focused field through %s', async (key, method, args) => {
+    const h = harness();
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await h.engine.keyboard!.press(key, operation());
+    expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([[method, args]]);
+  });
+
+  it.each(['Tab', 'Escape', 'Delete', 'ArrowLeft', 'Shift+Backspace'])('refuses %s on the focused field before any device call', async (key) => {
+    const h = harness();
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await expect(h.engine.keyboard!.press(key, operation())).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    expect(h.fake.calls).toHaveLength(before);
+  });
+
   it.each(['e2', ''])('presses the innermost control even when the row ref is %j', async (rowRef) => {
     const h = harness();
     h.fake.respond('capture.snapshot', () => ({
@@ -2115,9 +2148,10 @@ describe('perform', () => {
       { kind: 'setInputFiles', paths: ['/tmp/x'] },
       { kind: 'setInputFilePayloads', files: [{ name: 'x', mimeType: 'text/plain', buffer: new Uint8Array([120]) }] },
       { kind: 'scrollIntoView' },
-      // Named keys other than Enter and Space, and every modifier, have no soft-keyboard equivalent.
+      // Named keys other than Enter, Space, and Backspace, and every modifier, have no soft-keyboard equivalent.
       { kind: 'press', key: 'Escape' },
       { kind: 'press', key: 'Tab' },
+      { kind: 'press', key: 'Delete' },
       { kind: 'press', key: 'Control+a' },
       { kind: 'press', key: 'Shift+Enter' },
       // A tap would activate the row; focus is for editable fields only.
@@ -2365,6 +2399,45 @@ describe('device fixture', () => {
     const before = h.fake.calls.length;
     await fixture(h).pressRemote(key);
     expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([['command.tvRemote', { platform: 'ios', button }]]);
+  });
+
+  it('device.keyboard types and presses into the focused field, labelling each step without the text', async () => {
+    const h = harness();
+    await openAttempt(h);
+    const device = fixture(h);
+    const before = h.fake.calls.length;
+    await device.keyboard.type('hello');
+    await device.keyboard.press('Backspace');
+    await device.keyboard.press('Enter');
+    expect(h.fake.calls.slice(before).map((call) => [call.method, call.args])).toEqual([
+      ['interactions.type', { text: 'hello' }],
+      ['interactions.type', { text: '\b' }],
+      ['command.keyboard', { action: 'enter' }],
+    ]);
+    expect(declared?.keyboard?.type?.label?.('hello')).toBe('5 chars');
+    expect(declared?.keyboard?.press?.label?.('Backspace')).toBe('Backspace');
+  });
+
+  it.each([
+    ['Tab', 'UNSUPPORTED_CAPABILITY'],
+    ['Control+a', 'UNSUPPORTED_CAPABILITY'],
+    ['Backspace2', 'INVALID_ARGUMENT'],
+    ['', 'INVALID_ARGUMENT'],
+    [8, 'INVALID_ARGUMENT'],
+  ] as const)('device.keyboard.press(%j) fails with %s before any device call', async (key, code) => {
+    const h = harness();
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await expect(fixture(h).keyboard.press(key as never)).rejects.toMatchObject({ code });
+    expect(h.fake.calls).toHaveLength(before);
+  });
+
+  it('device.keyboard.type refuses anything but a string, such as a Secret, before any device call', async () => {
+    const h = harness();
+    await openAttempt(h);
+    const before = h.fake.calls.length;
+    await expect(fixture(h).keyboard.type({ name: 'PASSWORD' } as never)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(h.fake.calls).toHaveLength(before);
   });
 
   it.each(['Menu', 'Home', 'toString', '', 3])('device.pressRemote refuses %j, a name outside the list, before any device call', async (key) => {
