@@ -135,11 +135,15 @@ export interface DesktopWindow {
 /** What a target launches: a `.app` bundle on disk, or an installed app by bundle id or name. */
 type LaunchTarget = { readonly path: string; readonly label: string } | { readonly bundleId: string; readonly label: string };
 
-/** A launch whose outcome is unknown: its token, and the driver's answer, which may still name the process it started. */
+/**
+ * A launch whose outcome is unknown: its token, and the driver's answer,
+ * which may still name the process it started, or say it started none
+ * (`not_started`: refused before `open` ran).
+ */
 interface PendingLaunch {
   readonly target: string;
   readonly token: string;
-  readonly settled: Promise<Launched | undefined>;
+  readonly settled: Promise<Launched | 'not_started' | undefined>;
 }
 
 /** What a state directory's launch record keeps: the launch's token, and once the process is known, its id and when it started. */
@@ -456,7 +460,7 @@ export class DesktopSurface {
     } catch (cause) {
       // A launch the driver refused started nothing; any other may have started the app, which the next quit looks for.
       if (started !== undefined && !(cause instanceof DriverFailure && cause.notDelivered)) {
-        this.pending = { target: target.label, token, settled: started.then((answer: Envelope<Launched>) => (answer.ok ? answer.data : undefined), () => undefined) };
+        this.pending = { target: target.label, token, settled: started.then((answer: Envelope<Launched>) => (answer.ok ? answer.data : answer.error.disposition?.delivery === 'not_delivered' ? 'not_started' : undefined), () => undefined) };
       }
       throw this.launchFailure(cause, target);
     }
@@ -626,6 +630,12 @@ export class DesktopSurface {
       const wait = Math.min(Math.max(timeoutMs - EXIT_WAIT_MS, 0), PENDING_SETTLE_MS);
       const settled = await settleWithin(pending.settled, wait, signal);
       if (signal.aborted) throw new EngineError('CANCELLED', `looking for the process a launch of ${pending.target} started was cancelled`, { retryable: false });
+      // The driver gave the launch up before `open` ran: it started no app, and there is nothing to look for.
+      if (settled === 'not_started') {
+        this.pending = undefined;
+        if (this.home !== undefined) await rm(path.join(this.home, APP_FILE), { force: true }).catch(() => undefined);
+        return;
+      }
       // A process carrying the launch's token is its own, whether or not the driver reported it.
       const carriers = await this.requireDriver().processesCarrying(`${LAUNCH_TOKEN}=${pending.token}`);
       if (carriers === null) {

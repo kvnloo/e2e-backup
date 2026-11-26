@@ -259,6 +259,14 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(late)).toBe(true);
   });
 
+  it('ends a launch the driver gave up before open ran without looking for an app it never started', async () => {
+    const { surface } = await initialized({ launch: [{ ...failure('TIMEOUT', 'not_delivered', 'the launch was given up before open ran'), sleepMs: 1_000 }] });
+    await expect(surface.restart({ ...operation(), timeoutMs: 600 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    const started = Date.now();
+    await surface.endAttempt({ signal, timeoutMs: 5_000 });
+    expect(Date.now() - started).toBeLessThan(1_500);
+  });
+
   it('keeps a launch pending when the quit has no time left to look for its late app, so the next quit still finds it', async () => {
     const { surface, fake } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified', 'no new process carries the token', { kind: 'unclaimed' })] });
     await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
