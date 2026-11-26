@@ -81,12 +81,16 @@ export function declaredAnnotations(
 ): TestAnnotation[] {
   const layers = [...chain.map((node) => node.options), options];
   const raw: TestAnnotation[] = [];
-  for (const layer of layers) {
-    if (layer.annotation === undefined) continue;
-    if (Array.isArray(layer.annotation)) raw.push(...layer.annotation);
-    else raw.push(layer.annotation as TestAnnotation);
+  for (const { annotation } of layers) {
+    if (annotation === undefined) continue;
+    raw.push(...(isAnnotationList(annotation) ? annotation : [annotation]));
   }
   return sanitizeAnnotations(raw, redact);
+}
+
+/** `Array.isArray` does not narrow a readonly array out of a union. */
+function isAnnotationList(value: TestAnnotation | readonly TestAnnotation[]): value is readonly TestAnnotation[] {
+  return Array.isArray(value);
 }
 
 /**

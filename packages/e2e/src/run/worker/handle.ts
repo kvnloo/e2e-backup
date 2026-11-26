@@ -31,7 +31,7 @@ function resolveEntry(): { path: string; execArgv: string[] } {
 }
 
 /** Run-wide settings every child-process worker boots with. */
-export type ChildProcessSpawnOptions = Omit<WorkerBootstrap, 'targetName' | 'workerSlot' | 'workerIndex' | 'parallelIndex'> & {
+export type ChildProcessSpawnOptions = Omit<WorkerBootstrap, 'targetName' | 'slots'> & {
   /** The environment each target's workers are spawned with. */
   readonly envFor: (targetName: string) => NodeJS.ProcessEnv;
   /** Handles a worker's call to a service function. */
@@ -43,7 +43,7 @@ export function childProcessSpawner(options: ChildProcessSpawnOptions): SpawnUni
   const { envFor, callService, ...bootstrap } = options;
   return (targetName, slots, events) =>
     new ChildProcessRunner(
-      { ...bootstrap, targetName, ...slots },
+      { ...bootstrap, targetName, slots },
       { projectRoot: bootstrap.projectRoot, env: envFor(targetName), callService },
       events,
     );
@@ -69,8 +69,8 @@ class ChildProcessRunner implements UnitRunner {
       env: {
         ...spawn.env,
         [WARNED_TSCONFIGS_ENV]: warnedTsconfigs(),
-        TEST_WORKER_INDEX: String(bootstrap.workerIndex),
-        TEST_PARALLEL_INDEX: String(bootstrap.parallelIndex),
+        TEST_WORKER_INDEX: String(bootstrap.slots.workerIndex),
+        TEST_PARALLEL_INDEX: String(bootstrap.slots.parallelIndex),
       },
     });
     this.child.on('message', (message) => {

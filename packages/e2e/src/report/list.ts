@@ -17,7 +17,7 @@ import type { RunEventFact, RunEventOf, RunEventResult, SetupStep } from '../run
 import type { AppLogRecord, StepRecord } from '@e2e-dev/core/lib/run/steps';
 import { cleanupErrorsOf, expectedFailureOf, failureBeforeSkip, type ArtifactRecord, type AttemptRecord, type AttemptStatus, type FailureEvidence, type ResultStatus, type SerialGroupRecord } from '@e2e-dev/core/lib/run/records';
 import type { Reporter, ReporterSummary } from '../run-types.ts';
-import type { TestAnnotation } from '@e2e-dev/core/lib/types';
+import { annotationLabel, shownAnnotations, type Annotated } from './annotations.ts';
 import { builtin } from './builtin-id.ts';
 import { projectSource } from './build.ts';
 import { codeFrame, userFrame } from './code-frame.ts';
@@ -139,8 +139,8 @@ interface ResultDetails {
   readonly cleanupErrors: readonly SerializedError[];
   /** Why the told attempt skipped itself, when it failed anyway. */
   readonly skipReason: string | undefined;
-  /** Annotations recorded on the verdict attempt, when any. */
-  readonly annotations?: readonly TestAnnotation[] | undefined;
+  /** The told attempt or member, when one ran: its annotations are the ones shown. */
+  readonly annotated: Annotated | undefined;
   readonly replays: readonly ReplayNotice[];
 }
 
@@ -190,7 +190,7 @@ function attemptDetails(attempts: readonly AttemptRecord[], passed: boolean, con
     appLog: appLogSummary(told?.appLog ?? []),
     cleanupErrors: cleanupErrorsOf(attempts),
     skipReason: told?.status === 'skipped' ? undefined : told?.skip?.reason,
-    ...(told?.annotations === undefined || told.annotations.length === 0 ? {} : { annotations: told.annotations }),
+    annotated: told,
     replays: replayNotices(steps, configured),
   };
 }
@@ -259,7 +259,7 @@ function serialMemberDetails(group: SerialGroupRecord, testId: string, passed: b
     appLog: appLogSummary(own?.appLog ?? []),
     cleanupErrors: cleanupErrorsOf(group.attempts),
     skipReason: neverRan ? undefined : own.skip?.reason,
-    ...(own?.annotations === undefined || own.annotations.length === 0 ? {} : { annotations: own.annotations }),
+    annotated: neverRan ? undefined : own,
     replays: replayNotices(steps, configured),
   };
 }
@@ -923,7 +923,7 @@ export class ListReporter {
     // Read before `detailsOf` releases the result's serial group.
     const skippedAfter = failureBeforeSkip(result, (id) => this.pendingSerial.get(id)?.group);
     const id = resultId(result.test.id, result.target.name, result.agent, result.repeat);
-    const { durationMs, usage, models, cache, error, videos, screenshots, failure, screenPath, appLog, skipReason, annotations, replays, cleanupErrors } =
+    const { durationMs, usage, models, cache, error, videos, screenshots, failure, screenPath, appLog, skipReason, annotated, replays, cleanupErrors } =
       this.detailsOf(result);
     this.screenshots.push(...screenshots);
     addUsage(this.runUsage, usage);
@@ -946,7 +946,7 @@ export class ListReporter {
       this.window.redraw();
       return;
     }
-    const resolvedAnnotations = annotations ?? result.test.annotations;
+    const annotations = shownAnnotations(annotated, result.test.annotations);
     const line: TestLine = {
       title,
       declarationIndex: result.test.declarationIndex,
@@ -956,7 +956,7 @@ export class ListReporter {
       firstErrorLine: error === undefined ? undefined : bounded(error.message).split('\n')[0],
       skipReason: result.skip === undefined ? undefined : bounded(result.skip.reason),
       ...expectedFailureLine(result),
-      ...(resolvedAnnotations === undefined || resolvedAnnotations.length === 0 ? {} : { annotations: resolvedAnnotations }),
+      ...(annotations.length === 0 ? {} : { annotations }),
       cleanupErrors,
       steps,
       replays,
@@ -1110,11 +1110,7 @@ export class ListReporter {
     const annotations = line.annotations;
     if (annotations === undefined || annotations.length === 0) return [];
     return annotations.map((annotation) => {
-      const label =
-        annotation.description === undefined || annotation.description === ''
-          ? `[${bounded(annotation.type)}]`
-          : `[${bounded(annotation.type)}] ${bounded(annotation.description)}`;
-      const glance = fitColumns(label, terminalColumns() - ERROR_GLANCE_INDENT);
+      const glance = fitColumns(annotationLabel(annotation, bounded), terminalColumns() - ERROR_GLANCE_INDENT);
       return `     ${this.pc.dim(`${F_RIGHT} ${glance}`)}`;
     });
   }

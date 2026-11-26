@@ -145,7 +145,7 @@ describe('TargetWorker disposal', () => {
     }, async () => ({
       config, target: config.targets[0]!, sessionStore: SessionStore.create('run', tmpdir()),
       runId: 'run', artifactsRoot: tmpdir(), rerunDir: undefined, headed: false,
-      workerSlot: 0, workerIndex: 0, parallelIndex: 0, env: {}, isolated: true, holdSteps: false, services: {}, resolvePairs: async () => ({ pairs: [], missing: [] }),
+      slots: { workerSlot: 0, workerIndex: 0, parallelIndex: 0 }, env: {}, isolated: true, holdSteps: false, services: {}, resolvePairs: async () => ({ pairs: [], missing: [] }),
     }));
     worker.start();
     await ready.promise;
@@ -185,7 +185,7 @@ describe('TargetWorker disposal', () => {
     }, async () => ({
       config, target: config.targets[0]!, sessionStore: SessionStore.create('run', tmpdir()),
       runId: 'run', artifactsRoot: tmpdir(), rerunDir: undefined, headed: false,
-      workerSlot: 0, workerIndex: 0, parallelIndex: 0, env: {}, isolated: true, holdSteps: false, services: {}, resolvePairs: async () => ({ pairs: [], missing: [] }),
+      slots: { workerSlot: 0, workerIndex: 0, parallelIndex: 0 }, env: {}, isolated: true, holdSteps: false, services: {}, resolvePairs: async () => ({ pairs: [], missing: [] }),
     }));
     worker.start();
     await ready.promise;

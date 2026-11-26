@@ -4,8 +4,9 @@
  */
 
 import type { EngineHandle, EngineIsolation } from '../engine/index.ts';
-import type { TestFixtures, TestInfo, WorkerInfo } from '../types.ts';
+import type { TestFixtures } from '../types.ts';
 import type { ServiceValues } from './services.ts';
+import type { TestInfo, WorkerInfo } from './test-info.ts';
 
 /**
  * How long one fixture instance lives. `test`, the default, is one instance
@@ -123,7 +124,9 @@ export type FixtureOverrides<Sees, WorkerSees, Base = Sees, Worker = WorkerSees>
  * The override of a worker fixture with options receives worker fixtures
  * (`WorkerSees`) only, whatever its scope: TypeScript can't type the
  * function of a tuple by the `scope` beside it. A function without options
- * is a test fixture, so it receives every fixture (`Sees`).
+ * is a test fixture, so it receives every fixture (`Sees`). The same holds
+ * for its info argument: typed `WorkerInfo`, it is the test's `TestInfo` at
+ * run time when the override's scope is `test`, which extends `WorkerInfo`.
  */
 export type FixtureOverride<Base, Worker, K extends keyof Base, Sees, WorkerSees> = K extends keyof Worker
   ? FixtureFn<Sees, Base[K], TestInfo> | readonly [FixtureFn<WorkerSees, Base[K], WorkerInfo>, { readonly scope?: FixtureScope; readonly auto?: boolean }]

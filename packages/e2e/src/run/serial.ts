@@ -285,8 +285,8 @@ export class SerialGroupProgress {
       if (memberIndex < next) continue;
       record.members.push(
         wasRunning && memberIndex === next
-          ? memberFailedWith(record, memberIndex, member.test.id, error, status)
-          : skippedMember(record.id, memberIndex, member.test.id, skip),
+          ? memberFailedWith(record, memberIndex, member.test, error, status)
+          : skippedMember(record.id, memberIndex, member.test, skip),
       );
     }
     return this.settled([...this.finished, finishedSerialAttempt(record, true)], members, target);
@@ -303,7 +303,7 @@ export class SerialGroupProgress {
     if (!this.inFlight) return this.finished.length === 0 ? undefined : this.settled(this.finished, members, target);
     const record = this.attemptInFlight('interrupted', undefined);
     for (const [memberIndex, member] of members.entries()) {
-      if (memberIndex >= this.currentMembers.length) record.members.push(skippedMember(record.id, memberIndex, member.test.id, skip));
+      if (memberIndex >= this.currentMembers.length) record.members.push(skippedMember(record.id, memberIndex, member.test, skip));
     }
     return this.settled([...this.finished, finishedSerialAttempt(record, true)], members, target);
   }
@@ -436,7 +436,7 @@ async function runSerialAttempt(
       skipRemaining = interruptedMemberSkip(host.interruptSignal);
     }
     if (skipRemaining !== undefined) {
-      finishMember(skippedMember(attemptId, memberIndex, member.test.id, skipRemaining));
+      finishMember(skippedMember(attemptId, memberIndex, member.test, skipRemaining));
       continue;
     }
     const registered = findRegistered(realm, member.test);
@@ -463,7 +463,7 @@ async function runSerialAttempt(
     hookFailure = await host.realms.enterScopes(realm, registered, shared.session);
     if (hookFailure !== undefined) {
       skipRemaining = { cause: 'hook-failed', reason: hookFailure.message };
-      finishMember(skippedMember(attemptId, memberIndex, member.test.id, skipRemaining));
+      finishMember(skippedMember(attemptId, memberIndex, member.test, skipRemaining));
       continue;
     }
     host.pairStarted(member);
@@ -543,15 +543,15 @@ function endBeforeMembers(
   if (interruptSignal.aborted) {
     record.status = 'interrupted';
     const skip = interruptedMemberSkip(interruptSignal);
-    members.forEach((member, memberIndex) => record.members.push(skippedMember(record.id, memberIndex, member.test.id, skip)));
+    members.forEach((member, memberIndex) => record.members.push(skippedMember(record.id, memberIndex, member.test, skip)));
     return;
   }
   record.status = 'failed';
   members.forEach((member, memberIndex) => {
     record.members.push(
       memberIndex === 0
-        ? memberFailedWith(record, 0, member.test.id, error, 'failed')
-        : skippedMember(record.id, memberIndex, member.test.id, predecessorFailed(0)),
+        ? memberFailedWith(record, 0, member.test, error, 'failed')
+        : skippedMember(record.id, memberIndex, member.test, predecessorFailed(0)),
     );
   });
 }
@@ -560,21 +560,30 @@ function endBeforeMembers(
 function memberFailedWith(
   record: SerialAttemptRecord,
   index: number,
-  testId: string,
+  test: MemberTest,
   error: SerializedError,
   status: 'failed' | 'timed-out',
 ): SerialMemberRecord {
   return {
     id: `${record.id}:member:${index}`,
     index,
-    testId,
+    testId: test.id,
     status,
     startedAt: record.startedAt,
     durationMs: 0,
     steps: [],
     error,
+    ...declaredAnnotations(test),
     secondaryErrors: [],
   };
+}
+
+/** What a member record the worker never wrote reads of its test. */
+type MemberTest = Pick<CollectedTest, 'id' | 'annotations'>;
+
+/** A member the worker never reported keeps what its test declares, as a member that ran would. */
+function declaredAnnotations(test: MemberTest): Pick<SerialMemberRecord, 'annotations'> {
+  return test.annotations.length === 0 ? {} : { annotations: [...test.annotations] };
 }
 
 function isFailedMember(member: SerialMemberRecord): member is SerialMemberRecord & { status: FailedStatus } {
@@ -599,18 +608,19 @@ function predecessorFailed(memberIndex: number): SkipInfo {
 function skippedMember(
   attemptId: string,
   index: number,
-  testId: string,
+  test: MemberTest,
   skip: SkipInfo,
 ): SerialMemberRecord {
   return {
     id: `${attemptId}:member:${index}`,
     index,
-    testId,
+    testId: test.id,
     status: 'skipped',
     startedAt: timestamp(),
     durationMs: 0,
     steps: [],
     skip,
+    ...declaredAnnotations(test),
     secondaryErrors: [],
   };
 }

@@ -206,9 +206,7 @@ class InProcessRunner implements UnitRunner {
       artifactsRoot: this.options.artifactsRoot,
       rerunDir: this.options.rerunDir,
       headed: this.options.headed,
-      workerSlot: this.slots.workerSlot,
-      workerIndex: this.slots.workerIndex,
-      parallelIndex: this.slots.parallelIndex,
+      slots: this.slots,
       env: {
         ...this.options.envFor(this.targetName),
         TEST_WORKER_INDEX: String(this.slots.workerIndex),

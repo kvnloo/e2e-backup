@@ -287,6 +287,29 @@ describe('multiple errors in teardown', () => {
     expect('a').toBe('b');
   });
 });
+
+describe('passes then afterEach fails', () => {
+  test.afterEach(async ({}, testInfo) => {
+    record(testInfo, 'afterEach-later');
+  });
+
+  test.afterEach(async () => {
+    throw new Error('afterEach boom');
+  });
+
+  test('passes before a failing afterEach', async () => {
+    expect(1).toBe(1);
+  });
+});
+
+describe('steps', () => {
+  test('reads info in a step', async ({}, testInfo) => {
+    await test.step('read info', async () => {
+      expect(test.info()).toBe(testInfo);
+      record(test.info(), 'in-step');
+    });
+  });
+});
 `;
 
     const { outcome, project } = await runProject(
@@ -341,6 +364,20 @@ describe('multiple errors in teardown', () => {
           errorCodes: [],
         });
       }
+
+      // afterEach hooks run in reverse declaration order: the later one sees the earlier one's failure.
+      for (const tag of ['afterEach-later', 'fixture-teardown']) {
+        expect(byTitleAndTag('passes before a failing afterEach', tag)).toMatchObject({
+          status: 'failed',
+          errorCode: 'ERROR',
+          errorCodes: ['ERROR'],
+          errorPhases: ['afterEach'],
+        });
+      }
+
+      const inStep = byTitleAndTag('reads info in a step', 'in-step');
+      expect(inStep).toMatchObject({ title: 'reads info in a step', expectedStatus: 'passed', errorCodes: [] });
+      expect(inStep?.['status']).toBeUndefined();
 
       // Fixture teardown runs after both afterEach hooks and sees both errors (body + afterEach).
       const multiTeardown = byTitleAndTag('body fails then afterEach fails', 'fixture-teardown');
@@ -474,6 +511,45 @@ test('runs after respawn', async ({}, testInfo) => {
       expect(flakyResult.attempts[0]!.annotations).toEqual([{ type: 'attempt', description: 'first' }]);
       expect(flakyResult.attempts[1]!.annotations).toEqual([{ type: 'attempt', description: 'second' }]);
       expect(flakyResult.annotations).toEqual([{ type: 'attempt', description: 'second' }]);
+    } finally {
+      project.cleanup();
+    }
+  });
+
+  it('passes WorkerInfo to a worker fixture override and TestInfo to a test-scoped one', async () => {
+    const { engine } = createFakeEngine();
+    const testSource = `import { appendFileSync } from 'node:fs';
+import path from 'node:path';
+import { test as base } from 'e2e';
+
+const test = base
+  .extend({
+    account: [async ({}, use) => {
+      await use('acct');
+    }, { scope: 'worker' }],
+  })
+  .extend({
+    account: [async ({ account }, use, workerInfo) => {
+      await use(account + ':w' + workerInfo.workerIndex + ':' + ('title' in workerInfo ? 'test' : 'worker'));
+    }, { scope: 'worker' }],
+  })
+  .extend({
+    account: [async ({ account }, use, info) => {
+      await use(account + ':' + ('title' in info ? String(info.title) : 'worker'));
+    }, { scope: 'test' }],
+  });
+
+test('reads its account', async ({ account }, testInfo) => {
+  appendFileSync(path.join(testInfo.config.projectRoot, 'accounts.txt'), account);
+});
+`;
+    const { outcome, project } = await runProject(
+      { 'tests/overrides.e2e.ts': testSource },
+      { config: engineConfig(engine, { retries: 0 }) },
+    );
+    try {
+      expect(outcome.report.run.results.map((result) => result.status)).toEqual(['passed']);
+      expect(readFileSync(path.join(project.dir, 'accounts.txt'), 'utf8')).toMatch(/^acct:w\d+:worker:reads its account$/);
     } finally {
       project.cleanup();
     }

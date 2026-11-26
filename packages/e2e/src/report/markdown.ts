@@ -44,6 +44,7 @@ import {
   toldAttempt,
 } from './failure-text.ts';
 import { cell, code, formatDuration, link, MAX_ID_CHARS, MAX_PATH_CHARS, MAX_TITLE_CHARS, plural } from './markdown-text.ts';
+import { annotationLabel } from './annotations.ts';
 import { outcome, type Outcome } from './outcome.ts';
 import { isExploreVerdict } from './traces.ts';
 import { posixRelative } from './write.ts';
@@ -460,9 +461,7 @@ function testRow({ result, final }: Entry, withAgent: boolean): string {
   }
   for (const annotation of result.annotations ?? []) {
     notes.push(
-      annotation.description === undefined || annotation.description === ''
-        ? cell(annotation.type)
-        : `${cell(annotation.type)}: ${cell(annotation.description)}`,
+      annotationLabel(annotation, cell),
     );
   }
   const name = `${testName(result)}${notes.length === 0 ? '' : ` (${notes.join('; ')})`}`;

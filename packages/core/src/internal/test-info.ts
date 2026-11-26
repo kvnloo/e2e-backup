@@ -24,16 +24,19 @@ export const MAX_ANNOTATION_DESCRIPTION_BYTES = 8192;
 /** Max annotations kept per attempt or result in reports. */
 export const MAX_ANNOTATIONS = 256;
 
-const TEST_INFO_ERROR_PHASES: ReadonlySet<string> = new Set<NonNullable<TestInfoError['phase']>>([
-  'launch',
-  'beforeEach',
-  'body',
-  'afterEach',
-  'cleanup',
-]);
+type TestInfoErrorPhase = NonNullable<TestInfoError['phase']>;
 
-function isTestInfoErrorPhase(value: string): value is NonNullable<TestInfoError['phase']> {
-  return TEST_INFO_ERROR_PHASES.has(value);
+/** Every phase `TestInfoError` names; the record type fails to compile when the union and this list part. */
+const TEST_INFO_ERROR_PHASES: Readonly<Record<TestInfoErrorPhase, true>> = {
+  launch: true,
+  beforeEach: true,
+  body: true,
+  afterEach: true,
+  cleanup: true,
+};
+
+function isTestInfoErrorPhase(value: string): value is TestInfoErrorPhase {
+  return Object.hasOwn(TEST_INFO_ERROR_PHASES, value);
 }
 
 /**
@@ -136,7 +139,7 @@ export function resolveOutputPath(outputDir: string, pathSegments: readonly stri
 /**
  * Normalizes, redacts, sanitizes, and bounds annotations before they enter a
  * record or report. Invalid entries pushed at runtime are ignored rather than
- * breaking report schema validation.
+ * breaking report schema validation, and an empty description is dropped.
  */
 export function sanitizeAnnotations(
   annotations: readonly unknown[],
@@ -151,12 +154,12 @@ export function sanitizeAnnotations(
     const type = truncateUtf8(sanitizeRecordedText(redact(rawType)), MAX_ANNOTATION_TYPE_BYTES);
     if (type.trim() === '') continue;
     const rawDescription = entry['description'];
-    if (typeof rawDescription === 'string') {
-      const description = truncateUtf8(sanitizeRecordedText(redact(rawDescription)), MAX_ANNOTATION_DESCRIPTION_BYTES);
-      result.push({ type, description });
-    } else {
-      result.push({ type });
-    }
+    const description =
+      typeof rawDescription === 'string'
+        ? truncateUtf8(sanitizeRecordedText(redact(rawDescription)), MAX_ANNOTATION_DESCRIPTION_BYTES)
+        : '';
+    // An empty description is no description, so reports test one thing.
+    result.push(description === '' ? { type } : { type, description });
   }
   return result;
 }

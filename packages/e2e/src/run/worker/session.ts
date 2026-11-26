@@ -19,7 +19,7 @@ import type { SessionStore } from '@e2e-dev/core/lib/run/sessions';
 import type { HoldReads, StepHold } from '../step-hold.ts';
 import type { HeldTestTools } from './held-test-tools.ts';
 import { countsTowardFailureLimit, disappearedResult } from '../units.ts';
-import type { MainToWorker, RunUnitMessage, WirePair, WorkerToMain } from './protocol.ts';
+import type { MainToWorker, RunUnitMessage, WirePair, WorkerSlots, WorkerToMain } from './protocol.ts';
 
 /** Pairs resolved locally for one unit, plus identities that vanished. */
 export interface ResolvedUnitPairs {
@@ -52,12 +52,8 @@ export interface TargetWorkerDeps {
   /** See `TargetExecutorOptions.rerunDir`. */
   readonly rerunDir: string | undefined;
   readonly headed: boolean;
-  /** See `TargetExecutorOptions.workerSlot`. */
-  readonly workerSlot: number;
-  /** See `TargetExecutorOptions.workerIndex`. */
-  readonly workerIndex: number;
-  /** See `TargetExecutorOptions.parallelIndex`. */
-  readonly parallelIndex: number;
+  /** See `TargetExecutorOptions.slots`. */
+  readonly slots: WorkerSlots;
   /** See `TargetExecutorOptions.env`. */
   readonly env: Readonly<Record<string, string | undefined>>;
   /** Whether the worker has a process of its own; see `TargetExecutorOptions.isolated`. */
@@ -141,9 +137,8 @@ export class TargetWorker {
         rerunDir: deps.rerunDir,
         sessionStore: deps.sessionStore,
         headed: deps.headed,
-        workerSlot: deps.workerSlot,
-        workerIndex: deps.workerIndex,
-        parallelIndex: deps.parallelIndex,
+        workerSlot: deps.slots.workerSlot,
+        slots: deps.slots,
         env: deps.env,
         isolated: deps.isolated,
         services: deps.services,

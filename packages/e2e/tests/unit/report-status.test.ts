@@ -49,6 +49,7 @@ function failedResult(error: SerializedError, title = 'case'): ResultRecord {
       declarationIndex: 0,
       sessions: [],
       tags: [],
+      annotations: [],
       source: undefined,
       file: 'tests/case.e2e.ts',
       id: `tests/case.e2e.ts::suite::${title}`,

@@ -22,8 +22,8 @@ export interface TestIdentity {
   readonly sessions: readonly string[];
   /** The tags the test declares, outermost describe first, each once; what `--tag` selects on. */
   readonly tags: readonly string[];
-  /** Static annotations declared on the test and its enclosing describes, outermost first. */
-  readonly annotations?: readonly TestAnnotation[];
+  /** Static annotations declared on the test and its enclosing describes, outermost first, redacted; `[]` when none. */
+  readonly annotations: readonly TestAnnotation[];
   readonly source: SourceLocation | undefined;
   /** Normalized project-root-relative file path with `/` separators. */
   readonly file: string;

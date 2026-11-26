@@ -7,6 +7,7 @@ import { BLOCKABLE_CODES } from '@e2e-dev/core/lib/agent/executor';
 import { DEFAULT_LIMITS } from '@e2e-dev/core/lib/config/agent';
 import type { ResolvedConfig, ResolvedLimits, ResolvedTarget } from '@e2e-dev/core/lib/config/resolve';
 import type { AgentErrorCode, TestAnnotation } from '@e2e-dev/core/lib/types';
+import { shownAnnotations } from './annotations.ts';
 import type { ErrorCategory, ErrorDetails, ErrorPhase, HookScope, SerializedError } from '@e2e-dev/core/lib/internal/errors';
 import { resultId, timestamp } from '@e2e-dev/core/lib/internal/ids';
 import { obj } from '@e2e-dev/core/lib/internal/objects';
@@ -690,32 +691,18 @@ function serializeResult(
   };
 }
 
-/**
- * Canonical annotation policy for report-1: every attempt that ran records its
- * own annotations (declared + runtime pushes, redacted); `result.annotations`
- * is the verdict attempt's (or verdict serial member's), falling back to the
- * test's declared annotations only when no attempt ran.
- */
+/** The verdict attempt's annotations, or the verdict serial member's; see `shownAnnotations`. */
 function resultAnnotations(
   result: ResultRecord,
   serialGroupsById: ReadonlyMap<string, SerialGroupRecord>,
 ): readonly TestAnnotation[] {
-  if (result.serialGroupId !== undefined) {
-    const group = serialGroupsById.get(result.serialGroupId);
-    if (group !== undefined) {
-      let verdict: SerialMemberRecord | undefined;
-      for (const attempt of group.attempts) {
-        if (attempt.cutRetry) continue;
-        const member = attempt.members.find((candidate) => candidate.testId === result.test.id);
-        if (member !== undefined) verdict = member;
-      }
-      if (verdict?.annotations !== undefined) return verdict.annotations;
-    }
-    return result.test.annotations ?? [];
-  }
-  const last = result.attempts.at(-1);
-  if (last !== undefined) return last.annotations ?? [];
-  return result.test.annotations ?? [];
+  if (result.serialGroupId === undefined) return shownAnnotations(result.attempts.at(-1), result.test.annotations);
+  const group = serialGroupsById.get(result.serialGroupId);
+  const verdict = group?.attempts
+    .filter((attempt) => !attempt.cutRetry)
+    .flatMap((attempt) => attempt.members.filter((member) => member.testId === result.test.id))
+    .at(-1);
+  return shownAnnotations(verdict, result.test.annotations);
 }
 
 /** The result's `expectedFailure` field, from its last attempt's mark. */

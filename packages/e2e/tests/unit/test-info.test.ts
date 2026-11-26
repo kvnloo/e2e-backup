@@ -69,15 +69,17 @@ describe('sanitizeAnnotations', () => {
         'not-an-object',
         { type: 'long-' + 'a'.repeat(400), description: 'b'.repeat(9000) },
         { type: 'non-string-desc', description: 42 },
+        { type: 'empty-desc', description: '' },
       ],
       redact,
     );
-    expect(sanitized).toHaveLength(4);
+    expect(sanitized).toHaveLength(5);
     expect(sanitized[0]).toEqual({ type: 'issue', description: 'token [REDACTED:token] leaked' });
     expect(sanitized[1]).toEqual({ type: 'owner' });
     expect(Buffer.byteLength(sanitized[2]!.type, 'utf8')).toBeLessThanOrEqual(MAX_ANNOTATION_TYPE_BYTES);
     expect(Buffer.byteLength(sanitized[2]!.description!, 'utf8')).toBeLessThanOrEqual(MAX_ANNOTATION_DESCRIPTION_BYTES);
     expect(sanitized[3]).toEqual({ type: 'non-string-desc' });
+    expect(sanitized[4]).toEqual({ type: 'empty-desc' });
   });
 
   it('caps the number of annotations at MAX_ANNOTATIONS', () => {
@@ -313,7 +315,7 @@ describe('reporter rendering of annotations', () => {
     expect(md).toContain('issue: `https://example.com/issues/42?a=1&b=2`; owner');
     const result = report.run.results[0]!;
     const trace = renderTracePage(report, result, outcome(result, new Map()));
-    expect(trace).toContain('Annotations: `issue` `https://example.com/issues/42?a=1&b=2` · `owner`');
+    expect(trace).toContain('Annotations: `issue`: `https://example.com/issues/42?a=1&b=2` · `owner`');
   });
 
   it('prints annotation glance lines in the list reporter', () => {
@@ -363,8 +365,8 @@ describe('reporter rendering of annotations', () => {
       },
     });
     const output = chunks.join('');
-    expect(output).toContain('[issue] https://example.com/1');
-    expect(output).toContain('[smoke]');
+    expect(output).toContain('issue: https://example.com/1');
+    expect(output.split('\n').some((line) => line.trimEnd().endsWith(' smoke'))).toBe(true);
   });
 
   it('preserves annotations across foldLastRun (both carried passes and rerun results)', () => {

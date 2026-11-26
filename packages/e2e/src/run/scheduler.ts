@@ -237,20 +237,13 @@ class SchedulerWorker {
   private watchTimer: NodeJS.Timeout | undefined;
   private awaitingPong = false;
 
-  readonly workerSlot: number;
-  readonly workerIndex: number;
-  readonly parallelIndex: number;
-
   constructor(
     readonly targetName: string,
-    slots: WorkerSlots,
+    readonly slots: WorkerSlots,
     spawn: SpawnUnitRunner,
     onMessage: (worker: SchedulerWorker, message: WorkerToMain) => void,
     onExit: (worker: SchedulerWorker, detail: string, signal: NodeJS.Signals | null, active: WatchedAttempt | undefined) => void,
   ) {
-    this.workerSlot = slots.workerSlot;
-    this.workerIndex = slots.workerIndex;
-    this.parallelIndex = slots.parallelIndex;
     this.runner = spawn(targetName, slots, {
       onMessage: (message) => onMessage(this, message),
       onExit: (detail, signal) => {
@@ -963,10 +956,10 @@ class Scheduler {
 
   /** Starts a worker on the lowest target slot and global parallel slot free, with a fresh monotonic worker index. */
   private spawn(state: TargetState): SchedulerWorker {
-    const taken = new Set(this.workersOf(state.target.name).map((worker) => worker.workerSlot));
+    const taken = new Set(this.workersOf(state.target.name).map((worker) => worker.slots.workerSlot));
     let workerSlot = 0;
     while (taken.has(workerSlot)) workerSlot += 1;
-    const takenParallel = new Set(this.workers.map((worker) => worker.parallelIndex));
+    const takenParallel = new Set(this.workers.map((worker) => worker.slots.parallelIndex));
     let parallelIndex = 0;
     while (takenParallel.has(parallelIndex)) parallelIndex += 1;
     const workerIndex = this.nextWorkerIndex;

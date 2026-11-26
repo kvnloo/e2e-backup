@@ -193,6 +193,33 @@ test('counts past a pause', async ({ app, screen }) => {
 });
 `;
 
+const INFO = `import { writeFileSync } from 'node:fs';
+import { expect, test } from 'e2e';
+
+let earlier = 0;
+
+test.afterEach(async ({}, testInfo) => {
+  writeFileSync(new URL('../info.json', import.meta.url), JSON.stringify({
+    status: testInfo.status,
+    errors: testInfo.errors.map((error) => error.code + ' in ' + error.phase),
+    same: test.info() === testInfo,
+    durationGrew: testInfo.duration - earlier,
+  }));
+});
+
+test.afterEach(async ({}, testInfo) => {
+  earlier = testInfo.duration;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  throw new Error('cleanup failed');
+});
+
+test('carries its info', { annotation: { type: 'issue', description: 'https://example.com/1233' } }, async ({ app }, testInfo) => {
+  await app.open('/');
+  testInfo.annotations.push({ type: 'retry', description: String(testInfo.retry) });
+  await test.step('reads its info', () => expect(test.info()).toBe(testInfo));
+});
+`;
+
 /** The one-based line of the first line of `source` that holds `fragment`. */
 const lineOf = (source: string, fragment: string): number => source.split('\n').findIndex((line) => line.includes(fragment)) + 1;
 
@@ -240,6 +267,7 @@ describe('open_session {test}', { timeout: 120_000 }, () => {
         'tests/expected.e2e.ts': EXPECTED,
         'tests/marked-hooks.e2e.ts': MARKED_HOOKS,
         'tests/pause.e2e.ts': PAUSE,
+        'tests/info.e2e.ts': INFO,
       });
       const transport = new StdioClientTransport({
         command: process.execPath,
@@ -273,6 +301,17 @@ describe('open_session {test}', { timeout: 120_000 }, () => {
       const closed = await invoke('close_session');
       expect(closed.text).toMatch(/^Session \S+ closed/);
       expect(readFileSync(marker, 'utf8')).toBe('ran');
+    });
+
+    it('gives the test its info, reports its annotations, and fails its info on a teardown failure', async () => {
+      const opened = await invoke('open_session', { test: 'tests/info.e2e.ts' });
+      expect(opened.isError, opened.text).toBe(false);
+      expect(opened.text).toMatch(/^Test "carries its info" \(tests\/info\.e2e\.ts:\d+\) passed after \S+; 2 steps ran\.\nAnnotations: issue: https:\/\/example\.com\/1233 · retry: 0\n/);
+      const closed = await invoke('close_session');
+      expect(closed.text).toContain('cleanup failed');
+      const info = JSON.parse(readFileSync(path.join(project.dir, 'info.json'), 'utf8')) as Record<string, unknown>;
+      expect(info).toMatchObject({ status: 'failed', errors: ['ERROR in afterEach'], same: true });
+      expect(info['durationGrew']).toBeGreaterThanOrEqual(250);
     });
 
     it('runs the test past its screen.pause() right away', async () => {

@@ -23,7 +23,7 @@ import { parallelPlacements, type ParallelPlacement } from './parallel.ts';
 import type { SourceLocation } from '@e2e-dev/core/lib/internal/source';
 import type { TestIdentity } from '@e2e-dev/core/lib/run/records';
 
-export interface CollectedTest extends RegisteredTest, Omit<TestIdentity, 'annotations'> {
+export interface CollectedTest extends RegisteredTest, TestIdentity {
   /** Outermost serial group, when the test is a serial-group member. */
   readonly serialRoot: GroupNode | undefined;
   /** Where the test sits among its file's parallel scopes; the planner reads it and no record carries it. */
@@ -49,7 +49,7 @@ export function testIdentity(test: CollectedTest): TestIdentity {
     declarationIndex: test.declarationIndex,
     sessions: test.sessions,
     tags: test.tags,
-    ...(test.annotations.length === 0 ? {} : { annotations: test.annotations }),
+    annotations: test.annotations,
     source: test.source,
     file: test.file,
     id: test.id,

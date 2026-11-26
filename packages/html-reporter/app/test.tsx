@@ -27,7 +27,7 @@ export function TestView({ model, result, attemptParam }: { model: ReportModel; 
   const attempts = model.attempts(result);
   const chosen = attemptParam === null ? attempts.length - 1 : Number(attemptParam) - 1;
   const attempt = attempts[chosen] ?? attempts.at(-1);
-  // An attempt that ran carries its own annotations (declared + runtime); fall back to result.annotations only when no attempt ran.
+  // As e2e's own reports (shownAnnotations): an attempt that ran shows its own, a test that never ran what it declares.
   const annotations = attempts.length === 0 ? (result.annotations ?? []) : (attempt?.annotations ?? []);
 
   return (
@@ -53,7 +53,7 @@ export function TestView({ model, result, attemptParam }: { model: ReportModel; 
             {annotations.map((annotation, index) => (
               <li key={`${annotation.type}-${index}`}>
                 <strong className="text-shade-300">{annotation.type}</strong>
-                {annotation.description === undefined || annotation.description === '' ? null : (
+                {annotation.description === undefined ? null : (
                   <>
                     {': '}
                     {isHttpUrl(annotation.description) ? (

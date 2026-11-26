@@ -32,7 +32,7 @@ export async function writeHostTrace(options: HostTraceOptions): Promise<Report>
   const { config, attempt, title } = options;
   const status = attempt.status;
   const result: ResultRecord = {
-    test: { id: options.testId, kind: 'test', title, titlePath: [title], file: 'host', declarationIndex: 0, sessions: [], tags: [], source: undefined, serialId: undefined },
+    test: { id: options.testId, kind: 'test', title, titlePath: [title], file: 'host', declarationIndex: 0, sessions: [], tags: [], annotations: [], source: undefined, serialId: undefined },
     target: options.target, agent: options.agent, repeat: 0, selected: true, status, attempts: [attempt],
   };
   const report = buildReport({

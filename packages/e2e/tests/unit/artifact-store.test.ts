@@ -240,6 +240,7 @@ describe('artifact redaction labels', () => {
           declarationIndex: 0,
           sessions: [],
           tags: [],
+          annotations: [],
           source: undefined,
           file: 'tests/case.e2e.ts',
           id: 'tests/case.e2e.ts::missing artifacts',

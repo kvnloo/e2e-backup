@@ -5,7 +5,7 @@ import type { TargetSession } from '@e2e-dev/core/lib/engine/surface';
 import { isCiMode, type ResolvedConfig } from '@e2e-dev/core/lib/config/resolve';
 import { classifyError, ConfigurationError, E2EError, serializeError, sanitizeRecordedText, truncateUtf8, TestError, TestTimeoutError, withHint, type SerializedError } from '@e2e-dev/core/lib/internal/errors';
 import { buildWorkerInfo } from '@e2e-dev/core/lib/internal/test-info';
-import { attemptStep, isRuntimeSkip, runtimeSkipCause, type CaughtRuntimeSkip } from '../internal/skip.ts';
+import { attemptStep, isRuntimeSkip, runtimeSkipCause } from '../internal/skip.ts';
 import { lateExpectedFailureError } from '@e2e-dev/core/lib/internal/expected-failure';
 import { settleExpectedFailure } from './expected-failure.ts';
 import type { ExecutorAttempt } from '@e2e-dev/core/lib/agent/executor';
@@ -19,7 +19,8 @@ import { inLoadOf } from '../collect/collect-file.ts';
 import type { ModuleRegistration, RegisteredTest } from '../collect/registry.ts';
 import { pairRecordings, type TestTargetPair } from '../collect/select.ts';
 import type { ArtifactStore, WorkerInfo } from '@e2e-dev/core/lib/types';
-import { createAttemptTestInfo, type AttemptTestInfoHandle } from './attempt-test-info.ts';
+import { AttemptVerdict, createAttemptTestInfo, type AttemptTestInfoHandle } from './attempt-verdict.ts';
+import type { WorkerSlots } from './worker/protocol.ts';
 import { attemptSegments, createAttemptArtifacts, resultSegment } from '@e2e-dev/core/lib/run/artifacts';
 import { AttemptBudget, AttemptTimeout } from '@e2e-dev/core/lib/run/budget';
 import { planAttemptFixtures, WorkerFixturePool } from './fixture-pool.ts';
@@ -50,7 +51,7 @@ import { isOwnStep, StepRecorder, type StepHoldRequest, type StepProgress } from
 import { holdAttemptSteps, readHeldScreen, type AttemptHolds, type HoldReads, type StepHold } from './step-hold.ts';
 import { HeldTestTools } from './worker/held-test-tools.ts';
 import { WorkerModels } from '@e2e-dev/core/lib/run/worker-models';
-import { classifyAttemptStatus, EngineSessions, type EngineSessionsOptions } from '@e2e-dev/core/lib/run/engine-sessions';
+import { EngineSessions, type EngineSessionsOptions } from '@e2e-dev/core/lib/run/engine-sessions';
 import type { EngineDisposeContext } from '@e2e-dev/core/lib/engine/index';
 import { numberedAppLogLines } from '../report/failure-text.ts';
 
@@ -113,10 +114,8 @@ type ExecutorHold = {
 
 export interface TargetExecutorOptions extends EngineSessionsOptions {
   readonly artifactsRoot: string;
-  /** Monotonic 0-based worker index across the run; see `WorkerInfo.workerIndex`. */
-  readonly workerIndex: number;
-  /** 0-based parallel slot among live workers; see `WorkerInfo.parallelIndex`. */
-  readonly parallelIndex: number;
+  /** The worker's slots; `workerSlot` repeats the `EngineSessions` option of that name. */
+  readonly slots: WorkerSlots;
   /**
    * The directory under `artifactsRoot` a `--last-failed` rerun's attempts
    * write in (`claimRerunDir`), beside the evidence of the run it reruns;
@@ -196,8 +195,8 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       options.events?.onRunAbort?.({ error: serializeError(error) });
     });
     this.workerInfo = buildWorkerInfo({
-      workerIndex: options.workerIndex,
-      parallelIndex: options.parallelIndex,
+      workerIndex: options.slots.workerIndex,
+      parallelIndex: options.slots.parallelIndex,
       target: options.target,
       config: options.config,
       headed: options.headed,
@@ -557,7 +556,12 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       shared === undefined
         ? () => steps.completed()
         : () => [...shared.priorSteps, ...steps.completed()];
-    const secondaryErrors: SerializedError[] = [];
+    const verdict = new AttemptVerdict({
+      expectedFailure: pair.options.expectedFailure,
+      interrupted: () => this.interruptSignal.aborted,
+      serialize: (error, atPhase) => serializeError(error, { phase: atPhase, projectRoot: this.config.projectRoot, redact }),
+    });
+    const { secondaryErrors } = verdict;
     const attemptAbort = new AbortController();
     const onInterrupt = () => attemptAbort.abort();
     this.interruptSignal.addEventListener('abort', onInterrupt, { once: true });
@@ -613,13 +617,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       cleanup: 'complete',
     };
 
-    let failure: E2EError | undefined;
-    let failurePhase: AttemptPhase | undefined;
     let infoHandle: AttemptTestInfoHandle | undefined;
-    /** Set when the body (or a beforeEach) skipped the test with `test.skip(...)` or `test.fixme(...)`. */
-    let skipped: CaughtRuntimeSkip | undefined;
-    /** Why the attempt is expected to fail: the `fail` option, else the first `test.fail(...)` that marked it. */
-    let expectedFailure = pair.options.expectedFailure;
     let phase: AttemptPhase = 'launch';
     /** Moves the attempt to `next`, and the steps it records into the hook they run in (none for the body). */
     const enter = (next: AttemptPhase): void => {
@@ -627,7 +625,6 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       steps.phase = next === 'beforeEach' || next === 'afterEach' ? next : undefined;
       steps.holdable = next === 'beforeEach' || next === 'body';
     };
-    let timedOut = false;
     // The polls the fixtures, the beforeEach hooks, and the body start.
     const bodyPolls = new PollScope('the test body');
     // Captured the moment the primary failure lands: steps that pass later —
@@ -641,17 +638,9 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
     // The first failure is the verdict; whatever lands after it, a teardown
     // that also threw or a rejection surfacing late, is kept beside it.
     const recordFailure = (cause: unknown, atPhase: AttemptPhase): void => {
-      const classified = classifyError(cause);
-      if (!isModelUnreachable(classified)) implicatesUnconfirmed = true;
-      if (failure !== undefined) {
-        secondaryErrors.push(
-          serializeError(classified, { phase: atPhase, projectRoot: this.config.projectRoot, redact }),
-        );
-        return;
-      }
-      lastVerifiedAtFailure = steps.lastVerifiedStepIndex;
-      failure = classified;
-      failurePhase = atPhase;
+      const { error, primary } = verdict.fail(cause, atPhase);
+      if (!isModelUnreachable(error)) implicatesUnconfirmed = true;
+      if (primary) lastVerifiedAtFailure = steps.lastVerifiedStepIndex;
     };
     // One more look at the app the moment the failure lands: what the screen
     // held then is the evidence the message lacks. Taken before teardown, so
@@ -660,6 +649,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
     // not asked again, so a hung app costs the budget once.
     let evidenceTried = false;
     const captureEvidence = async (): Promise<void> => {
+      const failure = verdict.failure;
       if (failure === undefined || evidenceTried || openSession === null || this.interruptSignal.aborted) return;
       evidenceTried = true;
       const evidence = await captureFailureEvidence({
@@ -837,17 +827,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
         outputDir: artifacts.dir,
         startedMs,
         timeout,
-        state: {
-          failure: () => failure,
-          skipped: () => skipped !== undefined,
-          settled: () => phase === 'afterEach',
-          timedOut: () => timedOut,
-          interrupted: () => this.interruptSignal.aborted,
-          expectedFailure: () => expectedFailure,
-          secondaryErrors,
-          serializeFailure: (currentFailure) =>
-            serializeError(currentFailure, { phase: failurePhase ?? phase, projectRoot: this.config.projectRoot, redact }),
-        },
+        verdict,
       });
       const { testInfo } = infoHandle;
       publishAttempt(
@@ -860,7 +840,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
           assertionTimeout: this.config.assertionTimeout,
           toPass: this.config.toPass,
           recordSecondaryError: (error) => {
-            secondaryErrors.push(serializeError(error, { phase, projectRoot: this.config.projectRoot, redact }));
+            verdict.note(error, phase);
           },
           budget,
           soft,
@@ -869,7 +849,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
             ? {
                 expectFailure: (reason: string) => {
                   if (phase === 'afterEach') throw lateExpectedFailureError();
-                  expectedFailure ??= reason;
+                  verdict.expectFailure(reason);
                 },
               }
             : {}),
@@ -928,16 +908,12 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
           const notAwaited = await abandonNotAwaited();
           if (isRuntimeSkip(cause)) throw cause;
           for (const secondary of [...notAwaited, soft.close()]) {
-            if (secondary !== undefined) {
-              secondaryErrors.push(serializeError(secondary, { phase: 'body', projectRoot: this.config.projectRoot, redact }));
-            }
+            if (secondary !== undefined) verdict.note(secondary, 'body');
           }
           throw cause;
         }
         const [notAwaited, ...moreNotAwaited] = await abandonNotAwaited();
-        for (const secondary of moreNotAwaited) {
-          secondaryErrors.push(serializeError(secondary, { phase: 'body', projectRoot: this.config.projectRoot, redact }));
-        }
+        for (const secondary of moreNotAwaited) verdict.note(secondary, 'body');
         if (notAwaited !== undefined) throw notAwaited;
         // Soft failures fail the attempt once the body has settled, before
         // `afterEach`; a soft matcher in a hook finds collection closed and throws.
@@ -966,7 +942,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       ]);
       try {
         const onTimeout = (): Error => {
-          timedOut = true;
+          verdict.timeOut();
           attemptAbort.abort();
           return new TestTimeoutError(`test timed out after ${timeout.timeoutMs} ms in phase ${phase}`);
         };
@@ -985,7 +961,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
         // A body cut short may have been awaiting its polls; they end with it.
         bodyPolls.close();
         // `skipRunningTest` has already refused the cases that may not skip.
-        if (isRuntimeSkip(cause)) skipped = cause;
+        if (isRuntimeSkip(cause)) verdict.skip(cause);
         else {
           recordFailure(cause, phase);
           await captureEvidence();
@@ -1020,6 +996,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
         await captureEvidence();
       }
 
+      verdict.settle();
       enter('afterEach');
       // Each teardown gets its own cleanup budget: a body that timed out or
       // was cancelled must not leave the hook with dead fixtures, and a hook
@@ -1050,27 +1027,24 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       // The verdict is reached before the session closes: nothing after this
       // point changes it, and the close reads it to decide what the attempt's
       // recording is worth.
-      if (failure === undefined && skipped !== undefined) {
-        record.status = 'skipped';
-        record.skip = { cause: runtimeSkipCause(skipped), reason: truncateUtf8(sanitizeRecordedText(redact(skipped.reason)), 8192) };
-      } else if (failure === undefined) {
-        record.status = 'passed';
-      } else {
-        record.status = classifyAttemptStatus(failure, timedOut, this.interruptSignal.aborted);
-        record.error = serializeError(failure, { phase: failurePhase ?? phase, projectRoot: this.config.projectRoot, redact });
-        // A failure outranks the skip; the reason stays beside it.
-        if (skipped !== undefined) record.skip = { cause: runtimeSkipCause(skipped), reason: truncateUtf8(sanitizeRecordedText(redact(skipped.reason)), 8192) };
+      record.status = verdict.settle();
+      const { skipped } = verdict;
+      // A failure outranks the skip; the reason stays beside it.
+      if (skipped !== undefined) record.skip = { cause: runtimeSkipCause(skipped), reason: truncateUtf8(sanitizeRecordedText(redact(skipped.reason)), 8192) };
+      const failure = verdict.serializedFailure();
+      if (failure !== undefined) {
+        record.error = failure;
         // A failure that first landed in teardown has had no look yet.
         await captureEvidence();
       }
-      // The cache below still settles on what the attempt did, read off `failure`.
-      settleExpectedFailure(record, expectedFailure, {
+      // The cache below still settles on what the attempt did, read off the verdict's failure.
+      settleExpectedFailure(record, verdict.expectedFailure, {
         serialize: (error) => serializeError(error, { phase: 'body', projectRoot: this.config.projectRoot, redact }),
         redact,
       });
       for (const cause of await heldTools?.settleRecordings() ?? []) {
         record.cleanup = 'failed';
-        secondaryErrors.push(serializeError(classifyError(cause), { phase: 'cleanup', projectRoot: this.config.projectRoot, redact }));
+        verdict.note(cause, 'cleanup');
       }
 
       const recordedAnnotations = infoHandle?.recordAnnotations(redact) ?? pair.test.annotations;
@@ -1089,7 +1063,7 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
       }
       for (const cause of await guests.settle(record.status)) {
         record.cleanup = 'failed';
-        secondaryErrors.push(serializeError(cause, { phase: 'cleanup', projectRoot: this.config.projectRoot, redact }));
+        verdict.note(cause, 'cleanup');
       }
       // What a shared session's app logs from here waits for the next member.
       openSession?.appLog.route(undefined);
@@ -1118,8 +1092,8 @@ export class TargetExecutor extends EngineSessions implements SerialHost {
         record.status === 'interrupted'
           ? undefined
           : {
-              lastVerifiedStepIndex: failure === undefined ? steps.lastVerifiedStepIndex : lastVerifiedAtFailure,
-              implicatesUnconfirmed: failure === undefined || implicatesUnconfirmed,
+              lastVerifiedStepIndex: verdict.failure === undefined ? steps.lastVerifiedStepIndex : lastVerifiedAtFailure,
+              implicatesUnconfirmed: verdict.failure === undefined || implicatesUnconfirmed,
             },
       );
       for (const step of record.steps) {

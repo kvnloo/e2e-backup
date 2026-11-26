@@ -55,6 +55,7 @@ function result(title: string, steps: StepRecord[]): ResultRecord {
       declarationIndex: 0,
       sessions: [],
       tags: [],
+      annotations: [],
       source: undefined,
       file: 'tests/case.e2e.ts',
       id: `tests/case.e2e.ts::${title}`,

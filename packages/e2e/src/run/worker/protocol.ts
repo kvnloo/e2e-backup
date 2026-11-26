@@ -21,6 +21,16 @@ import type { StepHold } from '../step-hold.ts';
 import type { StepProgress } from '@e2e-dev/core/lib/run/steps';
 import type { ServiceReply, ServiceWire } from '../services.ts';
 
+/** Numeric slots assigned to a worker when the scheduler spawns it. */
+export interface WorkerSlots {
+  /** 0-based slot among live workers of this target; see `EngineInitInfo.workerSlot`. */
+  readonly workerSlot: number;
+  /** Monotonic 0-based worker index across the run; incremented for every spawned worker, never reused. */
+  readonly workerIndex: number;
+  /** 0-based parallel slot among all live workers across targets (`0` to `workers - 1`); reused when a worker exits. */
+  readonly parallelIndex: number;
+}
+
 /** One runnable pair on the wire; the worker resolves the test function. */
 export interface WirePair {
   readonly test: TestIdentity;
@@ -65,12 +75,7 @@ export interface WorkerBootstrap {
    */
   readonly ports: PortAssignments;
   readonly targetName: string;
-  /** This worker's slot among the target's workers; see `EngineInitInfo.workerSlot`. */
-  readonly workerSlot: number;
-  /** Monotonic 0-based worker index across the run; see `WorkerInfo.workerIndex`. */
-  readonly workerIndex: number;
-  /** 0-based parallel slot among live workers across targets; see `WorkerInfo.parallelIndex`. */
-  readonly parallelIndex: number;
+  readonly slots: WorkerSlots;
   readonly runId: string;
   readonly artifactsRoot: string;
   /** See `TargetExecutorOptions.rerunDir`. */

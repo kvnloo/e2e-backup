@@ -7,6 +7,7 @@
 
 import path from 'node:path';
 import picocolors from 'picocolors';
+import { annotationLabel } from '../report/annotations.ts';
 import { codeFrame } from '../report/code-frame.ts';
 import { nestingMarks } from '../report/failure-text.ts';
 import { formatTime } from '../report/format.ts';
@@ -39,6 +40,7 @@ export function describeTestOutcome(test: StandaloneTest, outcome: StandaloneTes
   const status = expectedFailure?.error === undefined ? STATUS_TEXT[outcome.status] : 'failed as expected';
   const lines = [`Test "${title}" (${testLocation(test.pair.test)}) ${status} after ${formatTime(outcome.durationMs)}; ${plural(steps.length, 'step')} ran.`];
   if (expectedFailure !== undefined) lines.push(`Expected to fail: ${expectedFailure.reason}`);
+  if (outcome.annotations.length > 0) lines.push(`Annotations: ${outcome.annotations.map((annotation) => annotationLabel(annotation)).join(' · ')}`);
   if (error !== undefined) {
     const phase = error.phase === undefined || error.phase === 'body' ? '' : ` in ${error.phase}`;
     lines.push(`${error.code}${phase}: ${error.message}`);

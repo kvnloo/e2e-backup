@@ -17,6 +17,7 @@ import type { AppLogRecord, StepCacheInfo, StepCacheRecord, StepEvent, StepTurn 
 import type { Report1Document, ReportError, ReportResult, ReportSource, ReportStep } from './build.ts';
 import { cell, code, formatDuration, link, MAX_CELL_CHARS, MAX_ID_CHARS, MAX_LABEL_CHARS, MAX_PATH_CHARS, MAX_TITLE_CHARS, plural } from './markdown-text.ts';
 import { ellipsize, repeatSuffix, STATUS_WORD, withActor } from './format.ts';
+import { annotationLabel, shownAnnotations } from './annotations.ts';
 import type { AttemptView, Outcome } from './outcome.ts';
 
 type ReportArtifact = ReportResult['attempts'][number]['artifacts'][number];
@@ -578,19 +579,12 @@ export function renderTracePage(report: Report1Document, result: ReportResult, f
   const ranOn = Object.entries(told.environment ?? {});
   if (ranOn.length > 0) lines.push(`Ran on: ${ranOn.map(([name, value]) => `${cell(name, MAX_ID_CHARS)} ${code(value, MAX_CELL_CHARS)}`).join(' · ')}`, '');
 
-  // An attempt that ran carries its own annotations; fall back to result.annotations only when no attempt ran.
-  const annotations = told.ran ? (told.annotations ?? []) : (result.annotations ?? []);
+  const annotations = shownAnnotations(told.ran ? told : undefined, result.annotations);
   if (annotations.length > 0) {
-    lines.push(
-      `Annotations: ${annotations
-        .map((annotation) =>
-          annotation.description === undefined || annotation.description === ''
-            ? code(annotation.type, MAX_ID_CHARS)
-            : `${code(annotation.type, MAX_ID_CHARS)} ${cell(annotation.description, MAX_CELL_CHARS)}`,
-        )
-        .join(' · ')}`,
-      '',
+    const labels = annotations.map((annotation) =>
+      annotationLabel(annotation, (type) => code(type, MAX_ID_CHARS), (description) => cell(description, MAX_CELL_CHARS)),
     );
+    lines.push(`Annotations: ${labels.join(' · ')}`, '');
   }
 
   // A test that failed as `test.fail` expected tells that failure, also below an earlier attempt's.
