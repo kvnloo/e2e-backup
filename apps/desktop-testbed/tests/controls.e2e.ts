@@ -55,6 +55,22 @@ test.describe('controls window', () => {
     await expect(screen.getByRole('textbox', 'Popup field')).toHaveValue('');
   });
 
+  test('stops typing when a key after a Tab opens another window', async ({ screen, desktop }) => {
+    // The Tab takes the keyboard from the Note to the Opener, whose first character opens the Popup.
+    const failure = await screen
+      .getByRole('textbox', 'Note')
+      .pressSequentially('ab\txyz')
+      .then(
+        () => undefined,
+        (cause: unknown) => cause,
+      );
+    expect(String(failure)).toMatch(/typing stopped/);
+    await expect(screen.getByRole('textbox', 'Opener')).toHaveValue('x');
+    const popup = (await desktop.windows()).find((window) => window.title === 'Popup');
+    await desktop.useWindow(popup);
+    await expect(screen.getByRole('textbox', 'Popup field')).toHaveValue('');
+  });
+
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
     // One key event per character, a surrogate pair in one. AppKit would rejoin a split pair, so this checks such text
