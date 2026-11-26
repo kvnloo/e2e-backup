@@ -234,7 +234,10 @@ export interface Device {
    * Android wakes the screen and dismisses
    * the keyguard, an iOS simulator swipes up from the bottom edge. A display
    * that is off turns on even when the screen is not locked (Android always
-   * sends its wake key); an unlocked screen that is on stays as it is. It never
+   * sends its wake key); an unlocked screen that is on stays as it is. The
+   * exception is an iPhone simulator with an always-on display, such as the
+   * iPhone 17 Pro: the unlock can leave its display off, and on iOS 26.5 the
+   * text a later fill types does not reach the app. It never
    * enters a PIN, pattern, password, or passcode: a lock that asks for one is
    * `UNSUPPORTED_CAPABILITY`, and so is a device agent-device cannot lock (a
    * physical iPhone or iPad, a TV, a device a provider drives through a

@@ -101,9 +101,10 @@ test('a shake is sent without an error and leaves the screen readable', async ({
 // passing both is the round trip, and the screen read afterwards shows the app
 // reads again. A lock that fails after it took effect still gets an unlock, so
 // the tests after this one do not start locked; the test then fails with the
-// lock's error, and the unlock's own error stays on its step. Android only: on
-// the iOS 26.5 simulator CI boots, the screen stays frozen after the unlock
-// and every later fill on that simulator fails its read-back.
+// lock's error, and the unlock's own error stays on its step. Android only:
+// CI's iPhone 17 Pro simulator has an always-on display, where the unlock can
+// leave the display off, and on its iOS 26.5 runtime every later fill on that
+// simulator then fails its read-back.
 test('a lock and an unlock both complete and leave the app readable', { platforms: ['android'] }, async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Sequential Onboarding');
   try {

@@ -1109,7 +1109,7 @@ await expect(screen.getByText('Welcome back')).toBeVisible();
 
 To lock the screen for a time, as Appium's `lock(seconds)` does, wait between `lock()` and `unlock()`.
 
-On an iOS 26.5 simulator, the screen stays frozen after `unlock()`, and every later `fill` on that simulator fails its read-back for the rest of the run. An iOS 27.2 simulator is not affected.
+On an iPhone simulator with an always-on display, such as the iPhone 17 Pro, `unlock()` can leave the display off while the device reports it unlocked: the lock dims the display instead of turning it off, and the unlock swipe dismisses the lock screen without waking it. Taps and screen reads still work, but a screenshot shows the last frame before the display went off, and on iOS 26.5 every later `fill` on that simulator fails its read-back for the rest of the run. An iPhone without an always-on display, such as the iPhone 16e, is not affected. The cause is in agent-device's iOS unlock.
 
 The engine never unlocks the device for you. A test that fails while the screen is locked leaves it locked for the next test on that device, so unlock in a `finally` block or in `afterEach`. Both methods run on the app session: after [`closeApp`](#closeapp) they fail with `APP_NOT_OPEN` until `openApp` opens an app, so unlock before you close the app.
 
@@ -1130,7 +1130,10 @@ The engine never unlocks the device for you. A test that fails while the screen 
  * Android wakes the screen and dismisses
  * the keyguard, an iOS simulator swipes up from the bottom edge. A display
  * that is off turns on even when the screen is not locked (Android always
- * sends its wake key); an unlocked screen that is on stays as it is. It never
+ * sends its wake key); an unlocked screen that is on stays as it is. The
+ * exception is an iPhone simulator with an always-on display, such as the
+ * iPhone 17 Pro: the unlock can leave its display off, and on iOS 26.5 the
+ * text a later fill types does not reach the app. It never
  * enters a PIN, pattern, password, or passcode: a lock that asks for one is
  * `UNSUPPORTED_CAPABILITY`, and so is a device agent-device cannot lock (a
  * physical iPhone or iPad, a TV, a device a provider drives through a
