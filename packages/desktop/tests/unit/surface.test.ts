@@ -853,6 +853,16 @@ describe('DesktopSurface: acting', () => {
     await expect(away.surface.perform(hidden!.ref, { kind: 'scrollIntoView' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
   });
 
+  it('takes a visible control that has no scroll action as in view, so an element screenshot of it does not fail', async () => {
+    const read = (actions: readonly string[]) => screen('w-mine', { name: 'Form', bounds: { x: 0, y: 0, width: 200, height: 200 }, children: [{ role: 'button', name: 'Sign in', ref_id: '@s:e1', available_actions: actions, bounds: { x: 10, y: 10, width: 50, height: 20 } }] });
+    const plain = await launched({ snapshot: [read(['Click'])] }, { observe: false });
+    await plain.surface.perform((await plain.surface.observe(operation(), undefined)).root.children![0]!.ref, { kind: 'scrollIntoView' }, operation());
+    expect(plain.fake.acted()).toEqual([]);
+    const scrolls = await launched({ snapshot: [read(['Click', 'ScrollTo'])] }, { observe: false });
+    await scrolls.surface.perform((await scrolls.surface.observe(operation(), undefined)).root.children![0]!.ref, { kind: 'scrollIntoView' }, operation());
+    expect(scrolls.fake.acted()).toEqual(['scrollTo']);
+  });
+
   it('scrolls a control into view through the driver when it is hidden and has a ref', async () => {
     const read = screen('w-mine', { name: 'Form', bounds: { x: 0, y: 0, width: 200, height: 200 }, children: [{ role: 'button', name: 'Far', ref_id: '@s:e1', states: ['offscreen'], bounds: { x: 10, y: 900, width: 50, height: 20 } }] });
     const { surface, fake } = await launched({ snapshot: [read] }, { observe: false });
