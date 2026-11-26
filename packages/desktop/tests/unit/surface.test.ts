@@ -259,6 +259,17 @@ describe('DesktopSurface: launching', () => {
     expect(await gone(late)).toBe(true);
   });
 
+  it('keeps a launch pending when the quit has no time left to look for its late app, so the next quit still finds it', async () => {
+    const { surface, fake } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified', 'no new process carries the token', { kind: 'unclaimed' })] });
+    await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    const { token } = last<{ token: string }>(fake, 'launch')!;
+    await expect(surface.endAttempt({ signal, timeoutMs: 400 })).rejects.toMatchObject({ code: 'ENGINE_FAILURE', message: expect.stringMatching(/ran out of time/) });
+    const late = standIn();
+    fake.carriers.set(late, token);
+    await surface.endAttempt({ signal, timeoutMs: 5_000 });
+    expect(await gone(late)).toBe(true);
+  });
+
   it('keeps a launch pending when the look for its late app is cancelled, so the next quit still finds it', async () => {
     const { surface, fake } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified', 'no new process carries the token', { kind: 'unclaimed' })] });
     await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
@@ -297,7 +308,8 @@ describe('DesktopSurface: launching', () => {
     const theirs = standIn();
     const { surface } = await initialized({ launch: [failure('TIMEOUT', 'delivered_unverified')] });
     await expect(surface.restart(operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
-    await expect(surface.endAttempt({ signal, timeoutMs: 1_000 })).rejects.toThrow(/no process it started was found/);
+    // A budget the whole look for a late app fits in: one cut short proves nothing and keeps the launch pending.
+    await expect(surface.endAttempt({ signal, timeoutMs: 5_000 })).rejects.toThrow(/no process it started was found/);
     expect(await gone(theirs, 300)).toBe(false);
   });
 
