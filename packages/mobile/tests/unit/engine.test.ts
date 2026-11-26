@@ -2098,9 +2098,46 @@ describe('perform', () => {
     const before = h.fake.calls.length;
     await expect(h.engine.perform!(done.ref, { kind: 'press', key: 'Backspace' }, operation())).rejects.toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY',
-      message: expect.stringContaining('only press Backspace on an editable field'),
+      message: expect.stringContaining('only press Backspace on an enabled, editable field'),
     });
     expect(h.fake.calls.slice(before).map((call) => call.method)).not.toContain('interactions.type');
+  });
+
+  it.each([
+    ['a disabled textbox', { type: 'TextField', enabled: false }],
+    ['a read-only textbox', { type: 'android.widget.EditText', editable: false }],
+  ] as const)('refuses Backspace on %s, which a tap cannot focus', async (name, field) => {
+    const h = harness();
+    h.fake.respond('capture.snapshot', () => ({
+      nodes: [
+        { ref: 'e1', index: 0, depth: 0, type: 'Application' },
+        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'TextField', label: 'Search', value: 'abc', focused: true },
+        { ref: 'e3', index: 2, parentIndex: 0, depth: 1, label: 'Code', value: '42', ...field },
+      ],
+    }));
+    await openAttempt(h);
+    const code = await observed(h, 'Code');
+    const before = h.fake.calls.length;
+    await expect(h.engine.perform!(code.ref, { kind: 'press', key: 'Backspace' }, operation())).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining(`is ${name}`),
+    });
+    expect(h.fake.calls.slice(before).map((call) => call.method)).toEqual([]);
+  });
+
+  it('taps an unfocused searchbox before Backspace, as it does a textbox', async () => {
+    const h = harness();
+    h.fake.respond('capture.snapshot', () => ({
+      nodes: [
+        { ref: 'e1', index: 0, depth: 0, type: 'Application' },
+        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'searchbox', label: 'Find', value: 'abc', editable: true },
+      ],
+    }));
+    await openAttempt(h);
+    const find = await observed(h, 'Find');
+    const before = h.fake.calls.length;
+    await h.engine.perform!(find.ref, { kind: 'press', key: 'Backspace' }, operation());
+    expect(h.fake.calls.slice(before).map((call) => call.method)).toEqual(['interactions.press', 'interactions.type']);
   });
 
   it.each([

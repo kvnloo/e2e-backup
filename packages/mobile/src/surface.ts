@@ -239,6 +239,23 @@ function softKey(key: string): SoftKey {
   }
 }
 
+/**
+ * Whether a press focuses this node before its key goes out: a text field
+ * (`textbox`, `searchbox`, or a `combobox` the platform says takes text).
+ * Anything else, a picker included, is pressed where focus already is.
+ */
+function typesIntoNode(node: SemanticNode): boolean {
+  return node.role === 'textbox' || node.role === 'searchbox' || (node.role === 'combobox' && node.states?.readonly === false);
+}
+
+/** A node's role, with the state that kept a press from reaching its text. */
+function describeField(node: SemanticNode): string {
+  const role = node.role ?? 'unknown';
+  if (node.states?.disabled === true) return `a disabled ${role}`;
+  if (node.states?.readonly === true) return `a read-only ${role}`;
+  return role;
+}
+
 /** Sends a {@link softKey} to whatever holds focus. */
 function sendSoftKey(client: AgentDeviceClient, key: SoftKey): Promise<unknown> {
   if (key.kind === 'enter') return client.command.keyboard({ action: 'enter' });
@@ -1755,14 +1772,16 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
    */
   private async pressKey(client: AgentDeviceClient, entry: NodeBinding, key: string, settle: SettleOptions, input: InputBudget): Promise<unknown> {
     const sent = this.softKey(key);
-    // Only a text field is focused before the key goes out, so Backspace on
-    // anything else would delete from whichever field kept focus.
-    if (sent.kind === 'delete' && entry.node.role !== 'textbox') {
-      throw unsupported(`agent-device can only press Backspace on an editable field; node ${entry.id} is ${entry.node.role ?? 'unknown'}`);
+    const field = typesIntoNode(entry.node);
+    // Only a text field is focused before the key goes out, and a tap on a
+    // disabled or read-only one leaves focus where it was, so Backspace on
+    // any of them would delete from whichever field kept focus.
+    if (sent.kind === 'delete' && (!field || entry.node.states?.disabled === true || entry.node.states?.readonly === true)) {
+      throw unsupported(`agent-device can only press Backspace on an enabled, editable field; node ${entry.id} is ${describeField(entry.node)}`);
     }
     // A key reaches the field through the soft keyboard, which is up only
     // while the field holds focus.
-    if (entry.node.role === 'textbox' && entry.node.states?.focused !== true) {
+    if (field && entry.node.states?.focused !== true) {
       await input.press(client, { ...this.actionTarget(entry), ...settle });
     }
     return input.send(() => sendSoftKey(client, sent));
