@@ -302,7 +302,9 @@ jobs:
       # The emulator lives for this step only (the action terminates it when
       # the step ends) and runs each `script` line in its own shell, so the
       # suite and its second pass over the failed tests are one line. Same
-      # rerun as the iOS job.
+      # rerun as the iOS job. A new AVD's screen lock is None, which
+      # device.lock() refuses, so the first line sets Swipe, a lock with no
+      # credential, for the lock test in tests/device.e2e.ts.
       - name: Run the suite
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -313,7 +315,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           working-directory: apps/mobile-benchmark
-          script: $E2E_RUN || $E2E_RUN --last-failed
+          script: |
+            adb shell locksettings set-disabled false
+            $E2E_RUN || $E2E_RUN --last-failed
         env:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           GITHUB_TOKEN: ${{ inputs.agent-device-version == '' && github.token || '' }}
