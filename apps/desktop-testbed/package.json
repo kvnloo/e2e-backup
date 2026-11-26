@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc --noEmit && node node_modules/e2e/dist/cli/bin.js run",
     "test:agent": "node node_modules/e2e/dist/cli/bin.js run --config e2e.agent.config.ts",
-    "test:headed": "node node_modules/e2e/dist/cli/bin.js run --config e2e.headed.config.ts"
+    "test:headed": "tsc --noEmit && node node_modules/e2e/dist/cli/bin.js run --config e2e.headed.config.ts"
   },
   "dependencies": {
     "@e2e-dev/desktop": "workspace:*",
