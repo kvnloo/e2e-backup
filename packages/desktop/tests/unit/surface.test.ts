@@ -1094,7 +1094,11 @@ describe('DesktopSurface: typing', () => {
   it('replaces the focused field as a keyboard does, select all and delete, and never by an accessibility clear', async () => {
     const { surface, fake } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] });
     await surface.typeText('ada', { replace: true }, operation());
-    expect(inputs(fake)).toEqual(['press cmd+a', 'press backspace', 'type']);
+    expect(inputs(fake)).toEqual(['selectAll', 'press backspace', 'type']);
+    // A field whose selection accessibility cannot set gets the select-all key.
+    const keys = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')], act: [failure('ACTION_NOT_SUPPORTED', 'not_delivered'), { ok: true, data: {} }] });
+    await keys.surface.typeText('ada', { replace: true }, operation());
+    expect(inputs(keys.fake)).toEqual(['selectAll', 'press cmd+a', 'press backspace', 'type']);
   });
 
   it('sends nothing when the control with keyboard focus takes no text, so no select-all or delete reaches a list or button', async () => {
@@ -1126,11 +1130,11 @@ describe('DesktopSurface: typing', () => {
     ) as Answer;
     const { surface, fake } = await launched({ snapshot: [form, form, form, moved] });
     await expect(surface.typeText('ada', { replace: true }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', message: expect.stringMatching(/lost keyboard focus after select all/) });
-    expect(inputs(fake)).toEqual(['press cmd+a']);
+    expect(inputs(fake)).toEqual(['selectAll']);
   });
 
   it('reports a type after a clear that changed the field as possibly committed', async () => {
-    const { surface } = await launched({ act: [failure('STALE_REF', 'not_delivered')] });
+    const { surface } = await launched({ act: [{ ok: true, data: {} }, failure('STALE_REF', 'not_delivered')] });
     await expect(surface.typeText('ada', { replace: true }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', retryable: false });
   });
 

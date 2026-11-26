@@ -1194,10 +1194,10 @@ export class DesktopSurface {
       throw notActionable(`the ${focused.role ?? 'control'}${focused.name === undefined ? '' : ` "${focused.name}"`} that has keyboard focus takes no text; tap or focus a text field first`);
     }
     if (options.replace) {
-      // Cleared as on a keyboard, select all and then delete: the app's key handlers see it, and a field that takes keys but refuses an accessibility write is cleared too.
+      // Cleared as on a keyboard, select all and then delete: the app's key handlers see the delete, and a field that takes keys but refuses an accessibility write is cleared too.
       const window = focused.windowId ?? (await this.ownWindow(operation))?.id;
       if (window === undefined) throw this.chosenWindow === undefined ? invalidState('the app is not running; open it with app.open()') : this.chosenClosed();
-      await this.sendKey('cmd+a', window, 'select all', operation);
+      await this.selectAll(focused, window, operation);
       // The app may move focus on select all: the delete goes only to the field that still holds it.
       await afterChange('delete the selection', async () => {
         if (!(await this.holdsFocus(focused, window, operation))) throw notActionable('the field lost keyboard focus after select all, so no delete was sent');
@@ -1209,6 +1209,21 @@ export class DesktopSurface {
     if (options.replace) await afterChange('type', type);
     else await type().catch((cause: unknown) => Promise.reject(translate(cause, 'type', true)));
     await this.settle(operation);
+  }
+
+  /**
+   * Selects all the text of the focused field. Through accessibility first:
+   * Cmd+A sent to an app in the background goes to its menu bar, not the
+   * field, and selects nothing. A field whose selection cannot be set gets
+   * the key.
+   */
+  private async selectAll(focused: NodeBinding, window: string, operation: OperationContext): Promise<void> {
+    try {
+      await this.tryRef('selectAll', focused, operation);
+    } catch (cause) {
+      if (!(cause instanceof DriverFailure && cause.notDelivered && cause.code === 'ACTION_NOT_SUPPORTED')) throw translate(cause, 'select all', true);
+      await this.sendKey('cmd+a', window, 'select all', operation);
+    }
   }
 
   /** One key to whatever holds focus in the app's window. */
