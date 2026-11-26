@@ -31,6 +31,8 @@ export interface RawNode {
   readonly native_id?: { readonly kind: string; readonly value: string };
   readonly states?: readonly string[];
   readonly available_actions?: readonly string[];
+  /** The axes a node offered `Scroll` scrolls along; absent from an older driver, which scrolled any way. */
+  readonly scroll_axes?: readonly string[];
   readonly bounds?: Rect;
   readonly subtree_truncated?: boolean;
   /** How many children the element has, when the read stopped at the depth limit and listed none of them. */
@@ -98,8 +100,8 @@ export interface ProjectedScreen {
   /** Set by the surface: the sheet on the window that held its focus when the window was read (see `sheetKey`). */
   readonly sheet?: string;
   readonly title?: string;
-  /** The first scrollable node, which the observation root's swipe scrolls. */
-  readonly scrollTarget?: string;
+  /** The first scrollable node along each axis, which the observation root's swipe in that direction scrolls. */
+  readonly scrollTargets?: { readonly vertical?: string; readonly horizontal?: string };
 }
 
 /**
@@ -304,7 +306,7 @@ export function projectSnapshot(
   const bindings = new Map<string, NodeBinding>();
   const secureRects: Rect[] = [];
   let unmaskable = false;
-  let scrollTarget: string | undefined;
+  const scrollTargets: { vertical?: string; horizontal?: string } = {};
 
   // `hiddenAbove`: an ancestor is hidden, a wrapper left out included, so nothing under it is on screen; the resolver reads each node's own state only.
   // `prior`: the id the node held before, which a cut gave it a fresh one in place of; look-alikes under it are reported against that id, which their identities are kept under.
@@ -353,8 +355,12 @@ export function projectSnapshot(
     const description = label(node.description);
     if (description !== undefined) attributes.description = description;
     if (node.native_id !== undefined) attributes['native-id-kind'] = node.native_id.kind;
-    // A swipe on the window scrolls the first node the driver offers Scroll, which it scrolls only then and only while visible and enabled: a list with no scroll mechanism, or a pane off screen, would refuse it.
-    if (scrollTarget === undefined && node.ref_id !== undefined && node.available_actions?.includes('Scroll') === true && states.hidden !== true && states.disabled !== true) scrollTarget = id;
+    // A swipe on the window scrolls the first node the driver offers Scroll along the swipe's axis, which it scrolls only then and only while visible and enabled: a list with no scroll mechanism, a pane off screen, or a carousel for a swipe down would refuse it.
+    if (node.ref_id !== undefined && node.available_actions?.includes('Scroll') === true && states.hidden !== true && states.disabled !== true) {
+      const axes = node.scroll_axes ?? ['vertical', 'horizontal'];
+      if (scrollTargets.vertical === undefined && axes.includes('vertical')) scrollTargets.vertical = id;
+      if (scrollTargets.horizontal === undefined && axes.includes('horizontal')) scrollTargets.horizontal = id;
+    }
     bindings.set(id, {
       id,
       ...(node.ref_id === undefined ? {} : { ref: node.ref_id }),
@@ -438,7 +444,7 @@ export function projectSnapshot(
     ...(raw.window === undefined ? {} : { windowId: raw.window.id }),
     // The window's accessibility root carries its title; the window server's is the app's name without Screen Recording permission.
     ...(title === undefined ? {} : { title }),
-    ...(scrollTarget === undefined ? {} : { scrollTarget }),
+    ...(scrollTargets.vertical === undefined && scrollTargets.horizontal === undefined ? {} : { scrollTargets }),
   };
 }
 

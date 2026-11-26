@@ -1012,9 +1012,10 @@ export class DesktopSurface {
       // The root is the window as it is now: read it again, since a locate or a restart may have moved on from the last observation.
       const screen = await this.capture(operation);
       if (screen !== undefined) this.remember(screen.bindings.values());
-      const target = screen?.scrollTarget;
-      if (target === undefined && screen?.cutShort === true) throw partialRead('what in it scrolls');
-      if (target === undefined) throw notActionable('the window has nothing that scrolls');
+      const axis = action.direction === 'left' || action.direction === 'right' ? 'horizontal' : 'vertical';
+      const target = screen?.scrollTargets?.[axis];
+      if (target === undefined && screen?.cutShort === true) throw partialRead(`what in it scrolls ${axis === 'vertical' ? 'up and down' : 'sideways'}`);
+      if (target === undefined) throw notActionable(`the window has nothing that scrolls ${axis === 'vertical' ? 'up and down' : 'sideways'}`);
       await this.scroll(this.binding({ id: target, revision: '' }), action.direction, action.momentum, operation);
       return this.settle(operation);
     }

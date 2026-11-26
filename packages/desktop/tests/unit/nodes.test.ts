@@ -293,7 +293,7 @@ describe('projectSnapshot', () => {
     for (const name of ['Drawer', 'Drawer item', 'Panel', 'Panel item']) expect(byName(name)?.states?.hidden).toBe(true);
     expect(byName('Main')?.states?.hidden).toBeUndefined();
     expect(byName('Main item')?.states?.hidden).toBeUndefined();
-    expect(screen.scrollTarget).toBe(byName('Main')?.ref.id);
+    expect(screen.scrollTargets?.vertical).toBe(byName('Main')?.ref.id);
   });
 
   it('reads every node of a minimized window as hidden, the window itself too', () => {
@@ -326,7 +326,26 @@ describe('projectSnapshot', () => {
       },
       minter(),
     );
-    expect(screen.scrollTarget).toBe(screen.root.children?.[4]?.ref.id);
+    expect(screen.scrollTargets).toEqual({ vertical: screen.root.children?.[4]?.ref.id, horizontal: screen.root.children?.[4]?.ref.id });
+  });
+
+  it('swipes each way the first node that scrolls that way, past a carousel for a swipe down', () => {
+    const screen = projectSnapshot(
+      {
+        snapshot_id: 's',
+        tree: {
+          role: 'window',
+          name: 'Store',
+          children: [
+            { role: 'scrollarea', name: 'Carousel', ref_id: '@s:e1', available_actions: ['Scroll'], scroll_axes: ['horizontal'] },
+            { role: 'scrollarea', name: 'List', ref_id: '@s:e2', available_actions: ['Scroll'], scroll_axes: ['vertical'] },
+          ],
+        },
+      },
+      minter(),
+    );
+    const [carousel, list] = screen.root.children ?? [];
+    expect(screen.scrollTargets).toEqual({ vertical: list?.ref.id, horizontal: carousel?.ref.id });
   });
 
   it('counts a node with children it did not list as a cut-short tree', () => {
