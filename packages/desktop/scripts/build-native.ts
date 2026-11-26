@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { cargoEnvironment } from './cargo.ts';
+import { cargo } from './cargo.ts';
 
 /** The Node platform and arch each supported target triple builds for. */
 const TARGETS: Readonly<Record<string, string>> = {
@@ -34,10 +34,11 @@ const platform = TARGETS[target];
 if (platform === undefined) throw new Error(`no native driver build for ${target}; one of ${Object.keys(TARGETS).join(', ')}`);
 
 const crate = path.join(import.meta.dirname, '..', 'native');
-const env = { ...cargoEnvironment(crate), MACOSX_DEPLOYMENT_TARGET: DEPLOYMENT_TARGET };
-execFileSync('cargo', ['build', '--release', '--locked', '--target', target], { cwd: crate, stdio: 'inherit', env });
+const run = cargo(crate);
+const env = { ...run.env, MACOSX_DEPLOYMENT_TARGET: DEPLOYMENT_TARGET };
+execFileSync(run.file, [...run.prefix, 'build', '--release', '--locked', '--target', target], { cwd: crate, stdio: 'inherit', env });
 // Where cargo wrote it: `CARGO_TARGET_DIR` or a cargo config can move the target directory off `native/target`.
-const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: crate, encoding: 'utf8', env })) as { target_directory: string };
+const metadata = JSON.parse(execFileSync(run.file, [...run.prefix, 'metadata', '--format-version', '1', '--no-deps'], { cwd: crate, encoding: 'utf8', env })) as { target_directory: string };
 const built = path.join(metadata.target_directory, target, 'release', 'libe2e_desktop_native.dylib');
 const name = `desktop.${platform}.node`;
 replace(built, path.join(crate, name));

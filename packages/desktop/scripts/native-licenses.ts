@@ -12,7 +12,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { cargoEnvironment } from './cargo.ts';
+import { cargo } from './cargo.ts';
 
 interface Target {
   readonly kind: readonly string[];
@@ -43,12 +43,13 @@ const crate = path.join(import.meta.dirname, '..', 'native');
 const packages = path.join(import.meta.dirname, '..', '..');
 const outputs = ['desktop-darwin-arm64', 'desktop-darwin-x64'].map((name) => path.join(packages, name, 'THIRD_PARTY_LICENSES.md'));
 
+const run = cargo(crate);
 // Resolved for the two Mac targets the platform packages ship, so a crate only another OS links (`windows-link`) is not listed.
 const metadata = JSON.parse(
-  execFileSync('cargo', ['metadata', '--format-version', '1', '--locked', '--filter-platform', 'aarch64-apple-darwin', '--filter-platform', 'x86_64-apple-darwin'], {
+  execFileSync(run.file, [...run.prefix, 'metadata', '--format-version', '1', '--locked', '--filter-platform', 'aarch64-apple-darwin', '--filter-platform', 'x86_64-apple-darwin'], {
     cwd: crate,
     encoding: 'utf8',
-    env: cargoEnvironment(crate),
+    env: run.env,
     maxBuffer: 64 * 1024 * 1024,
   }),
 ) as Metadata;
