@@ -50,7 +50,7 @@ export type Envelope<T> = { readonly ok: true; readonly data: T } | { readonly o
 export interface RawWindow {
   readonly id: string;
   readonly title?: string;
-  /** The app's key window. */
+  /** The app's key window, or the window its focused sheet or alert is on. */
   readonly is_focused?: boolean;
   /** On screen now: false for a minimized window, or one on another Space. */
   readonly visible?: boolean;
