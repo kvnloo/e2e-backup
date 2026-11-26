@@ -98,11 +98,17 @@ test('a shake is sent without an error and leaves the screen readable', async ({
 });
 
 // lock and unlock each return only once the device reports the new state, so
-// the check after them is that the app the lock covered is back in front.
-test('locking and unlocking the screen brings the same screen back', async ({ app, device, screen }) => {
+// passing both is the round trip. The screen read afterwards proves only that
+// the app reads again: on iOS that read can itself bring the app to the front.
+// The unlock is in finally so a lock that fails after it took effect does not
+// leave the device locked for the tests after this one.
+test('a lock and an unlock both complete and leave the app readable', async ({ app, device, screen }) => {
   await openScenario({ app, device, screen }, 'Sequential Onboarding');
-  await device.lock();
-  await device.unlock();
+  try {
+    await device.lock();
+  } finally {
+    await device.unlock();
+  }
   await expect(screen.getByTestId('email-input')).toBeVisible();
 });
 
