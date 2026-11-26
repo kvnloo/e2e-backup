@@ -71,7 +71,9 @@ export interface Launched {
 
 /** What the driver can do: one function per native call. */
 export interface DesktopDriver {
-  status(): { readonly accessibility: boolean; readonly screenRecording: boolean; readonly version: string };
+  /** The version of the package the driver came from, or `checkout build` for one built in this package's `native/`. */
+  readonly version: string;
+  status(): { readonly accessibility: boolean; readonly screenRecording: boolean };
   /** Whether the screen is locked; null when that cannot be told. */
   screenLocked(): boolean | null;
   /** How many menus a process has open on screen. */
@@ -125,9 +127,14 @@ export function loadNativeDriver(): DesktopDriver {
     throw new EngineError('UNSUPPORTED_CAPABILITY', `@e2e-dev/desktop has no native driver for ${process.platform} on ${process.arch}: it drives macOS apps only`, { retryable: false });
   }
   const failures: string[] = [];
-  for (const specifier of [packageName, path.join(import.meta.dirname, '..', 'native', `desktop.${platform}.node`)]) {
+  const builds: readonly [string, () => string][] = [
+    [packageName, () => (ownRequire(`${packageName}/package.json`) as { version: string }).version],
+    [path.join(import.meta.dirname, '..', 'native', `desktop.${platform}.node`), () => 'checkout build'],
+  ];
+  for (const [specifier, version] of builds) {
     try {
-      return ownRequire(specifier) as DesktopDriver;
+      // The addon's exports are not enumerable, so the version goes on an object that inherits them.
+      return Object.assign(Object.create(ownRequire(specifier) as object) as Omit<DesktopDriver, 'version'>, { version: version() });
     } catch (cause) {
       failures.push(`${specifier}: ${(cause as Error).message.split('\n')[0] ?? ''}`);
     }

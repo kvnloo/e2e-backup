@@ -67,6 +67,7 @@ export function standIn({ exits = false }: { exits?: boolean } = {}): number {
 const ok = (data: unknown): Answer => ({ ok: true, data });
 
 export class FakeDriver implements DesktopDriver {
+  readonly version = '0.0.0-test';
   readonly calls: FakeCall[] = [];
   /** What `screenLocked` answers. */
   locked: boolean | null = false;
@@ -119,7 +120,7 @@ export class FakeDriver implements DesktopDriver {
 
   status() {
     this.calls.push({ method: 'status', args: [] });
-    return { accessibility: this.accessibility, screenRecording: this.screenRecording, version: '0.0.0-test' };
+    return { accessibility: this.accessibility, screenRecording: this.screenRecording };
   }
 
   screenLocked(): boolean | null {

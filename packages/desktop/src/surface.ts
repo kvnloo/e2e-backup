@@ -304,7 +304,7 @@ export class DesktopSurface {
     const started = driver.processStarted(process.pid);
     await writeFile(path.join(this.home, OWNER_FILE), started === null ? String(process.pid) : `${process.pid}\n${started}`);
     const status = driver.status();
-    this.driverVersion = status.version;
+    this.driverVersion = driver.version;
     if (!status.accessibility) {
       throw new EngineError(
         'ENGINE_FAILURE',
@@ -374,7 +374,7 @@ export class DesktopSurface {
     if (driver !== undefined) {
       const status = driver.status();
       checks.push(
-        { id: 'desktop-driver', status: 'pass', message: `desktop driver ${status.version}` },
+        { id: 'desktop-driver', status: 'pass', message: `desktop driver ${driver.version}` },
         status.accessibility
           ? { id: 'accessibility', status: 'pass', message: 'Accessibility permission granted' }
           : { id: 'accessibility', status: 'fail', message: 'Allow the app that starts e2e in System Settings > Privacy & Security > Accessibility' },

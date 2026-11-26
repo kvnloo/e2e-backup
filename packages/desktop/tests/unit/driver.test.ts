@@ -1,4 +1,5 @@
 import { EngineError } from '@e2e-dev/core/engine';
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { call, DriverFailure, loadNativeDriver, translate, type Envelope } from '../../src/driver.ts';
 
@@ -91,6 +92,15 @@ describe('call: onCutOff', () => {
 });
 
 describe('loadNativeDriver', () => {
+  it.skipIf(process.platform !== 'darwin' || !existsSync(new URL(`../../native/desktop.darwin-${process.arch}.node`, import.meta.url)))(
+    'names the build it loaded and keeps every native function callable',
+    () => {
+      const driver = loadNativeDriver();
+      expect(['checkout build', expect.stringMatching(/^\d+\.\d+\.\d+/)]).toContainEqual(driver.version);
+      expect(typeof driver.status().accessibility).toBe('boolean');
+    },
+  );
+
   it.each(['linux', 'win32'] as const)('reports %s as unsupported: no driver is built for it', (platform) => {
     const real = Object.getOwnPropertyDescriptor(process, 'platform');
     Object.defineProperty(process, 'platform', { value: platform, configurable: true });
