@@ -2435,6 +2435,9 @@ describe('device fixture', () => {
     ]);
     expect(declared?.keyboard?.type?.label?.('hello')).toBe('5 chars');
     expect(declared?.keyboard?.press?.label?.('Backspace')).toBe('Backspace');
+    // The recorder labels a step before the call validates its argument.
+    expect(declared?.keyboard?.type?.label?.(null as never)).toBe('object');
+    expect(declared?.keyboard?.press?.label?.(8 as never)).toBe('number');
   });
 
   it.each([
@@ -2443,7 +2446,9 @@ describe('device fixture', () => {
     ['Backspace2', 'INVALID_ARGUMENT'],
     ['', 'INVALID_ARGUMENT'],
     [8, 'INVALID_ARGUMENT'],
-  ] as const)('device.keyboard.press(%j) fails with %s before any device call', async (key, code) => {
+    [8n, 'INVALID_ARGUMENT'],
+    [null, 'INVALID_ARGUMENT'],
+  ] as const)('device.keyboard.press(%s) fails with %s before any device call', async (key, code) => {
     const h = harness();
     await openAttempt(h);
     const before = h.fake.calls.length;

@@ -439,7 +439,7 @@ export function createDeviceFixture(surface: AgentDeviceSurface, context: Engine
         if (typeof key !== 'string' || parseKey(key) === undefined) {
           throw new TestError(
             'INVALID_ARGUMENT',
-            `device.keyboard.press(${JSON.stringify(key)}): not a key; press Enter, Space, Backspace, or one character`,
+            `device.keyboard.press(${typeof key === 'string' ? JSON.stringify(key) : typeof key}): not a key; press Enter, Space, Backspace, or one character`,
           );
         }
         const operation = context.operation();
@@ -486,7 +486,10 @@ export function createDeviceFixture(surface: AgentDeviceSurface, context: Engine
     alert: { ...action, label: (value) => value },
     dismissKeyboard: action,
     isKeyboardShown: action,
-    keyboard: { type: { ...action, label: (text) => `${text.length} chars` }, press: { ...action, label: (key) => key } },
+    keyboard: {
+      type: { ...action, label: (text) => (typeof text === 'string' ? `${text.length} chars` : typeof text) },
+      press: { ...action, label: (key) => (typeof key === 'string' ? key : typeof key) },
+    },
     clipboard: action,
     setClipboard: { ...action, label: (text) => `${text.length} chars` },
   });

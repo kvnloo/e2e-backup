@@ -34,6 +34,16 @@ viewport.width = 400;
 // @ts-expect-error viewport dimensions are readonly.
 viewport.height = 800;
 
+void (device.keyboard.type('jane@example.com') satisfies Promise<void>);
+void (device.keyboard.press('Backspace') satisfies Promise<void>);
+declare const secret: import('@e2e-dev/core/engine').Secret;
+// @ts-expect-error keyboard.type takes plain text; a Secret goes through locator.fill.
+void device.keyboard.type(secret);
+// @ts-expect-error keyboard.press takes a key name, not an Android key code.
+void device.keyboard.press(67);
+// @ts-expect-error keyboard is a fixed pair of methods, not reassignable.
+device.keyboard = entryDevice.keyboard;
+
 void device.pressRemote('menu');
 // @ts-expect-error pressRemote takes the lowercase remote keys, not the keyboard's capitalised names
 void device.pressRemote('Menu');
