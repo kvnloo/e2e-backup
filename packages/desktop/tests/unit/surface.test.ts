@@ -890,6 +890,29 @@ describe('DesktopSurface: acting', () => {
     const notes = every((await over.surface.observe(operation(), undefined)).root).find((node) => node.role === 'text' || node.name === 'Notes');
     await expect(over.surface.perform(notes!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
     expect(inputs(over.fake)).toEqual([]);
+    // A button scrolled out of its list is not under the pointer, whatever box it keeps.
+    const scrolled = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [
+        { role: 'statictext', value: 'Notes', bounds: { x: 10, y: 10, width: 100, height: 20 } },
+        { role: 'button', name: 'Delete', ref_id: '@s:e9', states: ['offscreen'], bounds: { x: 50, y: 5, width: 20, height: 30 } },
+      ],
+    });
+    const away = await launched({ snapshot: [scrolled], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const visible = every((await away.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Notes');
+    await away.surface.perform(visible!.ref, { kind: 'doubleTap' }, operation());
+    expect(away.fake.of('pointer').at(-1)?.args).toEqual([60, 20, 'doubleTap']);
+    // A read stopped at the depth limit may have left out the control at the center.
+    const deep = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [{ role: 'group', name: 'Row', bounds: { x: 10, y: 10, width: 100, height: 50 }, children_count: 1 }],
+    });
+    const cut = await launched({ snapshot: [deep], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const shallow = every((await cut.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Row');
+    await expect(cut.surface.perform(shallow!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NODE_STALE', message: expect.stringMatching(/read only in part/) });
+    expect(inputs(cut.fake)).toEqual([]);
   });
 
   it('double-clicks a node with a stable id where a fresh read finds it, never the box it was read with', async () => {

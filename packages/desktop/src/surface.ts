@@ -1184,6 +1184,10 @@ export class DesktopSurface {
     // The box it was read with could hold what replaced it, and a node with a stable id may have moved.
     const now = await this.capture(operation, binding.windowId, false, !binding.interactive);
     if (now?.cutShort === true) throw partialRead(`whether node ${binding.id} is still on screen`);
+    // A read stopped at the depth limit left out what is below some nodes: a control at the center may be one of them.
+    if (kind === 'doubleTap' && now?.truncated === true) {
+      throw new EngineError('NODE_STALE', `the window was read only in part (it is deeper than the ${this.options.maxDepth} levels a snapshot reads, which desktop({ maxDepth }) raises, or holds more than the ${MAX_SNAPSHOT_NODES} elements it reads), so what is at the center of node ${binding.id} cannot be told`, { retryable: true });
+    }
     const fresh = [...(now?.bindings.values() ?? [])].find((candidate) => sameNode(candidate, binding));
     if (fresh === undefined) throw new EngineError('NODE_STALE', `node ${binding.id} (${binding.role ?? 'unknown'}) is no longer on screen; observe again`, { retryable: true });
     if (fresh.states?.hidden === true) throw notActionable(`node ${binding.id} is not on screen; scroll it into view first`);
@@ -1194,7 +1198,7 @@ export class DesktopSurface {
     if (kind === 'doubleTap') {
       const around = new Set(now === undefined ? [] : ancestors(now.root, fresh.id));
       const other = [...(now?.bindings.values() ?? [])].find(
-        (candidate) => candidate.id !== fresh.id && !around.has(candidate.id) && candidate.ref !== undefined && candidate.rect !== undefined && holds(candidate.rect, center),
+        (candidate) => candidate.id !== fresh.id && !around.has(candidate.id) && candidate.ref !== undefined && candidate.states?.hidden !== true && candidate.rect !== undefined && holds(candidate.rect, center),
       );
       if (other !== undefined) throw notActionable(`a ${other.role ?? 'control'} is at the center of node ${binding.id}, so a double-click there would press it; act on that control instead`);
     }
