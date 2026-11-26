@@ -1109,6 +1109,14 @@ describe('DesktopSurface: keys', () => {
     expect(fake.of('press')).toHaveLength(1);
   });
 
+  it('refuses a shortcut the keyboard layout cannot type before it moves focus', async () => {
+    const { surface, fake, byTestId } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] });
+    // AZERTY types é on the 2 key without Shift: a digit shortcut there is no key the driver can press.
+    fake.untypable.add('cmd+2');
+    await expect(surface.perform(byTestId('username'), { kind: 'press', key: 'ControlOrMeta+2' }, operation())).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    expect(inputs(fake)).toEqual([]);
+  });
+
   it('sends no key when focusing the control fails', async () => {
     const { surface, fake, byTestId } = await launched({ act: [failure('ACTION_NOT_SUPPORTED', 'not_delivered')] });
     await expect(surface.perform(byTestId('username'), { kind: 'press', key: 'a' }, operation())).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });

@@ -105,6 +105,7 @@ const NATIVE_FUNCTIONS = [
   'inputId',
   'cancelInput',
   'press',
+  'checkCombo',
   'focusWindow',
   'pointer',
   'screenshot',

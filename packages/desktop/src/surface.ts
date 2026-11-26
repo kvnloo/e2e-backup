@@ -1058,10 +1058,11 @@ export class DesktopSurface {
         await this.refCommand('setValue', binding, operation, { value: action.value });
         break;
       case 'press': {
-        // A key the engine cannot press is refused before focus moves.
+        // A key the engine cannot press is refused before focus moves, and so is one this Mac's keyboard layout cannot type (a digit shortcut on AZERTY).
         const combo = toCombo(action.key);
         const window = binding.windowId;
         if (window === undefined) throw notActionable(`node ${binding.id} was read in no window to press a key into`);
+        await this.read((driver) => driver.checkCombo(combo), { label: 'press', input: false, signal: operation.signal, timeoutMs: operation.timeoutMs }).catch((cause: unknown) => Promise.reject(translate(cause, 'press', false)));
         await this.refCommand('focus', binding, operation);
         try {
           // The key goes to the process, which hands it to its key window: with another window that could be it, the control's must be the one shown focused.

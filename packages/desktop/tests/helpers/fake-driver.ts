@@ -169,6 +169,14 @@ export class FakeDriver implements DesktopDriver {
     this.calls.push({ method: 'cancelInput', args: [inputId] });
   }
 
+  /** Answers like the driver's layout check: a combo this fake's keyboard cannot type is listed in `untypable`. */
+  readonly untypable = new Set<string>();
+
+  checkCombo(combo: string): Promise<Envelope<unknown>> {
+    if (this.untypable.has(combo)) return Promise.resolve({ ok: false, error: { code: 'ACTION_NOT_SUPPORTED', message: `${combo}: no key on this layout types it`, disposition: { delivery: 'not_delivered' }, details: {} } } as Envelope<unknown>);
+    return Promise.resolve({ ok: true, data: {} });
+  }
+
   press(options: Parameters<DesktopDriver['press']>[0]): Promise<Envelope<unknown>> {
     return this.answer('press', [options], ok({}));
   }
