@@ -73,9 +73,10 @@ object entry becomes `-name value`, as on iOS, so
 The launched app gets only a minimal environment (`HOME`, `USER`, `LOGNAME`,
 `SHELL`, `PATH`, `TMPDIR`, `LANG`, `LC_*`, `__CF_USER_TEXT_ENCODING`, plus
 `E2E_DESKTOP_LAUNCH` for process tracking), so your secrets, model keys, and
-CI tokens never leak into it. macOS hides that variable in its own apps and
-in builds signed with the `restrict` flag, so those also get
-`-E2EDesktopLaunch <token>` as their last launch arguments.
+CI tokens never leak into it. macOS hides that variable in its own apps,
+in Apple's Mac App Store apps (Numbers, Pages, Xcode), and in builds signed
+with the `restrict` flag, so those also get `-E2EDesktopLaunch <token>` as
+their last launch arguments.
 
 ```ts title="e2e.config.ts"
 import type { E2EConfig } from 'e2e';
