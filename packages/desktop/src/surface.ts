@@ -420,6 +420,8 @@ export class DesktopSurface {
     const token = randomUUID();
     // Written before anything is sent, so the app stays findable by its token if this worker is killed mid-launch.
     await this.writeRecord({ token });
+    // The write takes time too: a launch sent with no budget left would start the app after the open gave up.
+    if (operation.timeoutMs <= 0) throw new EngineError('OPERATION_TIMEOUT', `launch ${target.label}: the operation's budget ran out before it was sent`, { retryable: false, cause: NOT_SENT });
     // Started by `call`, which starts nothing once the signal aborted: a cancelled open never launches the app.
     let started: Promise<Envelope<Launched>> | undefined;
     const start = (): Promise<Envelope<Launched>> =>
