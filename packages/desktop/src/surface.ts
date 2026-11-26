@@ -858,7 +858,11 @@ export class DesktopSurface {
       return windows.filter((window) => window.pid === undefined || window.pid === pid);
     } catch (cause) {
       if (cause instanceof DriverFailure && NO_WINDOW_CODES.has(cause.code)) {
-        if (strict) await this.requireRunning();
+        if (strict) {
+          await this.requireRunning();
+          // The process still runs, so the list failed, not the app: no empty screen, which would let a negative assertion pass.
+          throw new EngineError('NODE_STALE', `the windows of ${this.appName ?? 'the app'} could not be listed while it runs; reading again`, { retryable: true, cause: UNREADABLE });
+        }
         return [];
       }
       throw translate(cause, 'list windows', false);

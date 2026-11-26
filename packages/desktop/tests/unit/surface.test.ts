@@ -433,6 +433,13 @@ describe('DesktopSurface: the launch wait', () => {
 });
 
 describe('DesktopSurface: reading', () => {
+  it('reads again when the window list does not find the app while its process still runs, never an empty screen', async () => {
+    const first = windows(() => [{ id: 'w-mine', is_focused: true }]);
+    const lost = failure('APP_NOT_FOUND', 'not_delivered');
+    const { surface } = await launched({ listWindows: [first, lost] }, { observe: false });
+    await expect(surface.locate(testId('username'), operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true });
+  });
+
   it('reads and drives nothing before the app is opened, or once it quit', async () => {
     const { surface, fake } = await launched({}, { observe: false });
     await surface.closeApp(signal, 5_000);
