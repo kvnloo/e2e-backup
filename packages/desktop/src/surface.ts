@@ -798,13 +798,15 @@ export class DesktopSurface {
       }
     }
     if (candidates.length === 0) return undefined;
+    // A locked screen still lists the app's windows, none of them readable: say so rather than that each closed.
+    this.unlessLocked();
     throw new EngineError('NODE_STALE', `no window of ${this.appName ?? 'the app'} could be read through accessibility, or each closed while it was read`, { retryable: true, cause: UNREADABLE });
   }
 
   /**
    * Throws a retryable `NODE_STALE` while the Mac's screen is locked: macOS
-   * then lists none of the app's windows, which must not read as a window
-   * that closed or an app with none open.
+   * then lists the app's windows as unreadable, or none of them, which must
+   * not read as a window that closed or an app with none open.
    */
   private unlessLocked(): void {
     if (this.requireDriver().screenLocked() !== true) return;

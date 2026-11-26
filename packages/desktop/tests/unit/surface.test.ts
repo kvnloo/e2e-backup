@@ -514,6 +514,14 @@ describe('DesktopSurface: reading', () => {
     await expect(surface.locate(testId('username'), operation())).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/screen is locked/) });
   });
 
+  it('says the screen is locked when it lists the windows as ones accessibility cannot read', async () => {
+    const unreadable = windows(() => [{ id: 'w-mine', is_focused: true, accessible: false }]);
+    const fake = fakeDriver({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true }]), unreadable] });
+    const { surface } = await launched(fake, { observe: false });
+    fake.locked = true;
+    await expect(surface.observe(operation(), undefined)).rejects.toMatchObject({ code: 'NODE_STALE', retryable: true, message: expect.stringMatching(/screen is locked/) });
+  });
+
   it('reads again, never a closed window, when the screen locks between the window list and the read', async () => {
     const fake = fakeDriver({ listWindows: [windows(() => [{ id: 'w-mine', is_focused: true }, { id: 'w-panel' }])], snapshot: [snapshotAnswer('macos/appkit-form'), failure('WINDOW_NOT_FOUND', 'not_delivered')] });
     const { surface } = await launched(fake, { observe: false });
