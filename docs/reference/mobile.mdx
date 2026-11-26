@@ -1098,11 +1098,14 @@ await expect(screen.getByText('Welcome back')).toBeVisible();
 
 To lock the screen for a time, as Appium's `lock(seconds)` does, wait between `lock()` and `unlock()`.
 
+The engine never unlocks the device for you. A test that fails while the screen is locked leaves it locked for the next test on that device, so unlock in a `finally` block or in `afterEach`.
+
 | Throws | When |
 | --- | --- |
 | `UNSUPPORTED_CAPABILITY` | The device is not one agent-device can lock: a physical iPhone or iPad, an Android TV or Apple TV, or a device a provider drives through its own backend with no lock command. |
 | `UNSUPPORTED_CAPABILITY` | The Android device's screen lock is set to None. The message says so; set any other screen lock, such as Swipe, in Settings > Security. |
-| `ENGINE_FAILURE` | The device did not report the screen locked in time. On Android, a "Lock after screen timeout" delay above one minute outlasts the command. |
+| `ACTION_FAILED` | `actionTimeout` expired before the device reported the screen locked. On an Android device with a PIN, pattern, or password and "Power button instantly locks" off, the keyguard waits for "Lock after screen timeout", up to one minute; raise `actionTimeout` or turn that setting on. |
+| `ENGINE_FAILURE` | The device did not report the screen locked: on Android within 5 seconds, plus the "Lock after screen timeout" delay up to one minute. |
 
 #### `unlock`
 
