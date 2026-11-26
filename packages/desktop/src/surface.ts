@@ -1192,7 +1192,9 @@ export class DesktopSurface {
     const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     // A point names no element: the driver's check takes any control of the window there. A control inside this node at its center (a group's button) would take the double-click, so it is refused here, from the same read; a hover presses nothing.
     if (kind === 'doubleTap') {
-      const inner = [...(now?.bindings.values() ?? [])].find((candidate) => candidate !== fresh && candidate.ref !== undefined && candidate.rect !== undefined && within(candidate.rect, rect) && holds(candidate.rect, center));
+      // Inside by the read's tree, not by boxes: a child control may reach past its parent's box.
+      const below = new Set(now === undefined ? [] : descendants(now.root, fresh.id));
+      const inner = [...(now?.bindings.values() ?? [])].find((candidate) => below.has(candidate.id) && candidate.ref !== undefined && candidate.rect !== undefined && holds(candidate.rect, center));
       if (inner !== undefined) throw notActionable(`a ${inner.role ?? 'control'} inside node ${binding.id} is at its center, so a double-click there would press it; act on that control instead`);
     }
     this.pointWindow = binding.windowId === undefined ? undefined : { id: binding.windowId, sheet: now?.sheet };
@@ -1622,9 +1624,12 @@ async function abandon(directory: string): Promise<void> {
   await writeFile(path.join(directory, OWNER_FILE), ABANDONED);
 }
 
-/** Whether `inner` lies within `outer`. */
-function within(inner: Rect, outer: Rect): boolean {
-  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
+/** The ids of every node below the node `id` in a tree, none when the tree does not hold it. */
+function descendants(root: SemanticNode, id: string): string[] {
+  const below = (node: SemanticNode): string[] => (node.children ?? []).flatMap((child) => [child.ref.id, ...below(child)]);
+  const find = (node: SemanticNode): SemanticNode | undefined => (node.ref.id === id ? node : (node.children ?? []).map(find).find((found) => found !== undefined));
+  const node = find(root);
+  return node === undefined ? [] : below(node);
 }
 
 /** Whether a rect holds a point. */

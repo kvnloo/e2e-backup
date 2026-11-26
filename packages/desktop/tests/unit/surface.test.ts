@@ -865,6 +865,16 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(fake)).toEqual([]);
     await surface.perform(group!.ref, { kind: 'hover' }, operation());
     expect(fake.of('pointer').at(-1)?.args).toEqual([60, 35, 'hover']);
+    // A child button that reaches past its group's box is inside it all the same.
+    const wide = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [{ role: 'group', name: 'Row', bounds: { x: 20, y: 20, width: 80, height: 30 }, children: [{ role: 'button', name: 'Delete', ref_id: '@s:e9', bounds: { x: 50, y: 20, width: 80, height: 30 } }] }],
+    });
+    const past = await launched({ snapshot: [wide], listWindows: [placed] }, { observe: false, options: { headed: true } });
+    const wideRow = every((await past.surface.observe(operation(), undefined)).root).find((node) => node.role === 'group' && node.name === 'Row');
+    await expect(past.surface.perform(wideRow!.ref, { kind: 'doubleTap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE' });
+    expect(inputs(past.fake)).toEqual([]);
   });
 
   it('double-clicks a node with a stable id where a fresh read finds it, never the box it was read with', async () => {
