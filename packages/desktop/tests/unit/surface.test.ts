@@ -260,11 +260,13 @@ describe('DesktopSurface: launching', () => {
   });
 
   it('ends a launch the driver gave up before open ran without looking for an app it never started', async () => {
-    const { surface } = await initialized({ launch: [{ ...failure('TIMEOUT', 'not_delivered', 'the launch was given up before open ran'), sleepMs: 1_000 }] });
-    await expect(surface.restart({ ...operation(), timeoutMs: 600 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    // The answer comes well after the cut-off, which comes well after the launch is sent, even on a loaded machine.
+    const { surface } = await initialized({ launch: [{ ...failure('TIMEOUT', 'not_delivered', 'the launch was given up before open ran'), sleepMs: 3_000 }] });
+    await expect(surface.restart({ ...operation(), timeoutMs: 1_500 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
     const started = Date.now();
     await surface.endAttempt({ signal, timeoutMs: 5_000 });
-    expect(Date.now() - started).toBeLessThan(1_500);
+    // The quit waits only for the late answer (about 1.5 s after the cut-off), never for the look for a late app.
+    expect(Date.now() - started).toBeLessThan(2_500);
   });
 
   it('keeps a launch pending when the quit has no time left to look for its late app, so the next quit still finds it', async () => {
@@ -304,9 +306,9 @@ describe('DesktopSurface: launching', () => {
 
   it('never kills the process a late launch answer named once its id went to another process', async () => {
     // The launch answers late with a process and its start; by the quit, that id is a process that started at another time.
-    const fake = fakeDriver({ launch: [(driver) => ({ ok: true, data: { app: 'SpikeForm', pid: driver.spawn({}), started: 7 }, sleepMs: 1_500 })] });
+    const fake = fakeDriver({ launch: [(driver) => ({ ok: true, data: { app: 'SpikeForm', pid: driver.spawn({}), started: 7 }, sleepMs: 3_000 })] });
     const { surface } = await initialized(fake);
-    await expect(surface.restart({ ...operation(), timeoutMs: 600 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
+    await expect(surface.restart({ ...operation(), timeoutMs: 1_500 })).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED' });
     const pid = fake.pid;
     await expect(surface.endAttempt({ signal, timeoutMs: 5_000 })).rejects.toThrow(/no process it started was found/);
     expect(await gone(pid, 300)).toBe(false);
