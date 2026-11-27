@@ -10,8 +10,8 @@ function solid(width: number, height: number, channels: 3 | 4, value: number): D
 }
 
 describe('screenshot masking', () => {
-  it.each([FilterType.NoFilter, FilterType.Paeth])('masks and clips RGBA screenshots encoded with filter %i', (filter) => {
-    const masked = decodePng(maskPng(encodePng(solid(10, 10, 4, 255), filter), [{ x: 2, y: 2, width: 3, height: 2 }, { x: 8, y: 8, width: 50, height: 50 }]));
+  it.each([FilterType.NoFilter, FilterType.Paeth])('masks and clips RGBA screenshots encoded with filter %i', async (filter) => {
+    const masked = decodePng(await maskPng(encodePng(solid(10, 10, 4, 255), filter), [{ x: 2, y: 2, width: 3, height: 2 }, { x: 8, y: 8, width: 50, height: 50 }]));
     const at = (x: number, y: number) => [...masked.pixels.subarray((y * 10 + x) * 4, (y * 10 + x) * 4 + 4)];
     expect(at(2, 2)).toEqual([0, 0, 0, 255]);
     expect(at(4, 3)).toEqual([0, 0, 0, 255]);
@@ -33,8 +33,8 @@ describe('screenshot masking', () => {
     ['RGB', filled(8, 2, [10, 20, 30]), [10, 20, 30, 255]],
     ['16-bit RGB', filled(16, 2, [255, 255, 128, 0, 1, 1]), [255, 128, 1, 255]],
     ['16-bit RGBA', filled(16, 6, [0, 0, 255, 255, 0, 0, 128, 0]), [0, 255, 0, 128]],
-  ] as const)('masks a %s screenshot and writes the rest of it as RGBA', (_label, bytes, color) => {
-    const masked = decodePng(maskPng(bytes, [{ x: 0, y: 0, width: 2, height: 2 }]));
+  ] as const)('masks a %s screenshot and writes the rest of it as RGBA', async (_label, bytes, color) => {
+    const masked = decodePng(await maskPng(bytes, [{ x: 0, y: 0, width: 2, height: 2 }]));
     const at = (x: number, y: number) => [...masked.pixels.subarray((y * 4 + x) * 4, (y * 4 + x) * 4 + 4)];
     expect(at(0, 0)).toEqual([0, 0, 0, 255]);
     expect(at(1, 1)).toEqual([0, 0, 0, 255]);
@@ -42,18 +42,18 @@ describe('screenshot masking', () => {
     expect(at(3, 3)).toEqual(color);
   });
 
-  it('returns the bytes untouched when there is nothing to mask, and refuses other formats', () => {
+  it('returns the bytes untouched when there is nothing to mask, and refuses other formats', async () => {
     const bytes = encodePng(solid(2, 2, 3, 9));
-    expect(maskPng(bytes, [])).toBe(bytes);
+    expect(await maskPng(bytes, [])).toBe(bytes);
     const rects = [{ x: 0, y: 0, width: 1, height: 1 }];
-    expect(() => maskPng(new Uint8Array([1, 2, 3]), rects)).toThrow();
-    expect(() => maskPng(bytes.slice(0, -10), rects)).toThrow();
+    await expect(maskPng(new Uint8Array([1, 2, 3]), rects)).rejects.toThrow();
+    await expect(maskPng(bytes.slice(0, -10), rects)).rejects.toThrow();
     const corrupt = Uint8Array.from(bytes);
     corrupt[20] = 255;
-    expect(() => maskPng(corrupt, rects)).toThrow();
+    await expect(maskPng(corrupt, rects)).rejects.toThrow();
     const jpeg = new Uint8Array(Transformer.fromRgbaPixels(new Uint8Array(16).fill(255), 2, 2).jpegSync());
-    expect(() => maskPng(jpeg, rects)).toThrow('not a PNG');
-    const masked = decodePng(maskPng(bytes, rects));
+    await expect(maskPng(jpeg, rects)).rejects.toThrow('not a PNG');
+    const masked = decodePng(await maskPng(bytes, rects));
     expect([...masked.pixels.subarray(0, 4)]).toEqual([0, 0, 0, 255]);
     expect([...masked.pixels.subarray(4, 8)]).toEqual([9, 9, 9, 255]);
   });

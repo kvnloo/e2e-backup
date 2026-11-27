@@ -266,13 +266,13 @@ export class Invocation {
     if (observation.kind === 'semantic' && observation.truncated) {
       this.observationTruncated = true;
     }
-    if (this.pixelTier || observation.kind === 'pixels') this.recordPixels(observation);
+    if (this.pixelTier || observation.kind === 'pixels') await this.recordPixels(observation);
     return observation;
   }
 
   /** Records whether requested pixels actually became model input. */
-  private recordPixels(observation: AgentObservation): void {
-    const outcome = pixelsForModel(observation);
+  private async recordPixels(observation: AgentObservation): Promise<void> {
+    const outcome = await pixelsForModel(observation);
     if ('withheld' in outcome) {
       this.loseVision(outcome.withheld);
       return;

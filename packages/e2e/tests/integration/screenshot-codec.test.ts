@@ -1,5 +1,5 @@
 /**
- * `toHaveScreenshot` in a process where `@napi-rs/image` cannot load, as after
+ * `toHaveScreenshot` in a process where `@e2e-dev/util`'s addon cannot load, as after
  * `npm install --omit=optional`: the call fails as the codec's absence, with a
  * screenshot stored or not, not as an unreadable baseline or a screen that
  * never settled, and nothing is written.
@@ -16,7 +16,9 @@ import { runProject, type RunOutcome } from '../helpers/run-project.ts';
 // This file imports nothing that loads the addon, so no earlier test in the process has.
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
-    if (specifier === '@napi-rs/image') throw new Error('Cannot find native binding. npm has a bug related to optional dependencies');
+    if (/[\\/]util\.[^\\/]+\.node$/.test(specifier) || specifier.startsWith('@e2e-dev/util-')) {
+      throw Object.assign(new Error(`Cannot find module '${specifier}'`), { code: 'MODULE_NOT_FOUND' });
+    }
     return nextResolve(specifier, context);
   },
 });
@@ -46,7 +48,7 @@ function attemptError(outcome: RunOutcome) {
   return result.attempts.at(-1)!.error;
 }
 
-describe('toHaveScreenshot without the @napi-rs/image binding', () => {
+describe('toHaveScreenshot without the @e2e-dev/util addon', () => {
   it(
     'fails as IMAGE_CODEC_UNAVAILABLE, not as an unreadable stored screenshot',
     async () => {
@@ -57,7 +59,7 @@ describe('toHaveScreenshot without the @napi-rs/image binding', () => {
       try {
         const error = attemptError(outcome);
         expect(error?.code).toBe('IMAGE_CODEC_UNAVAILABLE');
-        expect(error?.message).toContain(`@napi-rs/image-${process.platform}-${process.arch}`);
+        expect(error?.message).toMatch(/@e2e-dev\/util-(darwin|linux|win32)-/);
         expect(error?.message).not.toContain('could not read the stored screenshot');
       } finally {
         project.cleanup();

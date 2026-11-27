@@ -200,20 +200,18 @@ function startupGraph(dir: string, entry: string): { readonly modules: number; r
 /** What a process loads for an entry before it knows what it will do, and the packages that serve only some of what it does. */
 const STARTUP: readonly { readonly dir: string; readonly entry: string; readonly lazy: readonly string[] }[] = [
   // `e2e run`, `list`, and `--help` need none of the MCP server, the prompts, or the schemas of `mcp`, `init`, `login`, and `explore`.
-  // None needs the image codec's native binding either: the first PNG decoded or encoded loads it, and a missing one fails only that call.
+  // None needs the image addon either: `@e2e-dev/util` loads it with the first PNG call, and a missing one fails only that call.
   // Only `init` parses the YAML of a CI pipeline and the TOML of a Codex config; its flags name their choices without the parsers.
-  { dir: 'e2e', entry: 'cli/index.ts', lazy: ['@modelcontextprotocol/server', '@clack/prompts', 'zod', '@napi-rs/image', 'yaml', 'toml-eslint-parser'] },
-  { dir: 'e2e', entry: 'runner.ts', lazy: ['@modelcontextprotocol/server', '@clack/prompts', 'zod', 'commander', '@napi-rs/image'] },
-  { dir: 'e2e', entry: 'run/worker/entry.ts', lazy: ['@modelcontextprotocol/server', '@clack/prompts', 'zod', 'commander', '@napi-rs/image'] },
-  // Every test file imports this entry.
-  { dir: 'e2e', entry: 'index.ts', lazy: ['@napi-rs/image'] },
+  { dir: 'e2e', entry: 'cli/index.ts', lazy: ['@modelcontextprotocol/server', '@clack/prompts', 'zod', 'yaml', 'toml-eslint-parser'] },
+  { dir: 'e2e', entry: 'runner.ts', lazy: ['@modelcontextprotocol/server', '@clack/prompts', 'zod', 'commander'] },
+  { dir: 'e2e', entry: 'run/worker/entry.ts', lazy: ['@modelcontextprotocol/server', '@clack/prompts', 'zod', 'commander'] },
   // A config imports these in every process, and only a worker that runs an ACP step or leases a Limrun device calls them.
   { dir: 'acp', entry: 'index.ts', lazy: ['@agentclientprotocol/sdk', '@modelcontextprotocol/server'] },
   { dir: 'limrun', entry: 'index.ts', lazy: ['@limrun/api'] },
   // `e2e list`, and a run whose browsers a provider hosts, read the config without ever launching a browser.
   { dir: 'web', entry: 'index.ts', lazy: ['playwright-core'] },
-  // A program that only drives a browser never decodes a PNG or runs the agent.
-  { dir: 'core', entry: 'core/index.ts', lazy: ['@napi-rs/image', 'ai', 'zod'] },
+  // A program that only drives a browser never runs the agent.
+  { dir: 'core', entry: 'core/index.ts', lazy: ['ai', 'zod'] },
 ];
 
 describe.each(STARTUP)('importing packages/$dir/src/$entry', ({ dir, entry, lazy }) => {

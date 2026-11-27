@@ -2028,7 +2028,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       throw new ConfigurationError('POLICY_DENIED', 'a secure field on screen has no bounds to mask, so the screenshot is withheld');
     }
     const data = await this.rawScreenshot(operation.signal, {}, budget);
-    const masked = redactSecure(data, secure, this.knownViewport);
+    const masked = await redactSecure(data, secure, this.knownViewport);
     if (masked === undefined) {
       throw new EngineError('ENGINE_FAILURE', 'the screenshot could not be read to mask the secure fields on screen; screenshot withheld', {
         retryable: false,
@@ -2060,7 +2060,7 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       if (cause instanceof EngineError && cause.code === 'OPERATION_TIMEOUT') throw cause;
       return undefined;
     }
-    const redacted = redactSecure(raw, secure, viewport);
+    const redacted = await redactSecure(raw, secure, viewport);
     if (redacted === undefined) return undefined;
     const size = readPngSize(redacted.data);
     if (size === undefined) return undefined;
@@ -2094,18 +2094,18 @@ function secureBounds(projected: ProjectedSnapshot): readonly Rect[] | undefined
  * logical points; the image may be at device scale, so they are scaled by
  * the image-to-viewport ratio.
  */
-function redactSecure(
+async function redactSecure(
   data: Uint8Array,
   secure: readonly Rect[],
   viewport: ViewportSize | undefined,
-): { data: Uint8Array; masked: number } | undefined {
+): Promise<{ data: Uint8Array; masked: number } | undefined> {
   if (secure.length === 0) return { data, masked: 0 };
   const size = readPngSize(data);
   if (size === undefined) return undefined;
   const scale = viewport !== undefined && viewport.width > 0 ? size.width / viewport.width : 1;
   const rects = secure.map((rect) => ({ x: rect.x * scale, y: rect.y * scale, width: rect.width * scale, height: rect.height * scale }));
   try {
-    return { data: maskPng(data, rects), masked: rects.length };
+    return { data: await maskPng(data, rects), masked: rects.length };
   } catch {
     return undefined;
   }

@@ -4,7 +4,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { LocatorExpression, SemanticNode, ViewportSize } from '../engine/surface.ts';
 import { asEngineError, ConfigurationError, isE2EError, TestError } from '../internal/errors.ts';
-import { clipBox, cropImage, decodePng, encodePng, type RgbaImage } from '../internal/image.ts';
+import { clipBox, pngSize, processPng } from '../internal/image.ts';
 import { pollReads, type ReadWindow } from '../internal/time.ts';
 import { isNodeVisible, locatorDetails, translateLocatorError, type LocatorEngine } from './engine.ts';
 import { describeExpression } from './expression.ts';
@@ -70,7 +70,8 @@ export async function captureMatch(
           missing = `locator or the viewport kept moving while its screenshot was taken: ${shown}`;
           return false;
         }
-        const image = decodeScreenshot(file);
+        const bytes = readFileSync(file);
+        const image = screenshotSize(bytes);
         // One scale for both axes, from the width, as the engines place their own masks.
         const scale = image.width / viewport.width;
         const visible = visiblePart(after, viewport);
@@ -79,7 +80,7 @@ export async function captureMatch(
           missing = `locator is outside the screenshot the engine took, so it has no pixels to capture: ${shown}`;
           return false;
         }
-        writeFileSync(file, encodePng(cropImage(image, box)));
+        writeFileSync(file, await cropScreenshot(bytes, box));
         // The engine's own spelling, with `/`: the report takes no other separator.
         kept = relative;
         return true;
@@ -101,14 +102,25 @@ export async function captureMatch(
   return kept!;
 }
 
-/** The engine's screenshot as pixels. An engine may write another format, which `app.screenshot()` passes on and a crop cannot read. */
-function decodeScreenshot(file: string): RgbaImage {
-  const bytes = readFileSync(file);
+/** An engine may write another format, which `app.screenshot()` passes on and a crop cannot read. */
+function notPng(cause?: unknown): ConfigurationError {
+  return new ConfigurationError('UNSUPPORTED_CAPABILITY', 'locator.screenshot() cuts a PNG of the viewport, and this engine\'s screenshot is not one', cause === undefined ? undefined : { cause });
+}
+
+/** The size the engine's screenshot states, read from its header without decoding it. */
+function screenshotSize(bytes: Uint8Array): { readonly width: number; readonly height: number } {
+  const size = pngSize(bytes);
+  if (size === undefined) throw notPng();
+  return size;
+}
+
+/** The screenshot cut to `box`, as PNG bytes, decoded and encoded off the JavaScript thread. */
+async function cropScreenshot(bytes: Uint8Array, box: { x: number; y: number; width: number; height: number }): Promise<Uint8Array> {
   try {
-    return decodePng(bytes);
+    return await processPng(bytes, { crop: box, output: 'png' });
   } catch (cause) {
     if (isE2EError(cause)) throw cause;
-    throw new ConfigurationError('UNSUPPORTED_CAPABILITY', 'locator.screenshot() cuts a PNG of the viewport, and this engine\'s screenshot is not one', { cause });
+    throw notPng(cause);
   }
 }
 

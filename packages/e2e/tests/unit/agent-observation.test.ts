@@ -145,16 +145,16 @@ describe('prepareObservation', () => {
     expect(unavailable.pixels?.maskedRegionCount).toBe(3);
   });
 
-  it('passes on pixels the session withheld for masking and keeps the tree', () => {
+  it('passes on pixels the session withheld for masking and keeps the tree', async () => {
     const withheld: Observation = { ...observation(node('root')), pixelsWithheld: 'MASKING_UNPROVEN' };
     const prepared = prepareObservation(withheld, { redact: NO_REDACT, redactCut: NO_REDACT, maxBytes: 4_096 });
     assert(prepared.kind === 'semantic');
     expect(prepared.pixels).toBeUndefined();
     expect(prepared.pixelsWithheld).toBe('MASKING_UNPROVEN');
     expect(prepared.text).toBe('#root');
-    expect(pixelsForModel(prepared)).toEqual({ withheld: 'MASKING_UNPROVEN' });
+    expect(await pixelsForModel(prepared)).toEqual({ withheld: 'MASKING_UNPROVEN' });
     const untaken = prepareObservation(observation(node('root')), { redact: NO_REDACT, redactCut: NO_REDACT, maxBytes: 4_096 });
-    expect(pixelsForModel(untaken)).toEqual({ withheld: 'UNSUPPORTED_CAPABILITY' });
+    expect(await pixelsForModel(untaken)).toEqual({ withheld: 'UNSUPPORTED_CAPABILITY' });
   });
 
   it('serializes the tree with node references and indentation', () => {

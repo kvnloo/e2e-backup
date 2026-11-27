@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { decodePng } from '@e2e-dev/core/lib/internal/image';
+import { pngSize } from '@e2e-dev/core/lib/internal/image';
 import { startFixtureApp, type FixtureApp } from '../helpers/fixture-app.ts';
 import { assertValidReport } from '../helpers/report-schema.ts';
 import { resultByTitle, runProject, type FixtureProject, type RunOutcome } from '../helpers/run-project.ts';
@@ -55,7 +55,7 @@ describe('locator.screenshot in a run', () => {
   it('writes the match alone: smaller than the viewport on both sides', () => {
     const attempt = resultByTitle(outcome, 'captures the heading').attempts[0]!;
     const artifact = attempt.artifacts.find((candidate) => candidate.kind === 'screenshot')!;
-    const image = decodePng(readFileSync(path.join(project.dir, '.e2e', 'results', artifact.path!)));
+    const image = pngSize(readFileSync(path.join(project.dir, '.e2e', 'results', artifact.path!)))!;
     expect(image.width).toBeLessThan(1280);
     expect(image.height).toBeLessThan(720);
     expect(image.height).toBeGreaterThan(0);

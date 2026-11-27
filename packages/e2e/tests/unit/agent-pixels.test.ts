@@ -30,28 +30,28 @@ function pixelAt(pixels: ObservationPixels, x: number, y: number): number[] {
 }
 
 describe('downscalePixels', () => {
-  it('returns the input untouched when the long side already fits', () => {
+  it('returns the input untouched when the long side already fits', async () => {
     const shot = picture(640, 360, { x: 0, y: 0, w: 10, h: 10 });
-    expect(downscalePixels(shot, 640)).toBe(shot);
-    expect(downscalePixels(shot, 0)).toBe(shot);
+    expect(await downscalePixels(shot, 640)).toBe(shot);
+    expect(await downscalePixels(shot, 0)).toBe(shot);
   });
 
-  it('caps the long side, keeps the aspect, and scales the image-to-viewport ratio with it', () => {
+  it('caps the long side, keeps the aspect, and scales the image-to-viewport ratio with it', async () => {
     const shot = picture(1280, 720, { x: 0, y: 0, w: 10, h: 10 });
-    const small = downscalePixels(shot, 640);
+    const small = await downscalePixels(shot, 640);
     expect([small.width, small.height]).toEqual([640, 360]);
     expect(small.scale).toBeCloseTo(0.5);
     expect(small.data.byteLength).toBeLessThan(shot.data.byteLength);
     // A device capture at 3x keeps its ratio meaning: image pixels per CSS pixel.
     const device = { ...picture(390, 844, { x: 0, y: 0, w: 10, h: 10 }), scale: 3 };
-    const capped = downscalePixels(device, 422);
+    const capped = await downscalePixels(device, 422);
     expect(capped.height).toBe(422);
     expect(capped.scale).toBeCloseTo(3 * (capped.width / 390));
   });
 
-  it('keeps a masked region black after resampling, and the surroundings white', () => {
+  it('keeps a masked region black after resampling, and the surroundings white', async () => {
     const shot = picture(1280, 720, { x: 200, y: 200, w: 400, h: 200 });
-    const small = downscalePixels(shot, 640);
+    const small = await downscalePixels(shot, 640);
     expect(pixelAt(small, 200, 150)).toEqual([0, 0, 0]);
     expect(pixelAt(small, 50, 50)).toEqual([255, 255, 255]);
   });

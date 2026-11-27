@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EngineError, resolveExpression, type SemanticNode } from '@e2e-dev/core/lib/engine/index';
-import { decodePng, encodePng, type RgbaImage } from '@e2e-dev/core/lib/internal/image';
+import { decodeRgbaPng as decodePng, encodeRgbaPng as encodePng, type RgbaImage } from '../helpers/rgba-png.ts';
 import type { Locator } from '@e2e-dev/core/lib/types';
 import { screenOver } from '../helpers/screen-over.ts';
 import { snapshot } from '../helpers/snapshot.ts';

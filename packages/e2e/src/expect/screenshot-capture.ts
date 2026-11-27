@@ -7,7 +7,7 @@
 
 import type { LocatorExpression } from '@e2e-dev/core/lib/engine/surface';
 import { ConfigurationError, isE2EError } from '@e2e-dev/core/lib/internal/errors';
-import { clipBox, cropImage, decodePng, fillBoxes, resampleImage, type ImageBox, type RgbaImage } from '@e2e-dev/core/lib/internal/image';
+import { clipBox, decodePng, pngSize, processPng, type Image, type ImageBox } from '@e2e-dev/core/lib/internal/image';
 import type { ReadWindow } from '@e2e-dev/core/lib/internal/time';
 import { isNodeVisible } from '@e2e-dev/core/lib/locator/engine';
 import { describeExpression } from '@e2e-dev/core/lib/locator/expression';
@@ -23,7 +23,7 @@ export interface CaptureRequest {
 }
 
 /** One capture, or why there is none yet. */
-export type Capture = { readonly image: RgbaImage } | { readonly missing: string };
+export type Capture = { readonly image: Image } | { readonly missing: string };
 
 /**
  * Captures for one call. The subject is scrolled into view once, the first
@@ -64,21 +64,28 @@ async function captureOnce(context: ScreenContext, request: CaptureRequest, read
   const { pixels } = observation;
   if (pixels === undefined) return { missing: 'the engine returned no screenshot' };
   const scale = pixels.scale > 0 ? pixels.scale : 1;
-  const raw = decodePng(pixels.data);
-  let image = resampleImage(raw, Math.max(1, Math.round(raw.width / scale)), Math.max(1, Math.round(raw.height / scale)));
-  let origin = { x: 0, y: 0 };
+  const raw = pngSize(pixels.data);
+  // Bytes that are not a PNG fail as the decoder says so.
+  if (raw === undefined) return { image: await decodePng(pixels.data) };
+  const size = { width: Math.max(1, Math.round(raw.width / scale)), height: Math.max(1, Math.round(raw.height / scale)) };
+  let crop: ImageBox | undefined;
   if (box !== undefined) {
-    const clipped = clipBox(image, box);
-    if (clipped === undefined) return { missing: `${shown} is outside the viewport` };
-    image = cropImage(image, clipped);
-    origin = clipped;
+    crop = clipBox(size, box);
+    if (crop === undefined) return { missing: `${shown} is outside the viewport` };
   }
-  if (request.masks.length === 0) return { image };
+  const origin = crop ?? { x: 0, y: 0 };
   const boxes: ImageBox[] = [];
   for (const mask of request.masks) {
     for (const node of await engine.readAllNow(mask, reads)) {
       if (isNodeVisible(node) && node.rect !== undefined) boxes.push({ ...node.rect, x: node.rect.x - origin.x, y: node.rect.y - origin.y });
     }
   }
-  return { image: fillBoxes(image, boxes, request.maskColor) };
+  // One native call: decode, resample to one image pixel per viewport pixel, cut, paint.
+  const image = await processPng(pixels.data, {
+    resize: size,
+    ...(crop === undefined ? {} : { crop }),
+    ...(boxes.length === 0 ? {} : { fill: { boxes, color: request.maskColor } }),
+    output: 'image',
+  });
+  return { image };
 }

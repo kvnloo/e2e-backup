@@ -140,9 +140,9 @@ describe('the TypeScript loader', () => {
     expect(output).toContain(`@oxc-transform/binding-${process.platform}-${process.arch}`);
   });
 
-  it('runs --version, --help, and a test that takes no screenshot without @napi-rs/image', async () => {
+  it('runs --version, --help, and a test that takes no screenshot without the @e2e-dev/util addon', async () => {
     createProject({ type: 'module' });
-    const hook = "import { registerHooks } from 'node:module';\nregisterHooks({ resolve(specifier, context, nextResolve) {\n  if (specifier === '@napi-rs/image') throw new Error('Cannot find native binding. npm has a bug related to optional dependencies');\n  return nextResolve(specifier, context);\n} });\n";
+    const hook = "import { registerHooks } from 'node:module';\nregisterHooks({ resolve(specifier, context, nextResolve) {\n  if (/[\\\\/]util\\.[^\\\\/]+\\.node$/.test(specifier) || specifier.startsWith('@e2e-dev/util-')) throw Object.assign(new Error('Cannot find module ' + specifier), { code: 'MODULE_NOT_FOUND' });\n  return nextResolve(specifier, context);\n} });\n";
     write({
       'no-image.mjs': hook,
       'tests/plain.e2e.ts': "import { expect, test } from 'e2e';\n\ntest('runs', () => {\n  expect(1 as number).toBe(1);\n});\n",

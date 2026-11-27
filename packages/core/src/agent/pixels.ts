@@ -11,7 +11,7 @@
 
 import type { ObservationPixels } from '../engine/surface.ts';
 import { InfrastructureError } from '../internal/errors.ts';
-import { decodePng, encodePng, resampleImage, type RgbaImage } from '../internal/image.ts';
+import { processPng } from '../internal/image.ts';
 
 /**
  * Longest side a model-bound screenshot keeps, in image pixels. Measured on
@@ -25,30 +25,30 @@ import { decodePng, encodePng, resampleImage, type RgbaImage } from '../internal
 const MAX_SCREENSHOT_LONG_SIDE = 768;
 
 /** Sizes a captured screenshot for the model; the input is returned as is when it already fits. */
-export function sizeForModel<P extends ObservationPixels>(pixels: P): P {
+export function sizeForModel<P extends ObservationPixels>(pixels: P): Promise<P> {
   return downscalePixels(pixels, MAX_SCREENSHOT_LONG_SIDE);
 }
 
 /**
  * Resamples the image so its longer side is at most `maxLongSide`, with a
- * box filter over the source pixels each target pixel covers. Returns the
- * input untouched when it already fits or cannot be decoded; whatever else
- * the caller's pixels carry (a masked-region count) rides along unchanged. A
- * codec that cannot load throws: that is the install's fault, not the image's.
+ * box filter over the source pixels each target pixel covers, off the
+ * JavaScript thread. Returns the input untouched when it already fits or
+ * cannot be decoded; whatever else the caller's pixels carry (a
+ * masked-region count) rides along unchanged. A codec that cannot load
+ * throws: that is the install's fault, not the image's.
  */
-export function downscalePixels<P extends ObservationPixels>(pixels: P, maxLongSide: number): P {
+export async function downscalePixels<P extends ObservationPixels>(pixels: P, maxLongSide: number): Promise<P> {
   const longSide = Math.max(pixels.width, pixels.height);
   if (longSide <= maxLongSide || maxLongSide <= 0) return pixels;
   const factor = maxLongSide / longSide;
   const width = Math.max(1, Math.round(pixels.width * factor));
   const height = Math.max(1, Math.round(pixels.height * factor));
-  let source: RgbaImage;
+  let data: Uint8Array;
   try {
-    source = decodePng(pixels.data);
+    data = await processPng(pixels.data, { resize: { width, height }, output: 'png' });
   } catch (cause) {
     if (cause instanceof InfrastructureError) throw cause;
     return pixels;
   }
-  const data = encodePng(resampleImage(source, width, height));
   return { ...pixels, data, width, height, scale: pixels.scale * (width / pixels.width) };
 }

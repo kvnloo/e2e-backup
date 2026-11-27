@@ -74,11 +74,14 @@ export class NativeUtilUnavailableError extends Error {
   readonly packageName: string | undefined;
   /** `<platform>-<arch>[-<abi>]`, as NAPI-RS names it. */
   readonly platform: string;
+  /** Whether the platform package is simply not installed, as npm leaves it with `--omit=optional`; false when it is there and fails to load. */
+  readonly notInstalled: boolean;
 
-  constructor(message: string, packageName: string | undefined, platform: string, options?: ErrorOptions) {
+  constructor(message: string, details: { packageName: string | undefined; platform: string; notInstalled: boolean }, options?: ErrorOptions) {
     super(message, options);
-    this.packageName = packageName;
-    this.platform = platform;
+    this.packageName = details.packageName;
+    this.platform = details.platform;
+    this.notInstalled = details.notInstalled;
   }
 }
 
@@ -116,17 +119,20 @@ export function binding(): Binding {
   // A checkout build exists only in a checkout (the package ships `dist` alone), and is the one just built there.
   const candidates = [path.join(import.meta.dirname, '..', `util.${platform}.node`), ...(packageName === undefined ? [] : [packageName])];
   let cause: unknown;
+  let notInstalled = true;
   for (const specifier of candidates) {
     try {
       loaded = ownRequire(specifier) as Binding;
       return loaded;
     } catch (error) {
-      cause ??= error;
+      // The last failure says the most: the platform package, which an install has; a checkout build is usually absent.
+      cause = error;
+      notInstalled = (error as { code?: unknown }).code === 'MODULE_NOT_FOUND';
       failures.push(`${specifier}: ${(error instanceof Error ? error.message : String(error)).split('\n', 1)[0] ?? ''}`);
     }
   }
   const message = packageName === undefined
     ? `@e2e-dev/util has no native build for ${platform}`
     : `@e2e-dev/util could not load its native build for ${platform}; install ${packageName}, which npm installs with @e2e-dev/util on this platform unless it runs with --omit=optional or from a lockfile written on another platform (npm/cli#4828)`;
-  throw new NativeUtilUnavailableError(`${message} (${failures.join('; ')})`, packageName, platform, { cause });
+  throw new NativeUtilUnavailableError(`${message} (${failures.join('; ')})`, { packageName, platform, notInstalled: packageName !== undefined && notInstalled }, { cause });
 }

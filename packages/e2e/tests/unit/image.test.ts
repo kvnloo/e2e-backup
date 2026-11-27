@@ -1,16 +1,9 @@
-/** The in-memory image operations `toHaveScreenshot` is built on: clipping, cropping, painting, the PNG round trip, and the comparison's tolerance. */
+/** The image operations `toHaveScreenshot` is built on, through `@e2e-dev/util`: decoding every PNG layout, the PNG round trip, clipping, cropping, painting, resampling, and the comparison's tolerance. */
 
 import { crc32, deflateSync } from 'node:zlib';
 import { Transformer } from '@napi-rs/image';
 import { describe, expect, it } from 'vitest';
-import { clipBox, compareImages, cropImage, decodePng, diffImage, encodePng, fillBoxes, resampleImage, type RgbaImage } from '@e2e-dev/core/lib/internal/image';
-
-/** A width by height image of one gray level. */
-function gray(width: number, height: number, level: number): RgbaImage {
-  const data = new Uint8Array(width * height * 4);
-  for (let at = 0; at < data.length; at += 4) data.set([level, level, level, 255], at);
-  return { width, height, data };
-}
+import { clipBox, compareImages, decodePng, diffImage, encodePng, processPng, type Image } from '@e2e-dev/core/lib/internal/image';
 
 const exact = { threshold: 0, maxDiffPixels: undefined, maxDiffPixelRatio: undefined };
 
@@ -61,10 +54,23 @@ function png(spec: {
 /** Red, green, and blue: the palette the indexed cases share. */
 const PALETTE = [[255, 0, 0], [0, 255, 0], [0, 0, 255]];
 
+/** A width by height 8-bit RGBA PNG of one gray level. */
+function grayPng(width: number, height: number, level: number): Uint8Array {
+  const row = Array.from({ length: width }, () => [level, level, level, 255]).flat();
+  return png({ width, height, depth: 8, colorType: 6, rows: Array.from({ length: height }, () => row) });
+}
+
+/** A decoded width by height image of one gray level. */
+function gray(width: number, height: number, level: number): Promise<Image> {
+  return decodePng(grayPng(width, height, level));
+}
+
 describe('image', () => {
-  it('round-trips through PNG', () => {
-    const image = gray(3, 2, 120);
-    expect(decodePng(encodePng(image))).toEqual(image);
+  it('round-trips through PNG', async () => {
+    const image = await gray(3, 2, 120);
+    const again = await decodePng(await encodePng(image));
+    expect([again.width, again.height]).toEqual([3, 2]);
+    expect(again.pixels()).toEqual(image.pixels());
   });
 
   it.each([
@@ -150,46 +156,41 @@ describe('image', () => {
       0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 255,
       0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 255,
     ]],
-  ] as const)('decodes %s to 8-bit RGBA', (_label, bytes, rgba) => {
-    const decoded = decodePng(bytes);
+  ] as const)('decodes %s to 8-bit RGBA', async (_label, bytes, rgba) => {
+    const decoded = await decodePng(bytes);
     expect([decoded.width, decoded.height]).toEqual([3, 2]);
-    expect([...decoded.data]).toEqual(rgba);
+    expect([...decoded.pixels()]).toEqual(rgba);
   });
 
-  it('keeps every sample of an odd-sized 8-bit RGB image when it adds the alpha channel', () => {
+  it('keeps every sample of an odd-sized 8-bit RGB image when it adds the alpha channel', async () => {
     const width = 37;
     const height = 11;
     const samples = Array.from({ length: width * height * 3 }, (_, at) => (at * 2654435761) >>> 24);
     const rows = Array.from({ length: height }, (_, y) => samples.slice(y * width * 3, (y + 1) * width * 3));
     const expected = Array.from({ length: width * height }, (_, pixel) => [...samples.slice(pixel * 3, pixel * 3 + 3), 255]).flat();
-    const decoded = decodePng(png({ width, height, depth: 8, colorType: 2, rows }));
+    const decoded = await decodePng(png({ width, height, depth: 8, colorType: 2, rows }));
     expect([decoded.width, decoded.height]).toEqual([width, height]);
-    expect([...decoded.data]).toEqual(expected);
+    expect([...decoded.pixels()]).toEqual(expected);
   });
 
-  it('encodes 8-bit RGBA PNG and returns decoded pixels a painted copy does not share', () => {
-    const encoded = encodePng(gray(4, 4, 0));
+  it('encodes 8-bit RGBA PNG, and paints a new image that leaves the decoded one alone', async () => {
+    const encoded = await encodePng(await gray(4, 4, 0));
     expect([encoded[24], encoded[25]]).toEqual([8, 6]);
-    const decoded = decodePng(encoded);
-    const painted = fillBoxes(decoded, [{ x: 0, y: 0, width: 2, height: 2 }], [255, 0, 0]);
-    expect([...painted.data.subarray(0, 4)]).toEqual([255, 0, 0, 255]);
-    expect([...decoded.data.subarray(0, 4)]).toEqual([0, 0, 0, 255]);
+    const decoded = await decodePng(encoded);
+    const painted = await processPng(encoded, { fill: { boxes: [{ x: 0, y: 0, width: 2, height: 2 }], color: [255, 0, 0] }, output: 'image' });
+    expect([...painted.pixels().subarray(0, 4)]).toEqual([255, 0, 0, 255]);
+    expect([...decoded.pixels().subarray(0, 4)]).toEqual([0, 0, 0, 255]);
   });
 
-  it('throws on bytes that are not a PNG, a PNG cut short, or one with a corrupt chunk', () => {
+  it('rejects bytes that are not a PNG, a PNG cut short, or one with a corrupt chunk', async () => {
     const valid = png({ width: 2, height: 2, depth: 8, colorType: 2, rows: [[9, 9, 9, 9, 9, 9], [9, 9, 9, 9, 9, 9]] });
     const corrupt = Uint8Array.from(valid);
     corrupt[20] = 255;
     const jpeg = new Uint8Array(Transformer.fromRgbaPixels(new Uint8Array(16).fill(255), 2, 2).jpegSync());
     for (const bytes of [new Uint8Array(), new Uint8Array([1, 2, 3]), valid.subarray(0, valid.length - 10), valid.subarray(0, 40), corrupt, jpeg]) {
-      expect(() => decodePng(bytes)).toThrow();
+      await expect(decodePng(bytes)).rejects.toThrow();
     }
-    expect(() => decodePng(jpeg)).toThrow('not a PNG');
-  });
-
-  it('refuses pixels that do not fill the image, where the addon would abort the process', () => {
-    expect(() => encodePng({ width: 2, height: 2, data: new Uint8Array(17) })).toThrow('not 17');
-    expect(() => encodePng({ width: 2, height: 2, data: new Uint8Array(15) })).toThrow('not 15');
+    await expect(decodePng(jpeg)).rejects.toThrow('not a PNG');
   });
 
   it('clips a box to the image on whole pixels, and has none for a box outside it', () => {
@@ -197,49 +198,48 @@ describe('image', () => {
     expect(clipBox({ width: 10, height: 10 }, { x: 12, y: 0, width: 5, height: 5 })).toBeUndefined();
   });
 
-  it('crops the pixels of a box and paints boxes clipped to the image', () => {
-    const blank = gray(4, 4, 0);
-    const image = fillBoxes(blank, [{ x: 2, y: 2, width: 10, height: 10 }], [255, 0, 0]);
-    expect(blank).toEqual(gray(4, 4, 0));
-    expect([...cropImage(image, { x: 1, y: 1, width: 2, height: 2 }).data]).toEqual([
+  it('crops the pixels of a box, then paints boxes clipped to the crop', async () => {
+    const image = await processPng(grayPng(4, 4, 0), { crop: { x: 1, y: 1, width: 2, height: 2 }, fill: { boxes: [{ x: 1, y: 1, width: 10, height: 10 }], color: [255, 0, 0] }, output: 'image' });
+    expect([...image.pixels()]).toEqual([
       0, 0, 0, 255, 0, 0, 0, 255,
       0, 0, 0, 255, 255, 0, 0, 255,
     ]);
   });
 
-  it('paints a copy of an image whose bytes are a Buffer at an odd offset, and leaves the image alone', () => {
-    const bytes = Buffer.alloc(1 + 2 * 2 * 4).subarray(1);
-    const painted = fillBoxes({ width: 2, height: 2, data: bytes }, [{ x: 1, y: 0, width: 1, height: 2 }], [1, 2, 3]);
-    expect([...painted.data]).toEqual([0, 0, 0, 0, 1, 2, 3, 255, 0, 0, 0, 0, 1, 2, 3, 255]);
-    expect([...bytes]).toEqual(Array.from({ length: 16 }, () => 0));
+  it('reads PNG bytes from a Buffer at an odd offset', async () => {
+    const bytes = grayPng(2, 2, 7);
+    const shifted = Buffer.alloc(bytes.length + 1).subarray(1);
+    shifted.set(bytes);
+    expect([...(await decodePng(shifted)).pixels().subarray(0, 4)]).toEqual([7, 7, 7, 255]);
   });
 
-  it('averages the pixels each target pixel covers when it resamples', () => {
-    const image: RgbaImage = { width: 2, height: 1, data: new Uint8Array([0, 0, 0, 255, 200, 200, 200, 255]) };
-    expect([...resampleImage(image, 1, 1).data]).toEqual([100, 100, 100, 255]);
-    expect(resampleImage(image, 2, 1)).toBe(image);
+  it('averages the pixels each target pixel covers when it resamples', async () => {
+    const bytes = png({ width: 2, height: 1, depth: 8, colorType: 6, rows: [[0, 0, 0, 255, 200, 200, 200, 255]] });
+    expect([...(await processPng(bytes, { resize: { width: 1, height: 1 }, output: 'image' })).pixels()]).toEqual([100, 100, 100, 255]);
+    expect([...(await processPng(bytes, { resize: { width: 2, height: 1 }, output: 'image' })).pixels()]).toEqual([0, 0, 0, 255, 200, 200, 200, 255]);
   });
 
-  it('reports a size mismatch, and counts differing pixels against maxDiffPixels and maxDiffPixelRatio, the smaller one when both are set', () => {
-    expect(compareImages(gray(2, 2, 0), gray(2, 3, 0), exact)).toMatchObject({ kind: 'size' });
-    const expected = gray(10, 10, 255);
-    const actual = fillBoxes(gray(10, 10, 255), [{ x: 0, y: 0, width: 5, height: 1 }], [0, 0, 0]);
-    expect(compareImages(expected, actual, exact)).toMatchObject({ kind: 'pixels', diffPixels: 5, ratio: 0.05 });
-    expect(compareImages(expected, actual, { ...exact, maxDiffPixels: 5 })).toMatchObject({ kind: 'match' });
-    expect(compareImages(expected, actual, { ...exact, maxDiffPixelRatio: 0.05 })).toMatchObject({ kind: 'match' });
-    expect(compareImages(expected, actual, { ...exact, maxDiffPixels: 10, maxDiffPixelRatio: 0.04 })).toMatchObject({ kind: 'pixels' });
+  it('reports a size mismatch, and counts differing pixels against maxDiffPixels and maxDiffPixelRatio, the smaller one when both are set', async () => {
+    expect(await compareImages(await gray(2, 2, 0), await gray(2, 3, 0), exact)).toMatchObject({ kind: 'size' });
+    const expected = await gray(10, 10, 255);
+    const actual = await processPng(grayPng(10, 10, 255), { fill: { boxes: [{ x: 0, y: 0, width: 5, height: 1 }], color: [0, 0, 0] }, output: 'image' });
+    expect(await compareImages(expected, actual, exact)).toMatchObject({ kind: 'pixels', diffPixels: 5, ratio: 0.05 });
+    expect(await compareImages(expected, actual, { ...exact, maxDiffPixels: 5 })).toMatchObject({ kind: 'match' });
+    expect(await compareImages(expected, actual, { ...exact, maxDiffPixelRatio: 0.05 })).toMatchObject({ kind: 'match' });
+    expect(await compareImages(expected, actual, { ...exact, maxDiffPixels: 10, maxDiffPixelRatio: 0.04 })).toMatchObject({ kind: 'pixels' });
   });
 
-  it('counts a pixel as the same when its color is within the threshold', () => {
-    expect(compareImages(gray(4, 4, 200), gray(4, 4, 204), { ...exact, threshold: 0.2 })).toMatchObject({ kind: 'match' });
-    expect(compareImages(gray(4, 4, 200), gray(4, 4, 204), exact)).toMatchObject({ kind: 'pixels', diffPixels: 16 });
+  it('counts a pixel as the same when its color is within the threshold', async () => {
+    expect(await compareImages(await gray(4, 4, 200), await gray(4, 4, 204), { ...exact, threshold: 0.2 })).toMatchObject({ kind: 'match' });
+    expect(await compareImages(await gray(4, 4, 200), await gray(4, 4, 204), exact)).toMatchObject({ kind: 'pixels', diffPixels: 16 });
   });
 
-  it('draws the pixels a comparison counts in red over the expected image', () => {
-    const expected = gray(4, 2, 255);
-    const actual = fillBoxes(expected, [{ x: 1, y: 0, width: 2, height: 1 }], [0, 0, 0]);
-    const diff = diffImage(expected, actual, 0);
-    const red = Array.from({ length: 8 }, (_, pixel) => [...diff.data.subarray(pixel * 4, pixel * 4 + 4)].join() === '255,0,0,255');
+  it('draws the pixels a comparison counts in red over the expected image', async () => {
+    const expected = await gray(4, 2, 255);
+    const actual = await processPng(grayPng(4, 2, 255), { fill: { boxes: [{ x: 1, y: 0, width: 2, height: 1 }], color: [0, 0, 0] }, output: 'image' });
+    const diff = await diffImage(expected, actual, 0);
+    const data = diff.pixels();
+    const red = Array.from({ length: 8 }, (_, pixel) => [...data.subarray(pixel * 4, pixel * 4 + 4)].join() === '255,0,0,255');
     expect(red).toEqual([false, true, true, false, false, false, false, false]);
     expect({ width: diff.width, height: diff.height }).toEqual({ width: 4, height: 2 });
   });

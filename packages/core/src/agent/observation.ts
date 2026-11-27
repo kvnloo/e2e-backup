@@ -373,15 +373,15 @@ function clearPixels(observation: Extract<Observation, { kind: 'semantic' }>): {
  * for every tier that asks: the capture's own reasons, then the pixels
  * themselves.
  */
-export function pixelsForModel(
+export async function pixelsForModel(
   observation: AgentObservation,
-): { readonly pixels: ExecutorPixels } | { readonly withheld: VisionDegradation } {
+): Promise<{ readonly pixels: ExecutorPixels } | { readonly withheld: VisionDegradation }> {
   if (observation.pixels === undefined) {
     return { withheld: observation.kind === 'semantic' ? observation.pixelsWithheld ?? 'UNSUPPORTED_CAPABILITY' : 'UNSUPPORTED_CAPABILITY' };
   }
   // Sized here, once per observation a model receives, not per capture: the
   // settle loop captures several times per action and only digests the bytes.
-  return { pixels: sizeForModel(observation.pixels) };
+  return { pixels: await sizeForModel(observation.pixels) };
 }
 
 /**

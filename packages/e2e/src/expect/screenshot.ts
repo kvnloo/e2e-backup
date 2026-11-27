@@ -10,7 +10,7 @@ import path from 'node:path';
 import type { LocatorExpression } from '@e2e-dev/core/lib/engine/surface';
 import { writeFileAtomic } from '@e2e-dev/core/lib/internal/atomic-write';
 import { InfrastructureError, TestError } from '@e2e-dev/core/lib/internal/errors';
-import { compareImages, decodePng, diffImage, encodePng, type ImageComparison, type RgbaImage } from '@e2e-dev/core/lib/internal/image';
+import { compareImages, decodePng, diffImage, encodePng, type Image, type ImageComparison } from '@e2e-dev/core/lib/internal/image';
 import { pollReads, type Deadline, type ReadWindow } from '@e2e-dev/core/lib/internal/time';
 import { describeExpression } from '@e2e-dev/core/lib/locator/expression';
 import type { ScreenContext } from '@e2e-dev/core/lib/locator/screen';
@@ -92,7 +92,7 @@ export async function expectScreenshot(
       throw labelAmbiguous(error, message);
     });
     const run: Run = { context, store, heading, call, stored, reads, capture };
-    const expected = existsSync(file) ? readStored(api, stored) : undefined;
+    const expected = existsSync(file) ? await readStored(api, stored) : undefined;
     if (expected !== undefined && (negated || !store.update) && store.written.has(file)) {
       throw failure(heading, `${stored.shown} was written earlier in this run and is not reviewed yet: look at it, commit it, and run again`, stored, 'unreviewed stored screenshot');
     }
@@ -111,16 +111,16 @@ export async function expectScreenshot(
  * within the call's tolerance. Returns the screen that held still, to keep;
  * undefined when it matched.
  */
-async function matchOrSettle(run: Run, expected: RgbaImage | undefined, deadline: Deadline): Promise<RgbaImage | undefined> {
+async function matchOrSettle(run: Run, expected: Image | undefined, deadline: Deadline): Promise<Image | undefined> {
   const settles = expected === undefined || run.store.update;
   // The newest capture with pixels, and why the newest without had none: a
   // read the deadline cut short can come back empty, and must not hide what
   // the screen showed before it.
-  let latest: { readonly image: RgbaImage; readonly comparison: ImageComparison | undefined } | undefined;
+  let latest: { readonly image: Image; readonly comparison: ImageComparison | undefined } | undefined;
   let missing: string | undefined;
-  let previous: RgbaImage | undefined;
-  let unsettled: readonly [RgbaImage, RgbaImage] | undefined;
-  let settled: RgbaImage | undefined;
+  let previous: Image | undefined;
+  let unsettled: readonly [Image, Image] | undefined;
+  let settled: Image | undefined;
   let captures = 0;
   await pollReads({
     deadline,
@@ -135,31 +135,31 @@ async function matchOrSettle(run: Run, expected: RgbaImage | undefined, deadline
       }
       captures += 1;
       const current = capture.image;
-      const comparison = expected === undefined ? undefined : compareImages(expected, current, run.call.tolerance);
+      const comparison = expected === undefined ? undefined : await compareImages(expected, current, run.call.tolerance);
       latest = { image: current, comparison };
       if (comparison?.kind === 'match') return true;
       if (!settles) return false;
       const before = previous;
       previous = current;
       if (before === undefined) return false;
-      if (compareImages(before, current, run.call.tolerance).kind === 'match') {
+      if ((await compareImages(before, current, run.call.tolerance)).kind === 'match') {
         settled = current;
         return true;
       }
       unsettled = [before, current];
       return false;
     },
-    onTimeout: (cause) => {
+    onTimeout: async (cause) => {
       if (latest === undefined) return failure(run.heading, missing ?? (cause === undefined ? 'no screenshot was taken' : 'the last screenshot ran past the timeout'), run.stored, 'no screenshot', cause);
       if (!settles && expected !== undefined && latest.comparison !== undefined && latest.comparison.kind !== 'match') {
         return mismatch(run, expected, latest.image, latest.comparison, cause);
       }
       const images: string[] = [];
       if (unsettled !== undefined) {
-        const between = compareImages(unsettled[0], unsettled[1], { threshold: 0, maxDiffPixels: undefined, maxDiffPixelRatio: undefined });
-        if (between.kind === 'pixels') images.push(`diff: ${attach(run, `${run.call.stem}-diff`, diffImage(unsettled[0], unsettled[1], 0))}`);
-        images.push(`previous: ${attach(run, `${run.call.stem}-previous`, unsettled[0])}`);
-        images.push(`actual: ${attach(run, `${run.call.stem}-actual`, unsettled[1])}`);
+        const between = await compareImages(unsettled[0], unsettled[1], { threshold: 0, maxDiffPixels: undefined, maxDiffPixelRatio: undefined });
+        if (between.kind === 'pixels') images.push(`diff: ${await attach(run, `${run.call.stem}-diff`, await diffImage(unsettled[0], unsettled[1], 0))}`);
+        images.push(`previous: ${await attach(run, `${run.call.stem}-previous`, unsettled[0])}`);
+        images.push(`actual: ${await attach(run, `${run.call.stem}-actual`, unsettled[1])}`);
       }
       const message = captures < 2
         ? `took ${captures} screenshot${captures === 1 ? '' : 's'} before the timeout and needs two the same; give it a longer timeout`
@@ -176,14 +176,14 @@ async function matchOrSettle(run: Run, expected: RgbaImage | undefined, deadline
  * it is only attached, under the path it belongs at, since a CI checkout is
  * thrown away and a retry must not pass against what its first attempt wrote.
  */
-async function keep(run: Run, expected: RgbaImage | undefined, settled: RgbaImage): Promise<void> {
+async function keep(run: Run, expected: Image | undefined, settled: Image): Promise<void> {
   const { store, stored, heading } = run;
   if (expected === undefined && !store.update && store.ci) {
-    const kept = attach(run, path.join('snapshots', ...stored.shown.split('/')), settled);
+    const kept = await attach(run, path.join('snapshots', ...stored.shown.split('/')), settled);
     throw failure(heading, `no stored screenshot at ${stored.shown}, and CI writes none without --update-snapshots; commit this run's there\nactual: ${kept}`, stored, 'no stored screenshot');
   }
   mkdirSync(path.dirname(stored.file), { recursive: true });
-  await writeFileAtomic(stored.file, encodePng(settled));
+  await writeFileAtomic(stored.file, await encodePng(settled));
   store.written.add(stored.file);
   if (expected === undefined && !store.update) {
     throw failure(heading, `no stored screenshot at ${stored.shown}; wrote this run's there. Look at it, commit it, and run again`, stored, 'no stored screenshot');
@@ -191,7 +191,7 @@ async function keep(run: Run, expected: RgbaImage | undefined, settled: RgbaImag
 }
 
 /** `.not`: waits for the screen to differ from the stored screenshot, which must exist. */
-async function expectDifferent(run: Run, expected: RgbaImage | undefined, deadline: Deadline): Promise<void> {
+async function expectDifferent(run: Run, expected: Image | undefined, deadline: Deadline): Promise<void> {
   if (expected === undefined) {
     throw failure(run.heading, `no stored screenshot at ${run.stored.shown} to differ from`, run.stored, 'no stored screenshot');
   }
@@ -209,7 +209,7 @@ async function expectDifferent(run: Run, expected: RgbaImage | undefined, deadli
         return undefined;
       }
       compared = true;
-      return compareImages(expected, capture.image, run.call.tolerance).kind === 'match';
+      return (await compareImages(expected, capture.image, run.call.tolerance)).kind === 'match';
     },
     onTimeout: (cause) =>
       compared
@@ -219,9 +219,9 @@ async function expectDifferent(run: Run, expected: RgbaImage | undefined, deadli
 }
 
 /** Reads a stored screenshot; one that is not a PNG fails the call, and a codec that cannot load fails it as itself. */
-function readStored(api: string, stored: Stored): RgbaImage {
+async function readStored(api: string, stored: Stored): Promise<Image> {
   try {
-    return decodePng(readFileSync(stored.file));
+    return await decodePng(readFileSync(stored.file));
   } catch (cause) {
     if (cause instanceof InfrastructureError) throw cause;
     throw new TestError('INVALID_ARGUMENT', `${api} could not read the stored screenshot ${stored.shown} as a PNG; delete it or run with --update-snapshots`, { cause });
@@ -229,18 +229,18 @@ function readStored(api: string, stored: Stored): RgbaImage {
 }
 
 /** The failure of a comparison that never matched, the diff, actual, and stored images attached and named in the message. */
-function mismatch(
+async function mismatch(
   run: Run,
-  expected: RgbaImage,
-  actual: RgbaImage,
+  expected: Image,
+  actual: Image,
   comparison: Exclude<ImageComparison, { kind: 'match' }>,
   cause: unknown,
-): TestError {
+): Promise<TestError> {
   const { stem } = run.call;
   const images = [
-    ...(comparison.kind === 'pixels' ? [`diff: ${attach(run, `${stem}-diff`, diffImage(expected, actual, run.call.tolerance.threshold))}`] : []),
-    `actual: ${attach(run, `${stem}-actual`, actual)}`,
-    `expected: ${attach(run, `${stem}-expected`, expected)}`,
+    ...(comparison.kind === 'pixels' ? [`diff: ${await attach(run, `${stem}-diff`, await diffImage(expected, actual, run.call.tolerance.threshold))}`] : []),
+    `actual: ${await attach(run, `${stem}-actual`, actual)}`,
+    `expected: ${await attach(run, `${stem}-expected`, expected)}`,
   ];
   const { shown } = run.stored;
   const observed = comparison.kind === 'size'
@@ -267,14 +267,15 @@ function formatRatio(ratio: number): string {
  * at `name` itself when it ends in `.png`, and attaches it to the running
  * step. Returns its path as a failure names it: relative to the project root.
  */
-function attach(run: Run, name: string, image: RgbaImage): string {
+async function attach(run: Run, name: string, image: Image): Promise<string> {
+  const png = await encodePng(image);
   const { artifacts } = run.store;
   const wanted = name.endsWith('.png') ? name : path.join('screenshots', `${name}.png`);
   let relative = wanted;
   for (let n = 2; existsSync(path.join(artifacts.dir, relative)); n += 1) relative = wanted.replace(/\.png$/, `-${n}.png`);
   const absolute = path.join(artifacts.dir, relative);
   mkdirSync(path.dirname(absolute), { recursive: true });
-  writeFileSync(absolute, encodePng(image));
+  writeFileSync(absolute, png);
   run.context.steps.attachArtifact(artifacts.register('screenshot', relative));
   return path.relative(run.store.projectRoot, absolute).split(path.sep).join('/');
 }

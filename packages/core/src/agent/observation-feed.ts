@@ -189,7 +189,7 @@ export class ObservationFeed {
       this.opening = undefined;
       const reusable = opening !== undefined && opening === this.newest && this.accounting.metrics.actionSteps === 0 &&
         (!pixels || opening.pixels !== undefined);
-      return this.view(reusable ? opening : await this.observeNow('held-still', pixels), options);
+      return await this.view(reusable ? opening : await this.observeNow('held-still', pixels), options);
     });
   }
 
@@ -234,14 +234,14 @@ export class ObservationFeed {
   }
 
   /** Projects one capture, including its permitted screenshot whenever semantic evidence is unavailable. */
-  private view(observation: AgentObservation, options: ExecutorObserveOptions): ExecutorObservation {
+  private async view(observation: AgentObservation, options: ExecutorObserveOptions): Promise<ExecutorObservation> {
     const metadata = {
       revision: observation.revision,
       viewport: observation.viewport,
       ...(observation.path === undefined ? {} : { path: observation.path }),
       ...(observation.tabs === undefined ? {} : { tabs: observation.tabs }),
     };
-    const pixels = this.options.pixelsAllowed && (options.pixels === true || observation.kind === 'pixels') ? this.pixelsFor(observation) : {};
+    const pixels = this.options.pixelsAllowed && (options.pixels === true || observation.kind === 'pixels') ? await this.pixelsFor(observation) : {};
     if (observation.kind === 'pixels') {
       return { ...metadata, text: observation.text, treeUnavailable: true, truncated: true, ...pixels };
     }
@@ -499,8 +499,8 @@ export class ObservationFeed {
    * the same decision the judgment tier makes, recorded as a policy event
    * whenever it changes within the step.
    */
-  private pixelsFor(observation: AgentObservation): Pick<ExecutorObservation, 'pixels' | 'pixelsWithheld'> {
-    const outcome = pixelsForModel(observation);
+  private async pixelsFor(observation: AgentObservation): Promise<Pick<ExecutorObservation, 'pixels' | 'pixelsWithheld'>> {
+    const outcome = await pixelsForModel(observation);
     if ('withheld' in outcome) {
       this.recordPixelDecision('denied', outcome.withheld);
       this.visionDegraded = outcome.withheld;
