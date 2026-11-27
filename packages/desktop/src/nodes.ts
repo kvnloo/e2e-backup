@@ -230,7 +230,7 @@ function identityOf(node: RawNode, named = false): string {
  * The window is always `root`.
  * Wrappers nothing reads (anonymous groups) are dropped
  * and their children lifted, so the model reads the controls, not the
- * scaffolding, and the window's title-bar buttons are left out. Every node
+ * scaffolding (the driver leaves the window's title-bar buttons out). Every node
  * of a `minimized` window is hidden: accessibility still reads its controls,
  * but nothing of it is on screen. `interactive` marks the bindings of a read
  * the driver pruned (`interactive`), whose tree, and so whose ids and look-alike

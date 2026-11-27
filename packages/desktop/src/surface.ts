@@ -1047,7 +1047,7 @@ export class DesktopSurface {
         break;
       case 'scrollIntoView':
         // A node outside the window is read offscreen, as hidden, so one not hidden is in view already. It is scrolled only when it
-        // can be (a ref and the driver's ScrollTo): static text has no ref, and a button need not take the scroll action, which an
+        // can be (a ref and the driver's ScrollTo): most static text has no ref, and a button need not take the scroll action, which an
         // element screenshot asks for before it captures.
         if (binding.states?.hidden !== true && (binding.ref === undefined || !binding.actions.includes('ScrollTo'))) break;
         await this.refCommand('scrollTo', binding, operation);
