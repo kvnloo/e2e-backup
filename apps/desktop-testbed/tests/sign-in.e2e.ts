@@ -31,6 +31,15 @@ test.describe('sign-in form', () => {
     await expect(screen.getByRole('menuitem', 'Team')).toHaveCount(0);
   });
 
+  test('closes a pop-up menu a tap opened when the select asks for the option it already shows', async ({ screen }) => {
+    const plan = screen.getByRole('combobox', 'Plan');
+    await plan.tap();
+    await expect(screen.getByRole('menuitem', 'Pro')).toBeVisible();
+    await plan.selectOption('Pro');
+    await expect(plan).toHaveValue('Pro');
+    await expect(screen.getByRole('menuitem', 'Pro')).toHaveCount(0);
+  });
+
   test('types a username with an uppercase letter and a password through key events', async ({ screen }) => {
     // Typing goes key by key, as a person types: a capital takes its key with Shift, and a password field takes keystrokes.
     await screen.getByRole('textbox', 'Username').pressSequentially('Ada');
