@@ -29,10 +29,14 @@ final class Controller: NSObject, NSApplicationDelegate {
     password.setAccessibilityIdentifier("password")
     password.setAccessibilityLabel("Password")
     remember.setAccessibilityIdentifier("remember")
-    plan.addItems(withTitles: ["Free", "Pro", "Team", "Enterprise"])
-    // Enterprise stays disabled: a select of it must wait, then refuse it as disabled, not as missing.
+    plan.addItems(withTitles: ["Free", "Pro", "Team", "Enterprise", "Enterprise (new)", "Legacy"])
     plan.autoenablesItems = false
+    // Two Enterprise items, the disabled one first (a pop-up keeps titles unique, so the second is renamed after it is
+    // added): a select of Enterprise must choose the enabled one.
     plan.item(withTitle: "Enterprise")?.isEnabled = false
+    plan.item(withTitle: "Enterprise (new)")?.title = "Enterprise"
+    // Legacy stays disabled: a select of it must wait, then refuse it as disabled, not as missing.
+    plan.item(withTitle: "Legacy")?.isEnabled = false
     plan.selectItem(withTitle: "Pro")
     plan.setAccessibilityIdentifier("plan")
     plan.setAccessibilityLabel("Plan")

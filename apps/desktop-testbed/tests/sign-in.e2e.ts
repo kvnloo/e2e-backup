@@ -42,13 +42,20 @@ test.describe('sign-in form', () => {
 
   test('refuses a disabled option of a pop-up as disabled, and closes its menu', async ({ screen }) => {
     const plan = screen.getByRole('combobox', 'Plan');
-    const refused = await plan.selectOption('Enterprise', { timeout: 1_000 }).then(
+    const refused = await plan.selectOption('Legacy', { timeout: 1_000 }).then(
       () => undefined,
       (cause: unknown) => cause,
     );
-    expect(String(refused)).toMatch(/disabled/);
+    expect(String(refused)).toMatch(/option "Legacy" is disabled/);
     await expect(plan).toHaveValue('Pro');
-    await expect(screen.getByRole('menuitem', 'Enterprise')).toHaveCount(0);
+    await expect(screen.getByRole('menuitem', 'Legacy')).toHaveCount(0);
+  });
+
+  test('chooses the enabled one of two pop-up options of one title', async ({ screen }) => {
+    // The Plan menu holds a disabled Enterprise before an enabled one.
+    const plan = screen.getByRole('combobox', 'Plan');
+    await plan.selectOption('Enterprise');
+    await expect(plan).toHaveValue('Enterprise');
   });
 
   test('types a username with an uppercase letter and a password through key events', async ({ screen }) => {
