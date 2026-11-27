@@ -120,8 +120,15 @@ test.describe('controls window', () => {
   test('waits for a disabled list to be enabled before it selects an option', async ({ screen }) => {
     await expect(screen.getByRole('combobox', 'Size')).toBeDisabled();
     // The app enables the list half a second after this tap: the select starts while it is still disabled.
-    await screen.getByRole('button', 'Enable size').tap();
+    await screen.getByRole('button', 'Enable later').tap();
     await screen.getByRole('combobox', 'Size').selectOption('Large');
     await expect(screen.getByRole('combobox', 'Size')).toHaveValue('Large');
+  });
+
+  test('waits for a disabled box to be enabled before it checks it', async ({ screen }) => {
+    await expect(screen.getByRole('checkbox', 'Agree')).toBeDisabled();
+    await screen.getByRole('button', 'Enable later').tap();
+    await screen.getByRole('checkbox', 'Agree').check();
+    await expect(screen.getByRole('checkbox', 'Agree')).toBeChecked();
   });
 });

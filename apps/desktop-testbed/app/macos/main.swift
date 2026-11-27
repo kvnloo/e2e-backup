@@ -112,10 +112,11 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
   let note = NSTextField()
   let volume = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)
   let size = NSPopUpButton()
+  let agree = NSButton(checkboxWithTitle: "Agree", target: nil, action: nil)
 
   func show() {
     if let window { window.makeKeyAndOrderFront(nil); return }
-    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 680),
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 710),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Controls"
     window.isReleasedWhenClosed = false
@@ -180,13 +181,16 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     disabled.isEnabled = false
     disabled.setAccessibilityIdentifier("disabled")
 
-    // A list that starts disabled, and a button that enables it a moment later: a select must wait for it.
+    // A list and a box that start disabled, and a button that enables them a moment later: a select or a check must
+    // wait for them.
     size.addItems(withTitles: ["Small", "Large"])
     size.isEnabled = false
     size.setAccessibilityLabel("Size")
     size.setAccessibilityIdentifier("size")
-    let enableSize = NSButton(title: "Enable size", target: self, action: #selector(enableSizeSoon(_:)))
-    enableSize.setAccessibilityIdentifier("enable-size")
+    agree.isEnabled = false
+    agree.setAccessibilityIdentifier("agree")
+    let enableLater = NSButton(title: "Enable later", target: self, action: #selector(enableLater(_:)))
+    enableLater.setAccessibilityIdentifier("enable-later")
 
     let double = DoubleClickButton(title: "Double-click me", target: nil, action: nil)
     double.setAccessibilityIdentifier("double")
@@ -202,7 +206,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
     hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
-    let stack = NSStackView(views: [scroll, note, opener, tabs, options, volume, disabled, enableSize, size, double, hover, hoverStatus, status])
+    let stack = NSStackView(views: [scroll, note, opener, tabs, options, volume, disabled, enableLater, size, agree, double, hover, hoverStatus, status])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
@@ -212,8 +216,11 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     window.makeKeyAndOrderFront(nil)
   }
 
-  @objc func enableSizeSoon(_ sender: NSButton) {
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.size.isEnabled = true }
+  @objc func enableLater(_ sender: NSButton) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+      self?.size.isEnabled = true
+      self?.agree.isEnabled = true
+    }
   }
 
   func numberOfRows(in tableView: NSTableView) -> Int { items.count }
