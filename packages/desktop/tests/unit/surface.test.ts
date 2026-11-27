@@ -1212,6 +1212,13 @@ describe('DesktopSurface: keys', () => {
     expect(fake.of('press')).toHaveLength(1);
   });
 
+  it("brings a control's window forward before it focuses the control for a headed press", async () => {
+    const { surface, fake, byTestId } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] }, { options: { headed: true } });
+    await surface.perform(byTestId('username'), { kind: 'press', key: 'Enter' }, operation());
+    // The window comes forward first, so a control in a window another held the keyboard from can take focus.
+    expect(inputs(fake).slice(-3)).toEqual(['focusWindow', 'focus', 'press return']);
+  });
+
   it('refuses a shortcut the keyboard layout cannot type before it moves focus', async () => {
     const { surface, fake, byTestId } = await launched({ snapshot: [renamed('macos/appkit-form', 'w-8032', 'w-mine')] });
     // AZERTY types é on the 2 key without Shift: a digit shortcut there is no key the driver can press.

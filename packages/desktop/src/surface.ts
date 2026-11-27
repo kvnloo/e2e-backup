@@ -1028,6 +1028,20 @@ export class DesktopSurface {
         const window = binding.windowId;
         if (window === undefined) throw notActionable(`node ${binding.id} was read in no window to press a key into`);
         await this.read((driver) => driver.checkCombo(combo), { label: 'press', input: false, signal: operation.signal, timeoutMs: operation.timeoutMs }).catch((cause: unknown) => Promise.reject(translate(cause, 'press', false)));
+        // With `headed` the key goes through the real keyboard to the window in front: the control's window comes forward
+        // first, so a control in a window useWindow() picked while another held the keyboard can take focus. The checks
+        // below still run before the key.
+        if (this.options.headed && this.pid !== undefined) {
+          const pid = this.pid;
+          const focusId = this.requireDriver().inputId();
+          await this.input((driver, timeoutMs) => driver.focusWindow(pid, window, focusId, timeoutMs), {
+            label: 'focus window',
+            input: true,
+            signal: operation.signal,
+            timeoutMs: operation.timeoutMs,
+            onCutOff: () => this.driver?.cancelInput(focusId),
+          }).catch((cause: unknown) => Promise.reject(translate(cause, 'focus window', true)));
+        }
         await this.refCommand('focus', binding, operation);
         try {
           // The key goes to the process, which hands it to its key window: with another window that could be it, the control's must be the one shown focused.
