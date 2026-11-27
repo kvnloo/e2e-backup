@@ -31,6 +31,9 @@ test.describe('controls window', () => {
     await expect(screen.getByRole('cell', 'Item 2')).toBeVisible();
     await screen.getByRole('cell', 'Item 2').tap();
     await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 2');
+    // A row takes a tap too: the table selects it, though the row offers no press of its own.
+    await screen.getByRole('row', 'Item 3').tap();
+    await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 3');
   });
 
   test('selects a row of a two-column table by all its text, and refuses a label two rows show', async ({ screen }) => {
