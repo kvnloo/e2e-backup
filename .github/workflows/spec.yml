@@ -169,7 +169,9 @@ jobs:
       - uses: ./.github/actions/workspace-install
         with:
           agent-device-version: ${{ inputs.agent-device-version }}
-      - run: pnpm --filter @e2e-dev/util run build && pnpm --filter @e2e-dev/core run build && pnpm --filter e2e run build
+      - run: pnpm --filter @e2e-dev/util run build:native && pnpm --filter @e2e-dev/util run build && pnpm --filter @e2e-dev/core run build && pnpm --filter e2e run build
+      - name: The image addon on Bun ${{ matrix.bun }}
+        run: bun packages/util/tests/runtime-smoke.mjs
       - name: The CLI on Bun ${{ matrix.bun }}
         run: pnpm --filter e2e exec vitest run tests/integration/bun-runtime.test.ts
         env:

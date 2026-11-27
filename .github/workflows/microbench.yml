@@ -28,6 +28,9 @@ on:
       - packages/core/src/**
       - packages/core/package.json
       - packages/core/tsconfig*.json
+      - packages/util/src/**
+      - packages/util/package.json
+      - packages/util/tsconfig*.json
       - packages/mobile/src/**
       - packages/mobile/package.json
       - packages/mobile/tsconfig*.json
@@ -85,6 +88,8 @@ jobs:
             (
               cd "$RUNNER_TEMP/mb/$side"
               pnpm install --frozen-lockfile
+              # Core compiles against @e2e-dev/util's types; a base from before it has no such package.
+              if [ -d packages/util ]; then pnpm --filter @e2e-dev/util run build; fi
               pnpm --filter @e2e-dev/core run build
               pnpm --filter e2e run build
               pnpm --filter @e2e-dev/mobile run build
@@ -127,6 +132,8 @@ jobs:
             (
               cd "$RUNNER_TEMP/mb/$side"
               pnpm install --frozen-lockfile
+              # Core compiles against @e2e-dev/util's types; a base from before it has no such package.
+              if [ -d packages/util ]; then pnpm --filter @e2e-dev/util run build; fi
               pnpm --filter @e2e-dev/core run build
               pnpm --filter e2e run build
               pnpm --filter @e2e-dev/mobile run build

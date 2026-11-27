@@ -3,8 +3,9 @@ description: >-
   Installs an example's dependencies with e2e, @e2e-dev/web, and
   @e2e-dev/mobile swapped for the tarballs the examples workflow packed from
   main, so the example runs this checkout's packages instead of the npm
-  releases its package.json names. @e2e-dev/core, which they all build on, comes
-  from its tarball through an override, since e2e names its exact snapshot.
+  releases its package.json names. @e2e-dev/core, which they all build on, and
+  @e2e-dev/util, which core depends on, come from their tarballs through
+  overrides, since e2e and core name their exact snapshots.
 
 inputs:
   agent-device-version:
@@ -46,7 +47,11 @@ runs:
               console.log(`${name}: ${manifest[field][name]}`);
             }
           }
-          manifest.overrides = { ...manifest.overrides, "@e2e-dev/core": `file:${process.env.PACKED}/core.tgz` };
+          manifest.overrides = {
+            ...manifest.overrides,
+            "@e2e-dev/core": `file:${process.env.PACKED}/core.tgz`,
+            "@e2e-dev/util": `file:${process.env.PACKED}/util.tgz`,
+          };
           fs.writeFileSync("package.json", `${JSON.stringify(manifest, null, 2)}\n`);
         '
         if [ -n "$AGENT_DEVICE_VERSION" ]; then
