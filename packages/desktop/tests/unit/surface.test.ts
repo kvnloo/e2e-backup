@@ -1411,6 +1411,18 @@ describe('DesktopSurface: typing', () => {
     expect(inputs(fake)).toEqual(['selectAll']);
   });
 
+  it('types nothing when the delete moved focus off the field, so the type never takes focus back from the app', async () => {
+    const form = renamed('macos/appkit-form', 'w-8032', 'w-mine');
+    const moved = JSON.parse(
+      JSON.stringify(form)
+        .replace('"states":["focused"]', '"states":[]')
+        .replace('"native_id":{"kind":"ax_identifier","value":"sign-in"}', '"native_id":{"kind":"ax_identifier","value":"sign-in"},"states":["focused"]'),
+    ) as Answer;
+    const { surface, fake } = await launched({ snapshot: [form, form, form, form, moved] });
+    await expect(surface.typeText('ada', { replace: true }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', message: expect.stringMatching(/lost keyboard focus after the delete/) });
+    expect(inputs(fake)).toEqual(['selectAll', 'press backspace']);
+  });
+
   it('reports a type after a clear that changed the field as possibly committed', async () => {
     const { surface } = await launched({ act: [{ ok: true, data: {} }, failure('STALE_REF', 'not_delivered')] });
     await expect(surface.typeText('ada', { replace: true }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', retryable: false });

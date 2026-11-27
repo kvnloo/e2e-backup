@@ -1274,6 +1274,8 @@ export class DesktopSurface {
     if (!focused.actions.includes('TypeText')) {
       throw notActionable(`the ${focused.role ?? 'control'}${focused.name === undefined ? '' : ` "${focused.name}"`} that has keyboard focus takes no text; tap or focus a text field first`);
     }
+    // Keystrokes, so the app's key handlers run; with `headed` they go through the real keyboard.
+    const type = (): Promise<unknown> => this.tryRef('type', focused, operation, { value: text, physical: this.options.headed });
     if (options.replace) {
       // Cleared as on a keyboard, select all and then delete: the app's key handlers see the delete, and a field that takes keys but refuses an accessibility write is cleared too.
       const window = focused.windowId ?? (await this.ownWindow(operation))?.id;
@@ -1284,19 +1286,13 @@ export class DesktopSurface {
         if (!(await this.holdsFocus(focused, window, operation))) throw notActionable('the field lost keyboard focus after select all, so no delete was sent');
         await this.sendKey('backspace', window, 'delete the selection', operation, focused.ref);
       });
-    }
-    // Keystrokes, so the app's key handlers run; with `headed` they go through the real keyboard.
-    const type = (): Promise<unknown> => this.tryRef('type', focused, operation, { value: text, physical: this.options.headed });
-    if (options.replace) {
       // The delete's handler may move focus on (an emptied field that advances): the driver would focus the field back
       // to type, taking focus from the app, so the field must still hold it.
-      const window = focused.windowId ?? (await this.ownWindow(operation))?.id;
       await afterChange('type', async () => {
-        if (window === undefined || !(await this.holdsFocus(focused, window, operation))) throw notActionable('the field lost keyboard focus after the delete, so nothing was typed');
+        if (!(await this.holdsFocus(focused, window, operation))) throw notActionable('the field lost keyboard focus after the delete, so nothing was typed');
         await type();
       });
-    }
-    else await type().catch((cause: unknown) => Promise.reject(translate(cause, 'type', true)));
+    } else await type().catch((cause: unknown) => Promise.reject(translate(cause, 'type', true)));
     await this.settle(operation);
   }
 
