@@ -25,7 +25,7 @@
  * `.cts` is CommonJS. A JSON file imported without `with { type: 'json' }`
  * loads as a module whose default export is the parsed file.
  *
- * Freshness: a module imported with the `e2e-graph` query parameter hands it
+ * Freshness: a module the loader puts in a fresh graph hands its graph key
  * on to every file it reaches by path or `#` import outside `node_modules`,
  * so the project's own graph (a config and the base config or targets file
  * it imports) evaluates afresh with it, while packages stay one shared
@@ -35,7 +35,7 @@
  * Registrars: a project file that registered a test or a hook while it
  * evaluated (`registrar-modules.ts`), and every project file that imports
  * it, evaluates again with each fresh load that reaches it, by taking the
- * importer's `e2e` query. A test file imported again then gets the tests and
+ * importer's load key. A test file imported again then gets the tests and
  * hooks of the helper it imports again, where one shared instance of the
  * helper would register them for its first importer alone. The load that
  * first reached a file keeps the one instance it evaluated. `require()` has
@@ -91,8 +91,12 @@ const firstLoads = new Map<string, string>();
  * to the load at work, not to the load that first reached the file.
  */
 const atWork = new AsyncLocalStorage<{ readonly key: string; readonly entryURL?: string }>();
-/** Original URLs of modules whose URLs this loader changed for a fresh load. */
-const originalModuleURLs = new Map<string, string>();
+/** The original URL and the freshness keys actually added by this loader. */
+const moduleLoads = new Map<string, {
+  readonly originalURL: string | undefined;
+  readonly key: string | undefined;
+  readonly graph: string | undefined;
+}>();
 
 /** Runs `work` as part of the fresh load `key`: the import of its module, or code of that module. */
 export function runInLoad<T>(key: string, work: () => T): T {
@@ -111,7 +115,7 @@ function addRegistrar(file: string): void {
  * of the import graph and, for a registrar imported from a fresh load,
  * moved into that load.
  */
-function inFreshLoad(parentURL: string | undefined, resolution: Resolution): Resolution {
+function inFreshLoad(parentURL: string | undefined, resolution: Resolution, key: string | undefined): Resolution {
   if (parentURL?.startsWith('file:') !== true || !resolution.url.startsWith('file:')) return resolution;
   const parent = new URL(parentURL);
   const child = new URL(resolution.url);
@@ -121,9 +125,9 @@ function inFreshLoad(parentURL: string | undefined, resolution: Resolution): Res
   if (known === undefined) importers.set(childFile, (known = new Set()));
   known.add(parentFile);
   if (registrars.has(childFile)) addRegistrar(parentFile);
-  const key = parent.searchParams.get(FRESH_PARAM) ?? atWork.getStore()?.key;
   if (key === undefined) return resolution;
   if (!firstLoads.has(childFile)) firstLoads.set(childFile, key);
+  // An existing query parameter is user data. Preserve it in the resolved URL.
   if (!registrars.has(childFile) || firstLoads.get(childFile) === key || child.searchParams.has(FRESH_PARAM)) return resolution;
   return { ...resolution, url: appendQuery(child, FRESH_PARAM, key) };
 }
@@ -150,21 +154,23 @@ function reach(specifier: string): Reach {
   return specifier.startsWith('#') ? 'own-imports' : 'package';
 }
 
-/** The `e2e-graph` value of a module URL: the fresh graph it belongs to, or null. */
-function graphOf(url: string | undefined): string | null {
-  return url?.startsWith('file:') === true ? new URL(url).searchParams.get(GRAPH_PARAM) : null;
-}
-
 /**
- * Evaluates `absolutePath` afresh under `key`; with `graph`,
+ * Makes the URL to evaluate `absolutePath` afresh under `key`; with `graph`,
  * every project file it imports by path or `#` import is fresh too, shared
  * with every other module loaded under the same `graph`.
  */
-export function importFreshModule(absolutePath: string, key: string, graph: string | undefined): Promise<unknown> {
+export function freshModuleURL(absolutePath: string, key: string, graph: string | undefined): string {
   const url = pathToFileURL(absolutePath);
   url.searchParams.set(FRESH_PARAM, key);
   if (graph !== undefined) url.searchParams.set(GRAPH_PARAM, graph);
-  const entryURL = url.href;
+  // The resolve hook records the original URL after Node resolves symlinks.
+  moduleLoads.set(url.href, { originalURL: undefined, key, graph });
+  return url.href;
+}
+
+/** Evaluates the entry URL as part of its fresh load. */
+export function importFreshModule(absolutePath: string, key: string, graph: string | undefined): Promise<unknown> {
+  const entryURL = freshModuleURL(absolutePath, key, graph);
   return atWork.run({ key, entryURL }, () => import(entryURL));
 }
 
@@ -259,16 +265,15 @@ function withFormat(resolution: Resolution): Resolution {
 
 /**
  * The resolution, joined to its importer's fresh graph: a project file
- * reached by path or by a `#` import from a module that carries
- * `GRAPH_PARAM` carries it too. A package reached by name keeps its shared
+ * reached by path or by a `#` import from a module in a fresh graph
+ * joins that graph. A package reached by name keeps its shared
  * instance, even a workspace package that resolves outside `node_modules`: a
  * second instance of it would import a second instance of e2e itself.
  */
-function inGraph(how: Reach, parentURL: string | undefined, resolution: Resolution): Resolution {
-  if (how === 'package' || !resolution.url.startsWith('file:')) return resolution;
-  const graph = graphOf(parentURL);
+function inGraph(how: Reach, graph: string | null, resolution: Resolution): Resolution {
+  if (graph === null || how === 'package' || !resolution.url.startsWith('file:')) return resolution;
   const file = new URL(resolution.url);
-  if (graph === null || !isProjectFile(file) || file.searchParams.has(GRAPH_PARAM)) return resolution;
+  if (!isProjectFile(file) || file.searchParams.has(GRAPH_PARAM)) return resolution;
   return { ...resolution, url: appendQuery(file, GRAPH_PARAM, graph) };
 }
 
@@ -314,8 +319,10 @@ function resolveExport(request: string, context: ResolveHookContext, nextResolve
 
 export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
   const importer = compiledSource(context.parentURL);
+  const parentLoad = context.parentURL === undefined ? undefined : moduleLoads.get(context.parentURL);
+  const graph = parentLoad?.graph ?? null;
   // Only an import written in a compiled file looks at the project's files.
-  const view = importer === undefined ? undefined : projectView(graphOf(context.parentURL));
+  const view = importer === undefined ? undefined : projectView(graph);
   const target = importer === undefined || view === undefined ? undefined : typeScriptTarget(specifier, importer, requires(context), view);
   const how: Reach = target === undefined ? reach(specifier) : 'path';
   const request = target === undefined ? specifier : targetSpecifier(target, context);
@@ -324,13 +331,21 @@ export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
   );
   // CommonJS caches modules by file, with no query to make one fresh.
   if (requires(context)) return resolution;
-  const fresh = inFreshLoad(context.parentURL, inGraph(how, context.parentURL, resolution));
-  if (specifier === atWork.getStore()?.entryURL && resolution.url.startsWith('file:')) {
+  const active = atWork.getStore();
+  const key = parentLoad?.key ?? active?.key;
+  const inFreshGraph = inGraph(how, graph, resolution);
+  const fresh = inFreshLoad(context.parentURL, inFreshGraph, key);
+  const entry = specifier === active?.entryURL ? moduleLoads.get(specifier) : undefined;
+  if (entry !== undefined && resolution.url.startsWith('file:')) {
     // This entry came from importFreshModule, so its query is ours. Use the
     // resolved path here, after Node has applied its symlink rules.
-    originalModuleURLs.set(fresh.url, resolution.url.split('?', 1)[0]!);
+    moduleLoads.set(fresh.url, { ...entry, originalURL: resolution.url.split('?', 1)[0]! });
   } else if (fresh.url !== resolution.url) {
-    originalModuleURLs.set(fresh.url, resolution.url);
+    moduleLoads.set(fresh.url, {
+      originalURL: resolution.url,
+      key: fresh !== inFreshGraph ? key : undefined,
+      graph: inFreshGraph !== resolution ? graph ?? undefined : undefined,
+    });
   }
   return fresh;
 };
@@ -340,7 +355,7 @@ export const load: LoadHookSync = (url, context, nextLoad) => {
   if (source !== undefined) {
     const { format } = source.kind;
     const loaded = nextLoad(url, { ...context, format });
-    const compilerOptions = source.project ? (projectView(graphOf(url)).tsconfigFor(source.file)?.compilerOptions ?? {}) : {};
+    const compilerOptions = source.project ? (projectView(moduleLoads.get(url)?.graph ?? null).tsconfigFor(source.file)?.compilerOptions ?? {}) : {};
     return { format, source: compileTypeScript(source.file, text(loaded.source, source.file), source.kind, compilerOptions), shortCircuit: true };
   }
   // A require() has no import attributes, whatever the hook types say.
@@ -402,7 +417,7 @@ export function registerLoader(): void {
   if (!onBun) {
     nodeModule.registerHooks({ resolve, load });
     registrarModuleSlot.set(globalThis, addRegistrar);
-    originalModuleURLSlot.set(globalThis, (url) => originalModuleURLs.get(url));
+    originalModuleURLSlot.set(globalThis, (url) => moduleLoads.get(url)?.originalURL);
     hookedRequireSlot.set(globalThis, hookedRequire);
     process.setSourceMapsEnabled(true);
   }

@@ -197,9 +197,12 @@ A worker fixture outlives every test, so it sees worker fixtures only: its
 own kind, and the [built-in fixtures](/reference/test#fixtures) whose scope is
 worker on the target.
 
-On Node.js, the fixture value survives a runner reload of its module. ES
-module imports with different URL queries or fragments each get their own
-fixture instance.
+Declare shared worker fixtures in a module your test files import. On
+Node.js, call `test.extend()` before any top-level `await` so the fixture
+value survives a runner reload. Declarations after a top-level `await`
+can set up again while the earlier instance is still active. Await
+asynchronous setup inside the fixture function. ES module imports with
+different URL queries or fragments each get their own fixture instance.
 On Bun, declare worker fixtures in a module your test files import. When Bun
 reloads a test file, any worker fixture declared in that file gets a new
 instance. The old instance stays set up until the worker ends.

@@ -282,10 +282,12 @@ confirm the runner collects and executes the intended test.
 - **Extend a built-in.** A fixture named like an existing one extends it
   (`app: async ({ app }, use) => { await app.open('/x'); await use(app); }`).
 - **Worker fixtures** (`[fn, { scope: 'worker' }]`, second type argument of
-  `extend`) are set up once per worker and target. On Node.js, ES module imports
-  with different URL queries or fragments get separate instances. On Bun,
-  declare worker fixtures in a module the test files import to keep their
-  values when a test file reloads after a failure.
+  `extend`) are set up once per worker and target. Put shared worker
+  fixtures in a module your test files import, especially on Bun, where
+  reloading a test file creates another instance of its fixtures. On Node.js,
+  call `test.extend()` before any top-level `await` to reuse the fixture on
+  reload. Await setup inside the fixture function. ES module imports with
+  different URL queries or fragments get separate instances.
 - **Typing across targets:** `as const satisfies E2EConfig` on the config,
   then `base.extend<{}, {}, typeof config>()`. Passing `typeof config` also
   types the `services` fixture.

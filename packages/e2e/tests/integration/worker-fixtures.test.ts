@@ -1,15 +1,113 @@
 /** Worker-scoped fixtures and the suite hooks that receive them, on an engine that isolates each attempt and on one whose state outlives it. */
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import type { Report1Document } from '../../src/report/build.ts';
 import { createFakeEngine } from '../helpers/fake-engine.ts';
 import { engineConfig } from '../helpers/fixture-config.ts';
 import { hookLog, LOG_MODULE } from '../helpers/hook-log.ts';
 import { assertValidReport } from '../helpers/report-schema.ts';
 import { createProject, resultByTitle, runProject, workerFakeConfigSource } from '../helpers/run-project.ts';
 
+function runFixtureCLI(cwd: string) {
+  const cli = fileURLToPath(new URL('../../dist/cli/bin.js', import.meta.url));
+  const result = spawnSync(process.execPath, [cli, 'run'], {
+    cwd,
+    env: { ...process.env, CI: '', E2E_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  return JSON.parse(readFileSync(path.join(cwd, '.e2e/report.json'), 'utf8')) as Report1Document;
+}
+
 describe('worker fixtures', () => {
+  it('keeps a forwarded import separate from an explicit user freshness query', () => {
+    const imports = [
+      ['../support.mjs?variant=base', '?variant=base'],
+      ['../forward.mjs?e2e=blue', '?variant=base'],
+      ['../support.mjs?variant=base&e2e=blue', '?variant=base&e2e=blue'],
+    ];
+    const tests = Object.fromEntries(imports.map(([specifier, search], index) => [
+      `tests/${index}.e2e.ts`,
+      `import { expect } from 'e2e';
+import { test } from ${JSON.stringify(specifier)};
+test('gets the fixture for its import', ({ value }) => {
+  expect(new URL(value).search).toBe(${JSON.stringify(search)});
+});
+`,
+    ]));
+    const project = createProject({
+      ...tests,
+      'e2e.config.ts': workerFakeConfigSource(1),
+      'forward.mjs': "export { test } from './support.mjs?variant=base';",
+      'support.mjs': `import { test as base } from 'e2e';
+import { appendFileSync } from 'node:fs';
+export const test = base.extend({
+  value: [async ({}, use) => {
+    appendFileSync('setups.txt', new URL(import.meta.url).search + '\\n');
+    await use(import.meta.url);
+  }, { scope: 'worker' }],
+});
+test.beforeEach(() => {});
+`,
+    });
+    try {
+      runFixtureCLI(project.dir);
+      expect(readFileSync(path.join(project.dir, 'setups.txt'), 'utf8')).toBe('?variant=base\n?variant=base&e2e=blue\n');
+    } finally {
+      project.cleanup();
+    }
+  }, 30_000);
+
+  it('reuses a fixed-port fixture declared in the test file when a test retries', () => {
+    const project = createProject({
+      'e2e.config.ts': workerFakeConfigSource(1, 'retries: 1,'),
+      'tests/retry.e2e.ts': `import { test as base, expect } from 'e2e';
+import { createServer } from 'node:net';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+const test = base.extend<{}, { port: number }>({
+  port: [async ({}, use) => {
+    const portFile = 'fixture-port.txt';
+    const port = existsSync(portFile) ? Number(readFileSync(portFile, 'utf8')) : 0;
+    const server = createServer();
+    await new Promise<void>((resolve, reject) => server.once('error', reject).listen(port, '127.0.0.1', resolve));
+    const boundPort = server.address().port;
+    writeFileSync(portFile, String(boundPort));
+    appendFileSync('events.txt', 'setup\\n');
+    try {
+      await use(boundPort);
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+      appendFileSync('events.txt', 'teardown\\n');
+    }
+  }, { scope: 'worker' }],
+});
+test('retries after the first attempt fails', ({ port }) => {
+  expect(port).toBeGreaterThan(0);
+  if (existsSync('first-attempt.txt')) return;
+  writeFileSync('first-attempt.txt', '');
+  throw new Error('intentional first-attempt failure');
+});
+`,
+    });
+    try {
+      const report = runFixtureCLI(project.dir);
+      assertValidReport(report);
+      expect(report.run.results[0]).toMatchObject({
+        status: 'flaky',
+        attempts: [{ status: 'failed', error: { message: 'intentional first-attempt failure' } }, { status: 'passed' }],
+      });
+      expect(readFileSync(path.join(project.dir, 'events.txt'), 'utf8')).toBe('setup\nteardown\n');
+    } finally {
+      project.cleanup();
+    }
+  }, 30_000);
+
   it('separates user import URLs and reuses the fixture when the loader reloads the same URL', () => {
     const imports = [
       '?a=1&b=2#one',
@@ -52,15 +150,7 @@ test.beforeEach(() => {});
 `,
     });
     try {
-      const cli = fileURLToPath(new URL('../../dist/cli/bin.js', import.meta.url));
-      const result = spawnSync(process.execPath, [cli, 'run'], {
-        cwd: project.dir,
-        env: { ...process.env, CI: '', E2E_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
-        encoding: 'utf8',
-        timeout: 20_000,
-      });
-      expect(result.error).toBeUndefined();
-      expect(result.status, result.stdout + result.stderr).toBe(0);
+      runFixtureCLI(project.dir);
       const instances = new Set(imports).size;
       expect(log.lines()).toEqual([...Array<string>(instances).fill('setup'), ...Array<string>(instances).fill('teardown')]);
     } finally {

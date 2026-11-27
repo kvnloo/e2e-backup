@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { load, resolve } from '../../src/config/esm-hooks.ts';
+import { freshModuleURL, load, resolve } from '../../src/config/esm-hooks.ts';
 
 type Resolution = { url: string; format?: string | null | undefined };
 
@@ -224,7 +224,7 @@ describe('resolve', () => {
 });
 
 describe('fresh module graphs', () => {
-  const fromGraph = (relative: string): string => `${url(relative)}?e2e=module-3&e2e-graph=module-3`;
+  const fromGraph = (relative: string): string => freshModuleURL(path.join(project, relative), 'module-3', 'module-3');
 
   it.each([
     ['a relative import', './e2e.config.ts', 'e2e.config.ts'],
@@ -241,11 +241,16 @@ describe('fresh module graphs', () => {
 
   it.each([
     ['a package by name', fromGraph('e2e.config.ts'), '@e2e-dev/web', { '@e2e-dev/web': 'file:///app/packages/web/dist/index.js' }],
-    ['a file under node_modules', `${url('node_modules/dep/index.ts')}?e2e-graph=module-3`, './helper.ts', {}],
+    ['a file under node_modules', fromGraph('node_modules/dep/index.ts'), './helper.ts', {}],
     ['an importer outside any graph', `${url('e2e.config.ts')}?e2e=module-1`, './lib/helper.ts', {}],
     ['a builtin', fromGraph('e2e.config.ts'), 'node:path', {}],
   ])('leaves %s alone', (_case, parentURL, specifier, exports) => {
     expect(resolveFrom(parentURL, specifier, { exports }).resolution.url).not.toContain('e2e-graph');
+  });
+
+  it('leaves an importer with a user-written graph query outside any fresh graph', () => {
+    const parent = `${url('e2e.config.ts')}?e2e-graph=user`;
+    expect(resolveFrom(parent, './lib/helper.ts').resolution.url).toBe(url('lib/helper.ts'));
   });
 
   it('leaves a require() out of fresh graphs, which CommonJS cannot load twice', () => {
@@ -282,7 +287,8 @@ describe('fresh module graphs', () => {
 
   it('reads tsconfig.json afresh for a new graph and once for every other load', () => {
     write({ 'graph/tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@x': ['./a.ts'] } } }), 'graph/a.ts': '', 'graph/b.ts': '', 'graph/main.ts': '' });
-    const parent = (graph: string | undefined): string => `${url('graph/main.ts')}${graph === undefined ? '' : `?e2e-graph=${graph}`}`;
+    const parent = (graph: string | undefined): string =>
+      graph === undefined ? url('graph/main.ts') : freshModuleURL(path.join(project, 'graph/main.ts'), graph, graph);
     expect(resolveFrom(parent(undefined), '@x').asked).toEqual([url('graph/a.ts')]);
     expect(resolveFrom(parent('g-1'), '@x').asked).toEqual([url('graph/a.ts')]);
     write({ 'graph/tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@x': ['./b.ts'] } } }) });
