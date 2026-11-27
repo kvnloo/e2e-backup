@@ -49,6 +49,13 @@ test.describe('controls window', () => {
     await expect(screen.getByTestId('controls-status')).toHaveText('Selected account 1: Checking USD');
   });
 
+  test("keeps a content button with the close-button subrole, and leaves out the window's own title-bar buttons", async ({ screen }) => {
+    await expect(screen.getByTestId('close-tab')).toBeVisible();
+    // The window names its title-bar buttons, and only those are window chrome: none of them is read as a button.
+    await expect(screen.getByRole('button', 'Close')).toHaveCount(0);
+    await expect(screen.getByRole('button', 'Minimize')).toHaveCount(0);
+  });
+
   test('presses keys into a field of an app in the background, and types into it', async ({ screen }) => {
     // The keys go into the app's own event queue: it must not be the app in front, before or after.
     expect(frontmost()).not.toBe(TESTBED_APP);

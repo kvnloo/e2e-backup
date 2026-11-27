@@ -126,7 +126,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
 
   func show() {
     if let window { window.makeKeyAndOrderFront(nil); return }
-    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 800),
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 830),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Controls"
     window.isReleasedWhenClosed = false
@@ -217,6 +217,12 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     let enableLater = NSButton(title: "Enable later", target: self, action: #selector(enableLater(_:)))
     enableLater.setAccessibilityIdentifier("enable-later")
 
+    // A button of the app's content with the close-button subrole, as a tab's close button has: it is the app's, not
+    // window chrome, and must stay in the tree.
+    let closeTab = NSButton(title: "Close tab", target: nil, action: nil)
+    closeTab.setAccessibilitySubrole(.closeButton)
+    closeTab.setAccessibilityIdentifier("close-tab")
+
     let double = DoubleClickButton(title: "Double-click me", target: nil, action: nil)
     double.setAccessibilityIdentifier("double")
     double.onDoubleClick = { [weak self] in self?.status.stringValue = "Double-clicked" }
@@ -231,7 +237,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
     hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
-    let stack = NSStackView(views: [scroll, accountScroll, note, opener, tabs, options, volume, disabled, enableLater, size, agree, double, hover, hoverStatus, status])
+    let stack = NSStackView(views: [scroll, accountScroll, note, opener, tabs, options, volume, disabled, enableLater, size, agree, closeTab, double, hover, hoverStatus, status])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
