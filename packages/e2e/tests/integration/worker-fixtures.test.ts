@@ -12,11 +12,11 @@ import { hookLog, LOG_MODULE } from '../helpers/hook-log.ts';
 import { assertValidReport } from '../helpers/report-schema.ts';
 import { createProject, resultByTitle, runProject, workerFakeConfigSource } from '../helpers/run-project.ts';
 
-function runFixtureCLI(cwd: string) {
+function runFixtureCLI(cwd: string, env: NodeJS.ProcessEnv = {}) {
   const cli = fileURLToPath(new URL('../../dist/cli/bin.js', import.meta.url));
   const result = spawnSync(process.execPath, [cli, 'run'], {
     cwd,
-    env: { ...process.env, CI: '', E2E_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
+    env: { ...process.env, ...env, CI: '', E2E_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
     encoding: 'utf8',
     timeout: 20_000,
   });
@@ -103,6 +103,70 @@ test('retries after the first attempt fails', ({ port }) => {
         attempts: [{ status: 'failed', error: { message: 'intentional first-attempt failure' } }, { status: 'passed' }],
       });
       expect(readFileSync(path.join(project.dir, 'events.txt'), 'utf8')).toBe('setup\nteardown\n');
+    } finally {
+      project.cleanup();
+    }
+  }, 30_000);
+
+  it.each([
+    ['before', false],
+    ['after', false],
+    ['before', true],
+    ['after', true],
+  ] as const)('tracks instrumented retries with a resolver registered %s and changing fragments set to %s', (order, changes) => {
+    const config = workerFakeConfigSource(1, 'retries: 1,');
+    const project = createProject({
+      'e2e.config.ts': order === 'after' ? `import './instrument.mjs';\n${config}` : config,
+      'instrument.mjs': `
+import { existsSync } from 'node:fs';
+import { registerHooks } from 'node:module';
+registerHooks({ resolve(specifier, context, next) {
+  const result = next(specifier, context);
+  if (result.url.startsWith('file:') && new URL(result.url).pathname.endsWith('/retry.e2e.ts')) {
+    const fragment = ${changes} && existsSync('retried') ? '#second' : '#first';
+    return { ...result, url: result.url + fragment };
+  }
+  return result;
+} });
+`,
+      'tests/retry.e2e.ts': `
+import { test as base, expect } from 'e2e';
+import { appendFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+const fragment = new URL(import.meta.url).hash;
+const test = base.extend<{}, { value: string }>({
+  value: [async ({}, use) => {
+    const lock = 'worker' + fragment;
+    appendFileSync('events.txt', 'setup ' + fragment + '\\n');
+    writeFileSync(lock, '', { flag: 'wx' });
+    try {
+      await use(fragment);
+    } finally {
+      rmSync(lock);
+      appendFileSync('events.txt', 'teardown ' + fragment + '\\n');
+    }
+  }, { scope: 'worker' }],
+});
+test('retries with the resolved fragment', ({ value }) => {
+  expect(value).toBe(fragment);
+  if (existsSync('retried')) return;
+  writeFileSync('retried', '');
+  throw new Error('intentional first-attempt failure');
+});
+`,
+    });
+    try {
+      const env = order === 'before'
+        ? { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=./instrument.mjs`.trim() }
+        : {};
+      const report = runFixtureCLI(project.dir, env);
+      expect(report.run.results[0]).toMatchObject({
+        status: 'flaky',
+        attempts: [{ status: 'failed', error: { message: 'intentional first-attempt failure' } }, { status: 'passed' }],
+      });
+      const events = readFileSync(path.join(project.dir, 'events.txt'), 'utf8').trim().split('\n');
+      const expected = ['setup #first', 'teardown #first'];
+      if (changes) expected.push('setup #second', 'teardown #second');
+      expect(events.toSorted()).toEqual(expected.toSorted());
     } finally {
       project.cleanup();
     }

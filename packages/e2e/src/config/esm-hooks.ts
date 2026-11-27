@@ -374,12 +374,24 @@ function legacyConfigEntry(specifier: string, parentURL: string | undefined, url
 }
 
 /** A later resolver can append a fragment after this loader records the URL. */
+function appendedFragment(url: string): { load: ModuleLoad; fragment: string } | undefined {
+  const index = url.indexOf('#');
+  if (index === -1) return undefined;
+  const load = moduleLoads.get(url.slice(0, index));
+  return load === undefined ? undefined : { load, fragment: url.slice(index) };
+}
+
 function graphOf(url: string | undefined, known: ModuleLoad | undefined): string | null {
   if (known !== undefined || url === undefined) return known?.graph ?? null;
-  const fragment = url.indexOf('#');
-  if (fragment === -1) return null;
-  // Only config graph lookups can use the fragmentless URL.
-  return moduleLoads.get(url.slice(0, fragment))?.graph ?? null;
+  return appendedFragment(url)?.load.graph ?? null;
+}
+
+function originalModuleURL(url: string): string | undefined {
+  const exact = moduleLoads.get(url);
+  if (exact !== undefined) return exact.originalURL;
+  const appended = appendedFragment(url);
+  if (appended?.load.originalURL === undefined) return undefined;
+  return appended.load.originalURL + appended.fragment;
 }
 
 export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
@@ -405,7 +417,9 @@ export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
     : legacyConfigEntry(specifier, context.parentURL, resolution.url);
   if (entry !== undefined && resolution.url.startsWith('file:')) {
     // Use the resolved path after Node has applied its symlink rules.
-    moduleLoads.set(fresh.url, { ...entry, originalURL: resolution.url.split('?', 1)[0]! });
+    const original = new URL(resolution.url);
+    original.search = '';
+    moduleLoads.set(fresh.url, { ...entry, originalURL: original.href });
   } else if (fresh.url !== resolution.url) {
     moduleLoads.set(fresh.url, {
       originalURL: resolution.url,
@@ -485,7 +499,7 @@ export function registerLoader(): void {
   if (!onBun) {
     nodeModule.registerHooks({ resolve, load });
     registrarModuleSlot.set(globalThis, addRegistrar);
-    originalModuleURLSlot.set(globalThis, (url) => moduleLoads.get(url)?.originalURL);
+    originalModuleURLSlot.set(globalThis, originalModuleURL);
     hookedRequireSlot.set(globalThis, hookedRequire);
     process.setSourceMapsEnabled(true);
   }
