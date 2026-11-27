@@ -82,6 +82,11 @@ export interface NodeBinding {
   readonly testId?: string;
   /** Read with `-i`, whose ids and look-alike counts a check of the same control must read the same way to compare. */
   readonly interactive: boolean;
+  /**
+   * Hidden only because a scroll area holds it out of view, which a scroll into view can undo; one in a minimized
+   * window, under a hidden ancestor, or with no size stays hidden whatever scrolls.
+   */
+  readonly scrolledOut?: true;
 }
 
 /** A snapshot as the engine keeps it: the tree the harness sees, and a binding for every node in it. */
@@ -265,7 +270,9 @@ export function projectSnapshot(
     for (const state of STATE_NAMES) if (rawStates.has(state)) states[state] = true;
     if (rawStates.has('offscreen') || minimized || hiddenAbove) states.hidden = true;
     // A control collapsed to no width or height draws nothing, and the driver will not act on it. Only a leaf: a container with no box can still hold drawn children, listed or cut off at the depth limit.
-    if (id !== ROOT_ID && node.bounds !== undefined && (node.bounds.width <= 0 || node.bounds.height <= 0) && (node.children ?? []).length === 0 && (node.children_count ?? 0) === 0) states.hidden = true;
+    const collapsed = id !== ROOT_ID && node.bounds !== undefined && (node.bounds.width <= 0 || node.bounds.height <= 0) && (node.children ?? []).length === 0 && (node.children_count ?? 0) === 0;
+    if (collapsed) states.hidden = true;
+    const scrolledOut = rawStates.has('offscreen') && !minimized && !hiddenAbove && !collapsed;
     // A mixed checkbox is neither checked nor unchecked: no state, so check() and uncheck() always reach the control.
     if (CHECKABLE_ROLES.has(node.role) && !rawStates.has('indeterminate')) states.checked = rawStates.has('checked') || node.value === '1';
     else if (rawStates.has('checked')) states.checked = true;
@@ -320,6 +327,7 @@ export function projectSnapshot(
       stable,
       likeness,
       interactive,
+      ...(scrolledOut ? { scrolledOut } : {}),
       ...(node.native_id === undefined || node.native_id.value === '' ? {} : { testId: node.native_id.value }),
     });
     const kept: RawNode[] = [];

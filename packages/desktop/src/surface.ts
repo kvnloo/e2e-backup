@@ -1118,7 +1118,9 @@ export class DesktopSurface {
    */
   private async shown(binding: NodeBinding, what: string, operation: OperationContext): Promise<void> {
     if (binding.states?.hidden !== true) return;
-    if (binding.ref !== undefined && binding.actions.includes('ScrollTo')) {
+    // Only a node a scroll area holds out of view is scrolled: the driver checks it shows by its frame and the scroll
+    // areas around it, which a minimized window or a collapsed control would pass unchanged.
+    if (binding.scrolledOut === true && binding.ref !== undefined && binding.actions.includes('ScrollTo')) {
       await this.refCommand('scrollTo', binding, operation);
       return;
     }

@@ -887,6 +887,25 @@ describe('DesktopSurface: acting', () => {
     const hiddenBox = every((await box.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
     await box.surface.perform(hiddenBox!.ref, { kind: 'check' }, operation());
     expect(box.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['check']);
+    // Hidden for another reason than a scroll: no scroll shows a minimized window's control or one with no size, so
+    // each is refused at once, though both offer ScrollTo.
+    const minimized = await launched(
+      { listWindows: [windows(() => [{ id: 'w-mine', is_focused: true }]), windows(() => [{ id: 'w-mine', visible: false, minimized: true }])], snapshot: [at(false, ['Click', 'ScrollTo'])] },
+      { observe: false },
+    );
+    const folded = every((await minimized.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
+    expect(folded?.states?.hidden).toBe(true);
+    await expect(minimized.surface.perform(folded!.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/not on screen/) });
+    expect(minimized.fake.of('act')).toEqual([]);
+    const flat = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [{ role: 'button', name: 'Flat', ref_id: '@s:e1', available_actions: ['Click', 'ScrollTo'], bounds: { x: 10, y: 10, width: 0, height: 20 } }],
+    });
+    const zero = await launched({ snapshot: [flat] }, { observe: false });
+    const none = every((await zero.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Flat');
+    await expect(zero.surface.perform(none!.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/not on screen/) });
+    expect(zero.fake.of('act')).toEqual([]);
   });
 
   it('refuses to double-click a node with no ref whose center is a control inside it, and hovers it', async () => {
