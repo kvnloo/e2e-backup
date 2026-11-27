@@ -369,14 +369,23 @@ function legacyConfigEntry(specifier: string, parentURL: string | undefined, url
   if (queryAt === -1) return undefined;
   const query = specifier.slice(queryAt);
   const key = /^\?e2e=(module-[1-9]\d*)&e2e-graph=\1$/.exec(query)?.[1];
-  if (key === undefined || !url.endsWith(query) || !isConfigLoader(parentURL)) return undefined;
+  if (key === undefined || new URL(url).search !== query || !isConfigLoader(parentURL)) return undefined;
   return { originalURL: undefined, key, graph: key };
+}
+
+/** A later resolver can append a fragment after this loader records the URL. */
+function graphOf(url: string | undefined, known: ModuleLoad | undefined): string | null {
+  if (known !== undefined || url === undefined) return known?.graph ?? null;
+  const fragment = url.indexOf('#');
+  if (fragment === -1) return null;
+  // Only config graph lookups can use the fragmentless URL.
+  return moduleLoads.get(url.slice(0, fragment))?.graph ?? null;
 }
 
 export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
   const importer = compiledSource(context.parentURL);
   const parentLoad = context.parentURL === undefined ? undefined : moduleLoads.get(context.parentURL);
-  const graph = parentLoad?.graph ?? null;
+  const graph = graphOf(context.parentURL, parentLoad);
   // Only an import written in a compiled file looks at the project's files.
   const view = importer === undefined ? undefined : projectView(graph);
   const target = importer === undefined || view === undefined ? undefined : typeScriptTarget(specifier, importer, requires(context), view);
@@ -412,7 +421,9 @@ export const load: LoadHookSync = (url, context, nextLoad) => {
   if (source !== undefined) {
     const { format } = source.kind;
     const loaded = nextLoad(url, { ...context, format });
-    const compilerOptions = source.project ? (projectView(moduleLoads.get(url)?.graph ?? null).tsconfigFor(source.file)?.compilerOptions ?? {}) : {};
+    const compilerOptions = source.project
+      ? (projectView(graphOf(url, moduleLoads.get(url))).tsconfigFor(source.file)?.compilerOptions ?? {})
+      : {};
     return { format, source: compileTypeScript(source.file, text(loaded.source, source.file), source.kind, compilerOptions), shortCircuit: true };
   }
   // A require() has no import attributes, whatever the hook types say.
