@@ -948,7 +948,9 @@ export class DesktopSurface {
         // The trace is evidence; a sink that throws never fails the step.
       }
     }
-    // A read cut short (by its budget, or at the depth limit) can leave out a match: no match would not prove a control absent, and one would not prove it the only one. The locator reads again until its deadline.
+    // A read the deadline stopped is the locator's time running out: it answers as the timeout it is, so the wait ends on what its last whole read found (core never takes a cut read for an answer).
+    if (screen.timedOut) throw new EngineError('OPERATION_TIMEOUT', 'the window could not be read whole before the deadline', { retryable: false });
+    // A read cut short (by a stall, or at the depth limit) can leave out a match: no match would not prove a control absent, and one would not prove it the only one. The locator reads again until its deadline.
     if (screen.truncated) {
       throw new EngineError(
         'NODE_STALE',

@@ -667,6 +667,13 @@ describe('DesktopSurface: reading', () => {
     await expect(surface.locate(testId('username'), operation())).resolves.toHaveLength(1);
   });
 
+  it('answers a window read the deadline stopped as the timeout it is, so a wait ends on its last whole read', async () => {
+    const partial = snapshotAnswer('macos/appkit-form') as { ok: true; data: Record<string, unknown> };
+    const stopped = { ...partial, data: { ...partial.data, complete: false, timed_out: true } };
+    const { surface } = await launched({ snapshot: [stopped] }, { observe: false });
+    await expect(surface.locate(testId('nowhere'), operation())).rejects.toMatchObject({ code: 'OPERATION_TIMEOUT', retryable: false });
+  });
+
   it('reads the whole window for a locator even with interactive snapshots, so a label is found', async () => {
     const window = { name: 'Form', bounds: { x: 0, y: 0, width: 100, height: 100 } };
     const label = { role: 'statictext', value: 'Not signed in', bounds: { x: 10, y: 40, width: 80, height: 20 } };
