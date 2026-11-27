@@ -14,6 +14,18 @@ test.describe('physical input', () => {
     await expect(screen.getByTestId('controls-status')).toHaveText('Double-clicked');
   });
 
+  test('refuses to double-click a disabled control', async ({ screen }) => {
+    // AppKit takes the clicks and ignores them: the gesture waits for the button to be enabled, then fails.
+    const refused = await screen
+      .getByRole('button', 'Disabled')
+      .doubleTap({ timeout: 1_000 })
+      .then(
+        () => undefined,
+        (cause: unknown) => cause,
+      );
+    expect(String(refused)).toMatch(/disabled/);
+  });
+
   test('hovers a view with the real pointer', async ({ screen }) => {
     await screen.getByTestId('hover').hover();
     await expect(screen.getByTestId('hover-status')).toHaveText('Hovered');
