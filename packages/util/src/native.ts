@@ -70,16 +70,15 @@ export interface Binding {
 /** The addon could not be loaded on this machine. */
 export class NativeUtilUnavailableError extends Error {
   override readonly name = 'NativeUtilUnavailableError';
+  /** The platform package that holds this machine's build; undefined when no build exists for it. */
+  readonly packageName: string | undefined;
+  /** `<platform>-<arch>[-<abi>]`, as NAPI-RS names it. */
+  readonly platform: string;
 
-  constructor(
-    message: string,
-    /** The platform package that holds this machine's build; undefined when no build exists for it. */
-    readonly packageName: string | undefined,
-    /** `<platform>-<arch>[-<abi>]`, as NAPI-RS names it. */
-    readonly platform: string,
-    options?: ErrorOptions,
-  ) {
+  constructor(message: string, packageName: string | undefined, platform: string, options?: ErrorOptions) {
     super(message, options);
+    this.packageName = packageName;
+    this.platform = platform;
   }
 }
 

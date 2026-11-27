@@ -46,6 +46,7 @@
     "@napi-rs/image": "1.16.0",
     "@types/node": "26.6.11",
     "pixelmatch": "8.0.0",
+    "playwright-core": "1.65.1",
     "typescript": "7.0.2",
     "vitest": "5.1.2"
   },

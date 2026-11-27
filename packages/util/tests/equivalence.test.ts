@@ -12,6 +12,7 @@ import { decodePng, NativeImage, pngSize, processPng, type ImageBox } from '../s
 import * as reference from './reference.ts';
 import { writePng, type PngSpec } from './png-writer.ts';
 import { below, random } from './random.ts';
+import { screenshots } from './screenshots.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const TRACKED = execFileSync('git', ['ls-files', '*.png'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
@@ -115,10 +116,11 @@ describe('decoding', () => {
 });
 
 describe('encoding', () => {
-  it('writes PNGs the reference decodes to the same pixels', async () => {
-    for (const { file, image } of DECODED) {
+  it('writes the same PNG bytes as the reference, so a stored screenshot does not change', async () => {
+    const inputs = [...DECODED.map(({ file, image }) => ({ file, image })), ...(await screenshots()).map(({ name, bytes }) => ({ file: name, image: reference.decodePng(bytes) }))];
+    for (const { file, image } of inputs) {
       const png = await NativeImage.fromRgba(image.data, image.width, image.height).encode();
-      expect(same(reference.decodePng(png).data, image.data), file).toBe(true);
+      expect(same(png, reference.encodePng(image)), file).toBe(true);
     }
   });
 });
@@ -203,9 +205,9 @@ describe('comparing', () => {
     }
   }
 
-  it('counts and draws the difference of tracked screenshots and their perturbed, shifted, and translucent copies as pixelmatch does', async () => {
-    const screenshots = DECODED.filter((entry) => entry.image.width * entry.image.height <= 1_500_000);
-    for (const [index, { file, image }] of screenshots.entries()) {
+  it('counts and draws the difference of tracked PNGs and their perturbed, shifted, and translucent copies as pixelmatch does', async () => {
+    const tracked = DECODED.filter((entry) => entry.image.width * entry.image.height <= 1_500_000);
+    for (const [index, { file, image }] of tracked.entries()) {
       await check(`${file} itself`, image, image);
       await check(`${file} perturbed`, image, perturb(image, index, 0.02, 30, false));
       await check(`${file} shifted`, image, shift(image, 1));
@@ -235,5 +237,48 @@ describe('comparing', () => {
     }
     const small = NativeImage.fromRgba(new Uint8Array(4), 1, 1);
     expect(await left.compare(small, tolerance(0.1))).toEqual(reference.compareImages(image, { width: 1, height: 1, data: new Uint8Array(4) }, tolerance(0.1)));
+  });
+});
+
+describe('browser screenshots', () => {
+  const tolerance = (threshold: number) => ({ threshold, maxDiffPixels: undefined, maxDiffPixelRatio: undefined });
+
+  it('decodes, sizes for a model, and sizes for toHaveScreenshot as the reference does', async () => {
+    for (const { name, bytes } of await screenshots()) {
+      const image = reference.decodePng(bytes);
+      expect(same((await decodePng(bytes)).pixels(), image.data), name).toBe(true);
+      const factor = 768 / Math.max(image.width, image.height);
+      for (const [width, height] of [[Math.round(image.width * factor), Math.round(image.height * factor)], [Math.round(image.width / 2), Math.round(image.height / 2)], [Math.round(image.width / 3), Math.round(image.height / 3)]] as const) {
+        const native = await processPng(bytes, { resize: { width, height }, output: 'image' });
+        expect(same(native.pixels(), reference.resampleImage(image, width, height).data), `${name} to ${width}x${height}`).toBe(true);
+      }
+    }
+  });
+
+  it('counts and draws the difference between a screen and its variants as pixelmatch does, anti-aliasing included', async () => {
+    const shots = new Map((await screenshots()).map(({ name, bytes }) => [name, reference.decodePng(bytes)]));
+    const pairs = [
+      ['desktop-2560x1440', 'desktop-2560x1440-word'],
+      ['desktop-2560x1440', 'desktop-2560x1440-moved'],
+      ['desktop-2560x1440', 'desktop-2560x1440-overlay'],
+      ['desktop-1280x720', 'desktop-1280x720-word'],
+      ['phone-1170x2532', 'phone-1170x2532-overlay'],
+    ] as const;
+    let antialiased = 0;
+    for (const [left, right] of pairs) {
+      const expected = shots.get(left)!;
+      const actual = shots.get(right)!;
+      const one = NativeImage.fromRgba(expected.data, expected.width, expected.height);
+      const two = NativeImage.fromRgba(actual.data, actual.width, actual.height);
+      for (const threshold of [0, 0.1, 0.2]) {
+        const want = reference.compareImages(expected, actual, tolerance(threshold));
+        expect(await one.compare(two, tolerance(threshold)), `${left} vs ${right} at ${threshold}`).toEqual(want);
+        const drawn = reference.diffImage(expected, actual, threshold).data;
+        expect(same((await one.diff(two, threshold)).pixels(), drawn), `${left} vs ${right} diff at ${threshold}`).toBe(true);
+        for (let at = 0; at < drawn.length; at += 4) if (drawn[at] === 255 && drawn[at + 1] === 255 && drawn[at + 2] === 0) antialiased += 1;
+      }
+    }
+    // The pairs reach pixelmatch's anti-aliasing detector, not only its color distance.
+    expect(antialiased).toBeGreaterThan(0);
   });
 });

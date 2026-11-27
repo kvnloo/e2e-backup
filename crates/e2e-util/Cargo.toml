@@ -8,7 +8,7 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-png = "0.18.1"
+png = { version = "0.18.1", features = ["zlib-rs"] }
 
 [lints]
 workspace = true
