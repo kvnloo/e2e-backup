@@ -1026,6 +1026,8 @@ export class DesktopSurface {
       case 'tap':
       case 'secondaryTap': {
         const command = action.kind === 'tap' ? 'click' : 'rightClick';
+        // A secondary tap on a control that read with no context menu is refused before a scroll into view would move the list for it.
+        if (action.kind === 'secondaryTap' && binding.states?.hidden === true && !binding.actions.includes('RightClick')) throw unsupported('this element has no context menu');
         const scrolled = await this.shown(binding, action.kind === 'tap' ? 'tap' : 'secondary-tap', operation);
         const click = (): Promise<void> => this.refCommand(command, binding, operation);
         if (scrolled) await afterChange(command, click);
