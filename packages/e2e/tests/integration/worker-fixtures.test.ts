@@ -64,9 +64,12 @@ test.beforeEach(() => {});
     }
   }, 30_000);
 
-  it('reuses a fixed-port fixture declared in the test file when a test retries', () => {
+  it.each([
+    { loader: 'current', setup: '' },
+    { loader: 'without the original URL lookup', setup: "Reflect.deleteProperty(globalThis, Symbol.for('e2e.original-module-url.v1'));" },
+  ])('reuses a fixed-port fixture declared in the test file on retry with a loader $loader', ({ setup }) => {
     const project = createProject({
-      'e2e.config.ts': workerFakeConfigSource(1, 'retries: 1,'),
+      'e2e.config.ts': workerFakeConfigSource(1, 'retries: 1,') + '\n' + setup,
       'tests/retry.e2e.ts': `import { test as base, expect } from 'e2e';
 import { createServer } from 'node:net';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';

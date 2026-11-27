@@ -3,7 +3,7 @@
 import type { SourceLocation } from '@e2e-dev/core/lib/internal/source';
 import { originalModuleURLSlot } from '../internal/registrar-modules.ts';
 import { onBun } from '../internal/runtime.ts';
-import { runningModule } from './evaluating-module.ts';
+import { moduleFile, runningModule } from './evaluating-module.ts';
 
 /** How many definitions each name stands for so far, by collection. */
 const counts = new WeakMap<object, Map<string, number>>();
@@ -26,7 +26,10 @@ export function fixtureIdentities(collection: object | undefined, site: SourceLo
   if (collection === undefined || site === undefined || onBun) return () => undefined;
   const { location, loader } = runningModule();
   if (!loader || location === undefined) return () => undefined;
-  const evaluating = originalModuleURLSlot.get(globalThis)?.(location) ?? location;
+  const originalModuleURL = originalModuleURLSlot.get(globalThis);
+  // An older runner's loader supplies no original URL lookup. Keep its
+  // file-based identity so changing runner query keys do not repeat setup.
+  const evaluating = originalModuleURL === undefined ? moduleFile(location) : originalModuleURL(location) ?? location;
   const defined = counts.get(collection) ?? new Map<string, number>();
   counts.set(collection, defined);
   return (name) => {

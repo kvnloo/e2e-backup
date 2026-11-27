@@ -64,6 +64,6 @@ function outermostBeforeLoader(locations: readonly string[]): { readonly locatio
 }
 
 /** The path the registrar uses, without the module URL's query or fragment. */
-function moduleFile(location: string | undefined): string | undefined {
+export function moduleFile(location: string | undefined): string | undefined {
   return location?.startsWith('file:') === true ? fileURLToPath(location) : location;
 }
