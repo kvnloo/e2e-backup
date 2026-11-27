@@ -1,6 +1,6 @@
 {
   "name": "@e2e-dev/electron",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Electron engine for e2e agentic end-to-end testing: launches an Electron app and drives its windows through Chromium's accessibility tree",
   "keywords": [
     "e2e",

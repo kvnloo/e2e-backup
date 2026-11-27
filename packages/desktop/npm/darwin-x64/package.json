@@ -1,6 +1,6 @@
 {
   "name": "@e2e-dev/desktop-darwin-x64",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "The macOS x64 native driver of @e2e-dev/desktop, which npm installs with it",
   "keywords": [
     "e2e",

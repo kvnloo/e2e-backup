@@ -1,5 +1,13 @@
 # @e2e-dev/acp
 
+## 0.1.5
+
+### Patch Changes
+
+- [#2304](https://github.com/e2e-inc/e2e/pull/2304) [`342e95a`](https://github.com/e2e-inc/e2e/commit/342e95abebc188d7ee553b16643c9dac5cdcae50) Thanks [@okwasniewski](https://github.com/okwasniewski)! - Bump `agent-device`, `@agent-device/revyl`, and `@agent-device/testmu` to 0.21.43, `@vitest/expect` to 5.1.2, and `@agentclientprotocol/sdk` to 2.12.0.
+
+- [#2343](https://github.com/e2e-inc/e2e/pull/2343) [`27fd376`](https://github.com/e2e-inc/e2e/commit/27fd3763f9f2207c07c7c6a1ce4b719359e686cd) Thanks [@aloneangel45](https://github.com/aloneangel45)! - Pass `--disable <feature>` for every feature in `CODEX_FEATURES_OFF` when running `codex mcp list --json`, so MCP servers provided by disabled Codex plugins (such as `codex_app` or `cua_repl`) are not added to `mcp_servers` without a transport definition.
+
 ## 0.1.4
 
 ### Patch Changes

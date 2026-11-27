@@ -1,6 +1,6 @@
 {
   "name": "@e2e-dev/desktop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Desktop engine for e2e agentic end-to-end testing: native macOS apps through the accessibility tree, driven by a Rust driver loaded in process",
   "keywords": [
     "e2e",

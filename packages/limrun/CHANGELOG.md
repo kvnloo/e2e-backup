@@ -1,5 +1,15 @@
 # @e2e-dev/limrun
 
+## 0.2.8
+
+### Patch Changes
+
+- [#2304](https://github.com/e2e-inc/e2e/pull/2304) [`342e95a`](https://github.com/e2e-inc/e2e/commit/342e95abebc188d7ee553b16643c9dac5cdcae50) Thanks [@okwasniewski](https://github.com/okwasniewski)! - Bump `agent-device`, `@agent-device/revyl`, and `@agent-device/testmu` to 0.21.43, `@vitest/expect` to 5.1.2, and `@agentclientprotocol/sdk` to 2.12.0.
+
+- [#2299](https://github.com/e2e-inc/e2e/pull/2299) [`62f97e0`](https://github.com/e2e-inc/e2e/commit/62f97e04bc2c3aaf1d3992bd7dc166a0420e062d) Thanks [@kdy1](https://github.com/kdy1)! - `@e2e-dev/revyl`, `@e2e-dev/testmu`, and `@e2e-dev/limrun` check that their agent-device matches the engine's, and they now pin agent-device 0.21.44, so they need `@e2e-dev/mobile` 0.12.10 or newer, the first release that runs it.
+
+- [#2319](https://github.com/e2e-inc/e2e/pull/2319) [`5cb53be`](https://github.com/e2e-inc/e2e/commit/5cb53be2dfae7fb1d068c06b205cf3b7bce749b3) Thanks [@thymikee](https://github.com/thymikee)! - Use agent-device 0.21.44's ref formatter when pinning snapshot targets so interactions follow the installed SDK's live-ref grammar. Keep the hosted providers' SDKs and plugins on that version. E2B requires mobile 0.12.10 or newer so its client and the SDK installed in its sandbox match.
+
 ## 0.2.7
 
 ### Patch Changes
