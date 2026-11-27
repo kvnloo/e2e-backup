@@ -109,6 +109,9 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
   let hoverStatus = NSTextField(labelWithString: "Not hovered")
   let items = (1...40).map { "Item \($0)" }
   let table = NSTableView()
+  // A table whose rows show two cells each, two of them alike: a row is named by all its text.
+  let accounts = [("Checking", "USD"), ("Savings", "EUR"), ("Savings", "EUR")]
+  let accountTable = NSTableView()
   let note = NSTextField()
   let volume = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)
   let size = NSPopUpButton()
@@ -116,7 +119,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
 
   func show() {
     if let window { window.makeKeyAndOrderFront(nil); return }
-    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 710),
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 800),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Controls"
     window.isReleasedWhenClosed = false
@@ -130,6 +133,21 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     table.delegate = self
     table.setAccessibilityLabel("Items")
     table.setAccessibilityIdentifier("items")
+    for (name, width) in [("name", 140.0), ("currency", 80.0)] {
+      let accountColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(name))
+      accountColumn.width = width
+      accountTable.addTableColumn(accountColumn)
+    }
+    accountTable.headerView = nil
+    accountTable.dataSource = self
+    accountTable.delegate = self
+    accountTable.setAccessibilityLabel("Accounts")
+    accountTable.setAccessibilityIdentifier("accounts")
+    let accountScroll = NSScrollView()
+    accountScroll.documentView = accountTable
+    accountScroll.heightAnchor.constraint(equalToConstant: 70).isActive = true
+    accountScroll.widthAnchor.constraint(equalToConstant: 260).isActive = true
+
     let scroll = NSScrollView()
     scroll.documentView = table
     scroll.hasVerticalScroller = true
@@ -206,7 +224,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
     hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
-    let stack = NSStackView(views: [scroll, note, opener, tabs, options, volume, disabled, enableLater, size, agree, double, hover, hoverStatus, status])
+    let stack = NSStackView(views: [scroll, accountScroll, note, opener, tabs, options, volume, disabled, enableLater, size, agree, double, hover, hoverStatus, status])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
@@ -223,15 +241,25 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     }
   }
 
-  func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+  func numberOfRows(in tableView: NSTableView) -> Int { tableView === accountTable ? accounts.count : items.count }
 
   func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    if tableView === accountTable {
+      let account = accounts[row]
+      return NSTextField(labelWithString: tableColumn?.identifier.rawValue == "currency" ? account.1 : account.0)
+    }
     let cell = NSTextField(labelWithString: items[row])
     cell.identifier = NSUserInterfaceItemIdentifier("cell")
     return cell
   }
 
   func tableViewSelectionDidChange(_ notification: Notification) {
+    if (notification.object as? NSTableView) === accountTable {
+      guard accountTable.selectedRow >= 0 else { return }
+      let account = accounts[accountTable.selectedRow]
+      status.stringValue = "Selected account \(accountTable.selectedRow + 1): \(account.0) \(account.1)"
+      return
+    }
     guard table.selectedRow >= 0 else { return }
     status.stringValue = "Selected \(items[table.selectedRow])"
   }

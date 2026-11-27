@@ -33,6 +33,19 @@ test.describe('controls window', () => {
     await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 2');
   });
 
+  test('selects a row of a two-column table by all its text, and refuses a label two rows show', async ({ screen }) => {
+    const accounts = screen.getByRole('table', 'Accounts');
+    await accounts.selectOption('Checking USD');
+    await expect(screen.getByTestId('controls-status')).toHaveText('Selected account 1: Checking USD');
+    const refused = await accounts.selectOption('Savings EUR', { timeout: 1_000 }).then(
+      () => undefined,
+      (cause: unknown) => cause,
+    );
+    expect(String(refused)).toMatch(/more than one option/);
+    // Neither alike row was chosen: the status still shows the first choice.
+    await expect(screen.getByTestId('controls-status')).toHaveText('Selected account 1: Checking USD');
+  });
+
   test('presses keys into a field of an app in the background, and types into it', async ({ screen }) => {
     // The keys go into the app's own event queue: it must not be the app in front, before or after.
     expect(frontmost()).not.toBe(TESTBED_APP);
