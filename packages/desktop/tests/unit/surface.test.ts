@@ -851,6 +851,27 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(still.fake)).toEqual(['focusWindow', 'pointer']);
   });
 
+  it('refuses a tap on a button the read found off screen, and scrolls one into view first when it can', async () => {
+    const at = (hidden: boolean, actions: string[]) =>
+      screen('w-mine', {
+        name: 'Form',
+        bounds: { x: 0, y: 0, width: 200, height: 200 },
+        children: [{ role: 'button', name: 'Top', ref_id: '@s:e1', available_actions: actions, ...(hidden ? { states: ['offscreen'] } : {}), bounds: { x: 10, y: -40, width: 50, height: 20 } }],
+      });
+    const every = (node: SemanticNode): SemanticNode[] => [node, ...(node.children ?? []).flatMap(every)];
+    // No scroll action: accessibility would press it all the same, out of the user's reach.
+    const stuck = await launched({ snapshot: [at(true, ['Click'])] }, { observe: false });
+    const top = every((await stuck.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
+    await expect(stuck.surface.perform(top!.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/not on screen/) });
+    expect(stuck.fake.of('act')).toEqual([]);
+    // A scroll action: scrolled into view, read again, then pressed.
+    // The launch, the observation, then the read after the scroll.
+    const scrolls = await launched({ snapshot: [at(true, ['Click', 'ScrollTo']), at(true, ['Click', 'ScrollTo']), at(false, ['Click', 'ScrollTo'])] }, { observe: false });
+    const shown = every((await scrolls.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
+    await scrolls.surface.perform(shown!.ref, { kind: 'tap' }, operation());
+    expect(scrolls.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['scrollTo', 'click']);
+  });
+
   it('refuses to double-click a node with no ref whose center is a control inside it, and hovers it', async () => {
     const row = screen('w-mine', {
       name: 'Form',

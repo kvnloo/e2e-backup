@@ -1022,6 +1022,7 @@ export class DesktopSurface {
     const binding = this.binding(ref);
     switch (action.kind) {
       case 'tap':
+        await this.shown(binding, 'tap', operation);
         await this.refCommand('click', binding, operation);
         break;
       case 'doubleTap':
@@ -1030,6 +1031,7 @@ export class DesktopSurface {
         await this.refCommand('doubleClick', binding, operation);
         break;
       case 'secondaryTap':
+        await this.shown(binding, 'secondary-tap', operation);
         await this.refCommand('rightClick', binding, operation);
         break;
       case 'focus':
@@ -1109,6 +1111,21 @@ export class DesktopSurface {
   }
 
   /** One action on a node's ref, failures translated. */
+  /**
+   * Refuses a tap on a node the read found off screen, which accessibility would press all the same: one a scroll area
+   * holds out of view. When the driver can scroll it into view, it does, and a fresh read must then show it.
+   */
+  private async shown(binding: NodeBinding, what: string, operation: OperationContext): Promise<void> {
+    if (binding.states?.hidden !== true) return;
+    if (binding.ref !== undefined && binding.actions.includes('ScrollTo') && binding.windowId !== undefined) {
+      await this.refCommand('scrollTo', binding, operation);
+      const now = await this.capture(operation, binding.windowId, false, !binding.interactive);
+      const fresh = [...(now?.bindings.values() ?? [])].find((candidate) => sameNode(candidate, binding));
+      if (fresh !== undefined && fresh.states?.hidden !== true) return;
+    }
+    throw notActionable(`node ${binding.id} is not on screen, so a ${what} would reach a control the user cannot; scroll it into view first`);
+  }
+
   private async refCommand(action: string, binding: NodeBinding, operation: OperationContext, extra: { value?: string; direction?: string; pages?: number; physical?: boolean } = {}): Promise<void> {
     try {
       await this.tryRef(action, binding, operation, extra);
