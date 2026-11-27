@@ -197,8 +197,9 @@ A worker fixture outlives every test, so it sees worker fixtures only: its
 own kind, and the [built-in fixtures](/reference/test#fixtures) whose scope is
 worker on the target.
 
-On Node.js, the fixture value survives a runner reload of its module. Imports
-with different URL queries or fragments each get their own fixture instance.
+On Node.js, the fixture value survives a runner reload of its module. ES
+module imports with different URL queries or fragments each get their own
+fixture instance.
 On Bun, declare worker fixtures in a module your test files import. When Bun
 reloads a test file, any worker fixture declared in that file gets a new
 instance. The old instance stays set up until the worker ends.
