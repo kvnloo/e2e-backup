@@ -107,7 +107,10 @@ function repositoryTexts(cargoPackage: CargoPackage): string[] {
   if (directory === undefined || files.length === 0) {
     throw new Error(`${cargoPackage.name} ${cargoPackage.version} publishes no license file, and native/licenses has none for its repository (${cargoPackage.repository ?? 'none named'}); add that repository's license texts there`);
   }
-  return files.map((name) => readFileSync(path.join(directory, name), 'utf8').trim());
+  const texts = files.map((name) => readFileSync(path.join(directory, name), 'utf8').trim());
+  // An empty file is a fetch that found nothing, never a license.
+  if (texts.some((body) => body === '')) throw new Error(`a vendored license text for ${cargoPackage.name} under native/licenses/${slug} is empty`);
+  return texts;
 }
 
 /** The notices file: each distinct license text once, under the crates that carry it. */
