@@ -1608,4 +1608,3 @@ function sameRects(a: readonly Rect[] | undefined, b: readonly Rect[]): boolean 
     return rect.x === other.x && rect.y === other.y && rect.width === other.width && rect.height === other.height;
   });
 }
-
