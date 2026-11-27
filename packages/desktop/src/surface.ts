@@ -1334,7 +1334,15 @@ export class DesktopSurface {
     }
     // Keystrokes, so the app's key handlers run; with `headed` they go through the real keyboard.
     const type = (): Promise<unknown> => this.tryRef('type', focused, operation, { value: text, physical: this.options.headed });
-    if (options.replace) await afterChange('type', type);
+    if (options.replace) {
+      // The delete's handler may move focus on (an emptied field that advances): the driver would focus the field back
+      // to type, taking focus from the app, so the field must still hold it.
+      const window = focused.windowId ?? (await this.ownWindow(operation))?.id;
+      await afterChange('type', async () => {
+        if (window === undefined || !(await this.holdsFocus(focused, window, operation))) throw notActionable('the field lost keyboard focus after the delete, so nothing was typed');
+        await type();
+      });
+    }
     else await type().catch((cause: unknown) => Promise.reject(translate(cause, 'type', true)));
     await this.settle(operation);
   }
