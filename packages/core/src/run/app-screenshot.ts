@@ -55,9 +55,9 @@ export async function captureAppScreenshot(engine: LocatorEngine, artifactsDir: 
   const { artifacts } = engine.session;
   if (fullPage) return artifacts.screenshot(label, engine.operation(), { fullPage: true, ...(clip === undefined ? {} : { clip }) });
   if (clip === undefined) return artifacts.screenshot(label, engine.operation());
-  const deadline = engine.deadline();
-  const viewport = await engine.viewport(deadline);
-  const relative = await artifacts.screenshot(label, engine.operationWithin(deadline));
+  // The viewport read and the capture each get the budget a plain screenshot has, so a slow read on a heavy page does not starve the capture.
+  const viewport = await engine.viewport(engine.deadline());
+  const relative = await artifacts.screenshot(label, engine.operation());
   const file = path.join(artifactsDir, relative);
   let kept = false;
   try {

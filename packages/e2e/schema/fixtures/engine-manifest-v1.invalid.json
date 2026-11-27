@@ -6,6 +6,7 @@
     "engine/viewportIntersection"
   ],
   "fileApps": "yes",
+  "fullPageScreenshots": "yes",
   "actions": [
     "scrollTo",
     "scrollToEdge"
