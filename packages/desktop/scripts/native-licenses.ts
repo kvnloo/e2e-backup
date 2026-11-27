@@ -40,6 +40,8 @@ interface Metadata {
 const LICENSE_FILE = /^(licen[cs]e|copying|unlicense)/i;
 
 const crate = path.join(import.meta.dirname, '..', 'native');
+/** License texts of repositories whose crates publish none of their own, by `<owner>/<repo>` (`native/licenses/README.md`). */
+const vendored = path.join(crate, 'licenses');
 const packages = path.join(import.meta.dirname, '..', '..');
 const outputs = ['desktop-darwin-arm64', 'desktop-darwin-x64'].map((name) => path.join(packages, name, 'THIRD_PARTY_LICENSES.md'));
 
@@ -93,6 +95,21 @@ function linked(graph: Metadata): CargoPackage[] {
     .toSorted((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
 }
 
+/**
+ * The license texts of a crate that publishes no license file, from its repository's texts vendored under
+ * `native/licenses/<owner>/<repo>`. A crate with neither stops the generator: a sentence naming the license would drop
+ * the copyright and permission notice the license requires.
+ */
+function repositoryTexts(cargoPackage: CargoPackage): string[] {
+  const slug = /github\.com\/([^/]+\/[^/.]+)/.exec(cargoPackage.repository ?? '')?.[1];
+  const directory = slug === undefined ? undefined : path.join(vendored, slug);
+  const files = directory !== undefined && existsSync(directory) ? readdirSync(directory).filter((name) => LICENSE_FILE.test(name)).toSorted() : [];
+  if (directory === undefined || files.length === 0) {
+    throw new Error(`${cargoPackage.name} ${cargoPackage.version} publishes no license file, and native/licenses has none for its repository (${cargoPackage.repository ?? 'none named'}); add that repository's license texts there`);
+  }
+  return files.map((name) => readFileSync(path.join(directory, name), 'utf8').trim());
+}
+
 /** The notices file: each distinct license text once, under the crates that carry it. */
 function notices(crates: readonly CargoPackage[]): string {
   const groups = new Map<string, string[]>();
@@ -100,7 +117,7 @@ function notices(crates: readonly CargoPackage[]): string {
     const directory = path.dirname(cargoPackage.manifest_path);
     const files = readdirSync(directory).filter((name) => LICENSE_FILE.test(name)).toSorted();
     const label = `${cargoPackage.name} ${cargoPackage.version} (${cargoPackage.license ?? 'no license field'})${cargoPackage.repository === null ? '' : `, ${cargoPackage.repository}`}`;
-    const texts = files.length > 0 ? files.map((name) => readFileSync(path.join(directory, name), 'utf8').trim()) : [`The crate ships no license file; its license is ${cargoPackage.license ?? 'not stated'}.`];
+    const texts = files.length > 0 ? files.map((name) => readFileSync(path.join(directory, name), 'utf8').trim()) : repositoryTexts(cargoPackage);
     for (const body of texts) groups.set(body, [...(groups.get(body) ?? []), label]);
   }
   const sections = [...groups].map(([body, labels]) => `## ${[...new Set(labels)].join('; ')}\n\n\`\`\`text\n${body}\n\`\`\``);
