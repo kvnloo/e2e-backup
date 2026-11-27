@@ -31,6 +31,13 @@ test.describe('physical input', () => {
     await expect(screen.getByTestId('hover-status')).toHaveText('Hovered');
   });
 
+  test('presses a key into a field of a window another holds the keyboard from', async ({ screen, desktop }) => {
+    // The Controls window holds the keyboard; the Sign In window is picked, and the press must bring it forward first.
+    await desktop.useWindow((await desktop.windows()).find((window) => window.title === 'Sign In'));
+    await screen.getByTestId('username').press('x');
+    await expect(screen.getByTestId('username')).toHaveValue('x');
+  });
+
   test('taps a point in the window and types through the real keyboard', async ({ screen }) => {
     const note = screen.getByRole('textbox', 'Note');
     const box = await note.boundingBox();
