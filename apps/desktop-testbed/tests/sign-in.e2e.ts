@@ -30,6 +30,15 @@ test.describe('sign-in form', () => {
     await expect(screen.getByTestId('status')).toHaveText('Signed in as Ada on Pro (password: 7 characters)');
   });
 
+  test('puts the keyboard in the password field when it is tapped', async ({ screen, desktop }) => {
+    // AppKit's password field offers a confirm action too: a tap must focus it, so the keys after it go there.
+    await screen.getByRole('textbox', 'Username').tap();
+    await screen.getByRole('textbox', 'Password').tap();
+    await expect(screen.getByRole('textbox', 'Password')).toBeFocused();
+    await desktop.press('x');
+    await expect(screen.getByRole('textbox', 'Username')).toHaveValue('');
+  });
+
   test('reads controls by test id and refuses an empty password', async ({ screen }) => {
     await screen.getByTestId('username').fill('grace');
     await expect(screen.getByTestId('username')).toHaveValue('grace');
