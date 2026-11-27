@@ -29,7 +29,10 @@ final class Controller: NSObject, NSApplicationDelegate {
     password.setAccessibilityIdentifier("password")
     password.setAccessibilityLabel("Password")
     remember.setAccessibilityIdentifier("remember")
-    plan.addItems(withTitles: ["Free", "Pro", "Team"])
+    plan.addItems(withTitles: ["Free", "Pro", "Team", "Enterprise"])
+    // Enterprise stays disabled: a select of it must wait, then refuse it as disabled, not as missing.
+    plan.autoenablesItems = false
+    plan.item(withTitle: "Enterprise")?.isEnabled = false
     plan.selectItem(withTitle: "Pro")
     plan.setAccessibilityIdentifier("plan")
     plan.setAccessibilityLabel("Plan")

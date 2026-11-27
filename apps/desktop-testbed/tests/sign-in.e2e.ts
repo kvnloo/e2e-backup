@@ -40,6 +40,17 @@ test.describe('sign-in form', () => {
     await expect(screen.getByRole('menuitem', 'Pro')).toHaveCount(0);
   });
 
+  test('refuses a disabled option of a pop-up as disabled, and closes its menu', async ({ screen }) => {
+    const plan = screen.getByRole('combobox', 'Plan');
+    const refused = await plan.selectOption('Enterprise', { timeout: 1_000 }).then(
+      () => undefined,
+      (cause: unknown) => cause,
+    );
+    expect(String(refused)).toMatch(/disabled/);
+    await expect(plan).toHaveValue('Pro');
+    await expect(screen.getByRole('menuitem', 'Enterprise')).toHaveCount(0);
+  });
+
   test('types a username with an uppercase letter and a password through key events', async ({ screen }) => {
     // Typing goes key by key, as a person types: a capital takes its key with Shift, and a password field takes keystrokes.
     await screen.getByRole('textbox', 'Username').pressSequentially('Ada');
