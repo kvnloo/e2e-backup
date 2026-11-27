@@ -1,19 +1,21 @@
 //! The box filter `boxResample` in `@e2e-dev/core`'s `internal/image.ts` used.
 
-use super::Rgba;
+use super::{ImageError, Rgba, byte_len};
 
 /// Resamples an image to `width` by `height`, each target pixel the per-channel average of every source pixel it
 /// covers, rounded half up. The spans are computed in floating point exactly as the JavaScript did, so a target
-/// pixel covers the same source pixels on both sides. Returns a copy when the size already matches.
-pub fn resample_box(image: &Rgba, width: u32, height: u32) -> Rgba {
+/// pixel covers the same source pixels on both sides. Returns a copy when the size already matches, and an error when
+/// the target is over [`MAX_IMAGE_BYTES`](super::MAX_IMAGE_BYTES).
+pub fn resample_box(image: &Rgba, width: u32, height: u32) -> Result<Rgba, ImageError> {
+    byte_len(width, height)?;
     if image.width == width && image.height == height {
-        return image.clone();
+        return Ok(image.clone());
     }
     let (source_width, source_height) = (image.width as usize, image.height as usize);
     let (target_width, target_height) = (width as usize, height as usize);
     let mut data = vec![0; target_width * target_height * 4];
     if target_width == 0 || target_height == 0 || source_width == 0 || source_height == 0 {
-        return Rgba { width, height, data };
+        return Ok(Rgba { width, height, data });
     }
     let x_ratio = source_width as f64 / target_width as f64;
     let y_ratio = source_height as f64 / target_height as f64;
@@ -40,7 +42,7 @@ pub fn resample_box(image: &Rgba, width: u32, height: u32) -> Rgba {
             }
         }
     }
-    Rgba { width, height, data }
+    Ok(Rgba { width, height, data })
 }
 
 /// The source pixels `[start, end)` target pixel `at` covers along one axis.
@@ -57,13 +59,14 @@ mod tests {
     #[test]
     fn averages_each_box_rounding_half_up() {
         let image = Rgba::new(2, 1, vec![0, 10, 255, 255, 1, 11, 0, 0]).unwrap();
-        let half = resample_box(&image, 1, 1);
+        let half = resample_box(&image, 1, 1).unwrap();
         assert_eq!(half.data, vec![1, 11, 128, 128]);
     }
 
     #[test]
     fn upsamples_by_repeating() {
         let image = Rgba::new(1, 1, vec![9, 8, 7, 6]).unwrap();
-        assert_eq!(resample_box(&image, 2, 2).data, [9, 8, 7, 6].repeat(4));
+        assert_eq!(resample_box(&image, 2, 2).unwrap().data, [9, 8, 7, 6].repeat(4));
+        assert!(matches!(resample_box(&image, 100_000, 100_000), Err(ImageError::Size(_))));
     }
 }

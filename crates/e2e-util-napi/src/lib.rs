@@ -61,10 +61,17 @@ pub struct FillStep {
     pub color: Vec<u8>,
 }
 
+/// A target size, read as numbers so a value past `u32` is refused rather than wrapped.
+#[napi(object)]
+pub struct TargetSize {
+    pub width: f64,
+    pub height: f64,
+}
+
 /// What `processPng` does to a decoded PNG, in this order: resample, crop, paint.
 #[napi(object)]
 pub struct ProcessSteps {
-    pub resize: Option<ImageSize>,
+    pub resize: Option<TargetSize>,
     /// Clipped to the image first; a box with nothing inside fails the call.
     pub crop: Option<ImageBox>,
     pub fill: Option<FillStep>,
@@ -125,7 +132,8 @@ impl NativeImage {
 
     /// An image over a copy of `data`, `width * height` RGBA pixels.
     #[napi(factory)]
-    pub fn from_rgba(env: Env, data: &[u8], width: u32, height: u32) -> Result<Self> {
+    pub fn from_rgba(env: Env, data: &[u8], width: f64, height: f64) -> Result<Self> {
+        let (width, height) = dimensions(width, height)?;
         Self::adopt(&env, Rgba::new(width, height, data.to_vec()).map_err(invalid)?)
     }
 
@@ -185,23 +193,25 @@ pub fn png_size(bytes: &[u8]) -> Option<ImageSize> {
     img::png_size(bytes).map(|(width, height)| ImageSize { width, height })
 }
 
-/// Decodes PNG bytes to an image held on the native side.
+/// Decodes PNG bytes to an image held on the native side. The bytes are copied before the work is queued: JavaScript
+/// may reuse its buffer while the decode runs.
 #[napi(ts_return_type = "Promise<NativeImage>")]
-pub fn decode_png<'env>(env: &'env Env, bytes: Uint8Array) -> Result<PromiseRaw<'env, NativeImage>> {
+pub fn decode_png<'env>(env: &'env Env, bytes: &[u8]) -> Result<PromiseRaw<'env, NativeImage>> {
+    let bytes = bytes.to_vec();
     env.spawn_future_with_callback(async move { blocking(move || img::decode_png(&bytes).map_err(invalid)).await }, NativeImage::adopt)
 }
 
 /// Decodes a PNG, applies `steps`, and keeps the result on the native side.
 #[napi(ts_return_type = "Promise<NativeImage>")]
-pub fn process_png<'env>(env: &'env Env, bytes: Uint8Array, steps: ProcessSteps) -> Result<PromiseRaw<'env, NativeImage>> {
-    let steps = Steps::try_from(steps)?;
+pub fn process_png<'env>(env: &'env Env, bytes: &[u8], steps: ProcessSteps) -> Result<PromiseRaw<'env, NativeImage>> {
+    let (bytes, steps) = (bytes.to_vec(), Steps::try_from(steps)?);
     env.spawn_future_with_callback(async move { blocking(move || process(&bytes, &steps)).await }, NativeImage::adopt)
 }
 
 /// Decodes a PNG, applies `steps`, and encodes the result as PNG bytes: one call, no pixels crossing to JavaScript.
 #[napi(ts_return_type = "Promise<Buffer>")]
-pub fn process_png_to_png<'env>(env: &'env Env, bytes: Uint8Array, steps: ProcessSteps) -> Result<PromiseRaw<'env, Buffer>> {
-    let steps = Steps::try_from(steps)?;
+pub fn process_png_to_png<'env>(env: &'env Env, bytes: &[u8], steps: ProcessSteps) -> Result<PromiseRaw<'env, Buffer>> {
+    let (bytes, steps) = (bytes.to_vec(), Steps::try_from(steps)?);
     env.spawn_future(async move {
         blocking(move || {
             let image = process(&bytes, &steps)?;
@@ -230,8 +240,18 @@ impl TryFrom<ProcessSteps> for Steps {
                 Some((fill.boxes.into_iter().map(img::Box::from).collect(), color))
             }
         };
-        Ok(Self { resize: steps.resize.map(|size| (size.width, size.height)), crop: steps.crop.map(img::Box::from), fill })
+        let resize = steps.resize.map(|size| dimensions(size.width, size.height)).transpose()?;
+        Ok(Self { resize, crop: steps.crop.map(img::Box::from), fill })
     }
+}
+
+/// A width and height as whole pixels, 1 to `u32::MAX` each.
+fn dimensions(width: f64, height: f64) -> Result<(u32, u32)> {
+    let whole = |value: f64| value.fract() == 0.0 && (1.0..=f64::from(u32::MAX)).contains(&value);
+    if !whole(width) || !whole(height) {
+        return Err(Error::new(Status::InvalidArg, format!("an image size is whole pixels from 1 to {}, not {width}x{height}", u32::MAX)));
+    }
+    Ok((width as u32, height as u32))
 }
 
 fn process(bytes: &[u8], steps: &Steps) -> Result<Rgba> {
@@ -239,7 +259,7 @@ fn process(bytes: &[u8], steps: &Steps) -> Result<Rgba> {
     if let Some((width, height)) = steps.resize
         && (width != image.width || height != image.height)
     {
-        image = img::resample_box(&image, width, height);
+        image = img::resample_box(&image, width, height).map_err(invalid)?;
     }
     if let Some(area) = steps.crop {
         let clipped =

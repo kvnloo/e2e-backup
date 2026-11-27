@@ -1,14 +1,10 @@
 //! PNG bytes to RGBA and back.
 
-use super::{ImageError, Rgba, byte_len};
+use super::{ImageError, MAX_IMAGE_BYTES, Rgba, byte_len};
 use png::{BitDepth, ColorType, Compression, Decoder, Encoder, Filter, Limits, Transformations};
 use std::io::Cursor;
 
 const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
-
-/// The most pixel memory one decode may allocate: the `image` crate's default limit, which `@napi-rs/image` decoded
-/// under. A 4K screenshot at 16 bits per channel is 66 MB, over the `png` crate's own 64 MiB default.
-const DECODE_LIMIT_BYTES: usize = 512 * 1024 * 1024;
 
 /// The width and height a PNG's header states, read without decoding it; `None` when the bytes do not start with a
 /// PNG signature and an `IHDR` chunk.
@@ -28,10 +24,16 @@ pub fn decode_png(bytes: &[u8]) -> Result<Rgba, ImageError> {
     if bytes.len() < 8 || bytes[..8] != SIGNATURE {
         return Err(ImageError::Decode("not a PNG: the bytes do not start with the PNG signature".into()));
     }
-    let mut decoder = Decoder::new_with_limits(Cursor::new(bytes), Limits { bytes: DECODE_LIMIT_BYTES });
+    let mut decoder = Decoder::new_with_limits(Cursor::new(bytes), Limits { bytes: MAX_IMAGE_BYTES });
     decoder.set_transformations(Transformations::EXPAND);
     let mut reader = decoder.read_info().map_err(|error| ImageError::Decode(format!("not a readable PNG: {error}")))?;
-    let size = reader.output_buffer_size().ok_or_else(|| ImageError::Decode("the PNG is too large to decode".into()))?;
+    // The decoder's limit covers its own buffers, not the frame or the RGBA it expands to: both are checked against
+    // the header before either is allocated.
+    let header = reader.info();
+    byte_len(header.width, header.height)?;
+    let size = reader.output_buffer_size().filter(|&size| size <= MAX_IMAGE_BYTES).ok_or_else(|| {
+        ImageError::Size(format!("a {}x{} PNG is over the {} MiB an image may hold", header.width, header.height, MAX_IMAGE_BYTES / 1024 / 1024))
+    })?;
     let mut buffer = vec![0; size];
     let frame = reader.next_frame(&mut buffer).map_err(|error| ImageError::Decode(format!("not a readable PNG: {error}")))?;
     buffer.truncate(frame.buffer_size());
@@ -120,6 +122,29 @@ mod tests {
     fn refuses_bytes_that_are_not_a_png() {
         assert!(matches!(decode_png(b"GIF89a....."), Err(ImageError::Decode(_))));
         assert_eq!(png_size(b"short"), None);
+    }
+
+    #[test]
+    fn refuses_a_header_that_asks_for_more_than_an_image_may_hold() {
+        let image = Rgba::new(1, 1, vec![0; 4]).unwrap();
+        let mut png = encode_png(&image).unwrap();
+        // 40000x40000 RGBA is 6.4 GB; the IHDR CRC is rewritten so the header itself is valid.
+        png[16..20].copy_from_slice(&40_000_u32.to_be_bytes());
+        png[20..24].copy_from_slice(&40_000_u32.to_be_bytes());
+        let crc = crc32(&png[12..29]);
+        png[29..33].copy_from_slice(&crc.to_be_bytes());
+        assert!(matches!(decode_png(&png), Err(ImageError::Size(_))));
+    }
+
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc = !0_u32;
+        for &byte in bytes {
+            crc ^= u32::from(byte);
+            for _ in 0..8 {
+                crc = if crc & 1 == 1 { (crc >> 1) ^ 0xedb8_8320 } else { crc >> 1 };
+            }
+        }
+        !crc
     }
 
     #[test]

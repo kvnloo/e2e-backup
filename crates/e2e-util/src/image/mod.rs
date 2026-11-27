@@ -76,10 +76,17 @@ impl fmt::Display for ImageError {
 
 impl std::error::Error for ImageError {}
 
-/// The RGBA byte length of a `width` by `height` image, or an error when it does not fit in memory.
+/// The most pixel memory one image may hold, RGBA or as decoded: the `image` crate's default limit, which
+/// `@napi-rs/image` decoded under. A 4K screenshot at 16 bits per channel is 66 MB. The limit turns a PNG header or a
+/// resize that asks for gigabytes into an error before anything is allocated, since a failed allocation aborts the
+/// process the addon runs in.
+pub const MAX_IMAGE_BYTES: usize = 512 * 1024 * 1024;
+
+/// The RGBA byte length of a `width` by `height` image, or an error when it is over [`MAX_IMAGE_BYTES`].
 pub(crate) fn byte_len(width: u32, height: u32) -> Result<usize, ImageError> {
     (width as usize)
         .checked_mul(height as usize)
         .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| ImageError::Size(format!("a {width}x{height} image does not fit in memory")))
+        .filter(|&bytes| bytes <= MAX_IMAGE_BYTES)
+        .ok_or_else(|| ImageError::Size(format!("a {width}x{height} image is over the {} MiB an image may hold", MAX_IMAGE_BYTES / 1024 / 1024)))
 }

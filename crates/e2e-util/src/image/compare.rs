@@ -1,4 +1,5 @@
-//! Comparing two images: a port of pixelmatch 8 (ISC, Mapbox) with the options `toHaveScreenshot` uses
+//! Comparing two images: a port of pixelmatch 8 (ISC, Mapbox; the license is in `LICENSE-pixelmatch` beside this
+//! crate's manifest) with the options `toHaveScreenshot` uses
 //! (`includeAA: false`, `alpha: 0.1`, the default colors, the checkerboard on, no window, no ignore mask). It counts
 //! the same pixels and draws the same diff, bit for bit: the floating-point steps run in pixelmatch's order, its
 //! sRGB table comes from V8, and its `Math.cbrt` is V8's.
