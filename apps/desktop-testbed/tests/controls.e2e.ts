@@ -103,5 +103,14 @@ test.describe('controls window', () => {
     // A value set through accessibility does not always fire the control's action: the status line shows the app saw it.
     await expect(screen.getByTestId('controls-status')).toHaveText('Volume 40');
     await expect(screen.getByRole('button', 'Disabled')).toBeDisabled();
+    // AppKit acknowledges a press on a disabled button and ignores it: the tap waits for it to be enabled, then fails.
+    const refused = await screen
+      .getByRole('button', 'Disabled')
+      .tap({ timeout: 1_000 })
+      .then(
+        () => undefined,
+        (cause: unknown) => cause,
+      );
+    expect(String(refused)).toMatch(/disabled/);
   });
 });
