@@ -146,7 +146,7 @@ suites that consume the built packages the way a user would.
   by the operation's budget and translates it. Unit tests drive
   `DesktopSurface` with a scripted driver (`tests/helpers/fake-driver.ts`)
   and run on any OS. The app it launches gets only a few variables of the
-  run's environment (`INHERITED_ENV` in `src/surface.ts`): the driver
+  run's environment (`INHERITED_ENV` in `src/launch-ownership.ts`): the driver
   launches through `open -n` with exactly that environment, since
   LaunchServices hands the app the environment of the process that asks.
   `pnpm --filter @e2e-dev/desktop build:native` (needs `rustup`) builds
