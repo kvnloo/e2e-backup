@@ -21,6 +21,16 @@ test.describe('sign-in form', () => {
     await expect(screen.getByTestId('status')).toHaveText('Signed in as ada on Team, remembered (password: 7 characters)');
   });
 
+  test('selects an option of a pop-up whose menu a tap already opened', async ({ screen }) => {
+    const plan = screen.getByRole('combobox', 'Plan');
+    await plan.tap();
+    await expect(screen.getByRole('menuitem', 'Team')).toBeVisible();
+    // The open menu is the list: a press to open it again would close it.
+    await plan.selectOption('Team');
+    await expect(plan).toHaveValue('Team');
+    await expect(screen.getByRole('menuitem', 'Team')).toHaveCount(0);
+  });
+
   test('types a username with an uppercase letter and a password through key events', async ({ screen }) => {
     // Typing goes key by key, as a person types: a capital takes its key with Shift, and a password field takes keystrokes.
     await screen.getByRole('textbox', 'Username').pressSequentially('Ada');
