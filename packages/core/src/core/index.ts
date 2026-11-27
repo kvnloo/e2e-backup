@@ -12,6 +12,7 @@ export type { EngineHandle } from '../engine/index.ts';
 export type {
   ActionOptions,
   App,
+  AppScreenshotOptions,
   AppPermissionState,
   ClickOptions,
   Expectable,
@@ -37,6 +38,7 @@ export type {
   Screen,
   ScreenCoordinate,
   ScreenPoint,
+  ScreenshotClip,
   Secret,
   SelectOption,
   SwipeOptions,

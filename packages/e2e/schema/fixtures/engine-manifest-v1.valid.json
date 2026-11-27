@@ -32,5 +32,6 @@
   "grantsAllPermissions": true,
   "launchArgumentValues": true,
   "fileApps": true,
+  "fullPageScreenshots": true,
   "isolation": "worker"
 }

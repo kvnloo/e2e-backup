@@ -141,6 +141,7 @@ rules:
 | `grantsAllPermissions` | Not a boolean. |
 | `launchArgumentValues` | Not a boolean. |
 | `fileApps` | Not a boolean. |
+| `fullPageScreenshots` | Not a boolean, or `true` without `artifacts`. |
 | `isolation` | Anything but `'attempt'` or `'worker'`. |
 | `keyboard`, `state`, `artifacts`, `session` | An unknown key or a non-function member. `keyboard` without `type` and `press`; `state` without both `capture` and `restore`; `artifacts` without `screenshot`; `startVideo` without `stopVideo`, or the reverse. |
 | `secrets` | Not an array of `secrets.get()` handles. |
@@ -176,6 +177,7 @@ The body of one target. Every member but `name`, `version`, and
 | [`grantsAllPermissions`](#capabilities) | `boolean` |
 | [`launchArgumentValues`](#engineappinfo) | `boolean` |
 | [`fileApps`](#capabilities) | `boolean` |
+| [`fullPageScreenshots`](#capabilities) | `boolean` |
 | [`keyboard`](#keyboard) | `EngineKeyboard` |
 | [`fixtures`](#contributed-fixtures) | factories |
 | [`isolation`](#fixture-isolation) | `'attempt' \| 'worker'` |
@@ -306,6 +308,16 @@ export interface Engine {
    * harness refuses a file `app.url` at config load.
    */
   readonly fileApps?: boolean;
+  /**
+   * The engine captures the whole scrollable page: `artifacts.screenshot`
+   * honors `EngineScreenshotOptions`, and `observe` honors `fullPage` beside
+   * `pixels`, for `app.screenshot({ fullPage })` and
+   * `toHaveScreenshot({ fullPage })`. Requires `artifacts`. A full-page
+   * capture masks every secure field on the page, not only those in the
+   * viewport. Without it the harness fails a full-page capture with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine.
+   */
+  readonly fullPageScreenshots?: boolean;
   /** capability: keyboard - requires observation. Input to whatever holds focus; see `EngineKeyboard`. */
   readonly keyboard?: EngineKeyboard;
   /**
@@ -458,6 +470,7 @@ member. Two gaps end differently:
 | `grantsAllPermissions: true` | - | - | `app.permissions: 'all'`, which the engine receives as `EngineAppInfo.allPermissions`. Without it, config load refuses `'all'`, so an engine released before it never receives the string. |
 | `launchArgumentValues: true` | - | - | The object form of `app.launchArguments`, in `EngineAppInfo.launchArgumentValues`. |
 | `fileApps: true` | - | - | A target whose `app.url` is a `file:` URL. `validateApp` is told with `fileApp: true`. |
+| `fullPageScreenshots: true` | - | `artifacts` | `app.screenshot({ fullPage })` and `expect(screen).toHaveScreenshot({ fullPage })`, with every secure field on the page masked. A `clip` of the viewport needs no flag: the harness cuts it. |
 | `performAt` + `pointerActions` | `pointer` | `observe` | One pointer action at a viewport point, with no node behind it. |
 | `keyboard.{type,press,dismiss?}` | `keyboard` | `observe` | Input to whatever holds focus. |
 | `fixtures.<name>` | `<name>` | - | A contributed fixture. |
@@ -576,6 +589,8 @@ engine.
 | `test.setup` sessions, the `session:` option | `state` |
 | `app.screenshot()`, assertion evidence, the failure screenshot | `artifacts` |
 | `locator.screenshot()` | `artifacts`, with `observe` and `locate`; the `scrollIntoView` action when declared |
+| `app.screenshot({ clip })` | `artifacts`, with `observe` |
+| `app.screenshot({ fullPage })`, `toHaveScreenshot({ fullPage })` | `fullPageScreenshots: true` |
 | every [`video` mode](/reference/config#recording) but `off`, from the config, a target, a test, or `--video` | `artifacts` |
 | `app.open()` | `session.open`; on a target with no app URL, `session.restart`, or `session.openLink` for a path on a target with `app.linkBase` |
 | `app.back()` | `session.back` |
@@ -1199,8 +1214,22 @@ export interface EngineObserveOptions {
   readonly pixelFallback?: boolean;
   /** The pixels are compared against a stored screenshot: hold system chrome (a status bar's clock and battery) in a fixed state where the platform can. */
   readonly comparable?: boolean;
+  /**
+   * With `pixels`, the whole scrollable page rather than the viewport, with
+   * `ObservationPixels.scroll` set to where the viewport sits in it. Mask
+   * every secure field on the page and count them all in
+   * `maskedRegionCount`: the harness checks the count against the tree's
+   * secure nodes, so a tree read only to the viewport proves nothing below
+   * it. Only an engine that declares `fullPageScreenshots` receives it.
+   */
+  readonly fullPage?: boolean;
 }
 ```
+
+Full-page pixels set `ObservationPixels.scroll` to how far the page is
+scrolled, in CSS pixels, and `scale` to image pixels per CSS pixel of the
+page. The harness moves every node rect by `scroll` to place masks on the
+page.
 
 #### Truncated trees
 
@@ -2244,11 +2273,13 @@ or at a provider.
 
 | Member | Returns |
 | --- | --- |
-| `screenshot(label, context)` | `Promise<string>` |
+| `screenshot(label, context, options?)` | `Promise<string>` |
 | [`startVideo(context)`](#videos) | `Promise<void>` |
 | [`stopVideo(context)`](#videos) | `Promise<readonly VideoSegment[]>` |
 
-`screenshot` is required and returns the path of the file it wrote.
+`screenshot` is required and returns the path of the file it wrote. Only an
+engine that declares `fullPageScreenshots` receives `options`: the whole
+page, and a `clip` in the page's CSS pixels to cut it to.
 
 ```ts
 artifacts: {
@@ -2268,8 +2299,11 @@ artifacts: {
  * engine received in `startAttempt`.
  */
 export interface EngineArtifacts {
-  /** Captures a redacted screenshot; secure fields are masked at the source. */
-  screenshot(label: string | undefined, context: OperationContext): Promise<string>;
+  /**
+   * Captures a redacted screenshot; secure fields are masked at the source.
+   * Only an engine that declares `fullPageScreenshots` receives `options`.
+   */
+  screenshot(label: string | undefined, context: OperationContext, options?: EngineScreenshotOptions): Promise<string>;
   /**
    * Starts recording the surface. Declared together with `stopVideo`. An
    * attempt may start and stop more than once, never overlapping. A surface that has nothing to show yet (no page open) may
@@ -2284,6 +2318,23 @@ export interface EngineArtifacts {
    * one). An attempt that never showed anything returns none.
    */
   stopVideo?(context: OperationContext): Promise<readonly VideoSegment[]>;
+}
+
+/** What `EngineArtifacts.screenshot` captures when it is not the viewport. */
+export interface EngineScreenshotOptions {
+  /**
+   * The whole scrollable page, at the density a viewport screenshot has,
+   * with every secure field on the page masked, not only those in the
+   * viewport.
+   */
+  readonly fullPage: true;
+  /**
+   * The part of the page to keep, in CSS pixels from the page's top-left
+   * corner: finite, with a width and height above 0, as the harness checked.
+   * Keep the part of it on the page; throw `TestError('INVALID_ARGUMENT')`
+   * when none of it is.
+   */
+  readonly clip?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 }
 
 /**

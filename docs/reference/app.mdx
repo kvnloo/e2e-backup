@@ -129,11 +129,28 @@ await app.back();
 
 ### `screenshot`
 
-Captures a redacted evidence screenshot and returns its path.
+Captures a redacted evidence screenshot and returns its path: the viewport,
+the whole page, or a part of either.
 
 ```ts
 const shot = await app.screenshot('after-checkout');
+const page = await app.screenshot('receipt', { fullPage: true });
+const header = await app.screenshot({ clip: { x: 0, y: 0, width: 1280, height: 80 } });
 ```
+
+| Option | Type | Default |
+| --- | --- | --- |
+| `fullPage` | `boolean` | `false` |
+| `clip` | `{ x, y, width, height }` | - |
+
+- `fullPage` captures the whole scrollable page. It needs an engine that
+  declares [`fullPageScreenshots`](/reference/engine#capabilities): the web
+  engine does, the mobile and desktop engines don't.
+- `clip` keeps one rectangle in CSS pixels, measured from the viewport's
+  top-left corner, or from the page's with `fullPage`. The part outside the
+  screenshot is left out. A clip of the viewport needs no flag: e2e cuts it
+  from the engine's screenshot at the screenshot's own density, on any engine
+  that observes and writes PNG screenshots.
 
 - The file is an attempt artifact under `screenshots/`. The returned path is
   absolute. The report records the path relative to the artifact root.
@@ -145,7 +162,8 @@ const shot = await app.screenshot('after-checkout');
 
 | Throws | When |
 | --- | --- |
-| `UNSUPPORTED_CAPABILITY` | The engine takes no screenshots. |
+| `INVALID_ARGUMENT` | An unknown option, a `clip` that is not a rectangle with a positive size, or a `clip` with nothing inside the viewport or page. |
+| `UNSUPPORTED_CAPABILITY` | The engine takes no screenshots, `fullPage` on an engine that doesn't declare `fullPageScreenshots`, or `clip` on an engine without `observe` or whose screenshot is not a PNG. |
 | `POLICY_DENIED` | On iOS and Android, a secure field on screen has no bounds to mask. |
 | `ENGINE_FAILURE` | The capture failed. |
 
@@ -233,8 +251,12 @@ export interface App {
   clearState(): Promise<void>;
   /** Navigates back once. */
   back(): Promise<void>;
-  /** Captures a redacted evidence screenshot and returns its absolute path. */
-  screenshot(label?: string): Promise<string>;
+  /**
+   * Captures a redacted evidence screenshot and returns its absolute path:
+   * the viewport, the whole page with `fullPage`, or the part `clip` keeps.
+   */
+  screenshot(label?: string, options?: AppScreenshotOptions): Promise<string>;
+  screenshot(options: AppScreenshotOptions): Promise<string>;
   /**
    * Starts recording the screen, until `stopRecording`. One recording at a
    * time, and none while the test's `video` records: set `{ video: 'off' }`
@@ -246,6 +268,32 @@ export interface App {
    * web one per page it showed: a tab switch or a replaced page starts another.
    */
   stopRecording(): Promise<readonly [RecordedVideo, ...RecordedVideo[]]>;
+}
+
+/** A rectangle of a screenshot to keep, in CSS pixels from its top-left corner. */
+export interface ScreenshotClip {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The part of the screen `app.screenshot` and `expect(screen).toHaveScreenshot` take. */
+export interface AppScreenshotOptions {
+  /**
+   * The whole scrollable page rather than the viewport. Needs an engine that
+   * declares `fullPageScreenshots`, as the web engine does; any other fails
+   * with `UNSUPPORTED_CAPABILITY`.
+   */
+  fullPage?: boolean;
+  /**
+   * Only this rectangle, measured from the viewport's top-left corner, or
+   * from the page's with `fullPage`. The part outside the screenshot is left
+   * out. One with nothing of the viewport inside it fails with
+   * `INVALID_ARGUMENT`; so does one past the end of the page in
+   * `app.screenshot`, while `toHaveScreenshot` waits for the page to grow to it.
+   */
+  clip?: ScreenshotClip;
 }
 
 /** How `app.startRecording` names its file. */

@@ -16,6 +16,7 @@ import { ConfigurationError, errorMessage, InfrastructureError, TestError } from
 import { Deadline } from '../internal/time.ts';
 import { didYouMean } from '../internal/suggest.ts';
 import { createScreenshotContext, type ScreenshotContext, type WrittenScreenshots } from './screenshots.ts';
+import { captureAppScreenshot, describeAppScreenshot, parseAppScreenshotCall } from './app-screenshot.ts';
 import { sessionRecordings } from './recordings.ts';
 import { resolveSecretValue, sessionLedger } from './secrecy.ts';
 import { baseUrlOf, resolveNavigationUrl } from '../internal/urls.ts';
@@ -32,7 +33,7 @@ import {
 } from '../locator/screen.ts';
 import { engineAppInfo, joinLink, refusesLink } from '../config/app.ts';
 import type { ResolvedAgentConfig, ResolvedConfig, ResolvedTarget } from '../config/resolve.ts';
-import type { App, CommandConfig, Expectable, FixtureScope, RecordingOptions, SetupSession, TestFixtures } from '../types.ts';
+import type { App, AppScreenshotOptions, CommandConfig, Expectable, FixtureScope, RecordingOptions, SetupSession, TestFixtures } from '../types.ts';
 import type { StepRecord, StepRecorder } from './steps.ts';
 
 export interface ArtifactSink {
@@ -708,9 +709,10 @@ export function createApp(
         await engine.session.app.back(engine.operation());
       });
     },
-    async screenshot(label?: string): Promise<string> {
-      return steps.run('app', 'app.screenshot', label ?? '', async () => {
-        const relative = await engine.session.artifacts.screenshot(label, engine.operation());
+    async screenshot(labelOrOptions?: string | AppScreenshotOptions, options?: AppScreenshotOptions): Promise<string> {
+      const call = parseAppScreenshotCall(labelOrOptions, options);
+      return steps.run('app', 'app.screenshot', describeAppScreenshot(call), async () => {
+        const relative = await captureAppScreenshot(engine, environment.artifacts.dir, call);
         environment.steps.attachArtifact(environment.artifacts.register('screenshot', relative));
         return path.join(environment.artifacts.dir, relative);
       });

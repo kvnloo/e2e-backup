@@ -33,6 +33,7 @@ const KNOWN_KEYS = [
   'grantsAllPermissions',
   'launchArgumentValues',
   'fileApps',
+  'fullPageScreenshots',
   'keyboard',
   'fixtures',
   'isolation',
@@ -310,6 +311,12 @@ export function defineEngine<
   }
   if (spec.launchArgumentValues !== undefined && typeof spec.launchArgumentValues !== 'boolean') throw invalid(name, 'launchArgumentValues must be a boolean');
   if (spec.fileApps !== undefined && typeof spec.fileApps !== 'boolean') throw invalid(name, 'fileApps must be a boolean');
+  if (spec.fullPageScreenshots !== undefined) {
+    if (typeof spec.fullPageScreenshots !== 'boolean') throw invalid(name, 'fullPageScreenshots must be a boolean');
+    if (spec.fullPageScreenshots && spec.artifacts === undefined) {
+      throw invalid(name, 'declares fullPageScreenshots without artifacts: the full page is an artifacts.screenshot option');
+    }
+  }
   if (spec.isolation !== undefined && spec.isolation !== 'attempt' && spec.isolation !== 'worker') {
     throw invalid(name, `isolation must be 'attempt' or 'worker', got ${JSON.stringify(spec.isolation)}`);
   }
@@ -334,6 +341,7 @@ export function defineEngine<
   if (spec.grantsAllPermissions === true) handle['grantsAllPermissions'] = true;
   if (spec.launchArgumentValues === true) handle['launchArgumentValues'] = true;
   if (spec.fileApps === true) handle['fileApps'] = true;
+  if (spec.fullPageScreenshots === true) handle['fullPageScreenshots'] = true;
   if (spec.isolation === 'worker') handle['isolation'] = 'worker';
   if (spec.pointerActions !== undefined) {
     handle['pointerActions'] = declaredKinds(name, 'pointerActions', spec.pointerActions, POINTER_ACTION_KINDS);

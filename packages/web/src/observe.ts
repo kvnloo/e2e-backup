@@ -42,6 +42,15 @@ export function maskOptions(masks: readonly Locator[]): Partial<{ mask: Locator[
   return masks.length === 0 ? {} : { mask: [...masks], maskColor: MASK_COLOR };
 }
 
+/** The whole page's width, measured the way Playwright sizes a full-page screenshot, and how far it is scrolled, in CSS pixels. */
+function pageGeometry(page: Page): Promise<{ width: number; scroll: { x: number; y: number } }> {
+  return page.evaluate(() => {
+    const widths = [document.documentElement, document.body as HTMLElement | null]
+      .flatMap((element) => (element === null ? [] : [element.scrollWidth, element.offsetWidth, element.clientWidth]));
+    return { width: Math.max(...widths), scroll: { x: window.scrollX, y: window.scrollY } };
+  });
+}
+
 export interface PixelCapture {
   readonly pixels: ObservationPixels;
   readonly maskedRegionCount: number;
@@ -50,7 +59,8 @@ export interface PixelCapture {
 }
 
 /**
- * Captures masked viewport pixels.
+ * Captures masked viewport pixels, or with `fullPage` the whole page's, with
+ * `scroll` set to how far the page is scrolled.
  *
  * Secure fields are covered before the image leaves the engine and the covered
  * regions are counted, so the runner can prove the image is at least as redacted
@@ -65,6 +75,7 @@ export async function capturePixels(
   page: Page,
   operation: OperationContext,
   viewport: ViewportSize,
+  { fullPage = false }: { readonly fullPage?: boolean } = {},
 ): Promise<PixelCapture> {
   const deadline = Date.now() + operation.timeoutMs;
   const scope = new CaptureScope(deadline, operation.signal);
@@ -73,12 +84,14 @@ export async function capturePixels(
     // A frame that detaches mid-sweep contributes nothing to the count, which can
     // only push the observation toward withholding the image.
     const counts = await scope.read(() => Promise.allSettled(masks.map((mask) => mask.count())));
+    const whole = fullPage ? await scope.read(() => pageGeometry(page)) : undefined;
     // The adopted stylesheet hides the caret where Playwright's own option would write an inline style a hydrating framework flags.
     const image = await scope.read(() => withHiddenCaret(page, () => page.screenshot({
       type: 'png',
       scale: 'css',
       animations: 'disabled',
       caret: 'initial',
+      ...(fullPage ? { fullPage: true } : {}),
       timeout: Math.max(1, Math.min(deadline - Date.now(), PIXEL_CAPTURE_TIMEOUT_MS)),
       ...maskOptions(masks),
     })));
@@ -88,13 +101,15 @@ export async function capturePixels(
     // rather than assumed: if a capture ever comes back at device scale, reporting
     // the viewport instead would displace every coordinate the model reads off it.
     const size = readPngSize(data) ?? { width: viewport.width, height: viewport.height };
+    const width = whole?.width ?? viewport.width;
     return {
       pixels: {
         data,
         mediaType: 'image/png',
         width: size.width,
         height: size.height,
-        scale: viewport.width > 0 ? size.width / viewport.width : 1,
+        scale: width > 0 ? size.width / width : 1,
+        ...(whole === undefined ? {} : { scroll: whole.scroll }),
       },
       maskedRegionCount: counts.reduce((total, count) => total + (count.status === 'fulfilled' ? count.value : 0), 0),
       maskingProven: masks.length > 0 && counts.every((count) => count.status === 'fulfilled'),

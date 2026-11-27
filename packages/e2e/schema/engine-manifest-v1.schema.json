@@ -137,6 +137,10 @@
       "description": "The engine opens an app whose url is a file: URL, read from the disk of the machine the harness runs on; without it the harness refuses a file app.url at config load.",
       "type": "boolean"
     },
+    "fullPageScreenshots": {
+      "description": "The engine captures the whole scrollable page: artifacts/screenshot honors options.fullPage and engine/observe honors fullPage beside pixels; without it the harness refuses a full-page capture before it reaches the engine.",
+      "type": "boolean"
+    },
     "isolation": {
       "description": "What one attempt leaves for the next: present only as worker, when the engine's fixtures, app, and screen outlive an attempt.",
       "const": "worker"
@@ -170,6 +174,27 @@
           "methods": {
             "contains": {
               "const": "engine/perform"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "fullPageScreenshots": {
+            "const": true
+          }
+        },
+        "required": [
+          "fullPageScreenshots"
+        ]
+      },
+      "then": {
+        "properties": {
+          "methods": {
+            "contains": {
+              "const": "artifacts/screenshot"
             }
           }
         }

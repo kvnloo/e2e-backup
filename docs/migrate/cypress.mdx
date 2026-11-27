@@ -92,6 +92,7 @@ describe('todos', () => {
 | Cypress | e2e |
 | --- | --- |
 | `cy.visit(path)`, `cy.reload()`, `cy.viewport(w, h)`, `cy.setCookie()` | `app.open(path)`, `browser.reload()`, `browser.setViewport({ width, height })`, `browser.setCookies()` |
+| `cy.screenshot()`, `cy.get(selector).screenshot()` | `app.screenshot('label', { fullPage: true })`, `locator.screenshot('label')` |
 | `cy.get('[data-cy=x]')`, `.find('[data-cy=x]')` | `screen.getByTestId('x')`, `row.getByTestId('x')` |
 | `cy.get('css')` | `browser.locator('css')`, web only; prefer a role or label |
 | `cy.contains('text')`, `cy.contains('li', 'text')` | `screen.getByText('text', { exact: false })`, `screen.getByRole('listitem').filter({ hasText: 'text' })` |

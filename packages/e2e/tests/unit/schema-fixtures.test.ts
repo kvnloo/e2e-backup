@@ -89,6 +89,13 @@ describe.each(schemas)('%s schema', (name) => {
       manifest.methods = manifest.methods.filter((method) => method !== 'lifecycle/prepare');
       expect(validate(manifest)).toBe(false);
     });
+
+    it('rejects fullPageScreenshots without artifacts/screenshot', () => {
+      const manifest = readJson('fixtures', 'engine-manifest-v1.valid.json') as { methods: string[]; fullPageScreenshots: boolean };
+      expect(manifest.fullPageScreenshots).toBe(true);
+      manifest.methods = manifest.methods.filter((method) => method !== 'artifacts/screenshot');
+      expect(validate(manifest)).toBe(false);
+    });
   }
 
   if (name === 'report-v1') {

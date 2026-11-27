@@ -300,6 +300,13 @@ export interface ObservationPixels {
   readonly height: number;
   /** Image pixels per CSS pixel; 1 for a CSS-scale capture. */
   readonly scale: number;
+  /**
+   * How far the page is scrolled, in CSS pixels, on a capture of the whole
+   * page (`EngineObserveOptions.fullPage`): where the viewport's top-left
+   * corner, and so every node rect, sits in the image. Absent means the
+   * image starts at the viewport's corner.
+   */
+  readonly scroll?: { readonly x: number; readonly y: number };
 }
 
 /**

@@ -370,7 +370,9 @@ const users = expect(await response.json()).toMatchSchema(z.array(User)); // any
 - Screenshots: `await expect(screen).toHaveScreenshot('home.png')`. The
   first run writes the file and fails: look at it, commit it, rerun.
   Files are per target and OS, so write CI's from a CI job with `-u`
-  (docs/visual-testing.mdx).
+  (docs/visual-testing.mdx). `{ clip: { x, y, width, height } }` compares
+  one rectangle, and on the web `{ fullPage: true }` the whole page;
+  `app.screenshot(label, options)` takes the same two.
 
 Every matcher and option: Full reference: docs/reference/expect.mdx.
 

@@ -601,6 +601,7 @@ describe('engine protocol', () => {
       { ...base, methods: ['engine/observe'], actions: ['blur'] },
       { ...base, methods: ['engine/viewportIntersection'] },
       { ...base, methods: ['engine/observe'], tapModifiers: true },
+      { ...base, methods: ['engine/observe'], fullPageScreenshots: true },
       { ...base, methods: ['engine/observe'], selectsDevice: true },
       // The client serves prepare for finish alone, which would drop the device it never forwards.
       { ...base, methods: ['lifecycle/finish'], selectsDevice: true },
@@ -1014,6 +1015,39 @@ describe('engine protocol against a server written from the messages alone', () 
     expect(facts).toEqual([{ written: 'by hand' }]);
     await remote.dispose!(cleanup);
     expect(received).toEqual(['lifecycle/startAttempt', 'shutdown', 'transport closed']);
+    rmSync(artifactsDir, { recursive: true, force: true });
+  });
+
+  it('sends a full page and its clip to a server that declares fullPageScreenshots, and reads how far full-page pixels are scrolled', async () => {
+    const methods = ['engine/observe', 'artifacts/screenshot', 'lifecycle/startAttempt'] as const;
+    const asked: unknown[] = [];
+    const png = Buffer.from('png bytes').toString('base64');
+    const { transport } = handWritten([...methods], {
+      initialize: async () => ({ protocolVersion: 1, manifest: { name: 'hand', version: '1', spiVersion: 1, methods, fullPageScreenshots: true } }),
+      'artifacts/screenshot': async (params) => {
+        asked.push((params as { options?: unknown }).options);
+        return { data: png, mediaType: 'image/png' };
+      },
+      'engine/observe': async (params) => {
+        asked.push((params as { options?: unknown }).options);
+        return {
+          root: { ref: { id: 'root', revision: '' } },
+          viewport: { width: 1, height: 1 },
+          pixels: { data: png, mediaType: 'image/png', width: 1, height: 3, scale: 1, scroll: { x: 0, y: 2 } },
+        };
+      },
+    });
+    const remote = connectEngine({ manifest: { name: 'hand', version: '1', spiVersion: 1, methods: [...methods], fullPageScreenshots: true }, transport });
+    expect(remote.fullPageScreenshots).toBe(true);
+    const artifactsDir = mkdtempSync(path.join(tmpdir(), 'e2e-protocol-'));
+    await remote.init!(initInfo());
+    await remote.startAttempt!({ attemptId: 'attempt-1', artifactsDir, signal: new AbortController().signal, resolveSecret: async () => '', appLog: () => {}, navigation: () => {}, environment: () => {} });
+    const clip = { x: 0, y: 400, width: 10, height: 10 };
+    await remote.artifacts!.screenshot('page', operation(), { fullPage: true, clip });
+    const snapshot = await remote.observe!(operation(), { pixels: true, fullPage: true });
+    expect(asked).toEqual([{ fullPage: true, clip }, { pixels: true, fullPage: true }]);
+    expect(snapshot.pixels?.scroll).toEqual({ x: 0, y: 2 });
+    await remote.dispose!(cleanup);
     rmSync(artifactsDir, { recursive: true, force: true });
   });
 

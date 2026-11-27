@@ -15,7 +15,7 @@ import { pollReads, type Deadline, type ReadWindow } from '@e2e-dev/core/lib/int
 import { describeExpression } from '@e2e-dev/core/lib/locator/expression';
 import type { ScreenContext } from '@e2e-dev/core/lib/locator/screen';
 import type { ScreenshotContext } from '@e2e-dev/core/lib/run/screenshots';
-import type { ScreenExpectation, ScreenshotOptions } from '@e2e-dev/core/lib/types';
+import type { ScreenExpectation, ScreenScreenshotOptions } from '@e2e-dev/core/lib/types';
 import { parseScreenshotCall, type ScreenshotCall } from './screenshot-call.ts';
 import { screenshotCapturer, type Capture } from './screenshot-capture.ts';
 import { labelAmbiguous, withMessage } from './heading.ts';
@@ -49,7 +49,7 @@ export function createScreenExpectation(
     get not() {
       return createScreenExpectation(context, scoped, message, !negated);
     },
-    toHaveScreenshot: (nameOrOptions?: string | ScreenshotOptions, options?: ScreenshotOptions) => {
+    toHaveScreenshot: (nameOrOptions?: string | ScreenScreenshotOptions, options?: ScreenScreenshotOptions) => {
       if (scoped) {
         return Promise.reject(new TestError(
           'INVALID_ARGUMENT',
@@ -71,8 +71,8 @@ export async function expectScreenshot(
   subject: LocatorExpression | undefined,
   negated: boolean,
   message: string | undefined,
-  nameOrOptions: string | ScreenshotOptions | undefined,
-  maybeOptions: ScreenshotOptions | undefined,
+  nameOrOptions: string | ScreenScreenshotOptions | undefined,
+  maybeOptions: ScreenScreenshotOptions | undefined,
 ): Promise<void> {
   const api = `expect.${negated ? 'not.' : ''}toHaveScreenshot`;
   const heading = withMessage(message, `${api} failed`);
@@ -80,14 +80,14 @@ export async function expectScreenshot(
   if (store === undefined) {
     throw new TestError('UNSUPPORTED_CAPABILITY', `${api} keeps screenshots beside a test file, so it runs only inside a test`);
   }
-  const call = parseScreenshotCall(api, store, nameOrOptions, maybeOptions);
+  const call = parseScreenshotCall(api, store, subject, nameOrOptions, maybeOptions);
   const file = path.join(store.directory, `${call.stem}${store.suffix}.png`);
   const stored: Stored = { file, shown: path.relative(store.projectRoot, file).split(path.sep).join('/') };
   const label = `${subject === undefined ? 'screen' : describeExpression(subject)} vs ${call.stem}.png`;
   await context.steps.run('assertion', api, label, async () => {
     const deadline = context.engine.deadline(call.timeout ?? context.engine.assertionTimeout);
     const reads = context.engine.reads(deadline);
-    const captureOnce = screenshotCapturer(context, { api, subject, masks: call.masks, maskColor: call.maskColor }, reads);
+    const captureOnce = screenshotCapturer(context, { api, target: call.target, masks: call.masks, maskColor: call.maskColor }, reads);
     const capture = (): Promise<Capture> => captureOnce().catch((error: unknown) => {
       throw labelAmbiguous(error, message);
     });

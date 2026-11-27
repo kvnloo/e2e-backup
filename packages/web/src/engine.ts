@@ -141,6 +141,8 @@ export function web(options: WebOptions = {}): WebEngine<'web', 'attempt'> {
     actions: [...LOCATOR_ACTION_KINDS, 'blur', 'setInputFilePayloads', 'multiTap', 'scrollTo'],
     // Playwright holds each modifier for the click.
     tapModifiers: true,
+    // Playwright captures the whole page, and masks secure fields outside the viewport too.
+    fullPageScreenshots: true,
     // A page takes every pointer action of the contract at a bare point too.
     performAt: (point, action, operation) => surface.performAt(point, action, operation),
     pointerActions: POINTER_ACTION_KINDS,
@@ -163,7 +165,7 @@ export function web(options: WebOptions = {}): WebEngine<'web', 'attempt'> {
       reset: recoverable ? () => Promise.reject(persistentContextLimit('app.clearState()', mode, provider !== undefined)) : (operation) => surface.reset(operation),
     },
     artifacts: {
-      screenshot: (label, operation) => surface.screenshot(label, operation),
+      screenshot: (label, operation, screenshotOptions) => surface.screenshot(label, operation, screenshotOptions),
       startVideo: (operation) => surface.startVideo(operation),
       stopVideo: (operation) => surface.stopVideo(operation),
     },

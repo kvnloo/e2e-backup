@@ -28,7 +28,14 @@ test('checkout looks right', async ({ app, screen }) => {
 ```
 
 `expect(screen)` compares the whole screen. `expect(locator)` scrolls its
-one match into view and compares that box.
+one match into view and compares that box. `clip` compares one rectangle of
+the screen, and on the web `{ fullPage: true }` compares the whole scrollable
+page:
+
+```ts
+await expect(screen).toHaveScreenshot('landing.png', { fullPage: true });
+await expect(screen).toHaveScreenshot('header.png', { clip: { x: 0, y: 0, width: 1280, height: 80 } });
+```
 
 ## Stored screenshots
 

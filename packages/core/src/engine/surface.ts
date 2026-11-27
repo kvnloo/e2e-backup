@@ -24,7 +24,7 @@ import type {
   ViewportPoint,
   ViewportSize,
 } from './contract.ts';
-import type { AppLogEntry, EngineObserveOptions, EngineSnapshot, EngineState, EngineTabs, VideoSegment } from './index.ts';
+import type { AppLogEntry, EngineObserveOptions, EngineScreenshotOptions, EngineSnapshot, EngineState, EngineTabs, VideoSegment } from './index.ts';
 import type { ComputedStyleProperty, ComputedStyleValues } from './computed-style.ts';
 
 export type * from './contract.ts';
@@ -142,8 +142,12 @@ export interface SessionApp {
 }
 
 export interface SessionArtifacts {
-  /** Captures a redacted screenshot and returns an artifact-relative path. */
-  screenshot(label: string | undefined, operation: OperationContext): Promise<string>;
+  /**
+   * Captures a redacted screenshot and returns an artifact-relative path;
+   * `options` fails with `UNSUPPORTED_CAPABILITY` on an engine that does not
+   * declare `fullPageScreenshots`.
+   */
+  screenshot(label: string | undefined, operation: OperationContext, options?: EngineScreenshotOptions): Promise<string>;
   /** Starts video recording. */
   startVideo?(operation: OperationContext): Promise<void>;
   /** Stops video recording and returns the segments written, in order. */

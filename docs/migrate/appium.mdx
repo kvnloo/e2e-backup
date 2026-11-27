@@ -209,7 +209,7 @@ declares `platforms: ['ios', 'android']` on those tests.
 | `driver.isKeyboardShown()` | `device.isKeyboardShown()`. It reads the screen as it is now: after an action that opens or closes the keyboard, poll it with `expect.poll` |
 | `driver.getPageSource()` | `screen.tree()`, or `screen.debug()` to print it |
 | `driver.getWindowSize()` | [`device.viewport()`](/reference/mobile#viewport), `{ width, height }` in CSS pixels |
-| `driver.takeScreenshot()` | `app.screenshot('label')`, secure fields masked |
+| `driver.takeScreenshot()`, `element.takeScreenshot()` | `app.screenshot('label')`, `locator.screenshot('label')`, secure fields masked |
 | `startRecordingScreen()`, `stopRecordingScreen()` | `app.startRecording()`, `app.stopRecording()`, or `npx e2e run --video` |
 | `mobile: setPermission`, `mobile: changePermissions` | `device.setPermission('camera', 'grant')`, one per call, before `app.open()` |
 | `driver.acceptAlert()`, `driver.dismissAlert()` | `device.alert('accept')`, `device.alert('dismiss')` |

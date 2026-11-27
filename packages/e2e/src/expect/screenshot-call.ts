@@ -6,9 +6,10 @@ import { TestError } from '@e2e-dev/core/lib/internal/errors';
 import type { ImageTolerance } from '@e2e-dev/core/lib/internal/image';
 import { checkStepTimeout } from '@e2e-dev/core/lib/internal/time';
 import { isPlainObject, rejectUnknownOptions } from '@e2e-dev/core/lib/internal/options';
+import { parseScreenshotRegion, type ScreenshotRegion } from '@e2e-dev/core/lib/internal/screenshot-region';
 import { locatorInternals } from '@e2e-dev/core/lib/locator/screen';
 import type { ScreenshotContext } from '@e2e-dev/core/lib/run/screenshots';
-import type { ScreenshotOptions } from '@e2e-dev/core/lib/types';
+import type { ScreenScreenshotOptions } from '@e2e-dev/core/lib/types';
 
 /** One checked call. */
 export interface ScreenshotCall {
@@ -18,9 +19,15 @@ export interface ScreenshotCall {
   readonly masks: readonly LocatorExpression[];
   readonly maskColor: readonly [number, number, number];
   readonly timeout: number | undefined;
+  readonly target: ScreenshotTarget;
 }
 
-const OPTION_KEYS = ['threshold', 'maxDiffPixels', 'maxDiffPixelRatio', 'mask', 'maskColor', 'timeout'] as const;
+/** What one call compares: one locator's box, or a region of the screen. */
+export type ScreenshotTarget =
+  | { readonly kind: 'locator'; readonly expression: LocatorExpression }
+  | { readonly kind: 'screen'; readonly region: ScreenshotRegion };
+
+const OPTION_KEYS = ['threshold', 'maxDiffPixels', 'maxDiffPixelRatio', 'mask', 'maskColor', 'timeout', 'fullPage', 'clip'] as const;
 const DEFAULT_THRESHOLD = 0.2;
 const DEFAULT_MASK_COLOR: readonly [number, number, number] = [255, 0, 255];
 /** Characters a stored screenshot's name may not hold: path separators, controls, and what Windows refuses in a file name. */
@@ -37,19 +44,27 @@ const MAX_TITLE_NAME_BYTES = 100;
 /** Unnamed calls per attempt, keyed by the attempt's screenshot context, so names count from 1 in each attempt. */
 const unnamedCalls = new WeakMap<ScreenshotContext, number>();
 
-/** Checks a call's arguments and names its screenshot; `INVALID_ARGUMENT` before the screen is read. */
+/**
+ * Checks a call's arguments and names its screenshot; `INVALID_ARGUMENT`
+ * before the screen is read. `subject` is the locator of a locator's call,
+ * which compares the match's box and so takes no `fullPage` or `clip`.
+ */
 export function parseScreenshotCall(
   api: string,
   store: ScreenshotContext,
-  nameOrOptions: string | ScreenshotOptions | undefined,
-  maybeOptions: ScreenshotOptions | undefined,
+  subject: LocatorExpression | undefined,
+  nameOrOptions: string | ScreenScreenshotOptions | undefined,
+  maybeOptions: ScreenScreenshotOptions | undefined,
 ): ScreenshotCall {
   const named = typeof nameOrOptions === 'string';
   if (!named && nameOrOptions !== undefined && !isPlainObject(nameOrOptions)) {
     throw new TestError('INVALID_ARGUMENT', `${api} takes a name, options, or both`);
   }
-  const options: ScreenshotOptions | undefined = named ? maybeOptions : (nameOrOptions ?? maybeOptions);
+  const options: ScreenScreenshotOptions | undefined = named ? maybeOptions : (nameOrOptions ?? maybeOptions);
   rejectUnknownOptions(api, options, OPTION_KEYS);
+  if (subject !== undefined && (options?.fullPage !== undefined || options?.clip !== undefined)) {
+    throw new TestError('INVALID_ARGUMENT', `${api} on a locator compares the match's box and takes no ${options.fullPage === undefined ? 'clip' : 'fullPage'}; call it on screen for the whole page or a part of it`);
+  }
   const maxDiffPixels: unknown = options?.maxDiffPixels;
   if (maxDiffPixels !== undefined && !(typeof maxDiffPixels === 'number' && Number.isInteger(maxDiffPixels) && maxDiffPixels >= 0)) {
     throw new TestError('INVALID_ARGUMENT', `${api} option maxDiffPixels must be a whole number of pixels, 0 or more`);
@@ -66,6 +81,9 @@ export function parseScreenshotCall(
     masks: maskExpressions(api, options?.mask),
     maskColor: options?.maskColor === undefined ? DEFAULT_MASK_COLOR : parseColor(api, options.maskColor),
     timeout,
+    target: subject === undefined
+      ? { kind: 'screen', region: parseScreenshotRegion(api, options) }
+      : { kind: 'locator', expression: subject },
   };
 }
 

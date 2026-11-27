@@ -25,6 +25,7 @@ import {
   type EngineDoctorInfo,
   type EngineInitInfo,
   type EngineObserveOptions,
+  type EngineScreenshotOptions,
   type EnginePrepareInfo,
   type EnginePrepareResult,
   type EngineFinishInfo,
@@ -63,6 +64,7 @@ import { applyPostSteps, frameSelectors, projectExpression } from './locators.ts
 import { contentBox, frameContentInset, placeBoxInFrame, ROOT_NODE_ID, toSemanticNode } from './observation.ts';
 import { captureObservation } from './observation-capture.ts';
 import { maskOptions, secureFieldMasks } from './observe.ts';
+import { clipOutsidePage, regionOptions } from './screenshot-region.ts';
 import { SHOWN_SELECTOR } from './shown-selector.ts';
 import { withHiddenCaret } from './screenshot-caret.ts';
 import { withOperationDeadline, type OperationBound } from './operation-budget.ts';
@@ -1445,8 +1447,8 @@ export class PlaywrightSurface {
     return { relative, absolute };
   }
 
-  /** Redacted at the source: secure fields in every frame are masked, and the caret is hidden without editing styles, as in observation pixels. */
-  screenshot(label: string | undefined, operation: OperationContext): Promise<string> {
+  /** Redacted at the source: secure fields in every frame are masked, and the caret is hidden without editing styles, as in observation pixels. The whole page with `options`. */
+  screenshot(label: string | undefined, operation: OperationContext, options?: EngineScreenshotOptions): Promise<string> {
     return this.guard(operation, 'screenshot', async (currentOperation) => {
       const { relative, absolute } = this.artifactPath('screenshots', label, '.png');
       const deadline = new Deadline(currentOperation.timeoutMs);
@@ -1463,10 +1465,13 @@ export class PlaywrightSurface {
             path: absolute,
             timeout: Math.max(1, deadline.remaining()),
             caret: 'initial',
+            ...regionOptions(options),
             ...maskOptions(masks),
           }));
           return relative;
         } catch (cause) {
+          const outside = clipOutsidePage(cause, options);
+          if (outside !== undefined) throw outside;
           // The capture can reject before `framenavigated` is delivered. The
           // event is already in flight when the context was destroyed, so a
           // short wait tells a real navigation from an error that only looks

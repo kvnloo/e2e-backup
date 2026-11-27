@@ -4,21 +4,16 @@
  * Rewritten against the e2e public API: `page.screenshot()` is `app.screenshot()`, read back with
  * @napi-rs/image, and a `mask` is the `toHaveScreenshot` option, compared against the same viewport with
  * boxes of the mask color painted over the masked elements. Playwright's golden images belong to
- * its own renderer setup, so a golden comparison becomes a check of the pixels it shows.
+ * its own renderer setup, so a golden comparison becomes a check of the pixels it shows: a clip
+ * against the same box cut from a viewport screenshot, a full page against the viewport scrolled
+ * to each part of it.
  */
 
 /*
  * Not ported:
  * - should capture blinking caret if explicitly asked for: e2e has no `caret` option; its screenshots always hide the caret.
- * - should clip rect: e2e has no `clip` option.
- * - should clip rect with fullPage: e2e has no `clip` or `fullPage` option.
- * - should clip elements to the viewport: e2e has no `clip` option.
- * - should throw on clip outside the viewport: e2e has no `clip` option.
- * - should throw on a negative clip size: e2e has no `clip` option.
- * - should run in parallel: e2e has no `clip` option.
- * - should take fullPage screenshots: e2e has no `fullPage` option.
- * - should take fullPage screenshots and mask elements outside of it: e2e has no `fullPage` option.
- * - should restore viewport after fullPage screenshot: e2e has no `fullPage` option.
+ * - should take fullPage screenshots and mask elements outside of it: `app.screenshot` has no `mask`
+ *   option; `toHaveScreenshot({ fullPage, mask })` covers the same masks below.
  * - should allow transparency: e2e has no `omitBackground` option.
  * - should render white background on jpeg file: e2e screenshots are PNG only.
  * - should produce a valid webp screenshot: e2e screenshots are PNG only.
@@ -27,7 +22,7 @@
  * - webp screenshots should be lossless by default: e2e screenshots are PNG only.
  * - should allow transparency with webp: e2e has no `omitBackground` option.
  * - quality option should throw for webp when out of range: e2e has no `quality` option.
- * - should work with odd clip size on Retina displays: e2e has no `clip` option or device scale factor.
+ * - should work with odd clip size on Retina displays: the testbed sets no device scale factor.
  * - should work for webgl: golden only, and headless WebGL renders differently per GPU backend.
  * - path option should work: e2e has no `path` option.
  * - path option should create subdirectories: e2e has no `path` option.
@@ -37,14 +32,17 @@
  * - zero quality option should throw for png: e2e has no `quality` option.
  * - quality option should work for jpeg: e2e has no `quality` option.
  * - should prefer type over extension: e2e has no `path` or `type` option.
- * - should take fullPage screenshots during navigation: e2e has no `fullPage` option.
+ * - should take fullPage screenshots during navigation: a test runs its steps one at a time, so a reload
+ *   cannot run while a screenshot is taken.
  * - mask option should work with elementhandle: element handles.
  * - mask option should hide elements based on attr: e2e has no `style` option.
  * - mask option should remove elements based on attr: e2e has no `style` option.
  * - page screenshot animations (all 13 tests): e2e has no `animations` option.
- * - should throw if screenshot size is too large: e2e has no `fullPage` option.
+ * - should throw if screenshot size is too large: Chromium takes the largest size the test uses; the
+ *   error it checks is Firefox's and WebKit's.
  * - page screenshot should capture css transform: golden only, of a 3D transform with no stable pixel to check.
  * The `fullPage` option of should work while navigating and should work with Array deleted is dropped: they take the viewport.
+ * should run in parallel takes its three clips one at a time: a test runs its steps one at a time.
  */
 
 import { copyFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
@@ -331,6 +329,83 @@ test.describe('page screenshot', { platforms: ['web'], tags: ['playwright'] }, (
     expect(near(rgb(screenshot, 3, 3), [255, 204, 204])).toBe(true);
   });
 
+  test('should clip rect', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const clip = { x: 50, y: 100, width: 150, height: 100 };
+    const screenshot = readPng(await app.screenshot({ clip }));
+    expect([screenshot.width, screenshot.height]).toEqual([150, 100]);
+    expect(crop(screenshot, { x: 0, y: 0, width: 150, height: 100 }).equals(crop(readPng(await app.screenshot()), clip))).toBe(true);
+  });
+
+  test('should clip rect with fullPage', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const clip = { x: 50, y: 100, width: 150, height: 100 };
+    const unscrolled = crop(readPng(await app.screenshot()), clip);
+    await browser.evaluate('() => window.scrollBy(150, 200)');
+    const screenshot = readPng(await app.screenshot({ fullPage: true, clip }));
+    expect([screenshot.width, screenshot.height]).toEqual([150, 100]);
+    expect(crop(screenshot, { x: 0, y: 0, width: 150, height: 100 }).equals(unscrolled)).toBe(true);
+  });
+
+  test('should clip elements to the viewport', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const screenshot = readPng(await app.screenshot({ clip: { x: 50, y: 450, width: 1000, height: 100 } }));
+    expect([screenshot.width, screenshot.height]).toEqual([450, 50]);
+    const inside = { x: 50, y: 450, width: 450, height: 50 };
+    expect(crop(screenshot, { x: 0, y: 0, width: 450, height: 50 }).equals(crop(readPng(await app.screenshot()), inside))).toBe(true);
+  });
+
+  test('should throw on clip outside the viewport', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const error = await app.screenshot({ clip: { x: 50, y: 650, width: 100, height: 100 } }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect((error as Error).message).toContain('is outside the 500x500 viewport');
+  });
+
+  test('should throw on a negative clip size', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const error = await app.screenshot({ clip: { x: 50, y: 50, width: -100, height: 100 } }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect((error as Error).message).toContain('with a width and height above 0, got -100x100');
+  });
+
+  test('should run in parallel', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const screenshots: Rgba[] = [];
+    for (let i = 0; i < 3; ++i) screenshots.push(readPng(await app.screenshot({ clip: { x: 50 * i, y: 0, width: 50, height: 50 } })));
+    const viewport = readPng(await app.screenshot());
+    for (const [i, screenshot] of screenshots.entries()) {
+      expect(crop(screenshot, { x: 0, y: 0, width: 50, height: 50 }).equals(crop(viewport, { x: 50 * i, y: 0, width: 50, height: 50 }))).toBe(true);
+    }
+  });
+
+  test('should take fullPage screenshots', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const height = Number(await browser.evaluate('() => document.documentElement.scrollHeight'));
+    expect(height).toBeGreaterThan(500);
+    const screenshot = readPng(await app.screenshot({ fullPage: true }));
+    expect([screenshot.width, screenshot.height]).toEqual([500, height]);
+    for (const top of [0, height - 500]) {
+      await browser.evaluate(`() => window.scrollTo(0, ${top})`);
+      const shown = { x: 0, y: top, width: 500, height: 500 };
+      expect(crop(screenshot, shown).equals(crop(readPng(await app.screenshot()), { ...shown, y: 0 }))).toBe(true);
+    }
+  });
+
+  test('should restore viewport after fullPage screenshot', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    await app.screenshot({ fullPage: true });
+    expect(await browser.evaluate('() => [window.innerWidth, window.innerHeight]')).toEqual([500, 500]);
+  });
+
   test.describe('mask option', () => {
     test('should work', async ({ app, browser, screen }) => {
       await browser.setViewport({ width: 500, height: 500 });
@@ -452,6 +527,70 @@ test.describe('page screenshot', { platforms: ['web'], tags: ['playwright'] }, (
         maskColor: '#00FF00',
       });
     });
+  });
+});
+
+test.describe('full page screenshot', { platforms: ['web'] }, () => {
+  test('masks a password field below the viewport', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto(content(`
+      <style>body { margin: 0; } input { position: absolute; top: 900px; left: 0; width: 200px; height: 40px; background: white; border: 0; }</style>
+      <div style="height: 1200px;"></div>
+      <input type="password" value="hunter2">
+    `));
+    const screenshot = readPng(await app.screenshot({ fullPage: true }));
+    expect(screenshot.height).toBe(1200);
+    expect(rgb(screenshot, 100, 920)).toEqual([0, 0, 0]);
+    expect(rgb(screenshot, 100, 960)).toEqual([255, 255, 255]);
+  });
+
+  test('compares the whole page, masks where they sit on it however far it is scrolled', async ({ app, browser, screen }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    // The boxes take the page's own coordinates, so the reference holds wherever the page is scrolled.
+    await browser.evaluate(`() => {
+      for (const index of [5, 144]) {
+        const rect = document.querySelectorAll('.box')[index].getBoundingClientRect();
+        const box = document.createElement('div');
+        box.setAttribute('data-test-mask', '');
+        box.style.cssText = 'position: absolute; z-index: 2147483647; background: #ff00ff;';
+        box.style.left = (rect.left + window.scrollX) + 'px';
+        box.style.top = (rect.top + window.scrollY) + 'px';
+        box.style.width = rect.width + 'px';
+        box.style.height = rect.height + 'px';
+        document.documentElement.appendChild(box);
+      }
+    }`);
+    const file = storedPath('full-page-masks');
+    mkdirSync(path.dirname(file), { recursive: true });
+    stored.add(file);
+    copyFileSync(await app.screenshot({ fullPage: true }), file);
+    await browser.evaluate("() => { for (const box of document.querySelectorAll('[data-test-mask]')) box.remove(); }");
+    await browser.evaluate('() => window.scrollTo(0, 300)');
+    await expect(screen).toHaveScreenshot('full-page-masks', {
+      fullPage: true,
+      mask: [browser.locator('.box').nth(5), browser.locator('.box').nth(144)],
+    });
+  });
+
+  test('refuses a clip past the end of the page', async ({ app, browser }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const error = await app.screenshot({ fullPage: true, clip: { x: 0, y: 100_000, width: 10, height: 10 } }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect((error as Error).message).toContain('is outside the page');
+  });
+
+  test('compares a clip of the page below the viewport', async ({ app, browser, screen }) => {
+    await browser.setViewport({ width: 500, height: 500 });
+    await browser.goto('/grid.html');
+    const clip = { x: 50, y: 700, width: 200, height: 100 };
+    const file = storedPath('full-page-clip');
+    mkdirSync(path.dirname(file), { recursive: true });
+    stored.add(file);
+    copyFileSync(await app.screenshot({ fullPage: true, clip }), file);
+    await expect(screen).toHaveScreenshot('full-page-clip', { fullPage: true, clip });
+    expect(await browser.evaluate('() => window.scrollY')).toBe(0);
   });
 });
 

@@ -154,7 +154,7 @@ test('shows the home screen', async ({ agent, app, screen }) => {
 | `device.shake()` | `device.shake()`, on a local simulator or emulator |
 | `device.setBiometricEnrollment(true)` | `device.enrollBiometrics('faceid', true)` |
 | `device.matchFace()`, `unmatchFace()`, `matchFinger()`, `unmatchFinger()` | `device.setBiometrics('faceid' \| 'touchid', 'match' \| 'nonmatch')` |
-| `device.takeScreenshot()` | `app.screenshot('label')`, or [`toHaveScreenshot`](/visual-testing) to compare |
+| `device.takeScreenshot()`, `element.takeScreenshot(name)` | `app.screenshot('label')`, `locator.screenshot('label')`, or [`toHaveScreenshot`](/visual-testing) to compare |
 | `device.getPlatform()` | The `platform` fixture |
 | `:ios:` / `:android:` in a test name | `{ platforms: ['ios'] }` on the test |
 

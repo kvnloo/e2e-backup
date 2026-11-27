@@ -218,6 +218,8 @@ export interface EngineManifest {
   readonly launchArgumentValues?: boolean;
   /** The engine opens an app whose `url` is a `file:` URL, read from the disk of the machine the harness runs on. */
   readonly fileApps?: boolean;
+  /** Requires `artifacts/screenshot`: the engine captures the whole page; see `Engine.fullPageScreenshots`. */
+  readonly fullPageScreenshots?: boolean;
   /** See `Engine.isolation`; left out for `attempt`. */
   readonly isolation?: 'worker';
 }
@@ -242,7 +244,7 @@ params are the member's arguments by name, with every `OperationContext` as
 | `keyboard/dismiss` | `{ operation }` | `null` |
 | `state/capture` | `{ operation }` | `EngineState` |
 | `state/restore` | `{ state, operation }` | `null` |
-| `artifacts/screenshot` | `{ label?, operation }` | `{ path }` or `{ data, mediaType }` |
+| `artifacts/screenshot` | `{ label?, operation, options? }` | `{ path }` or `{ data, mediaType }` |
 | `artifacts/startVideo` | `{ operation }` | `null` |
 | `artifacts/stopVideo` | `{ operation }` | `VideoSegment[]` |
 | `session/open` | `{ url, operation }` | `null` |

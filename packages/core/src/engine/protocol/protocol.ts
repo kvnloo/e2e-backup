@@ -15,7 +15,7 @@
 
 import { E2EError, ConfigurationError, ERROR_CATEGORIES, InfrastructureError, TestError, asEngineError, isE2EError } from '../../internal/errors.ts';
 import { ENGINE_ERROR_CODES, EngineError, type EngineErrorCode, type EngineSpiVersion, type LocatorAction, type LocatorActionKind, type PointerActionKind } from '../contract.ts';
-import type { Engine, EngineSnapshot } from '../index.ts';
+import type { Engine, EngineSnapshot, ObservationPixels } from '../index.ts';
 import { RPC_ERRORS, isRpcErrorObject, type RpcErrorObject } from './connection.ts';
 
 /** The protocol version this runner speaks; `initialize` refuses any other. */
@@ -59,7 +59,7 @@ export const METHODS = {
   'keyboard/dismiss': operation('keyboard.dismiss', ['operation']),
   'state/capture': operation('state.capture', ['operation']),
   'state/restore': operation('state.restore', ['state', 'operation']),
-  'artifacts/screenshot': operation('artifacts.screenshot', ['label', 'operation'], 'screenshot'),
+  'artifacts/screenshot': operation('artifacts.screenshot', ['label', 'operation', 'options'], 'screenshot'),
   'artifacts/startVideo': operation('artifacts.startVideo', ['operation']),
   'artifacts/stopVideo': operation('artifacts.stopVideo', ['operation']),
   'session/open': operation('session.open', ['url', 'operation']),
@@ -125,6 +125,8 @@ export interface EngineManifest {
   readonly launchArgumentValues?: boolean;
   /** See `Engine.fileApps`. */
   readonly fileApps?: boolean;
+  /** See `Engine.fullPageScreenshots`. */
+  readonly fullPageScreenshots?: boolean;
   /** See `Engine.isolation`; left out for `attempt`. */
   readonly isolation?: 'worker';
 }
@@ -182,13 +184,7 @@ export interface WireCleanup {
 }
 
 /** `ObservationPixels` on the wire: `data` is base64. */
-export interface WirePixels {
-  readonly data: string;
-  readonly mediaType: 'image/png';
-  readonly width: number;
-  readonly height: number;
-  readonly scale: number;
-}
+export type WirePixels = Omit<ObservationPixels, 'data'> & { readonly data: string };
 
 /** `EngineSnapshot` on the wire. */
 export type WireSnapshot = Omit<EngineSnapshot, 'pixels'> & { readonly pixels?: WirePixels };

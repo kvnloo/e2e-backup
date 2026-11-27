@@ -317,6 +317,15 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
   const performAtRaw = guard('point actions', engine?.performAt);
   const pointerActions: ReadonlySet<PointerActionKind> = new Set(engine?.pointerActions ?? []);
   const tapModifiers = engine?.tapModifiers === true;
+  /** A full-page capture reaches only an engine that declared it, so one that predates the option never returns the viewport in its place. */
+  const requireFullPage = (): void => {
+    if (engine?.fullPageScreenshots === true) return;
+    throw new ConfigurationError(
+      'UNSUPPORTED_CAPABILITY',
+      `target "${targetName}" cannot capture the whole page: engine ${engine?.name ?? 'none'} does not declare fullPageScreenshots; capture the viewport, or a clip of it`,
+    );
+  };
+  const screenshotRaw = guard('screenshots', engine?.artifacts?.screenshot);
 
   const app: SessionApp = {
     open: guard('navigation', engine?.session?.open),
@@ -330,7 +339,11 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
   };
 
   const artifacts: SessionArtifacts = {
-    screenshot: guard('screenshots', engine?.artifacts?.screenshot),
+    screenshot: async (label, operation, screenshotOptions) => {
+      if (screenshotOptions === undefined) return screenshotRaw(label, operation);
+      requireFullPage();
+      return screenshotRaw(label, operation, screenshotOptions);
+    },
     ...(engine?.artifacts?.startVideo === undefined || engine.artifacts.stopVideo === undefined
       ? {}
       : {
@@ -392,12 +405,14 @@ export function createEngineSession(options: EngineSessionOptions): TargetSessio
           restoreState: guard('state restore', engine.state.restore),
         }),
     async observe(operation, observeOptions) {
+      if (observeOptions?.fullPage === true) requireFullPage();
       const snapshot = await observeRaw(
         operation,
         {
           ...(observeOptions?.pixels === true ? { pixels: true } : {}),
           ...(observeOptions?.pixelFallback === true ? { pixelFallback: true } : {}),
           ...(observeOptions?.comparable === true ? { comparable: true } : {}),
+          ...(observeOptions?.fullPage === true ? { fullPage: true } : {}),
         },
       );
       const minted = `${OBSERVE_REVISION_PREFIX}${revision + 1}`;

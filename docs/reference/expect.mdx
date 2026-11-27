@@ -365,9 +365,11 @@ screenshot: `name`, or one named after the test.
 await expect(screen).toHaveScreenshot('home.png');
 await expect(screen.getByRole('navigation')).toHaveScreenshot();
 await expect(screen).toHaveScreenshot('feed.png', { mask: [screen.getByTestId('timestamp')], maxDiffPixels: 50 });
+await expect(screen).toHaveScreenshot('landing.png', { fullPage: true });
 ```
 
-Both forms take the [Screenshot options](#screenshot-options).
+Both forms take the [Screenshot options](#screenshot-options). `fullPage` and
+`clip` are for `expect(screen)` only: a locator compares its match's box.
 
 | Property | Value |
 | --- | --- |
@@ -382,7 +384,8 @@ Both forms take the [Screenshot options](#screenshot-options).
 
 | Throws | When |
 | --- | --- |
-| `INVALID_ARGUMENT` | Before the screen is read: a name with a path separator, an option the matcher does not take (Playwright's `fullPage`, `animations`, `clip`), a value out of range, or `expect` on a screen scoped to a frame. Compare a locator inside the frame instead |
+| `INVALID_ARGUMENT` | Before the screen is read: a name with a path separator, an option the matcher does not take (Playwright's `animations`, `caret`, `scale`), `fullPage` or `clip` on a locator, a value out of range, or `expect` on a screen scoped to a frame. Compare a locator inside the frame instead. After the first read: a `clip` with nothing of the viewport inside it |
+| `UNSUPPORTED_CAPABILITY` | `fullPage` on an engine that doesn't declare [`fullPageScreenshots`](/reference/engine#capabilities), before the screen is read |
 | `ASSERTION_FAILED` | A missing, different, or same-run stored screenshot, as in the table above |
 | `POLICY_DENIED` | The engine can't prove every secure field on screen is masked |
 
@@ -396,9 +399,20 @@ Both forms take the [Screenshot options](#screenshot-options).
 | `mask` | `readonly Locator[]` | - |
 | `maskColor` | `string` | `#ff00ff` |
 | `timeout` | `number` | `config.assertionTimeout` |
+| `fullPage` | `boolean` | `false` |
+| `clip` | `{ x, y, width, height }` | - |
 
 [`ScreenshotOptions`](#screenexpectation-and-screenshotoptions) describes
 each option.
+
+- `fullPage` compares the whole scrollable page. The web engine declares it;
+  the mobile and desktop engines don't. Masks land where their locators sit
+  on the page, however far it's scrolled.
+- `clip` compares one rectangle in CSS pixels, measured from the viewport's
+  top-left corner, or from the page's with `fullPage`. The part outside the
+  screenshot is left out. A clip with nothing of the viewport inside it is
+  `INVALID_ARGUMENT` at once; one past the end of the page is retried until
+  the timeout, since the page may still grow.
 
 ### browser matchers
 
@@ -1135,9 +1149,12 @@ export interface ScreenExpectation {
   /** Inverts the matcher: waits for the screen to differ from its stored screenshot. */
   readonly not: ScreenExpectation;
   /** Waits for the screen to look like its stored screenshot, `name` or one named after the test. */
-  toHaveScreenshot(name: string, options?: ScreenshotOptions): Promise<void>;
-  toHaveScreenshot(options?: ScreenshotOptions): Promise<void>;
+  toHaveScreenshot(name: string, options?: ScreenScreenshotOptions): Promise<void>;
+  toHaveScreenshot(options?: ScreenScreenshotOptions): Promise<void>;
 }
+
+/** Options of `expect(screen).toHaveScreenshot`: those of a locator's, and the part of the screen `app.screenshot` takes. */
+export interface ScreenScreenshotOptions extends ScreenshotOptions, AppScreenshotOptions {}
 
 export interface ScreenshotOptions {
   /** How far one pixel's color may drift and still count as the same, from 0 (exact) to 1. Default `0.2`. */

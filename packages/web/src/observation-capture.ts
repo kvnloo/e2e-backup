@@ -38,12 +38,13 @@ export async function captureObservation(
     })).catch(() => undefined);
     if (operation.signal.aborted) throw cancelled('observe cancelled');
     const viewport = await currentViewport(page);
+    const capture = { fullPage: options?.fullPage === true };
     const semanticDeadline = options?.pixelFallback === true
       ? deadline - Math.min(PIXEL_FALLBACK_RESERVE_MS, (deadline - Date.now()) / 4)
       : deadline;
     // The initial image is independent of the reader. A fallback always takes a fresh one.
     const pixelCapture = options?.pixels === true
-      ? capturePixels(page, { ...operation, timeoutMs: semanticDeadline - Date.now() }, viewport).catch(() => undefined)
+      ? capturePixels(page, { ...operation, timeoutMs: semanticDeadline - Date.now() }, viewport, capture).catch(() => undefined)
       : Promise.resolve(undefined);
     let snapshot: EngineSnapshot;
     try {
@@ -76,7 +77,7 @@ export async function captureObservation(
       const fallbackViewport = await currentViewport(page);
       const pixels = await capturePixels(page, {
         ...operation, timeoutMs: deadline - Date.now(),
-      }, fallbackViewport);
+      }, fallbackViewport, capture);
       if (!pixels.maskingProven) throw cause;
       snapshot = {
         location: page.url(),

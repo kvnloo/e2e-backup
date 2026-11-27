@@ -720,8 +720,12 @@ export interface App {
   clearState(): Promise<void>;
   /** Navigates back once. */
   back(): Promise<void>;
-  /** Captures a redacted evidence screenshot and returns its absolute path. */
-  screenshot(label?: string): Promise<string>;
+  /**
+   * Captures a redacted evidence screenshot and returns its absolute path:
+   * the viewport, the whole page with `fullPage`, or the part `clip` keeps.
+   */
+  screenshot(label?: string, options?: AppScreenshotOptions): Promise<string>;
+  screenshot(options: AppScreenshotOptions): Promise<string>;
   /**
    * Starts recording the screen, until `stopRecording`. One recording at a
    * time, and none while the test's `video` records: set `{ video: 'off' }`
@@ -733,6 +737,32 @@ export interface App {
    * web one per page it showed: a tab switch or a replaced page starts another.
    */
   stopRecording(): Promise<readonly [RecordedVideo, ...RecordedVideo[]]>;
+}
+
+/** A rectangle of a screenshot to keep, in CSS pixels from its top-left corner. */
+export interface ScreenshotClip {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The part of the screen `app.screenshot` and `expect(screen).toHaveScreenshot` take. */
+export interface AppScreenshotOptions {
+  /**
+   * The whole scrollable page rather than the viewport. Needs an engine that
+   * declares `fullPageScreenshots`, as the web engine does; any other fails
+   * with `UNSUPPORTED_CAPABILITY`.
+   */
+  fullPage?: boolean;
+  /**
+   * Only this rectangle, measured from the viewport's top-left corner, or
+   * from the page's with `fullPage`. The part outside the screenshot is left
+   * out. One with nothing of the viewport inside it fails with
+   * `INVALID_ARGUMENT`; so does one past the end of the page in
+   * `app.screenshot`, while `toHaveScreenshot` waits for the page to grow to it.
+   */
+  clip?: ScreenshotClip;
 }
 
 /** How `app.startRecording` names its file. */
@@ -1320,9 +1350,12 @@ export interface ScreenExpectation {
    * named after the test. A missing one is written and the matcher fails;
    * `--update-snapshots` rewrites one that differs.
    */
-  toHaveScreenshot(name: string, options?: ScreenshotOptions): Promise<void>;
-  toHaveScreenshot(options?: ScreenshotOptions): Promise<void>;
+  toHaveScreenshot(name: string, options?: ScreenScreenshotOptions): Promise<void>;
+  toHaveScreenshot(options?: ScreenScreenshotOptions): Promise<void>;
 }
+
+/** Options of `expect(screen).toHaveScreenshot`: those of a locator's, and the part of the screen `app.screenshot` takes. */
+export interface ScreenScreenshotOptions extends ScreenshotOptions, AppScreenshotOptions {}
 
 /** Options of `toHaveScreenshot`. */
 export interface ScreenshotOptions {

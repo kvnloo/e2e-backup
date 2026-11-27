@@ -246,6 +246,7 @@ class EngineClient {
         grantsAllPermissions: manifest.grantsAllPermissions,
         launchArgumentValues: manifest.launchArgumentValues,
         fileApps: manifest.fileApps,
+        fullPageScreenshots: manifest.fullPageScreenshots,
         isolation: manifest.isolation,
         secrets: this.#options.secrets,
         fixtures: this.#options.fixtures,

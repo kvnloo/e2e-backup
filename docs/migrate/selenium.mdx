@@ -80,6 +80,7 @@ test('signs in', async ({ app, screen, browser }) => {
 | --- | --- |
 | `driver.get(url)`, `navigate().back()`, `.forward()`, `.refresh()` | `app.open(path)`, `app.back()`, `browser.forward()`, `browser.reload()` |
 | `getCurrentUrl()`, `getTitle()`, `manage().addCookie`, `getScreenshotAs` | `browser.url()`, `browser.title()`, `browser.setCookies`, `app.screenshot('label')` |
+| `element.getScreenshotAs()`, `getFullPageScreenshotAs()` | `locator.screenshot('label')`, `app.screenshot('label', { fullPage: true })` |
 | `By.id('x')` | `browser.locator('#x')`, or `'[id="x"]'` when the id has `:`, `.`, `$`, or a leading digit |
 | `By.name`, `By.cssSelector`, `By.xpath` | `browser.locator('[name="x"]')`, `browser.locator('css or xpath')` |
 | `By.linkText`, `By.partialLinkText` | `screen.getByRole('link', { name })`, `name: /part/` |

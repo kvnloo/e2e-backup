@@ -78,6 +78,14 @@ describe('defineEngine', () => {
     );
   });
 
+  it('carries fullPageScreenshots onto the handle only with artifacts, and only as a boolean', () => {
+    const artifacts = { screenshot: async () => 'screenshots/page.png' };
+    expect(defineEngine(observingEngine({ artifacts, fullPageScreenshots: true })).fullPageScreenshots).toBe(true);
+    expect(defineEngine(observingEngine({ artifacts, fullPageScreenshots: false })).fullPageScreenshots).toBeUndefined();
+    expect(() => defineEngine(observingEngine({ fullPageScreenshots: true }))).toThrow(/fullPageScreenshots without artifacts/);
+    expect(() => defineEngine(observingEngine({ artifacts, fullPageScreenshots: 'yes' as never }))).toThrow(/fullPageScreenshots must be a boolean/);
+  });
+
   it('keeps the SPI v1 list stable and accepts an explicitly declared upload action', () => {
     const perform = async () => undefined;
     const legacy = defineEngine(observingEngine({ actions: LOCATOR_ACTION_KINDS, perform }));

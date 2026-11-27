@@ -140,7 +140,7 @@ Calls on `device` run only on a device, so a test that uses it declares
 | `assertVisible: { enabled, checked, selected, focused }` | `.toBeVisible()`, then `.toBeEnabled()`, `.toBeChecked()`, `.toBeSelected()`, or `.toBeFocused()` |
 | `assertTrue: ${...}` | `expect(value).toBe(true)`, or `expect.poll` for a value that is still changing |
 | `assertScreenshot: { path, thresholdPercentage }` | `await expect(screen).toHaveScreenshot(name, { maxDiffPixelRatio })`, see [Visual comparison](/visual-testing) |
-| `takeScreenshot`, `startRecording`, `stopRecording` | `app.screenshot('label')`, [`app.startRecording()`, `app.stopRecording()`](/reference/app#startrecording) |
+| `takeScreenshot`, `takeScreenshot: { cropOn }`, `startRecording`, `stopRecording` | `app.screenshot('label')`, `locator.screenshot('label')`, [`app.startRecording()`, `app.stopRecording()`](/reference/app#startrecording) |
 | `assertWithAI`, `assertNoDefectsWithAI`, `extractTextWithAI` | `agent.assert('...', { vision: true })`, `agent.extract('...', { schema })` |
 | `label` on a command | [`test.step('label', fn)`](/reference/test#test-step) around the call; reports show the label with the call under it |
 | `runFlow: file.yaml`, `onFlowStart`, `onFlowComplete` | a function or a `test.extend` fixture; `beforeEach`, `afterEach` |

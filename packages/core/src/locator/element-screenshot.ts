@@ -1,10 +1,10 @@
 /** `locator.screenshot()`: the engine's screenshot of the screen, cut to one match's box. */
 
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync } from 'node:fs';
 import path from 'node:path';
 import type { LocatorExpression, SemanticNode, ViewportSize } from '../engine/surface.ts';
-import { asEngineError, ConfigurationError, isE2EError, TestError } from '../internal/errors.ts';
-import { clipBox, cropImage, decodePng, encodePng, type RgbaImage } from '../internal/image.ts';
+import { asEngineError, TestError } from '../internal/errors.ts';
+import { cutScreenshotFile } from '../internal/screenshot-region.ts';
 import { pollReads, type ReadWindow } from '../internal/time.ts';
 import { isNodeVisible, locatorDetails, translateLocatorError, type LocatorEngine } from './engine.ts';
 import { describeExpression } from './expression.ts';
@@ -70,16 +70,11 @@ export async function captureMatch(
           missing = `locator or the viewport kept moving while its screenshot was taken: ${shown}`;
           return false;
         }
-        const image = decodeScreenshot(file);
-        // One scale for both axes, from the width, as the engines place their own masks.
-        const scale = image.width / viewport.width;
         const visible = visiblePart(after, viewport);
-        const box = visible === undefined ? undefined : clipBox(image, { x: visible.x * scale, y: visible.y * scale, width: visible.width * scale, height: visible.height * scale });
-        if (box === undefined) {
+        if (visible === undefined || !cutScreenshotFile(file, viewport.width, visible, 'locator.screenshot()')) {
           missing = `locator is outside the screenshot the engine took, so it has no pixels to capture: ${shown}`;
           return false;
         }
-        writeFileSync(file, encodePng(cropImage(image, box)));
         // The engine's own spelling, with `/`: the report takes no other separator.
         kept = relative;
         return true;
@@ -99,17 +94,6 @@ export async function captureMatch(
   });
   // pollReads returns only once `evaluate` answered true, which set `kept`.
   return kept!;
-}
-
-/** The engine's screenshot as pixels. An engine may write another format, which `app.screenshot()` passes on and a crop cannot read. */
-function decodeScreenshot(file: string): RgbaImage {
-  const bytes = readFileSync(file);
-  try {
-    return decodePng(bytes);
-  } catch (cause) {
-    if (isE2EError(cause)) throw cause;
-    throw new ConfigurationError('UNSUPPORTED_CAPABILITY', 'locator.screenshot() cuts a PNG of the viewport, and this engine\'s screenshot is not one', { cause });
-  }
 }
 
 function sameBox(a: Box, b: Box): boolean {

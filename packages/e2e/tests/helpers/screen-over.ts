@@ -10,6 +10,7 @@ import {
   defineEngine,
   KNOWN_LOCATOR_ACTION_KINDS,
   type EngineKeyboard,
+  type EngineScreenshotOptions,
   type EngineSnapshot,
   type LocatorAction,
   type LocatorActionKind,
@@ -46,7 +47,9 @@ export interface ScreenOverOptions {
   /** The keyboard the engine declares, if any. */
   readonly keyboard?: EngineKeyboard;
   /** Writes a screenshot under `artifactsDir` and returns its relative path; without it the engine declares no artifacts. */
-  readonly screenshot?: (label: string | undefined) => string;
+  readonly screenshot?: (label: string | undefined, options: EngineScreenshotOptions | undefined) => string;
+  /** Whether the engine declares `fullPageScreenshots`; default not. */
+  readonly fullPageScreenshots?: boolean;
   /** The attempt's artifact directory; `screenshot` needs one. */
   readonly artifactsDir?: string;
   /** Told the relative path of every artifact the screen registers. */
@@ -57,8 +60,8 @@ export interface ScreenOverOptions {
   readonly timeoutMs: number;
 }
 
-/** A screen and the recorder of its steps over the engine `options` describe. */
-export function screenOver(options: ScreenOverOptions): { screen: Screen; steps: StepRecorder } {
+/** A screen, the locator engine under it, and the recorder of its steps, over the engine `options` describe. */
+export function screenOver(options: ScreenOverOptions): { screen: Screen; steps: StepRecorder; engine: LocatorEngine } {
   const { perform, performAt, screenshot, viewportIntersection } = options;
   const engine = defineEngine({
     name: 'fake',
@@ -86,20 +89,24 @@ export function screenOver(options: ScreenOverOptions): { screen: Screen; steps:
       ? {}
       : { viewportIntersection: async (ref: NodeRef) => viewportIntersection(ref) }),
     ...(options.keyboard === undefined ? {} : { keyboard: options.keyboard }),
-    ...(screenshot === undefined ? {} : { artifacts: { screenshot: async (label: string | undefined) => screenshot(label) } }),
+    ...(screenshot === undefined
+      ? {}
+      : { artifacts: { screenshot: async (label: string | undefined, _operation: OperationContext, screenshotOptions?: EngineScreenshotOptions) => screenshot(label, screenshotOptions) } }),
     ...(options.tapModifiers === undefined ? {} : { tapModifiers: options.tapModifiers }),
+    ...(options.fullPageScreenshots === undefined ? {} : { fullPageScreenshots: options.fullPageScreenshots }),
   });
   const steps = new StepRecorder('attempt');
   const signal = new AbortController().signal;
+  const locatorEngine = new LocatorEngine({
+    session: createEngineSession({ engine, targetName: 'fake' }),
+    budget: new AttemptBudget(signal, new Deadline(10_000)),
+    runId: 'run',
+    attemptId: 'attempt',
+    actionTimeout: options.timeoutMs,
+    assertionTimeout: options.timeoutMs,
+  });
   const screen = createScreen({
-    engine: new LocatorEngine({
-      session: createEngineSession({ engine, targetName: 'fake' }),
-      budget: new AttemptBudget(signal, new Deadline(10_000)),
-      runId: 'run',
-      attemptId: 'attempt',
-      actionTimeout: options.timeoutMs,
-      assertionTimeout: options.timeoutMs,
-    }),
+    engine: locatorEngine,
     steps,
     secrets: { resolve: async () => 'plaintext' },
     artifacts: { dir: options.artifactsDir ?? '', register: (_kind, relativePath) => {
@@ -109,5 +116,5 @@ export function screenOver(options: ScreenOverOptions): { screen: Screen; steps:
     renderTree: (observation) =>
       prepareObservation(observation, { redact: (text) => text, redactCut: (text) => text, maxBytes: 64_000 }).text,
   });
-  return { screen, steps };
+  return { screen, steps, engine: locatorEngine };
 }

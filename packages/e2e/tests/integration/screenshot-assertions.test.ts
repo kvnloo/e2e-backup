@@ -1,8 +1,9 @@
 /**
  * `toHaveScreenshot` through the real runner over the fake engine, so what
- * is tested is the engine-neutral path: pixels from `observe`, scaled to the
- * viewport, cut to a locator's box, masked, compared against the PNG stored
- * beside the test file, and rewritten under `updateSnapshots`.
+ * is tested is the engine-neutral path: pixels from `observe`, of the
+ * viewport or the whole page, scaled to CSS pixels, cut to a locator's box
+ * or a clip, masked, compared against the PNG stored beside the test file,
+ * and rewritten under `updateSnapshots`.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -52,6 +53,19 @@ function screenPng(background: Rgb, button: Rgb, scale = 1): ObservationPixels {
   return { data: new Uint8Array(Transformer.fromRgbaPixels(rgba, width, height).pngSync()), mediaType: 'image/png', width, height, scale };
 }
 
+/** A white page `height` CSS pixels tall and as wide as the viewport, at one image pixel per CSS pixel, scrolled down by `scrollY`. */
+function pagePng(height: number, scrollY: number): ObservationPixels {
+  const rgba = new Uint8Array(WIDTH * height * 4).fill(255);
+  const data = new Uint8Array(Transformer.fromRgbaPixels(rgba, WIDTH, height).pngSync());
+  return { data, mediaType: 'image/png', width: WIDTH, height, scale: 1, scroll: { x: 0, y: scrollY } };
+}
+
+/** The RGB of one pixel of an image the runner stored. */
+function rgbAt(image: { width: number; data: Uint8Array }, x: number, y: number): number[] {
+  const at = (y * image.width + x) * 4;
+  return [...image.data.subarray(at, at + 3)];
+}
+
 /** The tree with a secure field on screen. */
 const SECURE_TREE: SemanticNode = {
   ...TREE,
@@ -67,17 +81,20 @@ interface ScreenEngineOptions {
   readonly tree?: SemanticNode;
   /** Runs before every observation: a wait, or a throw. */
   readonly observe?: () => void | Promise<void>;
+  /** Declares `fullPageScreenshots`. */
+  readonly fullPage?: boolean;
 }
 
 /** A fake engine whose screen is `current()`, recording every observe option it was asked for. */
 function screenEngine(
   current: () => ObservationPixels | undefined,
-  { tree = TREE, observe }: ScreenEngineOptions = {},
+  { tree = TREE, observe, fullPage = false }: ScreenEngineOptions = {},
 ): { fake: FakeEngineHandle; asked: EngineObserveOptions[] } {
   const asked: EngineObserveOptions[] = [];
   const fake = createFakeEngine({
     tree,
     fixtures: true,
+    ...(fullPage ? { fullPageScreenshots: true, artifacts: true } : {}),
     ...(observe === undefined ? {} : { observe }),
     locate: (expression) => {
       if (expression.kind === 'query' && expression.query.kind === 'role') return [tree.children![0]!];
@@ -418,6 +435,106 @@ test('after a fill', async ({ app, screen }) => {
   );
 
   it(
+    'cuts the screen to a clip, the masks painted where they fall inside it',
+    async () => {
+      const { fake } = screenEngine(() => screenPng(WHITE, BLUE, 2));
+      const test = `import { test, expect } from 'e2e';
+
+test('clipped', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen).toHaveScreenshot('top', { clip: { x: 90, y: 0, width: 300, height: 100 }, mask: [screen.getByTestId('clock')], maskColor: '#00ff00' });
+});
+`;
+      const { project } = await runProject({ 'tests/clip.e2e.ts': test }, { appUrl: FAKE_APP_URL, config: fakeConfig(fake) });
+      try {
+        const top = readPng(path.join(project.dir, 'tests', 'clip.e2e.ts-snapshots', `top${SUFFIX}.png`));
+        expect([top.width, top.height]).toEqual([300, 100]);
+        expect(rgbAt(top, BUTTON.x - 90, BUTTON.y)).toEqual([...BLUE]);
+        expect(rgbAt(top, 310 - 90, 15)).toEqual([0, 255, 0]);
+        expect(rgbAt(top, 0, 0)).toEqual([...WHITE]);
+      } finally {
+        project.cleanup();
+      }
+    },
+    30_000,
+  );
+
+  it(
+    'compares the whole page on an engine that declares fullPageScreenshots, with masks moved by how far the page is scrolled',
+    async () => {
+      const { fake, asked } = screenEngine(() => pagePng(HEIGHT * 3, 600), { fullPage: true });
+      const test = `import { test, expect } from 'e2e';
+
+test('page', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen).toHaveScreenshot('page', { fullPage: true, mask: [screen.getByTestId('clock')], maskColor: '#00ff00' });
+  await expect(screen).toHaveScreenshot('footer', { fullPage: true, clip: { x: 0, y: ${HEIGHT * 3 - 100}, width: 200, height: 500 } });
+});
+`;
+      const { project } = await runProject({ 'tests/page.e2e.ts': test }, { appUrl: FAKE_APP_URL, config: fakeConfig(fake) });
+      try {
+        expect(asked.length).toBeGreaterThan(0);
+        expect(asked.every((options) => options.fullPage === true && options.pixels === true)).toBe(true);
+        const directory = path.join(project.dir, 'tests', 'page.e2e.ts-snapshots');
+        const page = readPng(path.join(directory, `page${SUFFIX}.png`));
+        expect([page.width, page.height]).toEqual([WIDTH, HEIGHT * 3]);
+        expect(rgbAt(page, 310, 600 + 15)).toEqual([0, 255, 0]);
+        expect(rgbAt(page, 310, 15)).toEqual([...WHITE]);
+        // The first run stops at the first missing screenshot; the next writes the clip, kept to the part on the page.
+        await runExisting(project, { appUrl: FAKE_APP_URL, config: fakeConfig(fake) });
+        const footer = readPng(path.join(directory, `footer${SUFFIX}.png`));
+        expect([footer.width, footer.height]).toEqual([200, 100]);
+      } finally {
+        project.cleanup();
+      }
+    },
+    60_000,
+  );
+
+  it(
+    'refuses fullPage on an engine that does not declare fullPageScreenshots and a clip on a locator before it reads the screen, and a clip outside the viewport at once',
+    async () => {
+      const { fake, asked } = screenEngine(() => screenPng(WHITE, BLUE));
+      const test = `import { test, expect } from 'e2e';
+
+test('no full page', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen).toHaveScreenshot('page', { fullPage: true });
+});
+
+test('locator clip', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen.getByRole('button')).toHaveScreenshot('button', { clip: { x: 0, y: 0, width: 10, height: 10 } });
+});
+
+test('clip below the viewport', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen).toHaveScreenshot('below', { clip: { x: 0, y: ${HEIGHT + 10}, width: 10, height: 10 }, timeout: 20000 });
+});
+`;
+      const { outcome, project } = await runProject({ 'tests/refused.e2e.ts': test }, { appUrl: FAKE_APP_URL, config: fakeConfig(fake) });
+      try {
+        expect(attemptOf(outcome, 'no full page').error).toMatchObject({
+          code: 'UNSUPPORTED_CAPABILITY',
+          message: expect.stringContaining('does not declare fullPageScreenshots'),
+        });
+        expect(attemptOf(outcome, 'locator clip').error).toMatchObject({
+          code: 'INVALID_ARGUMENT',
+          message: expect.stringContaining('on a locator compares the match\'s box and takes no clip'),
+        });
+        // The viewport does not grow while the call waits, so a clip outside it fails at once, not at the timeout.
+        const below = attemptOf(outcome, 'clip below the viewport');
+        expect(below.error).toMatchObject({ code: 'INVALID_ARGUMENT', message: expect.stringContaining(`is outside the ${WIDTH}x${HEIGHT} viewport`) });
+        expect(below.durationMs).toBeLessThan(10_000);
+        expect(asked).toHaveLength(1);
+      } finally {
+        project.cleanup();
+      }
+    },
+    30_000,
+  );
+
+  it(
     'paints a mask at the right place inside a locator\'s box',
     async () => {
       const { fake } = screenEngine(() => screenPng(WHITE, BLUE));
@@ -629,7 +746,9 @@ test('frame', async ({ app, gadget }) => {
 
   it.each([
     ['a name with a path separator', `'../home'`, 'name must be a file name'],
-    ['an unknown option', `'home', { fullPage: true }`, '"fullPage"'],
+    ['an unknown option', `'home', { animations: 'disabled' }`, '"animations"'],
+    ['a fullPage that is not a boolean', `'home', { fullPage: 'yes' }`, 'fullPage must be a boolean'],
+    ['an empty clip', `'home', { clip: { x: 0, y: 0, width: 0, height: 10 } }`, 'clip must be { x, y, width, height }'],
     ['a threshold above 1', `'home', { threshold: 2 }`, 'threshold must be a number from 0 to 1'],
     ['a negative timeout', `'home', { timeout: -1 }`, 'timeout must be a finite number of milliseconds, 0 or more'],
     ['a mask that is not a locator', `'home', { mask: ['#clock'] }`, 'mask must be an array of locators'],

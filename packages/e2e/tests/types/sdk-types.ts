@@ -647,8 +647,14 @@ void (expect(screen).toHaveScreenshot('home.png') satisfies Promise<void>);
 void (expect(screen).not.toHaveScreenshot({ maxDiffPixelRatio: 0.01, mask: [screen.getByTestId('clock')] }) satisfies Promise<void>);
 void (expect(screen.getByRole('button')).toHaveScreenshot({ threshold: 0.1, maxDiffPixels: 10, maskColor: '#000000', timeout: 1000 }) satisfies Promise<void>);
 void (expect.soft(screen).toHaveScreenshot() satisfies Promise<void>);
+// The screen compares the whole page or a part of it; a locator compares its match's box only.
+void (expect(screen).toHaveScreenshot('page', { fullPage: true, clip: { x: 0, y: 0, width: 200, height: 100 } }) satisfies Promise<void>);
+// @ts-expect-error a locator's screenshot is its match's box, so it takes no fullPage
+void expect(screen.getByRole('button')).toHaveScreenshot({ fullPage: true });
+// @ts-expect-error a locator's screenshot is its match's box, so it takes no clip
+void expect(screen.getByRole('button')).toHaveScreenshot({ clip: { x: 0, y: 0, width: 10, height: 10 } });
 // @ts-expect-error a page screenshot option the cross-platform matcher does not take
-void expect(screen).toHaveScreenshot({ fullPage: true });
+void expect(screen).toHaveScreenshot({ animations: 'disabled' });
 // @ts-expect-error masks are locators, not selectors
 void expect(screen).toHaveScreenshot({ mask: ['#clock'] });
 // @ts-expect-error screen is not a locator
@@ -877,6 +883,13 @@ screen.getByRole('button', { hidden: true });
 void (screen.getByTestId('summary').screenshot('summary') satisfies Promise<string>);
 // @ts-expect-error the file goes with the attempt's artifacts; there is no path option.
 void screen.getByTestId('summary').screenshot({ path: 'summary.png' });
+// app.screenshot takes the whole page or a clip, with a label or without one.
+void (appFixture.screenshot('home', { fullPage: true }) satisfies Promise<string>);
+void (appFixture.screenshot({ clip: { x: 0, y: 0, width: 320, height: 200 } }) satisfies Promise<string>);
+// @ts-expect-error the file goes with the attempt's artifacts; there is no path option.
+void appFixture.screenshot({ path: 'home.png' });
+// @ts-expect-error a clip is a rectangle in CSS pixels
+void appFixture.screenshot({ clip: { x: 0, y: 0 } });
 
 // Coordinate input: a viewport point on screen, a node-relative one on a locator.
 declare const point: import('../../src/index.ts').Point;

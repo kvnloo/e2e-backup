@@ -654,7 +654,7 @@ const ref = await this.singleOf(await this.resolveOnce(expression, reads, missin
   }
 
   /** The viewport size, read from one screen observation. */
-  private async viewport(deadline: Deadline): Promise<ViewportSize> {
+  async viewport(deadline: Deadline): Promise<ViewportSize> {
     return (await this.session.observe(this.operationWithin(deadline))).viewport;
   }
 

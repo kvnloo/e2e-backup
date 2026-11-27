@@ -335,8 +335,11 @@ export interface EngineStateCapability {
  * engine received in `startAttempt`.
  */
 export interface EngineArtifacts {
-  /** Captures a redacted screenshot; secure fields are masked at the source. */
-  screenshot(label: string | undefined, context: OperationContext): Promise<string>;
+  /**
+   * Captures a redacted screenshot; secure fields are masked at the source.
+   * Only an engine that declares `fullPageScreenshots` receives `options`.
+   */
+  screenshot(label: string | undefined, context: OperationContext, options?: EngineScreenshotOptions): Promise<string>;
   /**
    * Starts recording the surface. Declared together with `stopVideo`. An
    * attempt may start and stop more than once, never overlapping. A surface that has nothing to show yet (no page open) may
@@ -351,6 +354,23 @@ export interface EngineArtifacts {
    * one). An attempt that never showed anything returns none.
    */
   stopVideo?(context: OperationContext): Promise<readonly VideoSegment[]>;
+}
+
+/** What `EngineArtifacts.screenshot` captures when it is not the viewport. */
+export interface EngineScreenshotOptions {
+  /**
+   * The whole scrollable page, at the density a viewport screenshot has,
+   * with every secure field on the page masked, not only those in the
+   * viewport.
+   */
+  readonly fullPage: true;
+  /**
+   * The part of the page to keep, in CSS pixels from the page's top-left
+   * corner: finite, with a width and height above 0, as the harness checked.
+   * Keep the part of it on the page; throw `TestError('INVALID_ARGUMENT')`
+   * when none of it is.
+   */
+  readonly clip?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 }
 
 /**
@@ -632,6 +652,15 @@ export interface EngineObserveOptions {
    * in a fixed state: a status bar's clock, battery, and signal.
    */
   readonly comparable?: boolean;
+  /**
+   * With `pixels`, the whole scrollable page rather than the viewport, with
+   * `ObservationPixels.scroll` set to where the viewport sits in it. Mask
+   * every secure field on the page and count them all in
+   * `maskedRegionCount`: the harness checks the count against the tree's
+   * secure nodes, so a tree read only to the viewport proves nothing below
+   * it. Only an engine that declares `fullPageScreenshots` receives it.
+   */
+  readonly fullPage?: boolean;
 }
 
 /** The tabs a surface has open, as `EngineSnapshot.tabs` reports them. */
@@ -859,6 +888,16 @@ export interface Engine {
    * harness refuses a file `app.url` at config load.
    */
   readonly fileApps?: boolean;
+  /**
+   * The engine captures the whole scrollable page: `artifacts.screenshot`
+   * honors `EngineScreenshotOptions`, and `observe` honors `fullPage` beside
+   * `pixels`, for `app.screenshot({ fullPage })` and
+   * `toHaveScreenshot({ fullPage })`. Requires `artifacts`. A full-page
+   * capture masks every secure field on the page, not only those in the
+   * viewport. Without it the harness fails a full-page capture with
+   * `UNSUPPORTED_CAPABILITY` before it reaches the engine.
+   */
+  readonly fullPageScreenshots?: boolean;
   /** capability: keyboard - requires observation. Input to whatever holds focus; see `EngineKeyboard`. */
   readonly keyboard?: EngineKeyboard;
   /**
