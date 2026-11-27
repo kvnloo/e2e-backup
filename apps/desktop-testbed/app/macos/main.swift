@@ -104,6 +104,9 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
   let opener = NSTextField()
   let popupField = NSTextField()
   let status = NSTextField(labelWithString: "Nothing yet")
+  // The hover target reports to a label of its own: a pointer left over it (by the headed suite) enters it again when a
+  // menu closes, and must not overwrite what another test reads from the status line.
+  let hoverStatus = NSTextField(labelWithString: "Not hovered")
   let items = (1...40).map { "Item \($0)" }
   let table = NSTableView()
   let note = NSTextField()
@@ -111,7 +114,7 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
 
   func show() {
     if let window { window.makeKeyAndOrderFront(nil); return }
-    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 580),
+    let window = NSWindow(contentRect: NSRect(x: 660, y: 200, width: 360, height: 610),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Controls"
     window.isReleasedWhenClosed = false
@@ -185,11 +188,12 @@ final class ControlsWindow: NSObject, NSTableViewDataSource, NSTableViewDelegate
     hover.setAccessibilityRole(.group)
     hover.setAccessibilityLabel("Hover target")
     hover.setAccessibilityIdentifier("hover")
-    hover.onHover = { [weak self] in self?.status.stringValue = "Hovered" }
+    hover.onHover = { [weak self] in self?.hoverStatus.stringValue = "Hovered" }
+    hoverStatus.setAccessibilityIdentifier("hover-status")
     hover.widthAnchor.constraint(equalToConstant: 120).isActive = true
     hover.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
-    let stack = NSStackView(views: [scroll, note, opener, tabs, options, volume, disabled, double, hover, status])
+    let stack = NSStackView(views: [scroll, note, opener, tabs, options, volume, disabled, double, hover, hoverStatus, status])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)

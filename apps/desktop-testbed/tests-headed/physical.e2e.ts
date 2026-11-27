@@ -16,7 +16,7 @@ test.describe('physical input', () => {
 
   test('hovers a view with the real pointer', async ({ screen }) => {
     await screen.getByTestId('hover').hover();
-    await expect(screen.getByTestId('controls-status')).toHaveText('Hovered');
+    await expect(screen.getByTestId('hover-status')).toHaveText('Hovered');
   });
 
   test('taps a point in the window and types through the real keyboard', async ({ screen }) => {
