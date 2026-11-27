@@ -90,13 +90,39 @@ const firstLoads = new Map<string, string>();
  * it makes (a function of it that a test file or a test calls, say) belongs
  * to the load at work, not to the load that first reached the file.
  */
-const atWork = new AsyncLocalStorage<{ readonly key: string; readonly entryURL?: string }>();
-/** The original URL and the freshness keys actually added by this loader. */
-const moduleLoads = new Map<string, {
+interface ActiveLoad {
+  readonly key: string;
+  readonly entryURL?: string;
+}
+
+/** The original URL and the freshness keys actually added by the loader. */
+interface ModuleLoad {
   readonly originalURL: string | undefined;
   readonly key: string | undefined;
   readonly graph: string | undefined;
-}>();
+}
+
+interface FreshnessState {
+  readonly atWork: AsyncLocalStorage<ActiveLoad>;
+  readonly moduleLoads: Map<string, ModuleLoad>;
+  sequence: number;
+}
+
+/** The process installs one resolver, but any installed copy can start a load. */
+const freshnessSlot = realmSlot<FreshnessState>('e2e.typescript-loader-freshness.v1');
+const freshness = freshnessSlot.get(globalThis) ?? {
+  atWork: new AsyncLocalStorage<ActiveLoad>(),
+  moduleLoads: new Map<string, ModuleLoad>(),
+  sequence: 0,
+};
+freshnessSlot.set(globalThis, freshness);
+const { atWork, moduleLoads } = freshness;
+
+/** A sequence shared by every copy using the process loader. */
+export function nextFreshLoadSequence(): number {
+  freshness.sequence += 1;
+  return freshness.sequence;
+}
 
 /** Runs `work` as part of the fresh load `key`: the import of its module, or code of that module. */
 export function runInLoad<T>(key: string, work: () => T): T {

@@ -7,7 +7,7 @@ import { onBun } from '../internal/runtime.ts';
 import { withConfigSecretReferences } from '@e2e-dev/core/lib/secrets';
 import type { E2EConfig } from '../run-types.ts';
 import { explainModuleError } from './diagnose.ts';
-import { importFreshModule, registerLoader } from './esm-hooks.ts';
+import { importFreshModule, nextFreshLoadSequence, registerLoader } from './esm-hooks.ts';
 import { CONFIG_NAMES, JS_CONFIG_NAMES, TS_CONFIG_NAMES } from './names.ts';
 
 /** Spellings a config author might reach for that the loader does not read. */
@@ -131,13 +131,11 @@ export interface FreshLoad {
   readonly module: Promise<unknown>;
 }
 
-/** Process-unique sequence that keeps every fresh import's URL distinct. */
-let imports = 0;
+let bunImports = 0;
 
 function importFresh(absolutePath: string, cacheKey: string, graph: boolean | string): FreshLoad {
-  imports += 1;
   registerLoader();
-  const key = `${cacheKey}-${imports}`;
+  const key = `${cacheKey}-${onBun ? ++bunImports : nextFreshLoadSequence()}`;
   const graphName = graph === true ? key : graph === false ? undefined : graph;
   if (onBun) return { key: undefined, module: import('./bun-loader.ts').then((loader) => loader.importFreshOnBun(absolutePath, graphName)) };
   return { key, module: importFreshModule(absolutePath, key, graphName) };

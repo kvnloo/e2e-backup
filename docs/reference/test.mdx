@@ -1203,11 +1203,11 @@ export const test = base.extend<{}, { database: Database }>({
   device: it runs in a short engine attempt when the fixture names one of
   them, and without one when it names none.
 - Put shared worker fixtures in a module your test files import. On Node.js,
-  call `test.extend()` before any top-level `await` so the runner can reuse
-  the fixture when it reloads its module after a failure or to register
-  hooks. A declaration after a top-level `await` can set up again on reload
-  while the earlier instance is still active. Await asynchronous setup
-  inside the fixture function.
+  keep fixture registration synchronous so the runner can reuse the value
+  when the module reloads after a failure or to register hooks. A top-level
+  `await` in the fixture module or one of its dependencies can cause another
+  setup on reload while the earlier instance is still active. Await
+  asynchronous setup inside the fixture function.
 - On Node.js, imports of the same ES module with different URL queries or
   fragments each get their own fixture instance. Module variables start over
   on each reload, so pass shared state to tests through the fixture value.

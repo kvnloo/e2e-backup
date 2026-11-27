@@ -285,9 +285,10 @@ confirm the runner collects and executes the intended test.
   `extend`) are set up once per worker and target. Put shared worker
   fixtures in a module your test files import, especially on Bun, where
   reloading a test file creates another instance of its fixtures. On Node.js,
-  call `test.extend()` before any top-level `await` to reuse the fixture on
-  reload. Await setup inside the fixture function. ES module imports with
-  different URL queries or fragments get separate instances.
+  keep fixture registration synchronous. A top-level `await` in the fixture
+  module or one of its dependencies can cause another setup on reload.
+  Await setup inside the fixture function. ES module imports with different
+  URL queries or fragments get separate instances.
 - **Typing across targets:** `as const satisfies E2EConfig` on the config,
   then `base.extend<{}, {}, typeof config>()`. Passing `typeof config` also
   types the `services` fixture.

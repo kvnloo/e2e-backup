@@ -198,10 +198,10 @@ own kind, and the [built-in fixtures](/reference/test#fixtures) whose scope is
 worker on the target.
 
 Declare shared worker fixtures in a module your test files import. On
-Node.js, call `test.extend()` before any top-level `await` so the fixture
-value survives a runner reload. Declarations after a top-level `await`
-can set up again while the earlier instance is still active. Await
-asynchronous setup inside the fixture function. ES module imports with
+Node.js, keep fixture registration synchronous. A top-level `await` in the
+fixture module or one of its dependencies can cause another setup on reload
+while the earlier instance is still active. Await asynchronous setup inside
+the fixture function. ES module imports with
 different URL queries or fragments each get their own fixture instance.
 On Bun, declare worker fixtures in a module your test files import. When Bun
 reloads a test file, any worker fixture declared in that file gets a new
