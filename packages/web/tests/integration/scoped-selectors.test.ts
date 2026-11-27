@@ -2,8 +2,8 @@
  * A `selector` expression with a `scope` (`browser.locator(css, { within })`)
  * matches what Playwright's own `within.locator(css)` matches on the same
  * page: every element the selector reaches from any scope match, each once,
- * in document order, with XPath, `:scope`, and `..` read from the scope
- * element. Each case runs the engine and Playwright side by side and compares
+ * in Playwright's order (scope match by scope match, so not always document
+ * order), with XPath, `:scope`, and `..` read from the scope element. Each case runs the engine and Playwright side by side and compares
  * the `data-testid` of every match.
  */
 
@@ -29,6 +29,7 @@ const PAGE = `
 <input value="draft" aria-label="Note" data-testid="note">
 <iframe id="frame" srcdoc="<ul aria-label='Framed'><li class='x' data-testid='f1'>fig</li></ul>"></iframe>
 <iframe id="hidden" style="visibility: hidden" srcdoc="<ul aria-label='Hidden'><li class='x' data-testid='h1'>hidden</li></ul>"></iframe>
+<article data-testid="outer"><article data-testid="inner"><p class="direct" data-testid="early">early</p></article><p class="direct" data-testid="late">late</p></article>
 <div id="host" data-testid="host"></div>
 <script>
   const root = document.getElementById('host').attachShadow({ mode: 'closed' });
@@ -82,6 +83,7 @@ describe('a selector scoped inside a locator', () => {
     [':scope, the scope element itself', '#a', ':scope > li', ['a1', 'a2']],
     ['an XPath parent step, which leaves the scope', '[data-testid="a1"]', 'xpath=..', ['a']],
     ['a >> chain', '#a', 'li >> nth=1 >> li', ['a2-inner']],
+    ['nested scope matches, in scope order rather than document order', 'article', ':scope > .direct', ['late', 'early']],
   ])('matches Playwright for %s', async (_case, scope, selector, expected) => {
     expect(await playwright(page.locator(scope).locator(selector))).toEqual(expected);
     expect(await located(css(selector, css(scope)))).toEqual(expected);

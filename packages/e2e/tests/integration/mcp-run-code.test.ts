@@ -239,7 +239,7 @@ return (await browser.reload()) === undefined;`);
   });
 
   it("mixes the code's screen and the session's browser in one locator, as a test would", async () => {
-    const mixed = await runCode(`await expect(browser.locator('li', { within: screen.getByTestId('items') })).toHaveCount(3);
+    const mixed = await runCode(`await expect(browser.locator('*', { within: screen.getByTestId('items') })).toHaveCount(3);
 await expect(screen.getByTestId('items').or(browser.locator('#nowhere'))).toBeVisible();`);
     expect(mixed.isError, mixed.text).toBe(false);
     expect(mixed.text).toContain('Test lines: 2.\n');

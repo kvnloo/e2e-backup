@@ -91,10 +91,12 @@ export interface SemanticQuery {
  *
  * A `selector` with a `scope` runs from each node the scope matches, the way
  * the platform chains one selector after another (Playwright's
- * `scope.locator(selector)` on a document platform), each match once, in
- * document order. A tree-only resolver (`resolveExpression`) answers it over
- * the scope's descendants. An engine that resolves expressions itself must
- * honor `scope`: ignoring it matches the whole screen.
+ * `scope.locator(selector)` on a document platform), each match once. The
+ * order is the platform's: Playwright returns the matches under the first
+ * scope match, then the new ones under the next. A tree-only resolver
+ * (`resolveExpression`) answers it over the scope's descendants, in document
+ * order. An engine that resolves expressions itself must honor `scope`:
+ * ignoring it matches the whole screen.
  */
 export type LocatorExpression =
   | {

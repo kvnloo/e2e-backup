@@ -677,7 +677,9 @@ await expect(browser.locator('td.price', { within: row })).toHaveText('$12');
 ```
 
 - The selector runs from each element `within` matches. The locator matches
-  every element it reaches from any of them, each one time, in document order.
+  every element it reaches from any of them, each one time, in Playwright's
+  order: the matches under the first `within` match, then the new ones under
+  the next. With nested `within` matches that is not always document order.
 - A leading `//`, `:scope`, and `xpath=..` start at that element, as in
   Playwright.
 - `within` is any locator from `screen` or `browser`, filtered or not. One
