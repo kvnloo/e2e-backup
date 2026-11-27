@@ -101,7 +101,7 @@ export interface ProjectedScreen {
   /** Rects of the secure fields, in the viewport's points, for masking. Undefined when a secure field has no bounds to mask. */
   readonly secureRects: readonly Rect[] | undefined;
   readonly truncated: boolean;
-  /** The read ran out of time (`complete: false`), which the next read may not; a tree cut only at its depth limit is cut the same way every time. */
+  /** The read was cut short by its deadline, a stall, or the node budget (`complete: false`, `truncated`), which the next read may not be; a tree cut only at its depth limit is cut the same way every time. */
   readonly cutShort: boolean;
   /** The deadline stopped the read: the caller's time ran out before the window was read whole. */
   readonly timedOut: boolean;

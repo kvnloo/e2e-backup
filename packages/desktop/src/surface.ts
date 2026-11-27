@@ -954,7 +954,7 @@ export class DesktopSurface {
     if (screen.truncated) {
       throw new EngineError(
         'NODE_STALE',
-        `the window was read only in part (it ran out of time, is deeper than the ${this.options.maxDepth} levels a snapshot reads, which desktop({ maxDepth }) raises, or holds more than the ${MAX_SNAPSHOT_NODES} elements it reads), so the matches cannot be counted`,
+        `the window was read only in part (the app did not answer for part of it, it is deeper than the ${this.options.maxDepth} levels a snapshot reads, which desktop({ maxDepth }) raises, or it holds more than the ${MAX_SNAPSHOT_NODES} elements it reads), so the matches cannot be counted`,
         { retryable: true },
       );
     }
