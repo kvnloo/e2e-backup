@@ -1024,17 +1024,18 @@ export class DesktopSurface {
     const binding = this.binding(ref);
     switch (action.kind) {
       case 'tap':
-        await this.shown(binding, 'tap', operation);
-        await this.refCommand('click', binding, operation);
+      case 'secondaryTap': {
+        const command = action.kind === 'tap' ? 'click' : 'rightClick';
+        const scrolled = await this.shown(binding, action.kind === 'tap' ? 'tap' : 'secondary-tap', operation);
+        const click = (): Promise<void> => this.refCommand(command, binding, operation);
+        if (scrolled) await afterChange(command, click);
+        else await click();
         break;
+      }
       case 'doubleTap':
         // A double click needs the real pointer; declared with `headed` alone. A node with no ref (a plain view, text) takes it at its center.
         if (binding.ref === undefined) return await this.pointAtNode(binding, 'doubleTap', operation);
         await this.refCommand('doubleClick', binding, operation);
-        break;
-      case 'secondaryTap':
-        await this.shown(binding, 'secondary-tap', operation);
-        await this.refCommand('rightClick', binding, operation);
         break;
       case 'focus':
         await this.refCommand('focus', binding, operation);
@@ -1118,13 +1119,13 @@ export class DesktopSurface {
    * holds out of view. When the driver can scroll it into view, it does, and answers only once the element shows: a
    * fresh read could not tell a look-alike node that moved from its siblings.
    */
-  private async shown(binding: NodeBinding, what: string, operation: OperationContext): Promise<void> {
-    if (binding.states?.hidden !== true) return;
+  private async shown(binding: NodeBinding, what: string, operation: OperationContext): Promise<boolean> {
+    if (binding.states?.hidden !== true) return false;
     // Only a node a scroll area holds out of view is scrolled: the driver checks it shows by its frame and the scroll
     // areas around it, which a minimized window or a collapsed control would pass unchanged.
     if (binding.scrolledOut === true && binding.ref !== undefined && binding.actions.includes('ScrollTo')) {
       await this.refCommand('scrollTo', binding, operation);
-      return;
+      return true;
     }
     throw notActionable(`node ${binding.id} is not on screen, so a ${what} would reach a control the user cannot; scroll it into view first`);
   }

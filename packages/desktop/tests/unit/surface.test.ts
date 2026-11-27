@@ -888,6 +888,10 @@ describe('DesktopSurface: acting', () => {
       expect.objectContaining({ ref: '@s:e2', action: 'scrollTo' }),
       expect.objectContaining({ ref: '@s:e2', action: 'click' }),
     ]);
+    // The scroll changed the app: a click that then fails, even as a stale ref, is never retried as if nothing happened.
+    const moved = await launched({ snapshot: [twins], act: [ok({}), failure('STALE_REF', 'not_delivered')] }, { observe: false });
+    const stale = every((await moved.surface.observe(operation(), undefined)).root).filter((node) => node.name === 'Delete')[1];
+    await expect(moved.surface.perform(stale!.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', retryable: false });
     // A check goes to the driver, which reads the box first: one already right gets nothing, and one it must press out
     // of view is scrolled into view or refused there.
     const box = await launched({ snapshot: [at(true, ['Click', 'Check'], 'checkbox')] }, { observe: false });
