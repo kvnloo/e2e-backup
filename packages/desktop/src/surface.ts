@@ -559,7 +559,7 @@ export class DesktopSurface {
     }
     // In the foreground there is no background to blame: the app listed no window at all.
     if (!sawWindow && listedNone) {
-      throw new EngineError('ENGINE_FAILURE', `${this.appName ?? 'the app'} launched, but listed no window within ${LAUNCH_READY_MS / 1000} s: it may open none (a menu-bar app) or take longer to`, { retryable: false });
+      throw new EngineError('ENGINE_FAILURE', `${this.appName ?? 'the app'} launched, but listed no window within ${LAUNCH_READY_MS / 1000} s: it may open none (a menu-bar app) or take longer to show its first window`, { retryable: false });
     }
     throw new EngineError(
       'ENGINE_FAILURE',
