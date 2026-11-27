@@ -26,6 +26,13 @@ test.describe('controls window', () => {
     await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 40');
   });
 
+  test('finds a row and a cell by the text inside them, and selects a row by tapping its cell', async ({ screen }) => {
+    await expect(screen.getByRole('row', 'Item 1')).toBeVisible();
+    await expect(screen.getByRole('cell', 'Item 2')).toBeVisible();
+    await screen.getByRole('cell', 'Item 2').tap();
+    await expect(screen.getByTestId('controls-status')).toHaveText('Selected Item 2');
+  });
+
   test('presses keys into a field of an app in the background, and types into it', async ({ screen }) => {
     // The keys go into the app's own event queue: it must not be the app in front, before or after.
     expect(frontmost()).not.toBe(TESTBED_APP);
