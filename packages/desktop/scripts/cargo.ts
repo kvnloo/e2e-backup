@@ -13,6 +13,8 @@ export interface Cargo {
   readonly file: string;
   readonly prefix: readonly string[];
   readonly env: NodeJS.ProcessEnv;
+  /** The toolchain `rust-toolchain.toml` pins, when rustup runs cargo; with none, the `cargo` on `PATH`. */
+  readonly toolchain?: string;
 }
 
 /**
@@ -31,14 +33,16 @@ export function cargo(directory: string): Cargo {
   }
   const channel = /^channel\s*=\s*"([^"]+)"/m.exec(readFileSync(path.join(directory, 'rust-toolchain.toml'), 'utf8'))?.[1];
   if (channel === undefined) throw new Error('native/rust-toolchain.toml names no channel');
-  if (spawnSync('rustup', ['which', 'cargo'], { cwd: directory, stdio: 'ignore' }).status !== 0) {
-    // With no toolchain named, rustup installs the one the crate's `rust-toolchain.toml` pins.
-    spawnSync('rustup', ['toolchain', 'install'], { cwd: directory, stdio: 'inherit' });
+  if (spawnSync('rustup', ['which', '--toolchain', channel, 'cargo'], { cwd: directory, stdio: 'ignore' }).status !== 0) {
+    // With no toolchain named, rustup installs the one the crate's `rust-toolchain.toml` pins, with its targets and
+    // components. A `RUSTUP_TOOLCHAIN` override would name another, so it is left out.
+    const { RUSTUP_TOOLCHAIN: _override, ...env } = process.env;
+    spawnSync('rustup', ['toolchain', 'install'], { cwd: directory, stdio: 'inherit', env });
   }
   const pinned = spawnSync('rustup', ['which', '--toolchain', channel, 'cargo'], { cwd: directory, encoding: 'utf8' });
   if (pinned.status !== 0) throw new Error('rustup could not install the toolchain native/rust-toolchain.toml pins');
   // `rustup run` alone leaves the toolchain off PATH where rustup is the only tool there (Homebrew's), and cargo then
   // finds no rustc: its bin goes first too.
   const bin = path.dirname(pinned.stdout.trim());
-  return { file: 'rustup', prefix: ['run', channel, 'cargo'], env: { ...process.env, PATH: [bin, process.env.PATH].filter(Boolean).join(path.delimiter) } };
+  return { file: 'rustup', prefix: ['run', channel, 'cargo'], env: { ...process.env, PATH: [bin, process.env.PATH].filter(Boolean).join(path.delimiter) }, toolchain: channel };
 }
