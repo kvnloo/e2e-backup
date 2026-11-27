@@ -1,6 +1,7 @@
 /** What a fixture definition is called across evaluations of the module that defines it. */
 
 import type { SourceLocation } from '@e2e-dev/core/lib/internal/source';
+import { originalModuleURLSlot } from '../internal/registrar-modules.ts';
 import { onBun } from '../internal/runtime.ts';
 import { runningModule } from './evaluating-module.ts';
 
@@ -14,8 +15,8 @@ const counts = new WeakMap<object, Map<string, number>>();
  * helper that extends in a loop). A module that is evaluated again, a test
  * file after a failed test or a module that registers hooks with every file
  * that imports it, defines the same fixtures under the same names, so a
- * worker keeps one instance of each. The module evaluating is part of the
- * name because two test files that call one helper define two fixtures.
+ * worker keeps one instance of each. Use the original module URL to keep
+ * distinct user imports separate across those reloads.
  *
  * A fixture has no name, and is its definition, where nothing says for sure
  * which module is evaluating: outside a collection, once the module has
@@ -23,8 +24,9 @@ const counts = new WeakMap<object, Map<string, number>>();
  */
 export function fixtureIdentities(collection: object | undefined, site: SourceLocation | undefined): (name: string) => string | undefined {
   if (collection === undefined || site === undefined || onBun) return () => undefined;
-  const { file: evaluating, loader } = runningModule();
-  if (!loader || evaluating === undefined) return () => undefined;
+  const { location, loader } = runningModule();
+  if (!loader || location === undefined) return () => undefined;
+  const evaluating = originalModuleURLSlot.get(globalThis)?.(location) ?? location;
   const defined = counts.get(collection) ?? new Map<string, number>();
   counts.set(collection, defined);
   return (name) => {

@@ -58,7 +58,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { InfrastructureError } from '@e2e-dev/core/lib/internal/errors';
 import { onBun, unsupportedRuntimeMessage } from '../internal/runtime.ts';
 import { realmSlot } from '@e2e-dev/core/lib/internal/realm-slot';
-import { registrarModuleSlot } from '../internal/registrar-modules.ts';
+import { originalModuleURLSlot, registrarModuleSlot } from '../internal/registrar-modules.ts';
 import { compiledSource, HOOKED_REQUIRE_KEY, IMPLIED_EXTENSIONS, isProjectFile, writtenCandidates, type CompiledSource } from './compiled-files.ts';
 import { isPathSpecifier, pathTarget, type Target } from './specifiers.ts';
 import { projectView, ProjectView } from './tsconfig.ts';
@@ -90,11 +90,13 @@ const firstLoads = new Map<string, string>();
  * it makes (a function of it that a test file or a test calls, say) belongs
  * to the load at work, not to the load that first reached the file.
  */
-const atWork = new AsyncLocalStorage<string>();
+const atWork = new AsyncLocalStorage<{ readonly key: string; readonly entryURL?: string }>();
+/** Original URLs of modules whose URLs this loader changed for a fresh load. */
+const originalModuleURLs = new Map<string, string>();
 
 /** Runs `work` as part of the fresh load `key`: the import of its module, or code of that module. */
 export function runInLoad<T>(key: string, work: () => T): T {
-  return atWork.run(key, work);
+  return atWork.run({ key }, work);
 }
 
 /** Makes `file`, and every project file that reaches it by import, a registrar. */
@@ -119,12 +121,20 @@ function inFreshLoad(parentURL: string | undefined, resolution: Resolution): Res
   if (known === undefined) importers.set(childFile, (known = new Set()));
   known.add(parentFile);
   if (registrars.has(childFile)) addRegistrar(parentFile);
-  const key = parent.searchParams.get(FRESH_PARAM) ?? atWork.getStore();
+  const key = parent.searchParams.get(FRESH_PARAM) ?? atWork.getStore()?.key;
   if (key === undefined) return resolution;
   if (!firstLoads.has(childFile)) firstLoads.set(childFile, key);
   if (!registrars.has(childFile) || firstLoads.get(childFile) === key || child.searchParams.has(FRESH_PARAM)) return resolution;
-  child.searchParams.set(FRESH_PARAM, key);
-  return { ...resolution, url: child.href };
+  return { ...resolution, url: appendQuery(child, FRESH_PARAM, key) };
+}
+
+/** Adds a loader query parameter without re-encoding any user query or fragment. */
+function appendQuery(url: URL, name: string, value: string): string {
+  const fragment = url.href.indexOf('#');
+  const end = fragment === -1 ? url.href.length : fragment;
+  const beforeHash = url.href.slice(0, end);
+  const separator = beforeHash.includes('?') ? '&' : '?';
+  return `${beforeHash}${separator}${new URLSearchParams([[name, value]])}${url.href.slice(end)}`;
 }
 
 /**
@@ -146,15 +156,16 @@ function graphOf(url: string | undefined): string | null {
 }
 
 /**
- * A URL that evaluates `absolutePath` afresh under `key`; with `graph`,
+ * Evaluates `absolutePath` afresh under `key`; with `graph`,
  * every project file it imports by path or `#` import is fresh too, shared
  * with every other module loaded under the same `graph`.
  */
-export function freshModuleURL(absolutePath: string, key: string, graph: string | undefined): string {
+export function importFreshModule(absolutePath: string, key: string, graph: string | undefined): Promise<unknown> {
   const url = pathToFileURL(absolutePath);
   url.searchParams.set(FRESH_PARAM, key);
   if (graph !== undefined) url.searchParams.set(GRAPH_PARAM, graph);
-  return url.href;
+  const entryURL = url.href;
+  return atWork.run({ key, entryURL }, () => import(entryURL));
 }
 
 /** The first of `candidates` that is a file. */
@@ -258,8 +269,7 @@ function inGraph(how: Reach, parentURL: string | undefined, resolution: Resoluti
   const graph = graphOf(parentURL);
   const file = new URL(resolution.url);
   if (graph === null || !isProjectFile(file) || file.searchParams.has(GRAPH_PARAM)) return resolution;
-  file.searchParams.set(GRAPH_PARAM, graph);
-  return { ...resolution, url: file.href };
+  return { ...resolution, url: appendQuery(file, GRAPH_PARAM, graph) };
 }
 
 /** The file TypeScript's rules find for `missing`, a target URL that is not on disk, as a URL with the target's query and hash. */
@@ -313,7 +323,16 @@ export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
     view !== undefined && how !== 'path' ? resolveExport(request, context, nextResolve, view) : nextResolve(request, context),
   );
   // CommonJS caches modules by file, with no query to make one fresh.
-  return requires(context) ? resolution : inFreshLoad(context.parentURL, inGraph(how, context.parentURL, resolution));
+  if (requires(context)) return resolution;
+  const fresh = inFreshLoad(context.parentURL, inGraph(how, context.parentURL, resolution));
+  if (specifier === atWork.getStore()?.entryURL && resolution.url.startsWith('file:')) {
+    // This entry came from importFreshModule, so its query is ours. Use the
+    // resolved path here, after Node has applied its symlink rules.
+    originalModuleURLs.set(fresh.url, resolution.url.split('?', 1)[0]!);
+  } else if (fresh.url !== resolution.url) {
+    originalModuleURLs.set(fresh.url, resolution.url);
+  }
+  return fresh;
 };
 
 export const load: LoadHookSync = (url, context, nextLoad) => {
@@ -383,6 +402,7 @@ export function registerLoader(): void {
   if (!onBun) {
     nodeModule.registerHooks({ resolve, load });
     registrarModuleSlot.set(globalThis, addRegistrar);
+    originalModuleURLSlot.set(globalThis, (url) => originalModuleURLs.get(url));
     hookedRequireSlot.set(globalThis, hookedRequire);
     process.setSourceMapsEnabled(true);
   }

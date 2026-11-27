@@ -1204,9 +1204,10 @@ export const test = base.extend<{}, { database: Database }>({
   them, and without one when it names none.
 - A worker keeps one instance of a worker fixture, also when the module
   that declares it is evaluated again: a test file after a failed test, or
-  a module that declares tests or hooks. Only the fixture's value is kept,
-  not the module's variables, so hand tests what they need through the
-  value. On Bun, a worker fixture the test file
+  a module that declares tests or hooks. On Node.js, imports of the same
+  module with different URL queries or fragments each get their own fixture
+  instance. Module variables start over on each reload, so pass shared state
+  to tests through the fixture value. On Bun, a worker fixture the test file
   declares gets a new instance each time the file is imported again, and
   the old one stays set up until the worker ends: declare it in a module
   the file imports.

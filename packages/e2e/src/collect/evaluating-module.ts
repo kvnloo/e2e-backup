@@ -27,7 +27,7 @@ const DIRECT_FRAMES = 200;
  */
 export function evaluatingModule(): string | undefined {
   const direct = runningModule();
-  if (direct.loader) return direct.file;
+  if (direct.loader) return moduleFile(direct.location);
   const mapped = process.sourceMapsEnabled;
   const limit = Error.stackTraceLimit;
   Error.stackTraceLimit = Infinity;
@@ -39,7 +39,7 @@ export function evaluatingModule(): string | undefined {
     if (mapped) process.setSourceMapsEnabled(true);
     Error.stackTraceLimit = limit;
   }
-  return outermostBeforeLoader(stack.split('\n').slice(1).flatMap((line) => FRAME.exec(line.trim())?.[1] ?? [])).file;
+  return moduleFile(outermostBeforeLoader(stack.split('\n').slice(1).flatMap((line) => FRAME.exec(line.trim())?.[1] ?? [])).location);
 }
 
 /**
@@ -49,17 +49,21 @@ export function evaluatingModule(): string | undefined {
  * frame (`loader` false: the module awaited, or a timer runs the call)
  * nothing here says which module is evaluating.
  */
-export function runningModule(): { readonly file: string | undefined; readonly loader: boolean } {
+export function runningModule(): { readonly location: string | undefined; readonly loader: boolean } {
   return outermostBeforeLoader(util.getCallSites(DIRECT_FRAMES, { sourceMap: false }).map((site) => site.scriptName));
 }
 
-/** The file of the outermost of `locations`, innermost first, before a frame of the module loader, and whether there was such a frame. */
-function outermostBeforeLoader(locations: readonly string[]): { readonly file: string | undefined; readonly loader: boolean } {
+/** The outermost location before a frame of the module loader, and whether there was such a frame. */
+function outermostBeforeLoader(locations: readonly string[]): { readonly location: string | undefined; readonly loader: boolean } {
   let outermost: string | undefined;
   for (const location of locations) {
-    if (location.startsWith(MODULE_LOADER)) return { file: outermost, loader: true };
-    const file = location.startsWith('file:') ? fileURLToPath(location) : location;
-    if (path.isAbsolute(file)) outermost = file;
+    if (location.startsWith(MODULE_LOADER)) return { location: outermost, loader: true };
+    if (location.startsWith('file:') || path.isAbsolute(location)) outermost = location;
   }
-  return { file: outermost, loader: false };
+  return { location: outermost, loader: false };
+}
+
+/** The path the registrar uses, without the module URL's query or fragment. */
+function moduleFile(location: string | undefined): string | undefined {
+  return location?.startsWith('file:') === true ? fileURLToPath(location) : location;
 }

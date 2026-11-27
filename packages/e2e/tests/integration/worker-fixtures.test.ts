@@ -1,13 +1,73 @@
 /** Worker-scoped fixtures and the suite hooks that receive them, on an engine that isolates each attempt and on one whose state outlives it. */
 
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createFakeEngine } from '../helpers/fake-engine.ts';
 import { engineConfig } from '../helpers/fixture-config.ts';
 import { hookLog, LOG_MODULE } from '../helpers/hook-log.ts';
 import { assertValidReport } from '../helpers/report-schema.ts';
-import { resultByTitle, runProject } from '../helpers/run-project.ts';
+import { createProject, resultByTitle, runProject, workerFakeConfigSource } from '../helpers/run-project.ts';
 
 describe('worker fixtures', () => {
+  it('separates user import URLs and reuses the fixture when the loader reloads the same URL', () => {
+    const imports = [
+      '?a=1&b=2#one',
+      '?b=2&a=1#one',
+      '?a=1&b=2#two',
+      '?e2e=user-a&e2e-graph=user-a',
+      '?e2e=user-b&e2e-graph=user-a',
+      '?e2e=user-a&e2e-graph=user-b',
+      '?a=a%20b',
+      '?a=a+b',
+      '?a=1&b=2#one',
+    ];
+    const tests = Object.fromEntries(imports.map((suffix, index) => {
+      const { search, hash } = new URL(suffix, 'file:///support.ts');
+      return [`tests/${index}.e2e.ts`, `
+import { expect } from 'e2e';
+import { test } from './support.ts${suffix}';
+test(${JSON.stringify('uses fixture for ' + suffix)}, ({ fixtureURL }) => {
+  const url = new URL(fixtureURL);
+  expect(url.search.split('&').slice(0, ${search.split('&').length}).join('&')).toBe(${JSON.stringify(search)});
+  expect(url.hash).toBe(${JSON.stringify(hash)});
+});
+`];
+    }));
+    const log = hookLog('worker-fixture-urls');
+    const project = createProject({
+      ...tests,
+      'e2e.config.ts': workerFakeConfigSource(1),
+      'tests/log.ts': LOG_MODULE,
+      'tests/support.ts': `import { test as base } from 'e2e';
+import { log } from './log.ts';
+export const test = base.extend<{}, { fixtureURL: string }>({
+  fixtureURL: [async ({}, use) => {
+    log('setup');
+    await use(import.meta.url);
+    log('teardown');
+  }, { scope: 'worker' }],
+});
+test.beforeEach(() => {});
+`,
+    });
+    try {
+      const cli = fileURLToPath(new URL('../../dist/cli/bin.js', import.meta.url));
+      const result = spawnSync(process.execPath, [cli, 'run'], {
+        cwd: project.dir,
+        env: { ...process.env, CI: '', E2E_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
+        encoding: 'utf8',
+        timeout: 20_000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      const instances = new Set(imports).size;
+      expect(log.lines()).toEqual([...Array<string>(instances).fill('setup'), ...Array<string>(instances).fill('teardown')]);
+    } finally {
+      project.cleanup();
+    }
+  }, 30_000);
+
   it(
     'sets a worker fixture up once per worker, shares it with the suite hooks, and tears it down after the last test',
     async () => {
