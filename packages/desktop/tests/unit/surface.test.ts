@@ -887,6 +887,24 @@ describe('DesktopSurface: acting', () => {
     const hiddenBox = every((await box.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
     await box.surface.perform(hiddenBox!.ref, { kind: 'check' }, operation());
     expect(box.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['check']);
+    // A button in a row the list holds out of view is hidden by the scroll area alone: it is scrolled into view too.
+    const inRow = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [
+        {
+          role: 'group',
+          name: 'Row',
+          states: ['offscreen'],
+          bounds: { x: 0, y: 300, width: 200, height: 30 },
+          children: [{ role: 'button', name: 'Remove', ref_id: '@s:e3', available_actions: ['Click', 'ScrollTo'], states: ['offscreen'], bounds: { x: 10, y: 305, width: 50, height: 20 } }],
+        },
+      ],
+    });
+    const nested = await launched({ snapshot: [inRow] }, { observe: false });
+    const remove = every((await nested.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Remove');
+    await nested.surface.perform(remove!.ref, { kind: 'tap' }, operation());
+    expect(nested.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['scrollTo', 'click']);
     // Hidden for another reason than a scroll: no scroll shows a minimized window's control or one with no size, so
     // each is refused at once, though both offer ScrollTo.
     const minimized = await launched(

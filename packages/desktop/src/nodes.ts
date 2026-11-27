@@ -260,19 +260,19 @@ export function projectSnapshot(
   let unmaskable = false;
   const scrollTargets: { vertical?: string; horizontal?: string } = {};
 
-  // `hiddenAbove`: an ancestor is hidden, a wrapper left out included, so nothing under it is on screen; the resolver reads each node's own state only.
+  // `hiddenAbove`: an ancestor is hidden, a wrapper left out included, so nothing under it is on screen; the resolver reads each node's own state only. `scrolled` when a scroll area is all that hides it, which a scroll into view of the node can undo, else `other`.
   // `prior`: the id the node held before, which a cut gave it a fresh one in place of; look-alikes under it are reported against that id, which their identities are kept under.
-  const project = (node: RawNode, id: string, stable: boolean, likeness: string, hiddenAbove: boolean, prior: string | undefined): SemanticNode => {
+  const project = (node: RawNode, id: string, stable: boolean, likeness: string, hiddenAbove: false | 'scrolled' | 'other', prior: string | undefined): SemanticNode => {
     const rawStates = new Set(node.states ?? []);
     const role = ROLE_MAP[node.role] ?? (node.role === 'unknown' ? undefined : node.role);
     const secure = rawStates.has('secure');
     const states: Record<string, boolean> = {};
     for (const state of STATE_NAMES) if (rawStates.has(state)) states[state] = true;
-    if (rawStates.has('offscreen') || minimized || hiddenAbove) states.hidden = true;
+    if (rawStates.has('offscreen') || minimized || hiddenAbove !== false) states.hidden = true;
     // A control collapsed to no width or height draws nothing, and the driver will not act on it. Only a leaf: a container with no box can still hold drawn children, listed or cut off at the depth limit.
     const collapsed = id !== ROOT_ID && node.bounds !== undefined && (node.bounds.width <= 0 || node.bounds.height <= 0) && (node.children ?? []).length === 0 && (node.children_count ?? 0) === 0;
     if (collapsed) states.hidden = true;
-    const scrolledOut = rawStates.has('offscreen') && !minimized && !hiddenAbove && !collapsed;
+    const scrolledOut = (rawStates.has('offscreen') || hiddenAbove === 'scrolled') && !minimized && hiddenAbove !== 'other' && !collapsed;
     // A mixed checkbox is neither checked nor unchecked: no state, so check() and uncheck() always reach the control.
     if (CHECKABLE_ROLES.has(node.role) && !rawStates.has('indeterminate')) states.checked = rawStates.has('checked') || node.value === '1';
     else if (rawStates.has('checked')) states.checked = true;
@@ -331,17 +331,17 @@ export function projectSnapshot(
       ...(node.native_id === undefined || node.native_id.value === '' ? {} : { testId: node.native_id.value }),
     });
     const kept: RawNode[] = [];
-    const underHidden = new Set<RawNode>();
+    const underHidden = new Map<RawNode, 'scrolled' | 'other'>();
     // Whether a wrapper left out had children the read cut off: its unread children are this node's, and one could be a twin of a listed one.
     let wrapperCut = false;
-    const collect = (child: RawNode, throughHidden: boolean): void => {
+    const collect = (child: RawNode, throughHidden: false | 'scrolled' | 'other'): void => {
       if (transparent(child)) {
         if (childrenCut(child)) wrapperCut = true;
-        const hiddenWrapper = throughHidden || child.states?.includes('hidden') === true || child.states?.includes('offscreen') === true;
+        const hiddenWrapper = throughHidden === 'other' || child.states?.includes('hidden') === true ? 'other' : throughHidden === 'scrolled' || child.states?.includes('offscreen') === true ? 'scrolled' : false;
         for (const grandchild of child.children ?? []) collect(grandchild, hiddenWrapper);
       } else {
         kept.push(child);
-        if (throughHidden) underHidden.add(child);
+        if (throughHidden !== false) underHidden.set(child, throughHidden);
       }
     };
     for (const child of node.children ?? []) collect(child, false);
@@ -368,7 +368,7 @@ export function projectSnapshot(
       const childStable = stable && identity !== undefined;
       const childId = idFor(childStable ? `${id}/${identity}` : undefined);
       const childPrior = childStable ? childId : prior !== undefined && seen !== undefined ? priorIdOf?.(`${prior}/${seen}`) : undefined;
-      return project(child, childId, childStable, `${likeness}/${plain.get(identityOf(child)) ?? 1}`, states.hidden === true || underHidden.has(child), childPrior);
+      return project(child, childId, childStable, `${likeness}/${plain.get(identityOf(child)) ?? 1}`, states.hidden === true ? (scrolledOut ? 'scrolled' : 'other') : (underHidden.get(child) ?? false), childPrior);
     });
     return {
       ref: { id, revision: '' },
