@@ -195,58 +195,6 @@ function label(value: string | undefined): string | undefined {
   return value === undefined || value.trim() === '' ? undefined : value;
 }
 
-/** The names macOS gives a window's title-bar buttons, which have no title of their own. */
-const WINDOW_CONTROLS = new Set(['Close', 'Minimize', 'Zoom', 'Full Screen']);
-
-/** The largest a title-bar button is, in points: macOS draws them 14 to 16 points across. */
-const WINDOW_CONTROL_SIZE = 20;
-
-/** How far down from the window's top edge a title-bar button can reach, in points: the title bar, or a unified title bar and toolbar, is at most this tall. */
-const TITLE_BAR_HEIGHT = 52;
-
-/**
- * A window's own title-bar button: a button straight under the window, with
- * no developer id, named only for what it does to the window, the size of a
- * title-bar button, and in the window's title bar. Left out, so
- * `getByRole('button', 'Close')` finds the app's Close button and not the
- * window's; an app's own button of the same name is larger or lower in the
- * window, and one with no bounds, or in a window with none, is kept.
- */
-function windowControl(raw: RawNode, window: Rect | undefined): boolean {
-  const bounds = raw.bounds;
-  return (
-    window !== undefined &&
-    raw.role === 'button' &&
-    raw.native_id === undefined &&
-    raw.name !== undefined &&
-    WINDOW_CONTROLS.has(raw.name) &&
-    label(raw.value) === undefined &&
-    label(raw.description) === undefined &&
-    bounds !== undefined &&
-    bounds.width <= WINDOW_CONTROL_SIZE &&
-    bounds.height <= WINDOW_CONTROL_SIZE &&
-    bounds.y >= window.y &&
-    bounds.y + bounds.height <= window.y + TITLE_BAR_HEIGHT
-  );
-}
-
-/** How far apart, at most, two neighbouring title-bar buttons are, left edge to left edge, in points: macOS spaces them about 23. */
-const WINDOW_CONTROL_GAP = 30;
-
-/**
- * The window's own title-bar buttons among its direct children: each a
- * `windowControl` beside another of a different name, in one row, as macOS
- * draws Close, Minimize, and Zoom together. The snapshot carries no subrole
- * that names them, so a lone small Close button, such as an app's own in a
- * corner of the title bar, is kept.
- */
-function titleBarButtons(tree: RawNode): ReadonlySet<RawNode> {
-  const candidates = (tree.children ?? []).filter((child) => windowControl(child, tree.bounds));
-  const beside = (a: RawNode, b: RawNode): boolean =>
-    a !== b && a.name !== b.name && a.bounds !== undefined && b.bounds !== undefined && Math.abs(a.bounds.y - b.bounds.y) <= 2 && Math.abs(a.bounds.x - b.bounds.x) <= WINDOW_CONTROL_GAP;
-  return new Set(candidates.filter((candidate) => candidates.some((other) => beside(candidate, other))));
-}
-
 /** A node the driver reports but nothing reads: a wrapper with no name, value, id, ref, or text of its own. */
 function transparent(raw: RawNode): boolean {
   // A secure node is never dropped: its bounds are what a screenshot masks.
@@ -302,7 +250,6 @@ export function projectSnapshot(
   }: { readonly minimized?: boolean; readonly interactive?: boolean; readonly onLookAlike?: (identity: string) => void; readonly priorIdOf?: (identity: string) => string | undefined } = {},
 ): ProjectedScreen {
   const window = raw.tree.bounds ?? { x: 0, y: 0, width: 0, height: 0 };
-  const titleBar = titleBarButtons(raw.tree);
   const bindings = new Map<string, NodeBinding>();
   const secureRects: Rect[] = [];
   let unmaskable = false;
@@ -389,7 +336,7 @@ export function projectSnapshot(
         if (throughHidden) underHidden.add(child);
       }
     };
-    for (const child of node.children ?? []) if (id !== ROOT_ID || !titleBar.has(child)) collect(child, false);
+    for (const child of node.children ?? []) collect(child, false);
     const tally = (named: boolean): Map<string, number> => {
       const counts = new Map<string, number>();
       for (const child of kept) counts.set(identityOf(child, named), (counts.get(identityOf(child, named)) ?? 0) + 1);

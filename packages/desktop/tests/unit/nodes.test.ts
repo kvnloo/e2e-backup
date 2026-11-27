@@ -88,28 +88,11 @@ describe('projectSnapshot', () => {
     expect(byTestId(root, 'password')).toMatchObject({ inputPurpose: 'password', states: { secure: true } });
   });
 
-  it("leaves out the window's own title-bar buttons, and keeps the app's", () => {
+  it("keeps every Close button the driver reports: it leaves the window's own out by their subrole", () => {
     const { root } = project('macos/sign-in-form');
     expect(all(root).filter((node) => node.role === 'button').map((node) => node.name)).toEqual(['Sign in']);
-    const own = projectSnapshot(
-      {
-        snapshot_id: 's',
-        tree: {
-          role: 'window',
-          name: 'W',
-          children: [
-            { role: 'button', name: 'Close', native_id: { kind: 'ax_identifier', value: 'close' }, ref_id: '@s:e1' },
-            { role: 'group', name: 'Toolbar', children: [{ role: 'button', name: 'Close', ref_id: '@s:e2' }] },
-          ],
-        },
-      },
-      minter(),
-    );
-    expect(all(own.root).filter((node) => node.role === 'button' && node.name === 'Close')).toHaveLength(2);
-    const sheet = projectSnapshot({ snapshot_id: 's', tree: { role: 'window', name: 'About', children: [{ role: 'button', name: 'Close', ref_id: '@s:e1', bounds: { x: 0, y: 0, width: 80, height: 18 } }] } }, minter());
-    expect(all(sheet.root).filter((node) => node.role === 'button' && node.name === 'Close')).toHaveLength(1);
-    // A small Close button of the app's, below the title bar, is the app's; the one in the title bar is the window's.
     const small = { width: 16, height: 16 };
+    // An app's own small Close button, even in the title bar beside another, is the app's.
     const panel = projectSnapshot(
       {
         snapshot_id: 's',
@@ -120,33 +103,12 @@ describe('projectSnapshot', () => {
           children: [
             { role: 'button', name: 'Close', ref_id: '@s:e1', bounds: { x: 108, y: 208, ...small } },
             { role: 'button', name: 'Minimize', ref_id: '@s:e3', bounds: { x: 131, y: 208, ...small } },
-            { role: 'button', name: 'Zoom', ref_id: '@s:e4', bounds: { x: 154, y: 208, ...small } },
-            { role: 'button', name: 'Close', ref_id: '@s:e2', bounds: { x: 460, y: 320, ...small } },
           ],
         },
       },
       minter(),
     );
-    expect(all(panel.root).filter((node) => node.role === 'button' && node.name === 'Close').map((node) => node.rect)).toEqual([{ x: 360, y: 120, ...small }]);
-    expect(all(panel.root).filter((node) => node.name === 'Minimize' || node.name === 'Zoom')).toEqual([]);
-    // An app's own small Close button in the title bar's far corner stands alone, apart from the window's row of buttons: it is kept.
-    const corner = projectSnapshot(
-      {
-        snapshot_id: 's',
-        tree: {
-          role: 'window',
-          name: 'Panel',
-          bounds: { x: 100, y: 200, width: 400, height: 300 },
-          children: [
-            { role: 'button', name: 'Close', ref_id: '@s:e1', bounds: { x: 108, y: 208, ...small } },
-            { role: 'button', name: 'Minimize', ref_id: '@s:e3', bounds: { x: 131, y: 208, ...small } },
-            { role: 'button', name: 'Close', ref_id: '@s:e2', bounds: { x: 476, y: 208, ...small } },
-          ],
-        },
-      },
-      minter(),
-    );
-    expect(all(corner.root).filter((node) => node.role === 'button' && node.name === 'Close').map((node) => node.rect)).toEqual([{ x: 376, y: 8, ...small }]);
+    expect(all(panel.root).filter((node) => node.role === 'button').map((node) => node.name)).toEqual(['Close', 'Minimize']);
   });
 
   it('marks no id stable that sits inside a look-alike, whose own id is new every snapshot', () => {
