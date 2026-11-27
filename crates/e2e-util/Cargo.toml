@@ -1,0 +1,14 @@
+[package]
+name = "e2e-util"
+description = "Work e2e moves off the JavaScript thread: PNG decoding and encoding, resampling, masking, and screenshot comparison. No binding dependency."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+png = "0.18.1"
+
+[lints]
+workspace = true

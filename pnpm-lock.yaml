@@ -964,6 +964,24 @@ importers:
         specifier: 5.1.2
         version: 5.1.2(@types/node@26.6.11)(vite@8.3.8(@types/node@26.6.11)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.51.2)(tsx@4.23.14)(yaml@2.9.0))
 
+  packages/util:
+    devDependencies:
+      '@napi-rs/image':
+        specifier: 1.16.0
+        version: 1.16.0
+      '@types/node':
+        specifier: 26.6.11
+        version: 26.6.11
+      pixelmatch:
+        specifier: 8.0.0
+        version: 8.0.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.1.2
+        version: 5.1.2(@types/node@26.6.11)(vite@8.3.8(@types/node@26.6.11)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.51.2)(tsx@4.23.14)(yaml@2.9.1))
+
   packages/web:
     dependencies:
       playwright-core:

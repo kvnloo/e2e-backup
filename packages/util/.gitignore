@@ -1,0 +1,2 @@
+# The addon a checkout build places here; a release ships it in the platform package instead.
+*.node

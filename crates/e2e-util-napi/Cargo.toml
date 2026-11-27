@@ -1,0 +1,23 @@
+[package]
+name = "e2e-util-napi"
+description = "The Node binding of e2e-util, loaded by @e2e-dev/util through NAPI-RS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+e2e-util = { workspace = true }
+napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt"] }
+napi-derive = "3"
+tokio = { version = "1", features = ["sync"] }
+
+[build-dependencies]
+napi-build = "2"
+
+[lints]
+workspace = true

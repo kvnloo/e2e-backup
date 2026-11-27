@@ -32,3 +32,5 @@ packages/e2e/docs/
 
 # scripts/check-docs-translations-deepl.ts --report
 /deepl-report.json
+# Cargo build output of the crates/ workspace.
+/target/
