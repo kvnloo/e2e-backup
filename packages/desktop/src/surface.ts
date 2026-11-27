@@ -1110,7 +1110,6 @@ export class DesktopSurface {
     if (operation.origin === 'agent') await sleep(Math.min(this.options.settleMs, operation.timeoutMs), operation.signal);
   }
 
-  /** One action on a node's ref, failures translated. */
   /**
    * Refuses a tap on a node the read found off screen, which accessibility would press all the same: one a scroll area
    * holds out of view. When the driver can scroll it into view, it does, and a fresh read must then show it.
@@ -1126,6 +1125,7 @@ export class DesktopSurface {
     throw notActionable(`node ${binding.id} is not on screen, so a ${what} would reach a control the user cannot; scroll it into view first`);
   }
 
+  /** One action on a node's ref, failures translated. */
   private async refCommand(action: string, binding: NodeBinding, operation: OperationContext, extra: { value?: string; direction?: string; pages?: number; physical?: boolean } = {}): Promise<void> {
     try {
       await this.tryRef(action, binding, operation, extra);
