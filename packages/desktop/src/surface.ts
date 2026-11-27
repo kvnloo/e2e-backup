@@ -1043,6 +1043,8 @@ export class DesktopSurface {
       case 'check':
       case 'uncheck':
         // The driver reads the live state, so a box already right gets nothing; the observed state may be stale.
+        // A box off screen is pressed all the same, as a tap is: it is scrolled into view first, or refused.
+        await this.shown(binding, action.kind, operation);
         await this.refCommand(action.kind, binding, operation);
         break;
       case 'scrollIntoView':
@@ -1111,7 +1113,7 @@ export class DesktopSurface {
   }
 
   /**
-   * Refuses a tap on a node the read found off screen, which accessibility would press all the same: one a scroll area
+   * Refuses a press (a tap, a check) on a node the read found off screen, which accessibility would press all the same: one a scroll area
    * holds out of view. When the driver can scroll it into view, it does, and a fresh read must then show it.
    */
   private async shown(binding: NodeBinding, what: string, operation: OperationContext): Promise<void> {

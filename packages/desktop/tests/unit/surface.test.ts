@@ -851,12 +851,12 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(still.fake)).toEqual(['focusWindow', 'pointer']);
   });
 
-  it('refuses a tap on a button the read found off screen, and scrolls one into view first when it can', async () => {
-    const at = (hidden: boolean, actions: string[]) =>
+  it('refuses a tap or a check on a control the read found off screen, and scrolls one into view first when it can', async () => {
+    const at = (hidden: boolean, actions: string[], role = 'button') =>
       screen('w-mine', {
         name: 'Form',
         bounds: { x: 0, y: 0, width: 200, height: 200 },
-        children: [{ role: 'button', name: 'Top', ref_id: '@s:e1', available_actions: actions, ...(hidden ? { states: ['offscreen'] } : {}), bounds: { x: 10, y: -40, width: 50, height: 20 } }],
+        children: [{ role, name: 'Top', ref_id: '@s:e1', available_actions: actions, ...(hidden ? { states: ['offscreen'] } : {}), bounds: { x: 10, y: -40, width: 50, height: 20 } }],
       });
     const every = (node: SemanticNode): SemanticNode[] => [node, ...(node.children ?? []).flatMap(every)];
     // No scroll action: accessibility would press it all the same, out of the user's reach.
@@ -870,6 +870,11 @@ describe('DesktopSurface: acting', () => {
     const shown = every((await scrolls.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
     await scrolls.surface.perform(shown!.ref, { kind: 'tap' }, operation());
     expect(scrolls.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['scrollTo', 'click']);
+    // A check presses the box as a tap does.
+    const box = await launched({ snapshot: [at(true, ['Click', 'Check'], 'checkbox')] }, { observe: false });
+    const hiddenBox = every((await box.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
+    await expect(box.surface.perform(hiddenBox!.ref, { kind: 'check' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/a check would reach/) });
+    expect(box.fake.of('act')).toEqual([]);
   });
 
   it('refuses to double-click a node with no ref whose center is a control inside it, and hovers it', async () => {
