@@ -1042,9 +1042,8 @@ export class DesktopSurface {
         break;
       case 'check':
       case 'uncheck':
-        // The driver reads the live state, so a box already right gets nothing; the observed state may be stale.
-        // A box off screen is pressed all the same, as a tap is: it is scrolled into view first, or refused.
-        await this.shown(binding, action.kind, operation);
+        // The driver reads the live state, so a box already right gets nothing; the observed state may be stale. A box it
+        // must press while a scroll area holds it out of view is scrolled into view first, or refused, as a tap is.
         await this.refCommand(action.kind, binding, operation);
         break;
       case 'scrollIntoView':
@@ -1113,16 +1112,15 @@ export class DesktopSurface {
   }
 
   /**
-   * Refuses a press (a tap, a check) on a node the read found off screen, which accessibility would press all the same: one a scroll area
-   * holds out of view. When the driver can scroll it into view, it does, and a fresh read must then show it.
+   * Refuses a tap on a node the read found off screen, which accessibility would press all the same: one a scroll area
+   * holds out of view. When the driver can scroll it into view, it does, and answers only once the element shows: a
+   * fresh read could not tell a look-alike node that moved from its siblings.
    */
   private async shown(binding: NodeBinding, what: string, operation: OperationContext): Promise<void> {
     if (binding.states?.hidden !== true) return;
-    if (binding.ref !== undefined && binding.actions.includes('ScrollTo') && binding.windowId !== undefined) {
+    if (binding.ref !== undefined && binding.actions.includes('ScrollTo')) {
       await this.refCommand('scrollTo', binding, operation);
-      const now = await this.capture(operation, binding.windowId, false, !binding.interactive);
-      const fresh = [...(now?.bindings.values() ?? [])].find((candidate) => sameNode(candidate, binding));
-      if (fresh !== undefined && fresh.states?.hidden !== true) return;
+      return;
     }
     throw notActionable(`node ${binding.id} is not on screen, so a ${what} would reach a control the user cannot; scroll it into view first`);
   }

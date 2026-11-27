@@ -851,7 +851,7 @@ describe('DesktopSurface: acting', () => {
     expect(inputs(still.fake)).toEqual(['focusWindow', 'pointer']);
   });
 
-  it('refuses a tap or a check on a control the read found off screen, and scrolls one into view first when it can', async () => {
+  it('refuses a tap on a control the read found off screen, and scrolls one into view first when it can', async () => {
     const at = (hidden: boolean, actions: string[], role = 'button') =>
       screen('w-mine', {
         name: 'Form',
@@ -864,17 +864,29 @@ describe('DesktopSurface: acting', () => {
     const top = every((await stuck.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
     await expect(stuck.surface.perform(top!.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/not on screen/) });
     expect(stuck.fake.of('act')).toEqual([]);
-    // A scroll action: scrolled into view, read again, then pressed.
-    // The launch, the observation, then the read after the scroll.
-    const scrolls = await launched({ snapshot: [at(true, ['Click', 'ScrollTo']), at(true, ['Click', 'ScrollTo']), at(false, ['Click', 'ScrollTo'])] }, { observe: false });
-    const shown = every((await scrolls.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
-    await scrolls.surface.perform(shown!.ref, { kind: 'tap' }, operation());
-    expect(scrolls.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['scrollTo', 'click']);
-    // A check presses the box as a tap does.
+    // A scroll action: the driver scrolls it into view and answers once it shows, then it is pressed. A look-alike
+    // that the scroll moved is not looked for again by its place, which changed.
+    const twins = screen('w-mine', {
+      name: 'Form',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      children: [
+        { role: 'button', name: 'Delete', ref_id: '@s:e1', available_actions: ['Click', 'ScrollTo'], bounds: { x: 10, y: 10, width: 50, height: 20 } },
+        { role: 'button', name: 'Delete', ref_id: '@s:e2', available_actions: ['Click', 'ScrollTo'], states: ['offscreen'], bounds: { x: 10, y: 400, width: 50, height: 20 } },
+      ],
+    });
+    const scrolls = await launched({ snapshot: [twins] }, { observe: false });
+    const second = every((await scrolls.surface.observe(operation(), undefined)).root).filter((node) => node.name === 'Delete')[1];
+    await scrolls.surface.perform(second!.ref, { kind: 'tap' }, operation());
+    expect(scrolls.fake.of('act').map((call) => call.args[0] as { ref: string; action: string })).toEqual([
+      expect.objectContaining({ ref: '@s:e2', action: 'scrollTo' }),
+      expect.objectContaining({ ref: '@s:e2', action: 'click' }),
+    ]);
+    // A check goes to the driver, which reads the box first: one already right gets nothing, and one it must press out
+    // of view is scrolled into view or refused there.
     const box = await launched({ snapshot: [at(true, ['Click', 'Check'], 'checkbox')] }, { observe: false });
     const hiddenBox = every((await box.surface.observe(operation(), undefined)).root).find((node) => node.name === 'Top');
-    await expect(box.surface.perform(hiddenBox!.ref, { kind: 'check' }, operation())).rejects.toMatchObject({ code: 'NOT_ACTIONABLE', message: expect.stringMatching(/a check would reach/) });
-    expect(box.fake.of('act')).toEqual([]);
+    await box.surface.perform(hiddenBox!.ref, { kind: 'check' }, operation());
+    expect(box.fake.of('act').map((call) => (call.args[0] as { action: string }).action)).toEqual(['check']);
   });
 
   it('refuses to double-click a node with no ref whose center is a control inside it, and hovers it', async () => {
