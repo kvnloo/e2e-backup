@@ -487,8 +487,10 @@ export class DesktopSurface {
         if (!(cause instanceof EngineError && (stale || cause.cause === QUIT))) throw cause;
         if (stale) sawWindow = true;
       }
-      if (screen !== undefined) return;
-      if (read) listedNone = true;
+      // A window whose root the app did not answer for is there but not readable yet, which is what this wait is for.
+      if (screen !== undefined && !screen.rootUnread) return;
+      if (screen !== undefined) sawWindow = true;
+      else if (read) listedNone = true;
       // An app that quit (or crashed) on its own never shows a window.
       if (this.pid !== undefined && !(await this.running(this.pid))) {
         this.forget();

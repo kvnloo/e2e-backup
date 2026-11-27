@@ -47,6 +47,8 @@ export interface RawSnapshot {
   readonly complete?: boolean;
   /** The deadline stopped the read, as opposed to a stall or a limit. */
   readonly timed_out?: boolean;
+  /** The app did not answer for the window itself: the tree is a bare window, no window read yet. */
+  readonly root_unread?: boolean;
   readonly truncated?: boolean;
   readonly tree: RawNode;
   readonly window?: { readonly id: string; readonly title?: string };
@@ -105,6 +107,8 @@ export interface ProjectedScreen {
   readonly cutShort: boolean;
   /** The deadline stopped the read: the caller's time ran out before the window was read whole. */
   readonly timedOut: boolean;
+  /** The app did not answer for the window itself (`root_unread`). */
+  readonly rootUnread: boolean;
   readonly windowId?: string;
   /** Set by the surface: the sheet on the window that held its focus when the window was read (see `sheetKey`). */
   readonly sheet?: string;
@@ -401,6 +405,7 @@ export function projectSnapshot(
     truncated: raw.complete === false || raw.truncated === true || hasTruncatedSubtree(raw.tree),
     cutShort: raw.complete === false || raw.truncated === true,
     timedOut: raw.timed_out === true,
+    rootUnread: raw.root_unread === true,
     ...(raw.window === undefined ? {} : { windowId: raw.window.id }),
     // The window's accessibility root carries its title; the window server's is the app's name without Screen Recording permission.
     ...(title === undefined ? {} : { title }),

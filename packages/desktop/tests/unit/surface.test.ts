@@ -428,6 +428,15 @@ describe('DesktopSurface: the launch wait', () => {
     expect(fake.spawned).toHaveLength(1);
   });
 
+  it('reads again when the window answered but its root did not, so the open waits for a readable window', async () => {
+    const form = snapshotAnswer('macos/appkit-form') as { ok: true; data: Record<string, unknown> & { tree: Record<string, unknown> } };
+    // The root's attributes stalled: a bare window with no size, and the read marked incomplete.
+    const unread = { ...form, data: { ...form.data, complete: false, root_unread: true, tree: { role: 'window' } } };
+    const { fake } = await launched({ snapshot: [unread, form] }, { observe: false });
+    expect(fake.of('snapshot').length).toBeGreaterThanOrEqual(2);
+    expect(fake.spawned).toHaveLength(1);
+  });
+
   it('reads again when the window was replaced while the open read it, and launches once', async () => {
     const { fake } = await launched({ snapshot: [failure('STALE_REF', 'not_delivered'), snapshotAnswer('macos/appkit-form')] }, { observe: false });
     expect(fake.of('snapshot').length).toBeGreaterThanOrEqual(2);
