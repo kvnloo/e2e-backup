@@ -343,6 +343,36 @@ function resolveExport(request: string, context: ResolveHookContext, nextResolve
   return file === undefined ? resolution : nextResolve(requires(context) ? fileURLToPath(file) : file, context);
 }
 
+const legacyConfigParents = new Map<string, boolean>();
+
+/** Older openHost callers import the config directly from their own loader. */
+function isConfigLoader(parentURL: string | undefined): boolean {
+  if (parentURL?.startsWith('file:') !== true || !/\/(?:dist\/config\/load\.js|src\/config\/load\.ts)$/.test(parentURL)) return false;
+  const known = legacyConfigParents.get(parentURL);
+  if (known !== undefined) return known;
+  let isE2E = false;
+  try {
+    const manifestPath = path.resolve(fileURLToPath(parentURL), '../../../package.json');
+    const manifest: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    isE2E = typeof manifest === 'object' && manifest !== null && 'name' in manifest && manifest.name === 'e2e';
+  } catch {
+    // An unidentifiable importer cannot start a legacy config graph.
+  }
+  legacyConfigParents.set(parentURL, isE2E);
+  return isE2E;
+}
+
+/** Recognizes the old graph:true config entry, only at its direct import. */
+function legacyConfigEntry(specifier: string, parentURL: string | undefined, url: string): ModuleLoad | undefined {
+  if (!specifier.startsWith('file:') || !url.startsWith('file:') || moduleLoads.has(url)) return undefined;
+  const queryAt = specifier.indexOf('?');
+  if (queryAt === -1) return undefined;
+  const query = specifier.slice(queryAt);
+  const key = /^\?e2e=(module-[1-9]\d*)&e2e-graph=\1$/.exec(query)?.[1];
+  if (key === undefined || !url.endsWith(query) || !isConfigLoader(parentURL)) return undefined;
+  return { originalURL: undefined, key, graph: key };
+}
+
 export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
   const importer = compiledSource(context.parentURL);
   const parentLoad = context.parentURL === undefined ? undefined : moduleLoads.get(context.parentURL);
@@ -361,10 +391,11 @@ export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
   const key = parentLoad?.key ?? active?.key;
   const inFreshGraph = inGraph(how, graph, resolution);
   const fresh = inFreshLoad(context.parentURL, inFreshGraph, key);
-  const entry = specifier === active?.entryURL ? moduleLoads.get(specifier) : undefined;
+  const entry = specifier === active?.entryURL
+    ? moduleLoads.get(specifier)
+    : legacyConfigEntry(specifier, context.parentURL, resolution.url);
   if (entry !== undefined && resolution.url.startsWith('file:')) {
-    // This entry came from importFreshModule, so its query is ours. Use the
-    // resolved path here, after Node has applied its symlink rules.
+    // Use the resolved path after Node has applied its symlink rules.
     moduleLoads.set(fresh.url, { ...entry, originalURL: resolution.url.split('?', 1)[0]! });
   } else if (fresh.url !== resolution.url) {
     moduleLoads.set(fresh.url, {

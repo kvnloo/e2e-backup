@@ -135,7 +135,8 @@ let bunImports = 0;
 
 function importFresh(absolutePath: string, cacheKey: string, graph: boolean | string): FreshLoad {
   registerLoader();
-  const key = `${cacheKey}-${onBun ? ++bunImports : nextFreshLoadSequence()}`;
+  // Older installs can still emit their own module-N entry and graph keys.
+  const key = onBun ? `${cacheKey}-${++bunImports}` : `fresh-${cacheKey}-${nextFreshLoadSequence()}`;
   const graphName = graph === true ? key : graph === false ? undefined : graph;
   if (onBun) return { key: undefined, module: import('./bun-loader.ts').then((loader) => loader.importFreshOnBun(absolutePath, graphName)) };
   return { key, module: importFreshModule(absolutePath, key, graphName) };
