@@ -375,10 +375,12 @@ function legacyConfigEntry(specifier: string, parentURL: string | undefined, url
 
 /** A later resolver can append a fragment after this loader records the URL. */
 function appendedFragment(url: string): { load: ModuleLoad; fragment: string } | undefined {
-  const index = url.indexOf('#');
-  if (index === -1) return undefined;
-  const load = moduleLoads.get(url.slice(0, index));
-  return load === undefined ? undefined : { load, fragment: url.slice(index) };
+  // The recorded URL may already include a user fragment.
+  for (let index = url.lastIndexOf('#'); index > 0; index = url.lastIndexOf('#', index - 1)) {
+    const load = moduleLoads.get(url.slice(0, index));
+    if (load !== undefined) return { load, fragment: url.slice(index) };
+  }
+  return undefined;
 }
 
 function graphOf(url: string | undefined, known: ModuleLoad | undefined): string | null {

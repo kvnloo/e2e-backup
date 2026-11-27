@@ -172,6 +172,77 @@ test('retries with the resolved fragment', ({ value }) => {
     }
   }, 30_000);
 
+  it.each(['before', 'after'])('reuses each user-fragment helper on retry with a resolver registered %s the loader', (order) => {
+    const config = workerFakeConfigSource(1, 'retries: 1,');
+    const project = createProject({
+      'e2e.config.ts': order === 'after' ? `import './instrument.mjs';\n${config}` : config,
+      'instrument.mjs': `
+import { registerHooks } from 'node:module';
+registerHooks({ resolve(specifier, context, next) {
+  const result = next(specifier, context);
+  if (result.url.startsWith('file:') && new URL(result.url).pathname.endsWith('/support.ts')) {
+    return { ...result, url: result.url + '#instrumented' };
+  }
+  return result;
+} });
+`,
+      'tests/support.ts': `
+import { test as base } from 'e2e';
+import { appendFileSync, rmSync, writeFileSync } from 'node:fs';
+const fragment = new URL(import.meta.url).hash;
+export const test = base.extend<{}, { value: string }>({
+  value: [async ({}, use) => {
+    const lock = 'worker' + fragment;
+    appendFileSync('events.txt', 'setup ' + fragment + '\\n');
+    writeFileSync(lock, '', { flag: 'wx' });
+    try {
+      await use(fragment);
+    } finally {
+      rmSync(lock);
+      appendFileSync('events.txt', 'teardown ' + fragment + '\\n');
+    }
+  }, { scope: 'worker' }],
+});
+test.beforeEach(() => {});
+`,
+      'tests/retry.e2e.ts': `
+import { expect } from 'e2e';
+import { existsSync, writeFileSync } from 'node:fs';
+import { test as one } from './support.ts?variant=app#one';
+import { test as inner } from './support.ts?variant=app#one#inner';
+
+for (const [test, expected] of [[one, '#one#instrumented'], [inner, '#one#inner#instrumented']] as const) {
+  test('retries ' + expected, ({ value }) => {
+    expect(value).toBe(expected);
+    const marker = 'retried' + expected;
+    if (existsSync(marker)) return;
+    writeFileSync(marker, '');
+    throw new Error('intentional first-attempt failure');
+  });
+}
+`,
+    });
+    try {
+      const env = order === 'before'
+        ? { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=./instrument.mjs`.trim() }
+        : {};
+      const report = runFixtureCLI(project.dir, env);
+      expect(report.run.results.map((test) => test.attempts.map((attempt) => attempt.status))).toEqual([
+        ['failed', 'passed'],
+        ['failed', 'passed'],
+      ]);
+      const events = readFileSync(path.join(project.dir, 'events.txt'), 'utf8').trim().split('\n');
+      expect(events.toSorted()).toEqual([
+        'setup #one#inner#instrumented',
+        'setup #one#instrumented',
+        'teardown #one#inner#instrumented',
+        'teardown #one#instrumented',
+      ]);
+    } finally {
+      project.cleanup();
+    }
+  }, 30_000);
+
   it('separates user import URLs and reuses the fixture when the loader reloads the same URL', () => {
     const imports = [
       '?a=1&b=2#one',
