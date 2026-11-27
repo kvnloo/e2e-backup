@@ -4,7 +4,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { LocatorExpression, SemanticNode, ViewportSize } from '../engine/surface.ts';
 import { asEngineError, ConfigurationError, isE2EError, TestError } from '../internal/errors.ts';
-import { clipBox, pngSize, processPng } from '../internal/image.ts';
+import { clipBox, decodePng, pngSize, processPng } from '../internal/image.ts';
 import { pollReads, type ReadWindow } from '../internal/time.ts';
 import { isNodeVisible, locatorDetails, translateLocatorError, type LocatorEngine } from './engine.ts';
 import { describeExpression } from './expression.ts';
@@ -77,6 +77,8 @@ export async function captureMatch(
         const visible = visiblePart(after, viewport);
         const box = visible === undefined ? undefined : clipBox(image, { x: visible.x * scale, y: visible.y * scale, width: visible.width * scale, height: visible.height * scale });
         if (box === undefined) {
+          // A header alone does not make a PNG: bytes that do not decode are the engine's, not a missing locator.
+          await checkPng(bytes);
           missing = `locator is outside the screenshot the engine took, so it has no pixels to capture: ${shown}`;
           return false;
         }
@@ -112,6 +114,16 @@ function screenshotSize(bytes: Uint8Array): { readonly width: number; readonly h
   const size = pngSize(bytes);
   if (size === undefined) throw notPng();
   return size;
+}
+
+/** Throws `UNSUPPORTED_CAPABILITY` for bytes that do not decode as a PNG. */
+async function checkPng(bytes: Uint8Array): Promise<void> {
+  try {
+    await decodePng(bytes);
+  } catch (cause) {
+    if (isE2EError(cause)) throw cause;
+    throw notPng(cause);
+  }
 }
 
 /** The screenshot cut to `box`, as PNG bytes, decoded and encoded off the JavaScript thread. */

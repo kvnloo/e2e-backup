@@ -253,6 +253,27 @@ describe('locator.screenshot', () => {
     expect(readdirSync(path.join(artifactsDir, 'screenshots'))).toEqual([]);
   });
 
+  it('says the screenshot is not a PNG when only its header is one, even where the box rounds to no pixels', async () => {
+    // The header states 1x1 for a 100-wide viewport, so the card's box rounds to nothing; the pixel data is cut off.
+    const header = encodePng({ width: 1, height: 1, data: new Uint8Array(4) }).subarray(0, 33);
+    const box = { x: 10, y: 20, width: 30, height: 15 };
+    const { screen } = screenOver({
+      locate: (expression) => resolveExpression(expression, [card(box)]),
+      observe: () => snapshot([card(box)], { viewport: VIEWPORT }),
+      perform: () => undefined,
+      screenshot: () => {
+        writeFileSync(path.join(artifactsDir, 'screenshots', 'shot.png'), header);
+        return 'screenshots/shot.png';
+      },
+      artifactsDir,
+      timeoutMs: 2_000,
+    });
+    await expect(screen.getByTestId('card').screenshot()).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: expect.stringContaining('cuts a PNG of the viewport'),
+    });
+  });
+
   it('refuses anything but a label before it captures', () => {
     const box = { x: 10, y: 20, width: 30, height: 15 };
     const { card: locator, captures } = screenWith(screenImage(1, box), () => card(box));
