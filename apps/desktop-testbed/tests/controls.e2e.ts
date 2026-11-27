@@ -79,6 +79,9 @@ test.describe('controls window', () => {
     await second.tap();
     await expect(second).toBeSelected();
     await expect(first).not.toBeSelected();
+    // A tab list selects by label too, and checks the tab shows it is selected.
+    await screen.getByRole('tablist').selectOption('First');
+    await expect(first).toBeSelected();
   });
 
   test('types text whose characters take two UTF-16 units each, whole', async ({ screen }) => {
