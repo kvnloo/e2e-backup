@@ -103,6 +103,21 @@ suites that consume the built packages the way a user would.
     are the whole public surface: the flows, stores, and fetch behind them
     are module-private, not a library for other products. `tests/live/` holds hand-run
     checks that need a stored login and are never part of `pnpm test`.
+- `crates/` - every Rust crate, one Cargo workspace (root `Cargo.toml`,
+  one `Cargo.lock`, the toolchain `rust-toolchain.toml` pins). A logic crate
+  (`e2e-util`) has no binding dependency and tests with `cargo test` alone;
+  its Node binding (`e2e-util-napi`) only converts types, schedules work off
+  the JavaScript thread, and maps errors. `scripts/native/build.ts` builds a
+  binding crate and places `<name>.<platform>.node` in its npm package.
+- `packages/util` - `@e2e-dev/util`, the loader and TypeScript API over
+  `e2e-util-napi`: PNG decode and encode, box resampling, crop, box
+  painting, and a bit-exact port of pixelmatch 8, every pixel call a
+  Promise run on a native pool, a decoded image kept native as
+  `NativeImage`. The addon loads on the first call. `@e2e-dev/core`'s
+  `internal/image.ts` and `@e2e-dev/mobile`'s masking use it; its
+  `tests/` hold it to the JavaScript it replaced, byte for byte, and
+  `bench/` times both. A prototype (ENG-1543): no platform packages are
+  published yet, so it loads only a checkout build.
 - `packages/web` — the published `@e2e-dev/web` package: the
   browser engine, built with the public `defineEngine`, contributing the
   `browser` fixture and `expect(browser)`. `@e2e-dev/web/engine` (and
