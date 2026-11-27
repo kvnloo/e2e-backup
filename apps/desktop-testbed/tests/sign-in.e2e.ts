@@ -56,6 +56,9 @@ test.describe('sign-in form', () => {
     await expect(screen.getByRole('textbox', 'Password')).toBeFocused();
     await desktop.press('x');
     await expect(screen.getByRole('textbox', 'Username')).toHaveValue('');
+    // The key reached the password field: signing in counts one character there.
+    await screen.getByRole('button', 'Sign in').tap();
+    await expect(screen.getByTestId('status')).toHaveText('Signed in as  on Pro (password: 1 characters)');
   });
 
   test('reads controls by test id and refuses an empty password', async ({ screen }) => {
