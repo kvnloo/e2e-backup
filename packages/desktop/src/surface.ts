@@ -1023,17 +1023,19 @@ export class DesktopSurface {
     }
     const binding = this.binding(ref);
     switch (action.kind) {
-      case 'tap':
-      case 'secondaryTap': {
-        const command = action.kind === 'tap' ? 'click' : 'rightClick';
-        // A secondary tap on a control that read with no context menu is refused before a scroll into view would move the list for it.
-        if (action.kind === 'secondaryTap' && binding.states?.hidden === true && !binding.actions.includes('RightClick')) throw unsupported('this element has no context menu');
-        const scrolled = await this.shown(binding, action.kind === 'tap' ? 'tap' : 'secondary-tap', operation);
-        const click = (): Promise<void> => this.refCommand(command, binding, operation);
-        if (scrolled) await afterChange(command, click);
+      case 'tap': {
+        const scrolled = await this.shown(binding, 'tap', operation);
+        const click = (): Promise<void> => this.refCommand('click', binding, operation);
+        if (scrolled) await afterChange('click', click);
         else await click();
         break;
       }
+      case 'secondaryTap':
+        // The driver checks the control offers a context menu, live, before it scrolls one out of view into view (or
+        // refuses one it cannot reach), and counts a failure after that scroll as delivered: the observed actions may be
+        // from a read that stalled, which proves no menu absent.
+        await this.refCommand('rightClick', binding, operation);
+        break;
       case 'doubleTap':
         // A double click needs the real pointer; declared with `headed` alone. A node with no ref (a plain view, text) takes it at its center.
         if (binding.ref === undefined) return await this.pointAtNode(binding, 'doubleTap', operation);

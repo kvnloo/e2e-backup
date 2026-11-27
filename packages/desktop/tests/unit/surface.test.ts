@@ -892,11 +892,12 @@ describe('DesktopSurface: acting', () => {
     const moved = await launched({ snapshot: [twins], act: [ok({}), failure('STALE_REF', 'not_delivered')] }, { observe: false });
     const stale = every((await moved.surface.observe(operation(), undefined)).root).filter((node) => node.name === 'Delete')[1];
     await expect(moved.surface.perform(stale!.ref, { kind: 'tap' }, operation())).rejects.toMatchObject({ code: 'ACTION_MAY_HAVE_COMMITTED', retryable: false });
-    // A secondary tap on one with no context menu is refused before the scroll, which would move the list for nothing.
+    // A secondary tap goes to the driver alone, which checks the context menu live before it scrolls: the observed
+    // actions may come from a read that stalled.
     const plain = await launched({ snapshot: [twins] }, { observe: false });
     const hiddenPlain = every((await plain.surface.observe(operation(), undefined)).root).filter((node) => node.name === 'Delete')[1];
-    await expect(plain.surface.perform(hiddenPlain!.ref, { kind: 'secondaryTap' }, operation())).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
-    expect(plain.fake.of('act')).toEqual([]);
+    await plain.surface.perform(hiddenPlain!.ref, { kind: 'secondaryTap' }, operation());
+    expect(plain.fake.acted()).toEqual(['rightClick']);
     // A check goes to the driver, which reads the box first: one already right gets nothing, and one it must press out
     // of view is scrolled into view or refused there.
     const box = await launched({ snapshot: [at(true, ['Click', 'Check'], 'checkbox')] }, { observe: false });
