@@ -50,7 +50,9 @@ export class NativeImage {
 
   /** The image as PNG bytes, each row adaptively filtered. */
   async encode(): Promise<Uint8Array> {
-    return plain(await this.#handle.encode());
+    const png = await this.#handle.encode();
+    keepAlive(this);
+    return plain(png);
   }
 
   /**
@@ -61,13 +63,27 @@ export class NativeImage {
    * neither is.
    */
   async compare(actual: NativeImage, tolerance: ImageTolerance): Promise<ImageComparison> {
-    return narrow(await this.#handle.compare(actual.#handle, tolerance));
+    const raw = await this.#handle.compare(actual.#handle, tolerance);
+    keepAlive(this, actual);
+    return narrow(raw);
   }
 
   /** The picture of how `actual`, of this image's size, differs: this image faded, each counted pixel red. */
   async diff(actual: NativeImage, threshold: number): Promise<NativeImage> {
-    return new NativeImage(await this.#handle.diff(actual.#handle, threshold));
+    const drawn = await this.#handle.diff(actual.#handle, threshold);
+    keepAlive(this, actual);
+    return new NativeImage(drawn);
   }
+}
+
+/**
+ * Holds images until the call that reads them has finished. The worker
+ * thread shares their pixels, and V8 stops counting those pixels as memory
+ * once the images are collected; a reference after the `await` keeps them
+ * reachable until then.
+ */
+function keepAlive(...images: readonly NativeImage[]): void {
+  void images;
 }
 
 function narrow(raw: RawComparison): ImageComparison {
