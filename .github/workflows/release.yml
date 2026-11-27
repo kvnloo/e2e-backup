@@ -23,9 +23,11 @@ permissions:
 jobs:
   # Whether a nightly is due: nothing merged since the last one means nothing to
   # ship, which this tells before the driver is built. A hand dispatch always
-  # publishes.
+  # publishes. It runs on every event, a push included, where its check is
+  # skipped and it says nothing: a skipped job here would skip `release` too,
+  # since a job's implicit success() covers every job above it, not only the
+  # ones it names.
   nightly-due:
-    if: ${{ github.event_name != 'push' }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
@@ -56,9 +58,8 @@ jobs:
   # failed build stops the run; running it again is the way past it.
   native:
     needs: nightly-due
-    # On a push the check below is skipped, and the driver is built for `release`. A scheduled run with nothing to ship
-    # builds none: a failed build there would fail a night that publishes nothing.
-    if: ${{ !cancelled() && (github.event_name == 'push' || (needs.nightly-due.result == 'success' && needs.nightly-due.outputs.skip != 'true')) }}
+    # A scheduled run with nothing to ship builds none: a failed build there would fail a night that publishes nothing.
+    if: ${{ needs.nightly-due.outputs.skip != 'true' }}
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 20
     steps:
