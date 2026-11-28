@@ -1402,7 +1402,9 @@ prove a fallback screenshot safe. The screen is read again after each
 screenshot: when a secure field moved, appeared, or went away between the two
 reads, or the screen changed size, the observation goes without pixels, and
 `app.screenshot()` tries once more, then fails with `POLICY_DENIED` if the
-field is still moving.
+screen is still changing. When that second read fails, the observation goes
+without pixels and continues, while `app.screenshot()` fails with the device's
+error and writes nothing.
 </Note>
 
 #### `unstable_deviceSession`
