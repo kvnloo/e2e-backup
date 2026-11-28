@@ -2096,23 +2096,51 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
 
   /**
    * Screenshot with every secure node on the current screen painted over.
-   * Observes first so the regions describe the screen the pixels show;
-   * throws when a secure field cannot be covered, because an image that may
-   * hold a credential must not leave the engine.
+   * Reads the screen before and after the capture, and paints only when both
+   * reads place the secure fields alike, so the regions describe the screen
+   * the pixels show; throws when a secure field cannot be covered, because an
+   * image that may hold a credential must not leave the engine.
    */
   private async maskedScreenshot(operation: OperationContext, budget: InputBudget): Promise<{ data: Uint8Array; masked: number }> {
-    const secure = secureBounds(this.project(await this.snapshotOrEmpty(operation, false, budget)));
-    if (secure === undefined) {
-      throw new ConfigurationError('POLICY_DENIED', 'a secure field on screen has no bounds to mask, so the screenshot is withheld');
+    // A screen still moving gets one more read and capture before the screenshot is refused.
+    for (let capture = 1; ; capture += 1) {
+      const projected = this.project(await this.snapshotOrEmpty(operation, false, budget));
+      const secure = secureBounds(projected);
+      if (secure === undefined) {
+        throw new ConfigurationError('POLICY_DENIED', 'a secure field on screen has no bounds to mask, so the screenshot is withheld');
+      }
+      const data = await this.rawScreenshot(operation.signal, {}, budget);
+      // A read that fails after the capture fails the screenshot with its own error: the image it took is never written.
+      const after = await this.securePlacement(operation, false, budget);
+      if (!samePlacement({ secure, viewport: projected.viewport }, after)) {
+        if (capture < SCREENSHOT_PLACEMENT_CAPTURES) continue;
+        throw new ConfigurationError('POLICY_DENIED', 'the screen changed while it was captured, so its secure fields cannot be placed; screenshot withheld');
+      }
+      const masked = redactSecure(data, secure, this.knownViewport);
+      if (masked === undefined) {
+        throw new EngineError('ENGINE_FAILURE', 'the screenshot could not be read to mask the secure fields on screen; screenshot withheld', {
+          retryable: false,
+        });
+      }
+      return masked;
     }
-    const data = await this.rawScreenshot(operation.signal, {}, budget);
-    const masked = redactSecure(data, secure, this.knownViewport);
-    if (masked === undefined) {
-      throw new EngineError('ENGINE_FAILURE', 'the screenshot could not be read to mask the secure fields on screen; screenshot withheld', {
-        retryable: false,
-      });
-    }
-    return masked;
+  }
+
+  /**
+   * Where the secure fields are on the screen now, read for a check that a
+   * screenshot shows the screen its masks were placed on. It projects
+   * without minting the session's ids or replacing the screen it last
+   * observed, so the observation the check belongs to keeps its own.
+   */
+  private async securePlacement(operation: OperationContext, interactiveOnly: boolean, budget: InputBudget): Promise<SecurePlacement> {
+    const raw = await this.snapshotOrEmpty(operation, interactiveOnly, budget);
+    const projected = projectSnapshot(raw.nodes ?? [], {
+      mintId: () => 'placement',
+      viewport: raw.viewport,
+      refsGeneration: raw.refsGeneration,
+      keyboard: keyboardBand(raw.nodes ?? [], raw.keyboard, raw.viewport),
+    });
+    return { secure: secureBounds(projected), viewport: projected.viewport };
   }
 
   /**
@@ -2138,6 +2166,18 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       if (cause instanceof EngineError && cause.code === 'OPERATION_TIMEOUT') throw cause;
       return undefined;
     }
+    // The snapshot and the screenshot are two device calls: read again, and withhold the image when a secure field moved, came, or went between them.
+    let after: SecurePlacement;
+    try {
+      after = await this.securePlacement(operation, this.interactiveSnapshots, budget);
+    } catch (cause) {
+      if (cause instanceof EngineError && cause.code === 'OPERATION_TIMEOUT') throw cause;
+      return secure.length > 0 ? { masked: 0 } : undefined;
+    }
+    if (!samePlacement({ secure, viewport: projected.viewport }, after)) {
+      // Only a secure field, seen in either read, makes the change a matter of masking.
+      return secure.length > 0 || after.secure === undefined || after.secure.length > 0 ? { masked: 0 } : undefined;
+    }
     const redacted = redactSecure(raw, secure, viewport);
     if (redacted === undefined) return undefined;
     const size = readPngSize(redacted.data);
@@ -2148,6 +2188,32 @@ export class AgentDeviceSurface<Platform extends MobilePlatform = MobilePlatform
       masked: redacted.masked,
     };
   }
+}
+
+/** How many screenshots an artifact takes before a screen that keeps moving its secure fields refuses it. */
+const SCREENSHOT_PLACEMENT_CAPTURES = 2;
+
+/** The secure fields of one read of the screen, and the screen size they were read on. */
+interface SecurePlacement {
+  readonly secure: readonly Rect[] | undefined;
+  readonly viewport: ViewportSize | undefined;
+}
+
+/**
+ * Whether two reads place the secure fields in the same spots on a screen
+ * of the same size: only then do masks taken from the first cover a
+ * screenshot taken between them. A read with an unbounded secure field
+ * places nothing; a size only one read reports is not compared.
+ */
+function samePlacement(before: SecurePlacement, after: SecurePlacement): boolean {
+  const a = before.secure;
+  const b = after.secure;
+  if (a === undefined || b === undefined || a.length !== b.length) return false;
+  if (before.viewport !== undefined && after.viewport !== undefined && (before.viewport.width !== after.viewport.width || before.viewport.height !== after.viewport.height)) return false;
+  return a.every((rect, index) => {
+    const other = b[index]!;
+    return rect.x === other.x && rect.y === other.y && rect.width === other.width && rect.height === other.height;
+  });
 }
 
 /**

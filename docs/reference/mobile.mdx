@@ -1398,7 +1398,11 @@ There is no `right_click`, `select`, `scroll_to` by node id, `upload`, or
 Pixels whose masking the engine cannot prove are withheld as `MASKING_UNPROVEN`. An accessibility
 capture failure still stops the observation. Device screenshot masks depend
 on secure-field bounds from that capture, so without them the engine cannot
-prove a fallback screenshot safe.
+prove a fallback screenshot safe. The screen is read again after each
+screenshot: when a secure field moved, appeared, or went away between the two
+reads, or the screen changed size, the observation goes without pixels, and
+`app.screenshot()` tries once more, then fails with `POLICY_DENIED` if the
+field is still moving.
 </Note>
 
 #### `unstable_deviceSession`

@@ -1505,6 +1505,100 @@ describe('observation', () => {
     expect(asked).toEqual([undefined, true]);
   });
 
+  it('withholds pixels and refuses a screenshot when a secure field moves, comes, or goes during the capture', async () => {
+    const h = harness();
+    const png = encodePng({ width: 195, height: 422, channels: 4, pixels: new Uint8Array(195 * 422 * 4).fill(255) });
+    h.fake.respond('capture.screenshot', (args) => {
+      writeFileSync((args as { path: string }).path, png);
+      return { path: (args as { path: string }).path };
+    });
+    const screen = (passwordY?: number) => ({
+      nodes: [
+        { ref: 'e1', index: 0, depth: 0, type: 'application', label: 'Bank', rect: { x: 0, y: 0, width: 390, height: 844 } },
+        ...(passwordY === undefined ? [] : [{ ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'SecureTextField', label: 'Password', rect: { x: 0, y: passwordY, width: 390, height: 44 } }]),
+      ],
+    });
+    // Each read of the screen takes the next screen in line, or fails with the next error; the last one stays.
+    const reads = (...screens: (ReturnType<typeof screen> | Error)[]) => {
+      const queue = [...screens];
+      h.fake.respond('capture.snapshot', () => {
+        const next = queue.length > 1 ? queue.shift()! : queue[0]!;
+        if (next instanceof Error) throw next;
+        return next;
+      });
+    };
+    await openAttempt(h);
+
+    // The field scrolled between the read and the screenshot: masks placed from the read would miss it.
+    reads(screen(270), screen(500));
+    const moved = await h.engine.observe!(operation(), { pixels: true });
+    expect(moved.pixels).toBeUndefined();
+    expect(moved.maskedRegionCount).toBe(0);
+    expect(moved.root.children).toHaveLength(1);
+
+    // A field that appeared after the read is in the image with nothing over it.
+    reads(screen(), screen(270));
+    const appeared = await h.engine.observe!(operation(), { pixels: true });
+    expect(appeared.pixels).toBeUndefined();
+    expect(appeared.maskedRegionCount).toBe(0);
+
+    // A screen with no secure field in either read still ships its pixels.
+    reads(screen());
+    const plain = await h.engine.observe!(operation(), { pixels: true });
+    expect(plain.pixels).toBeDefined();
+    expect(plain.maskedRegionCount).toBe(0);
+
+    // A screenshot artifact tries once more against the read that saw the field move, and masks the field where it settled.
+    reads(screen(270), screen(500), screen(500));
+    const shots = () => h.fake.methods().filter((method) => method === 'capture.screenshot').length;
+    const before = shots();
+    const relative = await h.engine.artifacts!.screenshot('settled', operation());
+    expect(shots() - before).toBe(2);
+    const written = decodePng(new Uint8Array(readFileSync(path.join(artifactsDir, relative))));
+    const at = (x: number, y: number) => [...written.pixels.subarray((y * written.width + x) * written.channels, (y * written.width + x) * written.channels + 3)];
+    expect(at(100, 520 / 2)).toEqual([0, 0, 0]);
+    expect(at(100, 290 / 2)).toEqual([255, 255, 255]);
+
+    // A field that keeps moving refuses the screenshot and writes nothing.
+    reads(screen(100), screen(200), screen(300), screen(400));
+    await expect(h.engine.artifacts!.screenshot('moving', operation())).rejects.toMatchObject({ category: 'configuration', code: 'POLICY_DENIED' });
+    expect(existsSync(path.join(artifactsDir, 'screenshots', '002-moving.png'))).toBe(false);
+
+    // The screen turned between the reads: the same rects on another screen size place nothing.
+    const turned = { nodes: [{ ...screen(270).nodes[0]!, rect: { x: 0, y: 0, width: 844, height: 390 } }, screen(270).nodes[1]!] };
+    reads(screen(270), turned);
+    const rotated = await h.engine.observe!(operation(), { pixels: true });
+    expect(rotated.pixels).toBeUndefined();
+    expect(rotated.maskedRegionCount).toBe(0);
+
+    // A read after the capture that fails withholds the pixels of a screen with a secure field,
+    // and fails the screenshot with the device's own error rather than a policy refusal.
+    reads(screen(270), new AppError('COMMAND_FAILED', 'snapshot failed'));
+    const unread = await h.engine.observe!(operation(), { pixels: true });
+    expect(unread.pixels).toBeUndefined();
+    expect(unread.maskedRegionCount).toBe(0);
+    reads(screen(270), new AppError('COMMAND_FAILED', 'snapshot failed'));
+    const failure = await h.engine.artifacts!.screenshot('unread', operation()).then(() => undefined, (cause: unknown) => cause);
+    expect(failure).toBeDefined();
+    expect(failure).not.toMatchObject({ code: 'POLICY_DENIED' });
+    expect(existsSync(path.join(artifactsDir, 'screenshots', '002-unread.png'))).toBe(false);
+
+    // An app drawn a third of the screen's size reports a smaller tree; the masks still scale to the screen the session knows.
+    const shrunk = (passwordY: number) => ({
+      nodes: [
+        { ref: 'e1', index: 0, depth: 0, type: 'application', label: 'Bank', rect: { x: 0, y: 0, width: 130, height: 281 } },
+        { ref: 'e2', index: 1, parentIndex: 0, depth: 1, type: 'SecureTextField', label: 'Password', rect: { x: 0, y: passwordY, width: 130, height: 20 } },
+      ],
+    });
+    reads(shrunk(90));
+    const small = await h.engine.artifacts!.screenshot('small', operation());
+    const smallImage = decodePng(new Uint8Array(readFileSync(path.join(artifactsDir, small))));
+    const smallAt = (x: number, y: number) => [...smallImage.pixels.subarray((y * smallImage.width + x) * smallImage.channels, (y * smallImage.width + x) * smallImage.channels + 3)];
+    // 390 points onto 195 pixels: the field at y=90..110 lands at 45..55, not where a 130-point screen would put it.
+    expect(smallAt(10, 50)).toEqual([0, 0, 0]);
+    expect(smallAt(10, 150)).toEqual([255, 255, 255]);
+  });
+
   it('withholds the pixels of a screen with a secure field when the image cannot be read or decoded', async () => {
     const h = harness();
     // A PNG signature and header naming the size, with no image data behind them: the size reads, the decode fails.
